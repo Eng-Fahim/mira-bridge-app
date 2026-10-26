@@ -21,6 +21,7 @@ import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.utils.AccountingColors;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -35,20 +36,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Step 6 — الأرصدة الافتتاحية (قلب النظام المحاسبي)
+ * Step 6 — الأرصدة الافتتاحية (v2 — Theme-compliant)
  *
- * 9 أقسام:
- *  1. النقدية
- *  2. البنوك
- *  3. الذهب المملوك (5 عيارات ثابتة)
- *  4. ذهب أمانة (التزام)
- *  5. كسر الذهب
- *  6. الألماس
- *  7. ذمم مدينة
- *  8. ذمم دائنة (التزام)
- *  9. أصول ثابتة
- *
- * + ملخص حي في الأسفل
+ * ✅ v2: كل الألوان theme-aware عبر AccountingColors
  */
 public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
 
@@ -56,7 +46,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private static final String[] KARATS = {"24K", "22K", "21K", "18K", "14K"};
     private static final double[] KARAT_FACTORS = {1.0, 0.9166, 0.875, 0.75, 0.5833};
 
-    // Views
     private LinearLayout cashContainer, banksContainer, goldContainer,
             trustContainer, scrapContainer, diamondsContainer,
             receivablesContainer, payablesContainer, fixedContainer;
@@ -64,7 +53,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private MaterialButton btnBack, btnNext;
     private View pbLoading;
 
-    // Lists
     private final List<GenericRow> cashRows        = new ArrayList<>();
     private final List<GenericRow> banksRows       = new ArrayList<>();
     private final Map<String, GoldRow> goldRows    = new HashMap<>();
@@ -75,11 +63,9 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private final List<GenericRow> payRows         = new ArrayList<>();
     private final List<GenericRow> fixedRows       = new ArrayList<>();
 
-    // Prices (from Step 4)
     private final Map<String, Double> buyPrices    = new HashMap<>();
     private final Map<String, Double> scrapDiscounts = new HashMap<>();
 
-    // Accounts
     private int scrapAccountId = 0;
 
     private MiraApiClient apiClient;
@@ -124,10 +110,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
     private void setupListeners() {
         btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
         btnNext.setOnClickListener(v -> saveAndNext());
-        vBindAddButtons();
+        bindAddButtons();
     }
 
-    private void vBindAddButtons() {
+    private void bindAddButtons() {
         View root = getView();
         if (root == null) return;
 
@@ -141,9 +127,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         root.findViewById(R.id.btnAddFixed).setOnClickListener(x -> addFixedRow("", ""));
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Load Data
-    // ═══════════════════════════════════════════════════════
     private void loadPricesAndAccounts() {
         showLoading(true);
         new Thread(() -> {
@@ -221,39 +204,21 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         trustRows.clear(); scrapRows.clear(); diamondRows.clear();
         recvRows.clear(); payRows.clear(); fixedRows.clear();
 
-        // 1) النقدية — صف افتراضي
         addCashRow("الصندوق الرئيسي", "");
-
-        // 2) البنوك — صف افتراضي
         addBankRow("البنك الرئيسي", "");
 
-        // 3) الذهب المملوك — 5 صفوف ثابتة
         for (String k : KARATS) buildGoldRow(k);
 
-        // 4) الأمانة — صف افتراضي
         addTrustRow("", "21K", "");
-
-        // 5) كسر الذهب — صف افتراضي
         addScrapRow("21K", "");
-
-        // 6) الألماس — صف افتراضي
         addDiamondRow("ألماس وأحجار كريمة", "");
-
-        // 7) ذمم مدينة
         addRecvRow("", "");
-
-        // 8) ذمم دائنة
         addPayRow("", "");
-
-        // 9) أصول ثابتة
         addFixedRow("", "");
 
         updateSummary();
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Gold Rows (fixed per karat)
-    // ═══════════════════════════════════════════════════════
     private void buildGoldRow(String karat) {
         View row = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_opening_gold_row, goldContainer, false);
@@ -279,18 +244,17 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         double w = parseDouble(gr.etWeight);
         if (w <= 0) {
             gr.tvValue.setText("—");
-            gr.tvValue.setTextColor(0xFF888888);
+            gr.tvValue.setTextColor(AccountingColors.text(requireContext(),
+                    AccountingColors.Status.NEUTRAL));
             return;
         }
         double buy = buyPrices.containsKey(karat) ? buyPrices.get(karat) : 0;
         double value = w * buy;
         gr.tvValue.setText(formatMoney(value) + " YER");
-        gr.tvValue.setTextColor(value > 0 ? 0xFF27AE60 : 0xFFE74C3C);
+        gr.tvValue.setTextColor(AccountingColors.text(requireContext(),
+                value > 0 ? AccountingColors.Status.SUCCESS : AccountingColors.Status.ERROR));
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Cash / Bank / Diamond / Receivable / Payable / Fixed
-    // ═══════════════════════════════════════════════════════
     private void addCashRow(String desc, String amount) {
         GenericRow row = buildGenericRow(cashContainer, desc, amount, "اسم/وصف الصندوق",
                 () -> { updateSummary(); return null; },
@@ -360,9 +324,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         return new GenericRow(row, etDesc, etAmount);
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Trust Gold Rows
-    // ═══════════════════════════════════════════════════════
     private void addTrustRow(String desc, String karat, String weight) {
         View row = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_opening_trust_row, trustContainer, false);
@@ -373,9 +334,8 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         TextView tvValue = row.findViewById(R.id.tvValue);
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
-        String[] karatOptions = KARATS;
         ArrayAdapter<String> ad = new ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_dropdown_item_1line, karatOptions);
+                requireContext(), android.R.layout.simple_dropdown_item_1line, KARATS);
         ddKarat.setAdapter(ad);
         ddKarat.setText(karat != null && !karat.isEmpty() ? karat : "21K", false);
 
@@ -408,12 +368,10 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         double buy = buyPrices.containsKey(karat) ? buyPrices.get(karat) : 0;
         double value = w * buy;
         tr.tvValue.setText(w > 0 ? formatMoney(value) + " YER" : "—");
-        tr.tvValue.setTextColor(value > 0 ? 0xFFE67E22 : 0xFF888888);
+        tr.tvValue.setTextColor(AccountingColors.text(requireContext(),
+                value > 0 ? AccountingColors.Status.WARNING : AccountingColors.Status.NEUTRAL));
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Scrap Rows
-    // ═══════════════════════════════════════════════════════
     private void addScrapRow(String karat, String weight) {
         View row = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_setup_opening_scrap_row, scrapContainer, false);
@@ -459,44 +417,33 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         double disc = scrapDiscounts.containsKey(karat) ? scrapDiscounts.get(karat) : 5.0;
         double value = w24k * buy24k * (1 - disc / 100.0);
         sr.tvValue.setText(physical > 0 ? formatMoney(value) + " YER" : "—");
-        sr.tvValue.setTextColor(value > 0 ? 0xFF3498DB : 0xFF888888);
+        sr.tvValue.setTextColor(AccountingColors.text(requireContext(),
+                value > 0 ? AccountingColors.Status.INFO : AccountingColors.Status.NEUTRAL));
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Summary
-    // ═══════════════════════════════════════════════════════
     private void updateSummary() {
         double totalAssets = 0;
         double totalLiabilities = 0;
 
-        // Cash
         for (GenericRow r : cashRows) totalAssets += parseDouble(r.etAmount);
-        // Banks
         for (GenericRow r : banksRows) totalAssets += parseDouble(r.etAmount);
-        // Gold owned
         for (Map.Entry<String, GoldRow> e : goldRows.entrySet()) {
             double w = parseDouble(e.getValue().etWeight);
             double buy = buyPrices.containsKey(e.getKey()) ? buyPrices.get(e.getKey()) : 0;
             totalAssets += w * buy;
         }
-        // Diamonds
         for (GenericRow r : diamondRows) totalAssets += parseDouble(r.etAmount);
-        // Receivables
         for (GenericRow r : recvRows) totalAssets += parseDouble(r.etAmount);
-        // Fixed assets
         for (GenericRow r : fixedRows) totalAssets += parseDouble(r.etAmount);
 
-        // Trust gold → LIABILITY
         for (TrustRow tr : trustRows) {
             double w = parseDouble(tr.etWeight);
             String karat = tr.ddKarat.getText().toString();
             double buy = buyPrices.containsKey(karat) ? buyPrices.get(karat) : 0;
             totalLiabilities += w * buy;
         }
-        // Payables → LIABILITY
         for (GenericRow r : payRows) totalLiabilities += parseDouble(r.etAmount);
 
-        // Scrap → ASSET (منخفض القيمة)
         for (ScrapRow sr : scrapRows) {
             double physical = parseDouble(sr.etWeight);
             String karat = sr.ddKarat.getText().toString();
@@ -516,24 +463,25 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
 
         if (Math.abs(net) < 1) {
             tvBalanceStatus.setText(isArabic ? "⚠️ لا أرصدة مدخلة" : "⚠️ No balances");
-            tvBalanceStatus.setTextColor(0xFF95A5A6);
+            tvBalanceStatus.setTextColor(AccountingColors.text(requireContext(),
+                    AccountingColors.Status.NEUTRAL));
         } else if (net > 0) {
-            tvBalanceStatus.setText(isArabic ? "✅ جاهز للاعتماد (رأس مال موجب)" : "✅ Ready (positive capital)");
-            tvBalanceStatus.setTextColor(0xFF27AE60);
+            tvBalanceStatus.setText(isArabic ? "✅ جاهز للاعتماد (رأس مال موجب)"
+                                            : "✅ Ready (positive capital)");
+            tvBalanceStatus.setTextColor(AccountingColors.text(requireContext(),
+                    AccountingColors.Status.SUCCESS));
         } else {
-            tvBalanceStatus.setText(isArabic ? "⚠️ الالتزامات > الأصول (رأس مال سالب)" : "⚠️ Liabilities > Assets");
-            tvBalanceStatus.setTextColor(0xFFE74C3C);
+            tvBalanceStatus.setText(isArabic ? "⚠️ الالتزامات > الأصول"
+                                            : "⚠️ Liabilities > Assets");
+            tvBalanceStatus.setTextColor(AccountingColors.text(requireContext(),
+                    AccountingColors.Status.ERROR));
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Save
-    // ═══════════════════════════════════════════════════════
     private void saveAndNext() {
         try {
             JSONArray balances = new JSONArray();
 
-            // Cash
             for (GenericRow r : cashRows) {
                 double amt = parseDouble(r.etAmount);
                 if (amt <= 0) continue;
@@ -545,7 +493,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Banks
             for (GenericRow r : banksRows) {
                 double amt = parseDouble(r.etAmount);
                 if (amt <= 0) continue;
@@ -557,7 +504,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Gold owned
             for (Map.Entry<String, GoldRow> e : goldRows.entrySet()) {
                 double w = parseDouble(e.getValue().etWeight);
                 if (w <= 0) continue;
@@ -574,7 +520,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Trust gold
             for (TrustRow tr : trustRows) {
                 double w = parseDouble(tr.etWeight);
                 if (w <= 0) continue;
@@ -591,7 +536,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Scrap
             for (ScrapRow sr : scrapRows) {
                 double physical = parseDouble(sr.etWeight);
                 if (physical <= 0) continue;
@@ -614,7 +558,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Diamonds
             for (GenericRow r : diamondRows) {
                 double amt = parseDouble(r.etAmount);
                 if (amt <= 0) continue;
@@ -626,7 +569,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Receivables
             for (GenericRow r : recvRows) {
                 double amt = parseDouble(r.etAmount);
                 if (amt <= 0) continue;
@@ -638,7 +580,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Payables
             for (GenericRow r : payRows) {
                 double amt = parseDouble(r.etAmount);
                 if (amt <= 0) continue;
@@ -650,7 +591,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
                 balances.put(o);
             }
 
-            // Fixed assets
             for (GenericRow r : fixedRows) {
                 double amt = parseDouble(r.etAmount);
                 if (amt <= 0) continue;
@@ -713,9 +653,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Utils
-    // ═══════════════════════════════════════════════════════
     private void showLoading(boolean show) {
         if (pbLoading != null) pbLoading.setVisibility(show ? View.VISIBLE : View.GONE);
     }
@@ -755,9 +692,6 @@ public class SetupStep6OpeningBalancesFragment extends BaseSetupStepFragment {
         return -1;
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Data classes
-    // ═══════════════════════════════════════════════════════
     private static class GenericRow {
         final View view;
         final TextInputEditText etDesc, etAmount;
