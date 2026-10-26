@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- IDs أخرى قد تكون موجودة -->
+    <item name="some_other_id" type="id" />
+
+    <!-- ✅ أضف هذا السطر -->
     <item name="accounting_fragment_host" type="id" />
 </resources>
