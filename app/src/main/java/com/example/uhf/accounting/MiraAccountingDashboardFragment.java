@@ -27,33 +27,39 @@ import org.json.JSONObject;
 
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * MIRA Accounting — Dashboard (Stage 4.4)
+ * MIRA Accounting — Dashboard (Stage 4.5)
  *
  * إصلاحات أساسية بعد قراءة استجابات API الفعلية:
- *  ✅ Balance Sheet: استخراج صحيح من assets.cash[] و assets.receivables[] و liabilities.payables[]
- *  ✅ Recent Activity: قراءة من data.data.items
- *  ✅ إزالة اعتماد على /aging-report (endpoint 404)
- *  ✅ دائماً تحديث UI — لا شيء يبقى في "جاري التحميل"
+ *  1. Balance Sheet: السيرفر يُرجع JSON تالف (assets ككائن بمفاتيح مكررة)
+ *     → نحلّل النص الخام يدوياً ونستخرج كل حساب على حدة
+ *  2. تصنيف الحسابات بحسب account_category و account_code (cash/banks/receivable/payable)
+ *  3. Recent Activity: قراءة من data.data.items (مع تراجع احتياطي)
+ *  4. لا شيء يبقى في "جاري التحميل" — كل حالة تُحدَّث نهائياً
+ *  5. وضع تشخيص مدمج: ضغط مطول على اسم الفرع
  */
 public class MiraAccountingDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboard";
 
+    // ─── Views ───
     private SwipeRefreshLayout swipeRefresh;
     private GridLayout gridKpi, gridQuick;
     private LinearLayout containerAlerts, containerRecent;
     private TextView tvAlertsEmpty, tvRecentEmpty;
     private TextView tvPeriodFrom, tvPeriodTo, tvBranch;
 
+    // ─── State ───
     private final Map<String, AccountingKpi> kpiMap = new HashMap<>();
     private final Map<String, View> kpiViews = new HashMap<>();
     private final Map<String, String> debugResponses = new LinkedHashMap<>();
@@ -65,6 +71,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
     private MiraApiClient api;
     private SessionManager session;
 
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -120,6 +129,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
         if (io != null) io.shutdownNow();
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Debug Dialog
+    // ═══════════════════════════════════════════════════════════
     private void showDebugDialog() {
         if (!isAdded()) return;
         StringBuilder sb = new StringBuilder("🔍 استجابات API\n\n");
@@ -162,6 +174,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
         debugResponses.put(key + " [code=" + resp.code + "]", body);
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Period
+    // ═══════════════════════════════════════════════════════════
     private void refreshPeriodLabels() {
         SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         tvPeriodFrom.setText(fmt.format(periodFrom.getTime()));
@@ -192,6 +207,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
         catch (Exception e) { return 0; }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  KPI Cards
+    // ═══════════════════════════════════════════════════════════
     private void buildKpiCards() {
         gridKpi.removeAllViews();
         kpiViews.clear();
@@ -259,6 +277,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
         if (card != null) bindKpi(card, kpi);
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Quick Actions
+    // ═══════════════════════════════════════════════════════════
     private void buildQuickActions() {
         gridQuick.removeAllViews();
         addQuickAction("➕", "قيد جديد",       MiraAccountingScreens.ID_JOURNAL);
@@ -283,6 +304,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
         gridQuick.addView(card);
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Load
+    // ═══════════════════════════════════════════════════════════
     private void loadDashboardData() {
         if (api == null) return;
         debugResponses.clear();
@@ -290,7 +314,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
 
         for (String k : kpiViews.keySet()) {
             AccountingKpi template = kpiMap.get(k);
-            if (template != null) updateKpi(k, AccountingKpi.loading(k, template.label, template.icon));
+            if (template != null) {
+                updateKpi(k, AccountingKpi.loading(k, template.label, template.icon));
+            }
         }
 
         final String from  = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(periodFrom.getTime());
@@ -307,7 +333,7 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Income Statement — flat JSON (no data wrapper)
+    //  Income Statement
     // ═══════════════════════════════════════════════════════════
     private void loadIncomeStatement(String from, String to, int branch) {
         try {
@@ -352,7 +378,7 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ Balance Sheet — البيانات الحقيقية من assets.cash[] / receivables[] / payables[]
+    //  ✅ Balance Sheet — يعالج JSON التالف
     // ═══════════════════════════════════════════════════════════
     private void loadBalanceSheet(String asOf, int branch) {
         try {
@@ -370,46 +396,57 @@ public class MiraAccountingDashboardFragment extends Fragment {
                 return;
             }
 
-            JSONObject assets = resp.data.optJSONObject("assets");
-            JSONObject liabilities = resp.data.optJSONObject("liabilities");
+            String rawBody = resp.getBody();
+            boolean malformed = isJsonMalformed(rawBody);
 
-            // ✅ النقدية = مجموع cash[] + banks[] (كلها نقدية متاحة)
-            double cash = 0;
-            if (assets != null) {
-                cash += sumArrayBalances(assets.optJSONArray("cash"));
-                cash += sumArrayBalances(assets.optJSONArray("banks"));
+            double cash = 0, receivables = 0, payables = 0;
+
+            if (malformed) {
+                Log.w(TAG, "⚠️ getBalanceSheet returns MALFORMED JSON — parsing raw text");
+                List<JSONObject> assets = extractAccountsFromMalformedJson(rawBody, "assets");
+                List<JSONObject> liabilities = extractAccountsFromMalformedJson(rawBody, "liabilities");
+                Log.d(TAG, "Parsed " + assets.size() + " assets, " + liabilities.size() + " liabilities");
+
+                for (JSONObject acc : assets) {
+                    String cat  = acc.optString("account_category", "").toLowerCase(Locale.US);
+                    String code = acc.optString("account_code", "");
+                    double bal  = acc.optDouble("balance", 0);
+                    if (isCashAccount(cat, code))            cash += bal;
+                    else if (isReceivableAccount(cat, code)) receivables += bal;
+                }
+                for (JSONObject acc : liabilities) {
+                    String cat  = acc.optString("account_category", "").toLowerCase(Locale.US);
+                    String code = acc.optString("account_code", "");
+                    double bal  = acc.optDouble("balance", 0);
+                    if (isPayableAccount(cat, code)) payables += bal;
+                }
+            } else {
+                JSONObject assets = resp.data.optJSONObject("assets");
+                JSONObject liabilities = resp.data.optJSONObject("liabilities");
+                if (assets != null) {
+                    cash += sumArrayBalances(assets.optJSONArray("cash"));
+                    cash += sumArrayBalances(assets.optJSONArray("banks"));
+                    receivables = sumArrayBalances(assets.optJSONArray("receivables"));
+                }
+                if (liabilities != null) {
+                    payables = sumArrayBalances(liabilities.optJSONArray("payables"));
+                }
             }
 
-            // ✅ الذمم المدينة = receivables[]
-            double receivables = assets != null
-                    ? sumArrayBalances(assets.optJSONArray("receivables"))
-                    : 0;
-
-            // ✅ الذمم الدائنة = payables[]
-            double payables = liabilities != null
-                    ? sumArrayBalances(liabilities.optJSONArray("payables"))
-                    : 0;
-
-            Log.d(TAG, "BalanceSheet → cash=" + cash + " receivables=" + receivables + " payables=" + payables);
+            Log.d(TAG, "BalanceSheet → cash=" + cash + " recv=" + receivables + " pay=" + payables);
 
             final double cf = cash, rcf = receivables, pf = payables;
             postUi(() -> {
                 String suffix = isArabic ? ("كما في " + asOf) : ("as of " + asOf);
 
-                if (cf != 0) updateKpi(AccountingKpi.KEY_CASH, AccountingKpi.success(
-                        AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰", cf, fmt(cf), "YER", suffix));
-                else updateKpi(AccountingKpi.KEY_CASH, AccountingKpi.empty(
-                        AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰", "لا توجد أرصدة نقدية"));
+                if (cf != 0) updateKpi(AccountingKpi.KEY_CASH, AccountingKpi.success(AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰", cf, fmt(cf), "YER", suffix));
+                else updateKpi(AccountingKpi.KEY_CASH, AccountingKpi.empty(AccountingKpi.KEY_CASH, "النقدية والخزائن", "💰", "لا توجد أرصدة نقدية"));
 
-                if (rcf != 0) updateKpi(AccountingKpi.KEY_RECEIVABLES, AccountingKpi.success(
-                        AccountingKpi.KEY_RECEIVABLES, "ذمم مدينة", "👤", rcf, fmt(rcf), "YER", suffix));
-                else updateKpi(AccountingKpi.KEY_RECEIVABLES, AccountingKpi.empty(
-                        AccountingKpi.KEY_RECEIVABLES, "ذمم مدينة", "👤", "لا توجد ذمم مدينة"));
+                if (rcf != 0) updateKpi(AccountingKpi.KEY_RECEIVABLES, AccountingKpi.success(AccountingKpi.KEY_RECEIVABLES, "ذمم مدينة", "👤", rcf, fmt(rcf), "YER", suffix));
+                else updateKpi(AccountingKpi.KEY_RECEIVABLES, AccountingKpi.empty(AccountingKpi.KEY_RECEIVABLES, "ذمم مدينة", "👤", "لا توجد ذمم مدينة"));
 
-                if (pf != 0) updateKpi(AccountingKpi.KEY_PAYABLES, AccountingKpi.success(
-                        AccountingKpi.KEY_PAYABLES, "ذمم دائنة", "🏢", pf, fmt(pf), "YER", suffix));
-                else updateKpi(AccountingKpi.KEY_PAYABLES, AccountingKpi.empty(
-                        AccountingKpi.KEY_PAYABLES, "ذمم دائنة", "🏢", "لا توجد ذمم دائنة"));
+                if (pf != 0) updateKpi(AccountingKpi.KEY_PAYABLES, AccountingKpi.success(AccountingKpi.KEY_PAYABLES, "ذمم دائنة", "🏢", pf, fmt(pf), "YER", suffix));
+                else updateKpi(AccountingKpi.KEY_PAYABLES, AccountingKpi.empty(AccountingKpi.KEY_PAYABLES, "ذمم دائنة", "🏢", "لا توجد ذمم دائنة"));
             });
         } catch (Throwable t) {
             Log.e(TAG, "loadBalanceSheet error", t);
@@ -421,20 +458,8 @@ public class MiraAccountingDashboardFragment extends Fragment {
         }
     }
 
-    /** جمع balance من كل حساب في مصفوفة */
-    private double sumArrayBalances(JSONArray arr) {
-        if (arr == null) return 0;
-        double sum = 0;
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject acc = arr.optJSONObject(i);
-            if (acc == null) continue;
-            sum += acc.optDouble("balance", 0);
-        }
-        return sum;
-    }
-
     // ═══════════════════════════════════════════════════════════
-    //  Alerts (Cheques only — aging 404 so no more)
+    //  Alerts
     // ═══════════════════════════════════════════════════════════
     private void loadAlerts(int branch) {
         try {
@@ -446,9 +471,12 @@ public class MiraAccountingDashboardFragment extends Fragment {
                 if (arr == null) arr = cheques.data.optJSONArray("data");
                 if (arr != null && arr.length() > 0) {
                     JSONObject a = new JSONObject();
-                    a.put("icon", "📑"); a.put("title", "شيكات معلّقة");
-                    a.put("subtitle", "بحاجة إلى إيداع"); a.put("count", arr.length());
-                    a.put("color", "#F59E0B"); a.put("target", MiraAccountingScreens.ID_CHEQUES);
+                    a.put("icon", "📑");
+                    a.put("title", "شيكات معلّقة");
+                    a.put("subtitle", "بحاجة إلى إيداع");
+                    a.put("count", arr.length());
+                    a.put("color", "#F59E0B");
+                    a.put("target", MiraAccountingScreens.ID_CHEQUES);
                     alertsArr.put(a);
                 }
             }
@@ -473,7 +501,10 @@ public class MiraAccountingDashboardFragment extends Fragment {
             ((TextView) row.findViewById(R.id.tvAlertTitle)).setText(a.optString("title", ""));
             ((TextView) row.findViewById(R.id.tvAlertSubtitle)).setText(a.optString("subtitle", ""));
             ((TextView) row.findViewById(R.id.tvAlertCount)).setText(a.optString("count", "0"));
-            try { ((View) row.findViewById(R.id.vAlertColor)).setBackgroundColor(android.graphics.Color.parseColor(a.optString("color", "#F59E0B"))); } catch (Exception ignored) {}
+            try {
+                ((View) row.findViewById(R.id.vAlertColor))
+                        .setBackgroundColor(android.graphics.Color.parseColor(a.optString("color", "#F59E0B")));
+            } catch (Exception ignored) {}
             final String target = a.optString("target", "");
             if (!target.isEmpty()) row.setOnClickListener(v -> navigateTo(target));
             containerAlerts.addView(row);
@@ -481,7 +512,7 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ Recent Activity — البيانات داخل data.data.items
+    //  Recent Activity — data.data.items
     // ═══════════════════════════════════════════════════════════
     private void loadRecentActivity(int branch) {
         try {
@@ -489,12 +520,9 @@ public class MiraAccountingDashboardFragment extends Fragment {
             captureResponse("getUnifiedActivity(branch=" + branch + ")", resp);
             if (!resp.isSuccess || resp.data == null) { postUi(this::showRecentEmpty); return; }
 
-            // ✅ المحاولة الأولى: data.data.items
             JSONArray items = null;
             JSONObject inner = resp.data.optJSONObject("data");
             if (inner != null) items = inner.optJSONArray("items");
-
-            // احتياطي: بحث مباشر
             if (items == null) items = resp.data.optJSONArray("items");
             if (items == null) items = resp.data.optJSONArray("activities");
 
@@ -522,16 +550,13 @@ public class MiraAccountingDashboardFragment extends Fragment {
             if (icon.isEmpty()) icon = "📝";
             ((TextView) row.findViewById(R.id.tvRecentIcon)).setText(icon);
 
-            // ✅ قراءة title من عدة مفاتيح
             String title = firstNonEmpty(it, "title", "action", "type", "event_type", "name");
             if (title.isEmpty()) title = "نشاط";
             ((TextView) row.findViewById(R.id.tvRecentTitle)).setText(title);
 
-            // ✅ details
             String subtitle = firstNonEmpty(it, "details", "description", "message", "reference", "item_name", "username");
             ((TextView) row.findViewById(R.id.tvRecentSubtitle)).setText(subtitle);
 
-            // ✅ timestamp
             ((TextView) row.findViewById(R.id.tvRecentDate))
                     .setText(shortDate(firstNonEmpty(it, "timestamp", "created_at", "date", "time")));
 
@@ -559,13 +584,8 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Helpers
+    //  JSON Helpers
     // ═══════════════════════════════════════════════════════════
-    private void postUi(Runnable r) {
-        if (!isAdded() || getActivity() == null) return;
-        getActivity().runOnUiThread(() -> { if (isAdded()) { try { r.run(); } catch (Exception ignored) {} } });
-    }
-
     private double pick(JSONObject o, String... keys) {
         if (o == null) return 0;
         for (String k : keys) {
@@ -578,6 +598,116 @@ public class MiraAccountingDashboardFragment extends Fragment {
             }
         }
         return 0;
+    }
+
+    private double sumArrayBalances(JSONArray arr) {
+        if (arr == null) return 0;
+        double sum = 0;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject acc = arr.optJSONObject(i);
+            if (acc == null) continue;
+            sum += acc.optDouble("balance", 0);
+        }
+        return sum;
+    }
+
+    /**
+     * فحص: هل الـ JSON التالف يعيد "id" أكثر من مرة داخل "assets":{...}؟
+     * هذا يكشف أن السيرفر يعيد objects بدل arrays.
+     */
+    private boolean isJsonMalformed(String raw) {
+        if (raw == null) return false;
+        int aStart = raw.indexOf("\"assets\":{");
+        if (aStart < 0) return false;
+        int aEnd = raw.indexOf("}", aStart);
+        if (aEnd < 0) return false;
+        String section = raw.substring(aStart, aEnd);
+        int idCount = 0;
+        int idx = 0;
+        while ((idx = section.indexOf("\"id\":", idx)) >= 0) {
+            idCount++;
+            idx += 5;
+            if (idCount > 1) return true;
+        }
+        return false;
+    }
+
+    /**
+     * استخراج حسابات من JSON تالف: {"id":"41",... ,"id":"42",...}
+     * يقسم على الفاصلة التي تسبق "id" — لأن هذا بداية حساب جديد.
+     */
+    private List<JSONObject> extractAccountsFromMalformedJson(String raw, String sectionKey) {
+        List<JSONObject> result = new ArrayList<>();
+        if (raw == null) return result;
+
+        String searchKey = "\"" + sectionKey + "\":";
+        int start = raw.indexOf(searchKey);
+        if (start < 0) return result;
+
+        int braceStart = start + searchKey.length();
+        while (braceStart < raw.length() && raw.charAt(braceStart) != '{') braceStart++;
+        if (braceStart >= raw.length()) return result;
+
+        int depth = 0;
+        int braceEnd = -1;
+        for (int i = braceStart; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) { braceEnd = i; break; }
+            }
+        }
+        if (braceEnd < 0) return result;
+
+        String inner = raw.substring(braceStart + 1, braceEnd);
+        String[] parts = inner.split(",(?=\"id\":\")");
+        for (String part : parts) {
+            if (part == null || part.isEmpty()) continue;
+            try {
+                String jsonStr = "{" + part + "}";
+                JSONObject obj = new JSONObject(jsonStr);
+                result.add(obj);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to parse account part: "
+                        + (part.length() > 80 ? part.substring(0, 80) + "..." : part));
+            }
+        }
+        return result;
+    }
+
+    /** تصنيف: هل هذا الحساب نقدي (cash/bank)؟ */
+    private boolean isCashAccount(String category, String code) {
+        if ("cash".equals(category) || "bank".equals(category)) return true;
+        return code.startsWith("1101") || code.startsWith("1102")
+                || code.startsWith("1110") || code.startsWith("1111")
+                || code.startsWith("1112") || code.startsWith("1113")
+                || code.startsWith("1114") || code.startsWith("1115");
+    }
+
+    /** تصنيف: هل هذا الحساب ذمم مدينة (receivable)؟ */
+    private boolean isReceivableAccount(String category, String code) {
+        if ("receivable".equals(category)) return true;
+        return code.startsWith("113") || code.startsWith("114")
+                || code.startsWith("1125") || code.startsWith("1201");
+    }
+
+    /** تصنيف: هل هذا الحساب ذمم دائنة (payable)؟ */
+    private boolean isPayableAccount(String category, String code) {
+        if ("payable".equals(category)) return true;
+        return code.startsWith("21") || code.startsWith("22");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Utility
+    // ═══════════════════════════════════════════════════════════
+    private void postUi(Runnable r) {
+        if (!isAdded() || getActivity() == null) return;
+        getActivity().runOnUiThread(() -> {
+            if (isAdded()) {
+                try { r.run(); } catch (Exception ignored) {}
+            }
+        });
     }
 
     private String fmt(double v) {
