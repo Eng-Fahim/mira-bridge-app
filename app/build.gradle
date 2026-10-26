@@ -36,6 +36,7 @@ android {
         }
 
         multiDexEnabled true
+        buildConfigField "boolean", "USE_NEW_ACCOUNTING_UI", "true"
     }
 
     // ✅ حل مشكلة الـ keystore على CI
