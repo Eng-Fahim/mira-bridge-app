@@ -12,9 +12,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;           // ← هذا
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
