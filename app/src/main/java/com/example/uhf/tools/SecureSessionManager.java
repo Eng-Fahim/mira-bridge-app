@@ -1066,6 +1066,188 @@ public class SecureSessionManager {
     public String getBranchName() {
         return userPrefs.getString(KEY_BRANCH_NAME, "");
     }
+    
+    // ═══════════════════════════════════════════════════════
+// ✅ License (MIRA License Center)
+// ═══════════════════════════════════════════════════════
+
+private static final String KEY_ACTIVATION_TOKEN       = "activation_token";
+private static final String KEY_DEVICE_UUID            = "device_uuid";
+private static final String KEY_LICENSE_TYPE           = "license_type";
+private static final String KEY_LICENSE_VALID_FROM     = "license_valid_from";
+private static final String KEY_LICENSE_VALID_UNTIL    = "license_valid_until";
+private static final String KEY_LICENSE_MAX_DEVICES    = "license_max_devices";
+private static final String KEY_LICENSE_MAX_USERS      = "license_max_users";
+private static final String KEY_LAST_HEARTBEAT         = "license_last_heartbeat";
+private static final String KEY_OFFLINE_GRACE_DAYS     = "license_offline_grace_days";
+private static final String KEY_OFFLINE_WARNING_DAY    = "license_offline_warning_day";
+private static final String KEY_OFFLINE_RESTRICT_DAY   = "license_offline_restrict_day";
+private static final String KEY_ACTIVATION_AT          = "license_activated_at";
+
+/** حفظ activation_token (مشفّر — EncryptedSharedPreferences) */
+public void saveActivationToken(String token) {
+    if (token == null || token.isEmpty()) return;
+    try {
+        boolean ok = securePrefs.edit()
+                .putString(KEY_ACTIVATION_TOKEN, token)
+                .putLong(KEY_ACTIVATION_AT, System.currentTimeMillis())
+                .commit();
+        if (!ok) Log.e(TAG, "🚨 saveActivationToken: commit FAILED");
+        Log.d(TAG, "✅ Activation token saved (" + token.length() + " chars)");
+    } catch (Exception e) {
+        Log.e(TAG, "saveActivationToken error: " + e.getMessage());
+    }
+}
+
+public String getActivationToken() {
+    try {
+        String t = securePrefs.getString(KEY_ACTIVATION_TOKEN, "");
+        return t != null ? t : "";
+    } catch (Exception e) {
+        return "";
+    }
+}
+
+public boolean hasActivationToken() {
+    return !getActivationToken().isEmpty();
+}
+
+public void saveDeviceUuid(String uuid) {
+    if (uuid == null || uuid.isEmpty()) return;
+    try {
+        securePrefs.edit().putString(KEY_DEVICE_UUID, uuid).apply();
+    } catch (Exception ignored) {}
+}
+
+public String getDeviceUuid() {
+    try {
+        String u = securePrefs.getString(KEY_DEVICE_UUID, "");
+        return u != null ? u : "";
+    } catch (Exception e) {
+        return "";
+    }
+}
+
+public void saveLicenseInfo(String type, String validFrom, String validUntil,
+                            int maxDevices, int maxUsers) {
+    try {
+        userPrefs.edit()
+                .putString(KEY_LICENSE_TYPE, type)
+                .putString(KEY_LICENSE_VALID_FROM, validFrom)
+                .putString(KEY_LICENSE_VALID_UNTIL, validUntil)
+                .putInt(KEY_LICENSE_MAX_DEVICES, maxDevices)
+                .putInt(KEY_LICENSE_MAX_USERS, maxUsers)
+                .apply();
+    } catch (Exception ignored) {}
+}
+
+public String getLicenseType() {
+    return userPrefs.getString(KEY_LICENSE_TYPE, "");
+}
+
+public String getLicenseValidFrom() {
+    return userPrefs.getString(KEY_LICENSE_VALID_FROM, "");
+}
+
+public String getLicenseValidUntil() {
+    return userPrefs.getString(KEY_LICENSE_VALID_UNTIL, "");
+}
+
+public int getLicenseMaxDevices() {
+    return userPrefs.getInt(KEY_LICENSE_MAX_DEVICES, 0);
+}
+
+public int getLicenseMaxUsers() {
+    return userPrefs.getInt(KEY_LICENSE_MAX_USERS, 0);
+}
+
+public void saveLastHeartbeat(long timestampMs) {
+    try {
+        userPrefs.edit().putLong(KEY_LAST_HEARTBEAT, timestampMs).apply();
+    } catch (Exception ignored) {}
+}
+
+public long getLastHeartbeat() {
+    return userPrefs.getLong(KEY_LAST_HEARTBEAT, 0L);
+}
+
+public void saveOfflineSettings(int graceDays, int warnDay, int restrictDay) {
+    try {
+        userPrefs.edit()
+                .putInt(KEY_OFFLINE_GRACE_DAYS, graceDays)
+                .putInt(KEY_OFFLINE_WARNING_DAY, warnDay)
+                .putInt(KEY_OFFLINE_RESTRICT_DAY, restrictDay)
+                .apply();
+    } catch (Exception ignored) {}
+}
+
+public int getOfflineGraceDays()   { return userPrefs.getInt(KEY_OFFLINE_GRACE_DAYS, 7); }
+public int getOfflineWarningDay()  { return userPrefs.getInt(KEY_OFFLINE_WARNING_DAY, 4); }
+public int getOfflineRestrictDay() { return userPrefs.getInt(KEY_OFFLINE_RESTRICT_DAY, 6); }
+
+public long getActivationTimestamp() {
+    try {
+        return securePrefs.getLong(KEY_ACTIVATION_AT, 0L);
+    } catch (Exception e) {
+        return 0L;
+    }
+}
+
+/**
+ * عدد الأيام منذ آخر heartbeat ناجح
+ */
+public int getDaysSinceLastHeartbeat() {
+    long last = getLastHeartbeat();
+    if (last <= 0) return 0;
+    long diffMs = System.currentTimeMillis() - last;
+    return (int) (diffMs / (24 * 60 * 60 * 1000L));
+}
+
+/**
+ * حالة الـ offline الحالية
+ * @return "ONLINE" | "WARNING" | "RESTRICTED" | "BLOCKED"
+ */
+public String getOfflineStatus() {
+    int days = getDaysSinceLastHeartbeat();
+    int warn = getOfflineWarningDay();
+    int restrict = getOfflineRestrictDay();
+    int grace = getOfflineGraceDays();
+
+    if (days >= grace + 1) return "BLOCKED";
+    if (days >= restrict) return "RESTRICTED";
+    if (days >= warn) return "WARNING";
+    return "ONLINE";
+}
+
+/**
+ * مسح بيانات الترخيص فقط (لا يمسح بيانات المستخدم)
+ * يُستخدم عند إعادة التفعيل
+ */
+public void clearLicense() {
+    try {
+        securePrefs.edit()
+                .remove(KEY_ACTIVATION_TOKEN)
+                .remove(KEY_DEVICE_UUID)
+                .remove(KEY_ACTIVATION_AT)
+                .apply();
+        userPrefs.edit()
+                .remove(KEY_LICENSE_TYPE)
+                .remove(KEY_LICENSE_VALID_FROM)
+                .remove(KEY_LICENSE_VALID_UNTIL)
+                .remove(KEY_LICENSE_MAX_DEVICES)
+                .remove(KEY_LICENSE_MAX_USERS)
+                .remove(KEY_LAST_HEARTBEAT)
+                .remove(KEY_OFFLINE_GRACE_DAYS)
+                .remove(KEY_OFFLINE_WARNING_DAY)
+                .remove(KEY_OFFLINE_RESTRICT_DAY)
+                .apply();
+        Log.d(TAG, "✅ License data cleared");
+    } catch (Exception e) {
+        Log.e(TAG, "clearLicense error: " + e.getMessage());
+    }
+}
+
+
 
     // ═══════════════════════════════════════════════════════
     // وظائف مساعدة / تنظيف
