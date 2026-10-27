@@ -514,5 +514,8 @@
         <item>#F5D77E</item>
         <item>#BCAAA4</item>
     </string-array>
-
+<color name="luxury_card_bg_light">#1E1B16</color> <!-- في الوضع الليلي يصبح داكناً -->
+<color name="luxury_card_bg_dark">#12100C</color>
+<color name="luxury_gold_accent">#D4AF37</color>
+<color name="luxury_gold_light">#F3C623</color>
 </resources>
