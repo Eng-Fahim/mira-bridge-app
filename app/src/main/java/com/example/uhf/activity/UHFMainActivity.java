@@ -328,7 +328,16 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         setContentView(R.layout.activity_main);
-
+        
+        // ═══ MIRA License Banner ═══
+try {
+    ViewGroup rootView = findViewById(android.R.id.content);
+    if (rootView != null) {
+        com.example.uhf.license.LicenseBannerHelper.attach(this, rootView);
+    }
+} catch (Exception e) {
+    android.util.Log.w("UHFMainActivity", "Banner attach failed: " + e.getMessage());
+}
         // ✅ العودة للسطر الأصلي الذي يمنع التداخل مع شريط الحالة
         findViewById(android.R.id.content).setFitsSystemWindows(true);
 
