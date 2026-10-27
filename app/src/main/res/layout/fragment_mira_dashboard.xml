@@ -339,6 +339,15 @@
                                         android:textColor="@color/hero_text_primary"
                                         android:textSize="36sp"
                                         android:textStyle="bold" />
+                                        <TextView
+    android:id="@+id/tvHeroTrend"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="4dp"
+    android:textSize="12sp"
+    android:textColor="@color/hero_text_secondary"
+    android:visibility="gone"
+    tools:text="▲ 2.5%" />
 
                                     <!-- تفاصيل الوزن والقطع -->
                                     <LinearLayout
@@ -353,6 +362,7 @@
                                             android:layout_height="wrap_content"
                                             android:layout_weight="1"
                                             android:orientation="vertical">
+                                            
                                             <TextView
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
