@@ -1,69 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- الماسة 1 -->
+    <!-- 1. الخلفية الأساسية للشاشة (ضرورية جداً لكي لا تصبح الشاشة شفافة) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/colorSurface" />
+        </shape>
+    </item>
+
+    <!-- 2. ماسة أعلى اليسار -->
     <item
-        android:left="30dp"
-        android:top="20dp"
-        android:width="20dp"
-        android:height="20dp">
-        <rotate
-            android:fromDegrees="45"
-            android:pivotX="50%"
-            android:pivotY="50%">
+        android:gravity="top|start"
+        android:left="40dp" android:top="60dp"
+        android:width="30dp" android:height="30dp">
+        <rotate android:fromDegrees="45" android:pivotX="50%" android:pivotY="50%">
             <shape android:shape="rectangle">
-                <solid android:color="#0DF5D97A" />
+                <solid android:color="#1AF5D97A" /> <!-- شفافية 10% لتبدو كالنقش -->
+                <corners android:radius="4dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- 3. ماسة كبيرة في المنتصف الأيمن -->
+    <item
+        android:gravity="center_vertical|end"
+        android:right="30dp" android:top="50dp"
+        android:width="40dp" android:height="40dp">
+        <rotate android:fromDegrees="45" android:pivotX="50%" android:pivotY="50%">
+            <shape android:shape="rectangle">
+                <solid android:color="#1AF5D97A" />
+                <corners android:radius="6dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- 4. ماسة صغيرة أسفل اليسار -->
+    <item
+        android:gravity="bottom|start"
+        android:left="80dp" android:bottom="200dp"
+        android:width="18dp" android:height="18dp">
+        <rotate android:fromDegrees="45" android:pivotX="50%" android:pivotY="50%">
+            <shape android:shape="rectangle">
+                <solid android:color="#1AF5D97A" />
                 <corners android:radius="2dp" />
             </shape>
         </rotate>
     </item>
 
-    <!-- الماسة 2 -->
+    <!-- 5. ماسة أعلى اليمين -->
     <item
-        android:left="280dp"
-        android:top="120dp"
-        android:width="14dp"
-        android:height="14dp">
-        <rotate
-            android:fromDegrees="45"
-            android:pivotX="50%"
-            android:pivotY="50%">
+        android:gravity="top|end"
+        android:right="100dp" android:top="120dp"
+        android:width="20dp" android:height="20dp">
+        <rotate android:fromDegrees="45" android:pivotX="50%" android:pivotY="50%">
             <shape android:shape="rectangle">
-                <solid android:color="#0DF5D97A" />
-                <corners android:radius="2dp" />
+                <solid android:color="#1AF5D97A" />
+                <corners android:radius="3dp" />
             </shape>
         </rotate>
     </item>
-
-    <!-- الماسة 3 -->
+    
+    <!-- 6. ماسة صغيرة جداً في المنتصف -->
     <item
-        android:left="60dp"
-        android:top="200dp"
-        android:width="12dp"
-        android:height="12dp">
-        <rotate
-            android:fromDegrees="45"
-            android:pivotX="50%"
-            android:pivotY="50%">
+        android:gravity="center"
+        android:top="300dp"
+        android:width="14dp" android:height="14dp">
+        <rotate android:fromDegrees="45" android:pivotX="50%" android:pivotY="50%">
             <shape android:shape="rectangle">
-                <solid android:color="#0DF5D97A" />
-                <corners android:radius="2dp" />
-            </shape>
-        </rotate>
-    </item>
-
-    <!-- الماسة 4 -->
-    <item
-        android:left="320dp"
-        android:top="60dp"
-        android:width="18dp"
-        android:height="18dp">
-        <rotate
-            android:fromDegrees="45"
-            android:pivotX="50%"
-            android:pivotY="50%">
-            <shape android:shape="rectangle">
-                <solid android:color="#0DF5D97A" />
+                <solid android:color="#1AF5D97A" />
                 <corners android:radius="2dp" />
             </shape>
         </rotate>
