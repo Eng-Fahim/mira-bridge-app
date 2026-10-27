@@ -899,5 +899,9 @@
         <item>#cccccc</item>
         <item>#888888</item>
     </string-array>
-
+<!-- ألوان البطاقات الفاخرة -->
+<color name="luxury_card_bg_light">#FFFDF8</color> <!-- أبيض كريمي ناعم -->
+<color name="luxury_card_bg_dark">#1E1B16</color>  <!-- بني داكن فخم -->
+<color name="luxury_gold_accent">#C49B3F</color>   <!-- ذهبي صريح -->
+<color name="luxury_gold_light">#D4AF37</color>    <!-- ذهبي لامع -->
 </resources>
