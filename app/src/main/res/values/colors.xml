@@ -908,5 +908,9 @@
     <color name="luxury_card_bg_end">#F5E6C8</color>   <!-- شامبانيا ذهبي -->
     <color name="luxury_gold_accent">#B8860B</color>   <!-- ذهبي داكن (للنصوص) -->
     <color name="luxury_gold_border">#D4AF37</color>   <!-- ذهبي معدني (للحدود) -->
-
+<!-- ألوان الكرت الأوسط (الوضع الفاتح) -->
+<color name="hero_text_primary">#3D2E00</color>   <!-- بني داكن جداً للنصوص الأساسية -->
+<color name="hero_text_secondary">#6B5A28</color> <!-- بني ذهبي باهت للنصوص الثانوية -->
+<color name="hero_box_bg">#14000000</color>       <!-- خلفية العملات (أسود شفاف 8%) -->
+<color name="hero_badge_bg">#333D2E00</color>     <!-- خلفية شارة MIRA (بني شفاف) -->
 </resources>
