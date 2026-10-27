@@ -519,4 +519,10 @@
     <color name="luxury_card_bg_end">#14110C</color>   <!-- أسود مائل للبني -->
     <color name="luxury_gold_accent">#E6C27A</color>   <!-- ذهبي لامع (للنصوص) -->
     <color name="luxury_gold_border">#D4AF37</color>   <!-- ذهبي معدني (للحدود) -->
+
+    <!-- ألوان الكرت الأوسط (الوضع الداكن) -->
+<color name="hero_text_primary">#FFFFFF</color>   <!-- أبيض للنصوص الأساسية -->
+<color name="hero_text_secondary">#E0D1A8</color> <!-- ذهبي فاتح للنصوص الثانوية -->
+<color name="hero_box_bg">#1A000000</color>       <!-- خلفية العملات (أسود شفاف 10%) -->
+<color name="hero_badge_bg">#33FFFFFF</color>     <!-- خلفية شارة MIRA (أبيض شفاف) -->
 </resources>
