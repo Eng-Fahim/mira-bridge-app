@@ -168,6 +168,13 @@ public class MiraApiClient {
                     if (!gateId.isEmpty()) {
                         builder.header("X-MIRA-Gate-ID", gateId);
                     }
+                    // ✅ [جديد] License token للـ Retrofit أيضاً
+                    try {
+                    String licenseToken = sessionManager.getActivationToken();
+                    if (licenseToken != null && !licenseToken.isEmpty()) {
+                    builder.header("X-MIRA-License-Token", licenseToken);
+                    }
+                    } catch (Exception ignored) {}
 
                     return chain.proceed(builder.build());
                 })
@@ -433,24 +440,33 @@ public class MiraApiClient {
 
         return sb.toString();
     }
-
     private void applyStandardHeaders(HttpURLConnection conn, boolean requiresAuth) {
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        conn.setRequestProperty("Accept", "application/json");
+    conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+    conn.setRequestProperty("Accept", "application/json");
 
-        String effectiveKey = getEffectiveApiKey();
-        if (!effectiveKey.isEmpty()) {
-            conn.setRequestProperty("X-MIRA-API-Key", effectiveKey);
-        }
+    String effectiveKey = getEffectiveApiKey();
+    if (!effectiveKey.isEmpty()) {
+        conn.setRequestProperty("X-MIRA-API-Key", effectiveKey);
+    }
 
-        if (requiresAuth) {
-            String token = getAuthToken();
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setRequestProperty("X-MIRA-Auth-Token", token);
-            }
+    if (requiresAuth) {
+        String token = getAuthToken();
+        if (!token.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestProperty("X-MIRA-Auth-Token", token);
         }
     }
+
+    // ✅ [جديد] إرسال X-MIRA-License-Token مع كل طلب
+    try {
+        String licenseToken = sessionManager.getActivationToken();
+        if (licenseToken != null && !licenseToken.isEmpty()) {
+            conn.setRequestProperty("X-MIRA-License-Token", licenseToken);
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "Could not read license token: " + e.getMessage());
+    }
+}
 
     public ApiResponse executeRequest(String method,
                                        String endpoint,
@@ -684,6 +700,13 @@ public class MiraApiClient {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
+            // ✅ [جديد] License token
+try {
+    String licenseToken = sessionManager.getActivationToken();
+    if (licenseToken != null && !licenseToken.isEmpty()) {
+        conn.setRequestProperty("X-MIRA-License-Token", licenseToken);
+    }
+} catch (Exception ignored) {}
 
             conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
             conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
