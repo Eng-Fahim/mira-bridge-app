@@ -92,7 +92,15 @@
                 android:textSize="20sp"
                 android:textStyle="bold"
                 tools:text="0" />
-
+<TextView
+    android:id="@+id/tvUserLimitBadge"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="4dp"
+    android:textColor="#7F8C8D"
+    android:textSize="12sp"
+    android:visibility="gone" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
