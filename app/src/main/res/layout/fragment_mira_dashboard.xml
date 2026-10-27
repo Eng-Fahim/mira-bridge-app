@@ -6,9 +6,9 @@
     android:id="@+id/motionLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"> <!-- تأكد من بقاء لون الخلفية الأساسي -->
+    android:background="?attr/colorSurface">
 
-    <!-- ✅ إضافة طبقة الخلفية الماسية خلف كل شيء -->
+    <!-- ✅ طبقة الخلفية الماسية العامة للشاشة خلف كل شيء -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -76,7 +76,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@android:color/transparent" 
+        android:background="@android:color/transparent"
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -100,7 +100,7 @@
                 android:paddingBottom="@dimen/space_6">
 
                 <!-- ═══════════════════════════════════════════════════
-                     CAROUSEL: البطاقات (الكود الأصلي كما هو)
+                     CAROUSEL: البطاقات العلوية
                      ═══════════════════════════════════════════════════ -->
                 <HorizontalScrollView
                     android:id="@+id/horizontalScrollCarousel"
@@ -284,7 +284,7 @@
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
-                        <!-- 2. HERO BALANCE CARD -->
+                        <!-- 2. HERO BALANCE CARD (تم إصلاح ألوان النصوص فيه) -->
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/heroBalanceCard"
                             android:layout_width="310dp"
@@ -314,10 +314,12 @@
                                         android:gravity="center_vertical"
                                         android:orientation="horizontal">
 
+                                        <!-- شارة MIRA ID -->
                                         <LinearLayout
                                             android:layout_width="wrap_content"
                                             android:layout_height="wrap_content"
                                             android:background="@drawable/bg_mira_badge"
+                                            android:backgroundTint="@color/hero_badge_bg"
                                             android:gravity="center_vertical"
                                             android:paddingHorizontal="8dp"
                                             android:paddingVertical="3dp">
@@ -326,14 +328,14 @@
                                                 android:layout_width="10dp"
                                                 android:layout_height="10dp"
                                                 android:src="@drawable/ic_diamond"
-                                                app:tint="#FFFFFF" />
+                                                app:tint="@color/hero_text_primary" />
 
                                             <TextView
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:layout_marginStart="4dp"
                                                 android:text="MIRA ID™"
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_primary"
                                                 android:textSize="9sp"
                                                 android:textStyle="bold" />
                                         </LinearLayout>
@@ -346,7 +348,7 @@
                                             android:ellipsize="end"
                                             android:maxLines="1"
                                             android:text="إجمالي قيمة المخزون"
-                                            android:textColor="#FFFFFF"
+                                            android:textColor="@color/hero_text_primary"
                                             android:textSize="12sp"
                                             android:textStyle="bold" />
 
@@ -358,7 +360,7 @@
                                             android:paddingHorizontal="6dp"
                                             android:paddingVertical="2dp"
                                             android:textSize="9sp"
-                                            android:textColor="#FFFFFF"
+                                            android:textColor="@color/hero_text_primary"
                                             android:layout_marginEnd="4dp"
                                             android:visibility="gone" />
 
@@ -369,7 +371,7 @@
                                             android:background="?attr/selectableItemBackgroundBorderless"
                                             android:padding="2dp"
                                             android:src="@drawable/ic_eye_off"
-                                            app:tint="#FFFFFF" />
+                                            app:tint="@color/hero_text_primary" />
                                     </LinearLayout>
 
                                     <LinearLayout
@@ -382,7 +384,7 @@
                                             android:layout_width="wrap_content"
                                             android:layout_height="wrap_content"
                                             android:text="القيمة الحالية"
-                                            android:textColor="#E0D1A8"
+                                            android:textColor="@color/hero_text_secondary"
                                             android:textSize="10sp" />
 
                                         <TextView
@@ -391,7 +393,7 @@
                                             android:layout_height="wrap_content"
                                             android:layout_marginTop="2dp"
                                             android:text="••••••••"
-                                            android:textColor="#FFFFFF"
+                                            android:textColor="@color/hero_text_primary"
                                             android:textSize="26sp"
                                             android:textStyle="bold" />
 
@@ -407,7 +409,7 @@
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:text="0.0 g"
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_primary"
                                                 android:textSize="13sp"
                                                 android:textStyle="bold" />
 
@@ -415,7 +417,7 @@
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:text=" | "
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_secondary"
                                                 android:alpha="0.5" />
 
                                             <TextView
@@ -423,16 +425,17 @@
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:text="0"
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_primary"
                                                 android:textSize="13sp" />
                                         </LinearLayout>
                                     </LinearLayout>
 
+                                    <!-- صندوق العملات -->
                                     <LinearLayout
                                         android:layout_width="match_parent"
                                         android:layout_height="wrap_content"
                                         android:layout_marginTop="12dp"
-                                        android:background="#1A000000"
+                                        android:background="@color/hero_box_bg"
                                         android:orientation="horizontal"
                                         android:paddingVertical="6dp"
                                         android:paddingHorizontal="4dp"
@@ -449,7 +452,7 @@
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:text="USD"
-                                                android:textColor="#E0D1A8"
+                                                android:textColor="@color/hero_text_secondary"
                                                 android:textSize="9sp" />
 
                                             <TextView
@@ -458,7 +461,7 @@
                                                 android:layout_height="wrap_content"
                                                 android:layout_marginTop="2dp"
                                                 android:text="••••"
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_primary"
                                                 android:textSize="11sp"
                                                 android:textStyle="bold" />
                                         </LinearLayout>
@@ -474,7 +477,7 @@
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:text="SAR"
-                                                android:textColor="#E0D1A8"
+                                                android:textColor="@color/hero_text_secondary"
                                                 android:textSize="9sp" />
 
                                             <TextView
@@ -483,7 +486,7 @@
                                                 android:layout_height="wrap_content"
                                                 android:layout_marginTop="2dp"
                                                 android:text="••••"
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_primary"
                                                 android:textSize="11sp" />
                                         </LinearLayout>
 
@@ -498,7 +501,7 @@
                                                 android:layout_width="wrap_content"
                                                 android:layout_height="wrap_content"
                                                 android:text="YER"
-                                                android:textColor="#E0D1A8"
+                                                android:textColor="@color/hero_text_secondary"
                                                 android:textSize="9sp" />
 
                                             <TextView
@@ -507,7 +510,7 @@
                                                 android:layout_height="wrap_content"
                                                 android:layout_marginTop="2dp"
                                                 android:text="••••"
-                                                android:textColor="#FFFFFF"
+                                                android:textColor="@color/hero_text_primary"
                                                 android:textSize="11sp" />
                                         </LinearLayout>
                                     </LinearLayout>
@@ -674,7 +677,9 @@
                     <View android:id="@+id/dot3" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
                 </LinearLayout>
 
-                <!-- بقية الأقسام -->
+                <!-- ═══════════════════════════════════════════════════
+                     بقية الأقسام (مع إضافة النقوش المخصصة)
+                     ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -721,7 +726,7 @@
                             android:textColor="?attr/colorPrimary" />
                     </LinearLayout>
 
-                    <!-- INVENTORY BY KARAT -->
+                    <!-- 1. INVENTORY BY KARAT (نقشة المخزون) -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardInventoryByKarat"
                         android:layout_width="match_parent"
@@ -733,79 +738,93 @@
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
 
-                        <LinearLayout
+                        <FrameLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_4">
+                            android:layout_height="wrap_content">
+
+                            <ImageView
+                                android:layout_width="140dp"
+                                android:layout_height="140dp"
+                                android:layout_gravity="bottom|end"
+                                android:layout_marginEnd="-20dp"
+                                android:layout_marginBottom="-20dp"
+                                android:src="@drawable/bg_wm_inventory"
+                                android:importantForAccessibility="no" />
 
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <ImageView
-                                    android:layout_width="@dimen/icon_md"
-                                    android:layout_height="@dimen/icon_md"
-                                    android:importantForAccessibility="no"
-                                    android:src="@drawable/ic_inventory_items"
-                                    app:tint="?attr/colorPrimary" />
-
-                                <TextView
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="@dimen/space_2"
-                                    android:layout_weight="1"
-                                    android:text="@string/inventory_by_karat"
-                                    android:textAppearance="@style/TextAppearance.App.Title.Small"
-                                    android:textColor="?attr/colorOnSurface" />
-
-                                <ImageButton
-                                    android:id="@+id/btnToggleInventoryVisibility"
-                                    android:layout_width="28dp"
-                                    android:layout_height="28dp"
-                                    android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:contentDescription="@string/toggle_visibility"
-                                    android:padding="2dp"
-                                    android:src="@drawable/ic_eye_off"
-                                    app:tint="?attr/colorPrimary" />
-                            </LinearLayout>
-
-                            <HorizontalScrollView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_3"
-                                android:clipToPadding="false"
-                                android:scrollbars="none"
-                                android:layoutDirection="rtl">
+                                android:orientation="vertical"
+                                android:padding="@dimen/space_4">
 
                                 <LinearLayout
-                                    android:id="@+id/llInventoryByKarat"
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:orientation="horizontal"
                                     android:gravity="center_vertical"
-                                    android:showDividers="middle"
-                                    android:divider="@drawable/divider_vertical_gold"
-                                    android:dividerPadding="10dp" />
-                            </HorizontalScrollView>
+                                    android:orientation="horizontal">
 
-                            <TextView
-                                android:id="@+id/tvKaratEmptyState"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_3"
-                                android:gravity="center"
-                                android:paddingVertical="@dimen/space_4"
-                                android:text="@string/no_data"
-                                android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:visibility="gone" />
-                        </LinearLayout>
+                                    <ImageView
+                                        android:layout_width="@dimen/icon_md"
+                                        android:layout_height="@dimen/icon_md"
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_inventory_items"
+                                        app:tint="?attr/colorPrimary" />
+
+                                    <TextView
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/space_2"
+                                        android:layout_weight="1"
+                                        android:text="@string/inventory_by_karat"
+                                        android:textAppearance="@style/TextAppearance.App.Title.Small"
+                                        android:textColor="?attr/colorOnSurface" />
+
+                                    <ImageButton
+                                        android:id="@+id/btnToggleInventoryVisibility"
+                                        android:layout_width="28dp"
+                                        android:layout_height="28dp"
+                                        android:background="?attr/selectableItemBackgroundBorderless"
+                                        android:contentDescription="@string/toggle_visibility"
+                                        android:padding="2dp"
+                                        android:src="@drawable/ic_eye_off"
+                                        app:tint="?attr/colorPrimary" />
+                                </LinearLayout>
+
+                                <HorizontalScrollView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_3"
+                                    android:clipToPadding="false"
+                                    android:scrollbars="none"
+                                    android:layoutDirection="rtl">
+
+                                    <LinearLayout
+                                        android:id="@+id/llInventoryByKarat"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:orientation="horizontal"
+                                        android:gravity="center_vertical"
+                                        android:showDividers="middle"
+                                        android:divider="@drawable/divider_vertical_gold"
+                                        android:dividerPadding="10dp" />
+                                </HorizontalScrollView>
+
+                                <TextView
+                                    android:id="@+id/tvKaratEmptyState"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_3"
+                                    android:gravity="center"
+                                    android:paddingVertical="@dimen/space_4"
+                                    android:text="@string/no_data"
+                                    android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:visibility="gone" />
+                            </LinearLayout>
+                        </FrameLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- SCRAP GOLD SUMMARY -->
+                    <!-- 2. SCRAP GOLD SUMMARY (نقشة كسر الذهب) -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardScrapGold"
                         android:layout_width="match_parent"
@@ -817,148 +836,162 @@
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
 
-                        <LinearLayout
+                        <FrameLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_4">
+                            android:layout_height="wrap_content">
+
+                            <ImageView
+                                android:layout_width="140dp"
+                                android:layout_height="140dp"
+                                android:layout_gravity="top|start"
+                                android:layout_marginStart="-20dp"
+                                android:layout_marginTop="-20dp"
+                                android:src="@drawable/bg_wm_scrap"
+                                android:importantForAccessibility="no" />
 
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <ImageView
-                                    android:layout_width="@dimen/icon_md"
-                                    android:layout_height="@dimen/icon_md"
-                                    android:importantForAccessibility="no"
-                                    android:src="@drawable/ic_gold_scrap"
-                                    app:tint="?attr/colorPrimary" />
-
-                                <TextView
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="@dimen/space_2"
-                                    android:layout_weight="1"
-                                    android:text="@string/scrap_gold_summary"
-                                    android:textAppearance="@style/TextAppearance.App.Title.Small"
-                                    android:textColor="?attr/colorOnSurface" />
-
-                                <ImageButton
-                                    android:id="@+id/btnToggleScrapVisibility"
-                                    android:layout_width="28dp"
-                                    android:layout_height="28dp"
-                                    android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:contentDescription="@string/toggle_visibility"
-                                    android:padding="2dp"
-                                    android:src="@drawable/ic_eye_off"
-                                    app:tint="?attr/colorPrimary" />
-                            </LinearLayout>
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_4"
-                                android:baselineAligned="false"
-                                android:orientation="horizontal">
+                                android:orientation="vertical"
+                                android:padding="@dimen/space_4">
 
                                 <LinearLayout
-                                    android:layout_width="0dp"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center"
-                                    android:orientation="vertical">
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <ImageView
+                                        android:layout_width="@dimen/icon_md"
+                                        android:layout_height="@dimen/icon_md"
+                                        android:importantForAccessibility="no"
+                                        android:src="@drawable/ic_gold_scrap"
+                                        app:tint="?attr/colorPrimary" />
 
                                     <TextView
-                                        android:layout_width="wrap_content"
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:text="@string/net_weight_24k"
-                                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                                    <TextView
-                                        android:id="@+id/tvScrapWeight"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/space_1"
-                                        android:text="••••••"
-                                        android:textAppearance="@style/TextAppearance.App.Number.Small"
-                                        android:textColor="@color/text_gold_accent" />
-                                </LinearLayout>
-
-                                <View
-                                    android:layout_width="1dp"
-                                    android:layout_height="match_parent"
-                                    android:background="?attr/colorOutlineVariant"
-                                    android:alpha="0.5" />
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center"
-                                    android:orientation="vertical">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="@string/estimated_value"
-                                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                                    <TextView
-                                        android:id="@+id/tvScrapValue"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/space_1"
-                                        android:text="••••••"
-                                        android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                        android:layout_marginStart="@dimen/space_2"
+                                        android:layout_weight="1"
+                                        android:text="@string/scrap_gold_summary"
+                                        android:textAppearance="@style/TextAppearance.App.Title.Small"
                                         android:textColor="?attr/colorOnSurface" />
+
+                                    <ImageButton
+                                        android:id="@+id/btnToggleScrapVisibility"
+                                        android:layout_width="28dp"
+                                        android:layout_height="28dp"
+                                        android:background="?attr/selectableItemBackgroundBorderless"
+                                        android:contentDescription="@string/toggle_visibility"
+                                        android:padding="2dp"
+                                        android:src="@drawable/ic_eye_off"
+                                        app:tint="?attr/colorPrimary" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_4"
+                                    android:baselineAligned="false"
+                                    android:orientation="horizontal">
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/net_weight_24k"
+                                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                        <TextView
+                                            android:id="@+id/tvScrapWeight"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="@dimen/space_1"
+                                            android:text="••••••"
+                                            android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                            android:textColor="@color/text_gold_accent" />
+                                    </LinearLayout>
+
+                                    <View
+                                        android:layout_width="1dp"
+                                        android:layout_height="match_parent"
+                                        android:background="?attr/colorOutlineVariant"
+                                        android:alpha="0.5" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/estimated_value"
+                                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                        <TextView
+                                            android:id="@+id/tvScrapValue"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="@dimen/space_1"
+                                            android:text="••••••"
+                                            android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                            android:textColor="?attr/colorOnSurface" />
+                                    </LinearLayout>
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_3"
+                                    android:orientation="horizontal"
+                                    android:weightSum="3">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btnOpenScrapBuy"
+                                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="@string/scrap_buy_new"
+                                        android:textColor="?attr/colorPrimary"
+                                        android:textSize="10sp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btnOpenScrapHistory"
+                                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="@string/scrap_history"
+                                        android:textColor="?attr/colorPrimary"
+                                        android:textSize="10sp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btnOpenScrapBatches"
+                                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="@string/scrap_batches"
+                                        android:textColor="?attr/colorPrimary"
+                                        android:textSize="10sp" />
                                 </LinearLayout>
                             </LinearLayout>
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_3"
-                                android:orientation="horizontal"
-                                android:weightSum="3">
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnOpenScrapBuy"
-                                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:text="@string/scrap_buy_new"
-                                    android:textColor="?attr/colorPrimary"
-                                    android:textSize="10sp" />
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnOpenScrapHistory"
-                                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:text="@string/scrap_history"
-                                    android:textColor="?attr/colorPrimary"
-                                    android:textSize="10sp" />
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnOpenScrapBatches"
-                                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:text="@string/scrap_batches"
-                                    android:textColor="?attr/colorPrimary"
-                                    android:textSize="10sp" />
-                            </LinearLayout>
-                        </LinearLayout>
+                        </FrameLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- SCRAP AGING -->
+                    <!-- 3. SCRAP AGING (نقشة الساعة الرملية/الأعمار) -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardScrapAging"
                         android:layout_width="match_parent"
@@ -970,147 +1003,161 @@
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
 
-                        <LinearLayout
+                        <FrameLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_4">
+                            android:layout_height="wrap_content">
+
+                            <ImageView
+                                android:layout_width="140dp"
+                                android:layout_height="140dp"
+                                android:layout_gravity="bottom|start"
+                                android:layout_marginStart="-20dp"
+                                android:layout_marginBottom="-20dp"
+                                android:src="@drawable/bg_wm_aging"
+                                android:importantForAccessibility="no" />
 
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:id="@+id/tvAgingStatusIcon"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="🟢"
-                                    android:textSize="20sp" />
-
-                                <TextView
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="@dimen/space_2"
-                                    android:layout_weight="1"
-                                    android:text="@string/scrap_aging_title"
-                                    android:textAppearance="@style/TextAppearance.App.Title.Small"
-                                    android:textColor="?attr/colorOnSurface" />
-
-                                <TextView
-                                    android:id="@+id/tvAgingStatusLabel"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/status_healthy"
-                                    android:textColor="#16A34A"
-                                    android:textStyle="bold"
-                                    android:textSize="12sp" />
-                            </LinearLayout>
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_3"
-                                android:orientation="horizontal"
-                                android:baselineAligned="false">
+                                android:orientation="vertical"
+                                android:padding="@dimen/space_4">
 
                                 <LinearLayout
-                                    android:layout_width="0dp"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center"
-                                    android:orientation="vertical">
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
 
                                     <TextView
+                                        android:id="@+id/tvAgingStatusIcon"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="@string/scrap_unfiltered_weight"
-                                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                        android:textColor="?attr/colorOnSurfaceVariant" />
+                                        android:text="🟢"
+                                        android:textSize="20sp" />
 
                                     <TextView
-                                        android:id="@+id/tvAgingWeight"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/space_2"
+                                        android:layout_weight="1"
+                                        android:text="@string/scrap_aging_title"
+                                        android:textAppearance="@style/TextAppearance.App.Title.Small"
+                                        android:textColor="?attr/colorOnSurface" />
+
+                                    <TextView
+                                        android:id="@+id/tvAgingStatusLabel"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="0.000 g"
-                                        android:textAppearance="@style/TextAppearance.App.Number.Small"
-                                        android:textColor="@color/text_gold_accent"
-                                        android:layout_marginTop="@dimen/space_1" />
+                                        android:text="@string/status_healthy"
+                                        android:textColor="#16A34A"
+                                        android:textStyle="bold"
+                                        android:textSize="12sp" />
                                 </LinearLayout>
-
-                                <View
-                                    android:layout_width="1dp"
-                                    android:layout_height="match_parent"
-                                    android:background="?attr/colorOutlineVariant"
-                                    android:alpha="0.5" />
 
                                 <LinearLayout
-                                    android:layout_width="0dp"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center"
-                                    android:orientation="vertical">
+                                    android:layout_marginTop="@dimen/space_3"
+                                    android:orientation="horizontal"
+                                    android:baselineAligned="false">
 
-                                    <TextView
-                                        android:layout_width="wrap_content"
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:text="@string/scrap_invoice_count"
-                                        android:textAppearance="@style/TextAppearance.App.Label.Small"
-                                        android:textColor="?attr/colorOnSurfaceVariant" />
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
 
-                                    <TextView
-                                        android:id="@+id/tvAgingCount"
-                                        android:layout_width="wrap_content"
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/scrap_unfiltered_weight"
+                                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                        <TextView
+                                            android:id="@+id/tvAgingWeight"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="0.000 g"
+                                            android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                            android:textColor="@color/text_gold_accent"
+                                            android:layout_marginTop="@dimen/space_1" />
+                                    </LinearLayout>
+
+                                    <View
+                                        android:layout_width="1dp"
+                                        android:layout_height="match_parent"
+                                        android:background="?attr/colorOutlineVariant"
+                                        android:alpha="0.5" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
                                         android:layout_height="wrap_content"
-                                        android:text="0"
-                                        android:textAppearance="@style/TextAppearance.App.Number.Small"
-                                        android:textColor="?attr/colorOnSurface"
-                                        android:layout_marginTop="@dimen/space_1" />
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/scrap_invoice_count"
+                                            android:textAppearance="@style/TextAppearance.App.Label.Small"
+                                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                        <TextView
+                                            android:id="@+id/tvAgingCount"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="0"
+                                            android:textAppearance="@style/TextAppearance.App.Number.Small"
+                                            android:textColor="?attr/colorOnSurface"
+                                            android:layout_marginTop="@dimen/space_1" />
+                                    </LinearLayout>
                                 </LinearLayout>
-                            </LinearLayout>
 
-                            <LinearLayout
-                                android:id="@+id/llAgingAlert"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_3"
-                                android:background="@color/alert_bg_danger"
-                                android:padding="8dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:visibility="gone">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
+                                <LinearLayout
+                                    android:id="@+id/llAgingAlert"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:text="⚠️"
-                                    android:textSize="14sp" />
+                                    android:layout_marginTop="@dimen/space_3"
+                                    android:background="@color/alert_bg_danger"
+                                    android:padding="8dp"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:visibility="gone">
 
-                                <TextView
-                                    android:id="@+id/tvAgingAlertText"
-                                    android:layout_width="0dp"
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="⚠️"
+                                        android:textSize="14sp" />
+
+                                    <TextView
+                                        android:id="@+id/tvAgingAlertText"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:layout_marginStart="6dp"
+                                        android:text="@string/aging_alert_default"
+                                        android:textColor="@color/alert_text_danger"
+                                        android:textSize="11sp"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnOpenAgingReport"
+                                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:layout_marginStart="6dp"
-                                    android:text="@string/aging_alert_default"
-                                    android:textColor="@color/alert_text_danger"
-                                    android:textSize="11sp"
-                                    android:textStyle="bold" />
+                                    android:layout_marginTop="@dimen/space_2"
+                                    android:text="@string/scrap_aging_report"
+                                    android:textColor="?attr/colorPrimary" />
                             </LinearLayout>
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnOpenAgingReport"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_2"
-                                android:text="@string/scrap_aging_report"
-                                android:textColor="?attr/colorPrimary" />
-                        </LinearLayout>
+                        </FrameLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- SALES TREND CHART -->
+                    <!-- 4. SALES TREND CHART (نقشة الرسم البياني الصاعد) -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardSalesTrend"
                         android:layout_width="match_parent"
@@ -1122,28 +1169,42 @@
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
 
-                        <LinearLayout
+                        <FrameLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_4">
+                            android:layout_height="wrap_content">
 
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/chart_sales_trend_title"
-                                android:textAppearance="@style/TextAppearance.App.Title.Small"
-                                android:textColor="?attr/colorOnSurface" />
+                            <ImageView
+                                android:layout_width="160dp"
+                                android:layout_height="160dp"
+                                android:layout_gravity="top|end"
+                                android:layout_marginEnd="-20dp"
+                                android:layout_marginTop="-20dp"
+                                android:src="@drawable/bg_wm_trend"
+                                android:importantForAccessibility="no" />
 
-                            <com.github.mikephil.charting.charts.LineChart
-                                android:id="@+id/lineChartSales"
+                            <LinearLayout
                                 android:layout_width="match_parent"
-                                android:layout_height="200dp"
-                                android:layout_marginTop="@dimen/space_3" />
-                        </LinearLayout>
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="@dimen/space_4">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/chart_sales_trend_title"
+                                    android:textAppearance="@style/TextAppearance.App.Title.Small"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <com.github.mikephil.charting.charts.LineChart
+                                    android:id="@+id/lineChartSales"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="200dp"
+                                    android:layout_marginTop="@dimen/space_3" />
+                            </LinearLayout>
+                        </FrameLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- SALES BY KARAT CHART -->
+                    <!-- 5. SALES BY KARAT CHART (نقشة الرسم الدائري) -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/cardSalesByKarat"
                         android:layout_width="match_parent"
@@ -1155,25 +1216,39 @@
                         app:strokeColor="@color/card_stroke_warm"
                         app:strokeWidth="1dp">
 
-                        <LinearLayout
+                        <FrameLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="@dimen/space_4">
+                            android:layout_height="wrap_content">
 
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/chart_sales_by_karat_title"
-                                android:textAppearance="@style/TextAppearance.App.Title.Small"
-                                android:textColor="?attr/colorOnSurface" />
+                            <ImageView
+                                android:layout_width="160dp"
+                                android:layout_height="160dp"
+                                android:layout_gravity="bottom|end"
+                                android:layout_marginEnd="-20dp"
+                                android:layout_marginBottom="-20dp"
+                                android:src="@drawable/bg_wm_pie"
+                                android:importantForAccessibility="no" />
 
-                            <com.github.mikephil.charting.charts.PieChart
-                                android:id="@+id/pieChartKarat"
+                            <LinearLayout
                                 android:layout_width="match_parent"
-                                android:layout_height="200dp"
-                                android:layout_marginTop="@dimen/space_3" />
-                        </LinearLayout>
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="@dimen/space_4">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/chart_sales_by_karat_title"
+                                    android:textAppearance="@style/TextAppearance.App.Title.Small"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <com.github.mikephil.charting.charts.PieChart
+                                    android:id="@+id/pieChartKarat"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="200dp"
+                                    android:layout_marginTop="@dimen/space_3" />
+                            </LinearLayout>
+                        </FrameLayout>
                     </com.google.android.material.card.MaterialCardView>
 
                     <!-- RECENT ACTIVITY HEADER -->
