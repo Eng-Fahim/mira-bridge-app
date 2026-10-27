@@ -104,6 +104,16 @@
             android:theme="@style/Theme.Uhfuartdemo"
             android:windowSoftInputMode="adjustResize|stateHidden"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density" />
+            
+            <!-- MIRA License Activation -->
+            <activity
+    android:name="com.example.uhf.activity.ActivationActivity"
+    android:screenOrientation="portrait"
+    android:exported="false"
+    android:label="تفعيل الترخيص"
+    android:theme="@style/Theme.Uhfuartdemo"
+    android:windowSoftInputMode="adjustResize|stateHidden"
+    android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density" />
 
         <!-- ==================== UHFMainActivity ==================== -->
         <activity
