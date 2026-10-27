@@ -423,12 +423,12 @@ public class MiraDashboardFragment extends Fragment {
                         float percent = Math.min(1f, (float) distance / (screenWidth / 2.0f));
                         card.setRotationY(0f); 
                         
-                        float minScale = 0.92f; 
+                        float minScale = 0.95f; 
                         float scale = 1f - (percent * (1f - minScale));
                         card.setScaleX(scale);
                         card.setScaleY(scale);
 
-                        float minAlpha = 0.75f; 
+                        float minAlpha = 0.85f; 
                         card.setAlpha(1f - (percent * (1f - minAlpha)));
                     }
 
@@ -711,47 +711,48 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void applyCarouselLayout() {
+    if (!isAdded() || getContext() == null) return;
+    if (hsvCarousel == null) return;
+
+    View cardsContainer = hsvCarousel.findViewById(R.id.cardsContainer);
+    if (cardsContainer == null || !(cardsContainer instanceof ViewGroup)) return;
+    ViewGroup container = (ViewGroup) cardsContainer;
+
+    float density = getResources().getDisplayMetrics().density;
+    int screenWidth = getResources().getDisplayMetrics().widthPixels;
+
+    // ✅ التعديل هنا: عرض البطاقة = 78% من الشاشة (لإظهار البطاقات الجانبية بوضوح)
+    int cardWidthPx = (int) (screenWidth * 0.78f);
+    int minWidth = (int) (260 * density);
+    if (cardWidthPx < minWidth) cardWidthPx = minWidth;
+
+    // حساب الحواف الجانبية
+    int sidePadding = (screenWidth - cardWidthPx) / 2;
+    if (sidePadding < (int) (16 * density)) sidePadding = (int) (16 * density);
+
+    hsvCarousel.setClipToPadding(false);
+    hsvCarousel.setPadding(sidePadding, 0, sidePadding, 0);
+
+    for (int i = 0; i < container.getChildCount(); i++) {
+        View child = container.getChildAt(i);
+        ViewGroup.LayoutParams lp = child.getLayoutParams();
+        if (lp.width != cardWidthPx) {
+            lp.width = cardWidthPx;
+            child.setLayoutParams(lp);
+        }
+    }
+
+    hsvCarousel.post(() -> {
         if (!isAdded() || getContext() == null) return;
-        if (hsvCarousel == null) return;
-
-        View cardsContainer = hsvCarousel.findViewById(R.id.cardsContainer);
-        if (cardsContainer == null || !(cardsContainer instanceof ViewGroup)) return;
-        ViewGroup container = (ViewGroup) cardsContainer;
-
-        float density = getResources().getDisplayMetrics().density;
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-
-        // ✅ عرض البطاقة = 82% من الشاشة (لإظهار البطاقات الجانبية بوضوح)
-        int cardWidthPx = (int) (screenWidth * 0.82f);
-        int minWidth = (int) (260 * density);
-        if (cardWidthPx < minWidth) cardWidthPx = minWidth;
-
-        int sidePadding = (screenWidth - cardWidthPx) / 2;
-        if (sidePadding < (int) (16 * density)) sidePadding = (int) (16 * density);
-
-        hsvCarousel.setClipToPadding(false);
-        hsvCarousel.setPadding(sidePadding, 0, sidePadding, 0);
-
-        for (int i = 0; i < container.getChildCount(); i++) {
-            View child = container.getChildAt(i);
-            ViewGroup.LayoutParams lp = child.getLayoutParams();
-            if (lp.width != cardWidthPx) {
-                lp.width = cardWidthPx;
-                child.setLayoutParams(lp);
+        if (container.getChildCount() > 1) {
+            View middleCard = container.getChildAt(1);
+            if (middleCard != null) {
+                int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
+                hsvCarousel.smoothScrollTo(scrollToX, 0);
             }
         }
-
-        hsvCarousel.post(() -> {
-            if (!isAdded() || getContext() == null) return;
-            if (container.getChildCount() > 1) {
-                View middleCard = container.getChildAt(1);
-                if (middleCard != null) {
-                    int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
-                    hsvCarousel.smoothScrollTo(scrollToX, 0);
-                }
-            }
-        });
-    }
+    });
+}
 
     private boolean isNightMode() {
         try {
