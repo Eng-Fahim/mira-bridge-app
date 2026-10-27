@@ -514,8 +514,10 @@
         <item>#F5D77E</item>
         <item>#BCAAA4</item>
     </string-array>
-<color name="luxury_card_bg_light">#1E1B16</color> <!-- في الوضع الليلي يصبح داكناً -->
-<color name="luxury_card_bg_dark">#12100C</color>
-<color name="luxury_gold_accent">#D4AF37</color>
-<color name="luxury_gold_light">#F3C623</color>
+<?xml version="1.0" encoding="utf-8"?>
+    <!-- ألوان البطاقات الفاخرة (الوضع الليلي) -->
+    <color name="luxury_card_bg_start">#2C2519</color> <!-- بني داكن دافئ -->
+    <color name="luxury_card_bg_end">#14110C</color>   <!-- أسود مائل للبني -->
+    <color name="luxury_gold_accent">#E6C27A</color>   <!-- ذهبي لامع (للنصوص) -->
+    <color name="luxury_gold_border">#D4AF37</color>   <!-- ذهبي معدني (للحدود) -->
 </resources>
