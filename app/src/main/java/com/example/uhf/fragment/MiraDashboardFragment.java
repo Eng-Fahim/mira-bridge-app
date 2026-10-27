@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.HorizontalScrollView;
@@ -67,10 +68,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.widget.LinearLayout;
-import android.view.ViewGroup;
 
 /**
- * MiraDashboardFragment v3.1 — Professional Carousel Edition & Charts (Theme-Aware)
+ * MiraDashboardFragment v5.0 — Ultimate Jaib Style with Mini Charts
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -98,8 +98,8 @@ public class MiraDashboardFragment extends Fragment {
     // Carousel & Charts
     private HorizontalScrollView hsvCarousel;
     private View dot1, dot2, dot3;
-    private LineChart lineChartSales;
-    private PieChart pieChartKarat;
+    private LineChart lineChartSales, miniChartGold, miniChartSales;
+    private PieChart pieChartKarat, miniChartInventory;
 
     private double currentScrapWeight = 0;
     private double currentScrapValue = 0;
@@ -131,13 +131,12 @@ public class MiraDashboardFragment extends Fragment {
     private CardView cardGoldPrices;
 
     private View heroBalanceCard;
-    private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle;
+    private TextView tvHeroBalance, tvHeroTrend, tvHeroSubtitle, tvHeroItemCount;
     private TextView tvHeroValueYER, tvHeroValueSAR, tvHeroValueUSD;
     private View alertsStrip;
     private TextView tvAlertIcon, tvAlertMessage, tvAlertAction;
     private View liveStatusDot;
     private TextView tvLiveStatusText;
-    private TextView tvHeroItemCount;
 
     private android.widget.LinearLayout llRecentActivity;
     private TextView tvViewAllActivity;
@@ -316,7 +315,6 @@ public class MiraDashboardFragment extends Fragment {
             startAutoRefresh();
             lastDataFetchTime = 0;
 
-            // جلب البيانات والرسوم البيانية فوراً
             fetchData();
             fetchDashboardCharts();
             fetchRecentActivity();
@@ -327,7 +325,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
-            // 1. ربط عناصر الكاروسيل (HorizontalScrollView)
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
             dot1 = v.findViewById(R.id.dot1);
             dot2 = v.findViewById(R.id.dot2);
@@ -337,7 +334,6 @@ public class MiraDashboardFragment extends Fragment {
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
             View salesSummaryCard = v.findViewById(R.id.salesSummaryCard);
 
-            // بطاقة المخزون
             tvHeroBalance   = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend     = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle  = v.findViewById(R.id.tvHeroSubtitle);
@@ -347,13 +343,11 @@ public class MiraDashboardFragment extends Fragment {
             tvHeroItemCount = v.findViewById(R.id.tvHeroItemCount);
             btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
 
-            // بطاقة المبيعات
             tvSalesToday = v.findViewById(R.id.tvSalesToday);
             tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
             tvSalesYear  = v.findViewById(R.id.tvSalesYear);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
-            // بطاقة الذهب
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
@@ -365,7 +359,6 @@ public class MiraDashboardFragment extends Fragment {
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             pbGoldLoading  = v.findViewById(R.id.pbGoldLoading);
 
-            // باقي العناصر
             llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
             tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
@@ -377,7 +370,6 @@ public class MiraDashboardFragment extends Fragment {
             tvAlertAction = v.findViewById(R.id.tvAlertAction);
             btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility);
 
-            // Scrap Gold
             tvScrapWeight = v.findViewById(R.id.tvScrapWeight);
             tvScrapValue = v.findViewById(R.id.tvScrapValue);
             btnToggleScrapVisibility = v.findViewById(R.id.btnToggleScrapVisibility);
@@ -385,7 +377,6 @@ public class MiraDashboardFragment extends Fragment {
             View btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
             View btnOpenScrapBatches = v.findViewById(R.id.btnOpenScrapBatches);
 
-            // Scrap Aging
             cardScrapAging = v.findViewById(R.id.cardScrapAging);
             tvAgingStatusIcon = v.findViewById(R.id.tvAgingStatusIcon);
             tvAgingStatusLabel = v.findViewById(R.id.tvAgingStatusLabel);
@@ -395,20 +386,25 @@ public class MiraDashboardFragment extends Fragment {
             tvAgingAlertText = v.findViewById(R.id.tvAgingAlertText);
             btnOpenAgingReport = v.findViewById(R.id.btnOpenAgingReport);
 
-            // Recent Activity & Charts
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
+            
             lineChartSales = v.findViewById(R.id.lineChartSales);
             pieChartKarat = v.findViewById(R.id.pieChartKarat);
 
-            // ═══════ إعداد الأحداث (Listeners) مع تحسين مظهر الكاروسيل ═══════
+            // New Mini Charts
+            miniChartGold = v.findViewById(R.id.miniChartGold);
+            miniChartInventory = v.findViewById(R.id.miniChartInventory);
+            miniChartSales = v.findViewById(R.id.miniChartSales);
+
+            setupMiniCharts();
+
+            // ═══════ إعداد أحداث التمرير والالتقاط (Jaib Style) ═══════
             if (hsvCarousel != null) {
                 final android.widget.LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
 
-                // 1. تأثير سلس ونظيف يعتمد على الـ Scaling والـ Alpha بدلاً من التدوير 3D الحاد
                 hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
                     if (!isAdded() || getContext() == null) return;
-
                     int screenWidth = getResources().getDisplayMetrics().widthPixels;
                     int screenCenter = scrollX + (screenWidth / 2);
                     int activeCardIndex = 0;
@@ -416,7 +412,6 @@ public class MiraDashboardFragment extends Fragment {
 
                     for (int i = 0; i < cardsContainer.getChildCount(); i++) {
                         View card = cardsContainer.getChildAt(i);
-
                         int cardCenter = card.getLeft() + (card.getWidth() / 2);
                         int distance = Math.abs(cardCenter - screenCenter);
 
@@ -425,18 +420,16 @@ public class MiraDashboardFragment extends Fragment {
                             activeCardIndex = i;
                         }
 
-                        // نسبة البعد عن مركز الشاشة (0 = في المنتصف تماماً، 1 = بعيد)
-                        float normalizedDistance = Math.min(1f, (float) distance / (screenWidth / 2.0f));
-
-                        // تكبير البطاقة الوسطى وتصغير البطاقات الجانبية بنسبة معتدلة وواضحة
-                        float scale = 1f - (normalizedDistance * 0.12f);
-                        // جعل البطاقات الجانبية أكثر تركيزاً بضبط الشفافية بسلاسة
-                        float alpha = 1f - (normalizedDistance * 0.35f);
-
+                        float percent = Math.min(1f, (float) distance / (screenWidth / 2.0f));
+                        card.setRotationY(0f); 
+                        
+                        float minScale = 0.92f; 
+                        float scale = 1f - (percent * (1f - minScale));
                         card.setScaleX(scale);
                         card.setScaleY(scale);
-                        card.setAlpha(alpha);
-                        card.setRotationY(0f); // إلغاء التدوير المائل تماماً لتجنب الاقتطاع المزعج
+
+                        float minAlpha = 0.75f; 
+                        card.setAlpha(1f - (percent * (1f - minAlpha)));
                     }
 
                     if (dot1 != null) dot1.setBackgroundResource(activeCardIndex == 0 ? R.drawable.dot_active : R.drawable.dot_inactive);
@@ -444,21 +437,48 @@ public class MiraDashboardFragment extends Fragment {
                     if (dot3 != null) dot3.setBackgroundResource(activeCardIndex == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
                 });
 
-                // 2. التمرير التلقائي للبطاقة الوسطى (المخزون) عند فتح الشاشة
+                hsvCarousel.setOnTouchListener(new View.OnTouchListener() {
+                    private float startX;
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                            startX = event.getX();
+                        } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                            if (Math.abs(startX - event.getX()) > 10) {
+                                hsvCarousel.smoothScrollBy(0, 0); 
+                                int screenWidth = getResources().getDisplayMetrics().widthPixels;
+                                int currentScroll = hsvCarousel.getScrollX();
+                                int center = currentScroll + (screenWidth / 2);
+                                View closestCard = null;
+                                int minDist = Integer.MAX_VALUE;
+                                
+                                for (int i = 0; i < cardsContainer.getChildCount(); i++) {
+                                    View child = cardsContainer.getChildAt(i);
+                                    int childCenter = child.getLeft() + (child.getWidth() / 2);
+                                    int dist = Math.abs(center - childCenter);
+                                    if (dist < minDist) {
+                                        minDist = dist;
+                                        closestCard = child;
+                                    }
+                                }
+                                if (closestCard != null) {
+                                    int scrollToX = closestCard.getLeft() - (screenWidth / 2) + (closestCard.getWidth() / 2);
+                                    hsvCarousel.smoothScrollTo(scrollToX, 0);
+                                }
+                            }
+                        }
+                        return false;
+                    }
+                });
+
                 hsvCarousel.post(() -> {
                     if (!isAdded() || getContext() == null) return;
-
                     if (cardsContainer != null && cardsContainer.getChildCount() > 1) {
                         View middleCard = cardsContainer.getChildAt(1);
                         if (middleCard != null) {
                             int screenWidth = getResources().getDisplayMetrics().widthPixels;
                             int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
-
                             hsvCarousel.smoothScrollTo(scrollToX, 0);
-
-                            if (dot1 != null) dot1.setBackgroundResource(R.drawable.dot_inactive);
-                            if (dot2 != null) dot2.setBackgroundResource(R.drawable.dot_active);
-                            if (dot3 != null) dot3.setBackgroundResource(R.drawable.dot_inactive);
                         }
                     }
                 });
@@ -487,7 +507,6 @@ public class MiraDashboardFragment extends Fragment {
                 swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
-            // إخفاء القيم افتراضياً
             isHeroHidden = true; isSalesHidden = true; isInventoryHidden = true; isScrapHidden = true;
             if (btnToggleHeroVisibility != null) btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null) btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
@@ -501,6 +520,44 @@ public class MiraDashboardFragment extends Fragment {
             applySalesVisibility();
             updateScrapUI();
         } catch (Exception e) { logNonFatal("initViews", e); }
+    }
+
+    private void setupMiniCharts() {
+        if (!isAdded()) return;
+        int primaryColor = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorPrimary, Color.parseColor("#D4AF37"));
+        
+        // Gold Mini Chart
+        if (miniChartGold != null) {
+            miniChartGold.getDescription().setEnabled(false);
+            miniChartGold.getLegend().setEnabled(false);
+            miniChartGold.getAxisRight().setEnabled(false);
+            miniChartGold.getAxisLeft().setEnabled(false);
+            miniChartGold.getXAxis().setEnabled(false);
+            miniChartGold.setTouchEnabled(false);
+            miniChartGold.setDrawGridBackground(false);
+        }
+        
+        // Inventory Mini Pie
+        if (miniChartInventory != null) {
+            miniChartInventory.getDescription().setEnabled(false);
+            miniChartInventory.getLegend().setEnabled(false);
+            miniChartInventory.setTouchEnabled(false);
+            miniChartInventory.setHoleRadius(70f);
+            miniChartInventory.setTransparentCircleRadius(75f);
+            miniChartInventory.setDrawEntryLabels(false);
+            miniChartInventory.setUsePercentValues(true);
+        }
+        
+        // Sales Mini Chart
+        if (miniChartSales != null) {
+            miniChartSales.getDescription().setEnabled(false);
+            miniChartSales.getLegend().setEnabled(false);
+            miniChartSales.getAxisRight().setEnabled(false);
+            miniChartSales.getAxisLeft().setEnabled(false);
+            miniChartSales.getXAxis().setEnabled(false);
+            miniChartSales.setTouchEnabled(false);
+            miniChartSales.setDrawGridBackground(false);
+        }
     }
 
     private void fetchDashboardCharts() {
@@ -521,7 +578,8 @@ public class MiraDashboardFragment extends Fragment {
     private void renderCharts(JSONObject data) {
         try {
             applyChartTheme();
-
+            
+            // 1. Full Sales Chart
             JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
             if (sales7Days != null && lineChartSales != null) {
                 List<Entry> entries = new ArrayList<>();
@@ -531,7 +589,6 @@ public class MiraDashboardFragment extends Fragment {
                     entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
                     labels.add(day.optString("date", ""));
                 }
-
                 int goldColor = Color.parseColor("#D4AF37");
                 LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
                 dataSet.setColor(goldColor);
@@ -540,24 +597,35 @@ public class MiraDashboardFragment extends Fragment {
                 dataSet.setCircleRadius(4f);
                 dataSet.setDrawValues(false);
                 dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-
                 LineData lineData = new LineData(dataSet);
                 lineChartSales.setData(lineData);
-
                 XAxis xAxis = lineChartSales.getXAxis();
                 xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
                 xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
                 xAxis.setGranularity(1f);
                 xAxis.setDrawGridLines(false);
-
                 lineChartSales.getAxisRight().setEnabled(false);
                 lineChartSales.getAxisLeft().setDrawGridLines(true);
                 lineChartSales.getDescription().setEnabled(false);
                 lineChartSales.getLegend().setEnabled(false);
                 lineChartSales.animateX(1000);
                 lineChartSales.invalidate();
+
+                // Update Mini Sales Chart
+                if (miniChartSales != null) {
+                    LineDataSet miniDataSet = new LineDataSet(entries, "المبيعات");
+                    int primaryColor = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorPrimary, Color.GRAY);
+                    miniDataSet.setColor(primaryColor);
+                    miniDataSet.setDrawCircles(false);
+                    miniDataSet.setDrawValues(false);
+                    miniDataSet.setLineWidth(2f);
+                    miniDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                    miniChartSales.setData(new LineData(miniDataSet));
+                    miniChartSales.invalidate();
+                }
             }
 
+            // 2. Full Pie Chart
             JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
             if (salesByKarat != null && pieChartKarat != null) {
                 List<PieEntry> entries = new ArrayList<>();
@@ -574,7 +642,6 @@ public class MiraDashboardFragment extends Fragment {
                     colors.add(Color.parseColor("#A0522D"));
                     dataSet.setColors(colors);
                     dataSet.setValueTextSize(12f);
-
                     PieData pieData = new PieData(dataSet);
                     pieChartKarat.setData(pieData);
                     pieChartKarat.getDescription().setEnabled(false);
@@ -593,7 +660,6 @@ public class MiraDashboardFragment extends Fragment {
         if (!isAdded() || getContext() == null) return;
         View anchor = getView();
         if (anchor == null) return;
-
         Context ctx = requireContext();
         try {
             int onSurface, onSurfaceVariant, surfaceColor;
@@ -606,7 +672,6 @@ public class MiraDashboardFragment extends Fragment {
                 onSurfaceVariant = isNightMode() ? 0xFFBBBBBB : 0xFF666666;
                 surfaceColor     = isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF;
             }
-
             int chartGrid, chartAxisText;
             try { chartGrid = ContextCompat.getColor(ctx, R.color.chart_grid); } catch (Exception e) { chartGrid = isNightMode() ? 0x33FFFFFF : 0x33000000; }
             try { chartAxisText = ContextCompat.getColor(ctx, R.color.chart_axis_text); } catch (Exception e) { chartAxisText = isNightMode() ? 0xFFBBBBBB : 0xFF666666; }
@@ -616,29 +681,30 @@ public class MiraDashboardFragment extends Fragment {
                 x.setTextColor(chartAxisText);
                 x.setAxisLineColor(chartGrid);
                 x.setTextSize(10f);
-
                 lineChartSales.getAxisLeft().setTextColor(chartAxisText);
                 lineChartSales.getAxisLeft().setGridColor(chartGrid);
                 lineChartSales.getAxisLeft().setAxisLineColor(chartGrid);
                 lineChartSales.getAxisLeft().setTextSize(10f);
-
                 lineChartSales.getAxisRight().setTextColor(chartAxisText);
                 lineChartSales.getLegend().setTextColor(onSurface);
                 lineChartSales.setNoDataTextColor(onSurfaceVariant);
                 lineChartSales.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
             }
-
             if (pieChartKarat != null) {
                 if (pieChartKarat.getData() != null && pieChartKarat.getData().getDataSet() != null) {
                     pieChartKarat.getData().getDataSet().setValueTextColor(onSurface);
                 }
                 pieChartKarat.setEntryLabelColor(onSurfaceVariant);
-                pieChartKarat.setHoleColor(surfaceColor);
-                pieChartKarat.setTransparentCircleColor(surfaceColor);
-                pieChartKarat.setTransparentCircleAlpha(120);
+                pieChartKarat.setHoleColor(Color.TRANSPARENT);
+                pieChartKarat.setTransparentCircleColor(Color.TRANSPARENT);
                 pieChartKarat.getLegend().setTextColor(onSurface);
                 pieChartKarat.setNoDataTextColor(onSurfaceVariant);
                 pieChartKarat.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
+            }
+            // Mini Inventory Chart Theme
+            if (miniChartInventory != null) {
+                miniChartInventory.setHoleColor(Color.TRANSPARENT);
+                miniChartInventory.setTransparentCircleColor(Color.TRANSPARENT);
             }
         } catch (Exception e) { logNonFatal("applyChartTheme", e); }
     }
@@ -654,14 +720,13 @@ public class MiraDashboardFragment extends Fragment {
         float density = getResources().getDisplayMetrics().density;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
 
-        int cardWidthPx = (int) (screenWidth * 0.78f);
+        // ✅ عرض البطاقة = 82% من الشاشة (لإظهار البطاقات الجانبية بوضوح)
+        int cardWidthPx = (int) (screenWidth * 0.82f);
         int minWidth = (int) (260 * density);
-        int maxWidth = (int) (340 * density);
         if (cardWidthPx < minWidth) cardWidthPx = minWidth;
-        if (cardWidthPx > maxWidth) cardWidthPx = maxWidth;
 
         int sidePadding = (screenWidth - cardWidthPx) / 2;
-        if (sidePadding < (int) (24 * density)) sidePadding = (int) (24 * density);
+        if (sidePadding < (int) (16 * density)) sidePadding = (int) (16 * density);
 
         hsvCarousel.setClipToPadding(false);
         hsvCarousel.setPadding(sidePadding, 0, sidePadding, 0);
@@ -709,6 +774,24 @@ public class MiraDashboardFragment extends Fragment {
             llInventoryByKarat.setVisibility(View.VISIBLE);
             List<KaratInventory> sorted = new ArrayList<>(items);
             Collections.sort(sorted, (a, b) -> Integer.compare(b.karat, a.karat));
+            
+            // Update Mini Pie Chart for Inventory
+            if (miniChartInventory != null && !items.isEmpty()) {
+                List<PieEntry> entries = new ArrayList<>();
+                for (KaratInventory inv : sorted) {
+                    entries.add(new PieEntry((float) inv.itemCount, inv.karat + "K"));
+                }
+                PieDataSet dataSet = new PieDataSet(entries, "");
+                List<Integer> colors = new ArrayList<>();
+                for (KaratInventory inv : sorted) {
+                    colors.add(getKaratColor(inv.karat));
+                }
+                dataSet.setColors(colors);
+                dataSet.setDrawValues(false);
+                miniChartInventory.setData(new PieData(dataSet));
+                miniChartInventory.invalidate();
+            }
+
             for (KaratInventory inv : sorted) {
                 View itemView = getLayoutInflater().inflate(R.layout.item_karat_inventory, llInventoryByKarat, false);
                 TextView tvKarat  = itemView.findViewById(R.id.tvKaratLabel);
@@ -738,16 +821,11 @@ public class MiraDashboardFragment extends Fragment {
             }
             if (isHeroHidden) {
                 tvHeroBalance.setText("••••••••");
-                if (tvHeroSubtitle != null) tvHeroSubtitle.setText("••• g");
-                if (tvHeroItemCount != null) tvHeroItemCount.setText("••• قطعة");
+                if (tvHeroSubtitle != null) tvHeroSubtitle.setText("••• g | ••• قطعة");
             } else {
                 tvHeroBalance.setText(String.format(Locale.US, "$%,.2f", totalValue));
-                if (tvHeroSubtitle != null) tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g", totalWeight));
-                if (tvHeroItemCount != null) tvHeroItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
+                if (tvHeroSubtitle != null) tvHeroSubtitle.setText(String.format(Locale.US, "%.1f g | %d قطعة", totalWeight, itemCount));
             }
-            if (tvHeroValueUSD != null) tvHeroValueUSD.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue));
-            if (tvHeroValueSAR != null) tvHeroValueSAR.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue * 3.75));
-            if (tvHeroValueYER != null) tvHeroValueYER.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0));
         } catch (Exception e) { logNonFatal("updateHeroBalance", e); }
     }
 
@@ -832,7 +910,6 @@ public class MiraDashboardFragment extends Fragment {
         if (tvAgingStatusIcon == null) return;
         if (tvAgingWeight != null) tvAgingWeight.setText(String.format(Locale.US, "%.3f g", totalWeight));
         if (tvAgingCount != null) tvAgingCount.setText(totalItems + " فاتورة");
-
         if (oldCount > 0) {
             tvAgingStatusIcon.setText("🔴");
             if (tvAgingStatusLabel != null) { tvAgingStatusLabel.setText("تحذير"); tvAgingStatusLabel.setTextColor(0xFFDC2626); }
@@ -1463,6 +1540,9 @@ public class MiraDashboardFragment extends Fragment {
                     applyChartTheme();
                     if (lineChartSales != null) lineChartSales.invalidate();
                     if (pieChartKarat != null) pieChartKarat.invalidate();
+                    if (miniChartGold != null) miniChartGold.invalidate();
+                    if (miniChartInventory != null) miniChartInventory.invalidate();
+                    if (miniChartSales != null) miniChartSales.invalidate();
                 }
             });
         } catch (Exception e) {
