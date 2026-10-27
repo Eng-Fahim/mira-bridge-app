@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
+    <!-- تدرج لوني فاخر يتغير حسب الثيم -->
     <gradient
-        android:angle="135"
-        android:startColor="@color/luxury_card_bg_light"
-        android:endColor="@color/luxury_card_bg_dark"
+        android:angle="45"
+        android:startColor="@color/luxury_card_bg_start"
+        android:endColor="@color/luxury_card_bg_end"
         android:type="linear" />
+    
+    <!-- حواف دائرية بنفس انحناء البطاقة (24dp) -->
     <corners android:radius="24dp" />
+    
+    <!-- حدود ذهبية خفيفة -->
     <stroke
         android:width="1dp"
-        android:color="@color/luxury_gold_accent" />
+        android:color="@color/luxury_gold_border" />
 </shape>
