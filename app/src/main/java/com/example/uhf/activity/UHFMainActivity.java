@@ -1572,6 +1572,12 @@ public void onResume() {
     syncCurrentFragment();   // ← ✅ أضف هذا السطر
 
     checkSetupStampOnResume();
+    // ═══ تحديث حالة الترخيص عند كل عودة للشاشة ═══
+try {
+    com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
+} catch (Exception e) {
+    android.util.Log.w("UHFMainActivity", "onResume heartbeat failed: " + e.getMessage());
+}
 }
 
     private void checkSetupStampOnResume() {
