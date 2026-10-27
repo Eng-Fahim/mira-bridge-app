@@ -70,7 +70,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import android.widget.LinearLayout;
 
 /**
- * MiraDashboardFragment v5.0 — Ultimate Jaib Style with Mini Charts
+ * MiraDashboardFragment v5.1 — Luxury Jaib Style with Fixed Mini Charts
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -524,7 +524,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setupMiniCharts() {
         if (!isAdded()) return;
-        int primaryColor = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorPrimary, Color.parseColor("#D4AF37"));
         
         // Gold Mini Chart
         if (miniChartGold != null) {
@@ -535,6 +534,7 @@ public class MiraDashboardFragment extends Fragment {
             miniChartGold.getXAxis().setEnabled(false);
             miniChartGold.setTouchEnabled(false);
             miniChartGold.setDrawGridBackground(false);
+            miniChartGold.setNoDataText("");
         }
         
         // Inventory Mini Pie
@@ -546,6 +546,9 @@ public class MiraDashboardFragment extends Fragment {
             miniChartInventory.setTransparentCircleRadius(75f);
             miniChartInventory.setDrawEntryLabels(false);
             miniChartInventory.setUsePercentValues(true);
+            miniChartInventory.setNoDataText("");
+            // إخفاء افتراضي حتى تأتي البيانات
+            miniChartInventory.setVisibility(View.GONE); 
         }
         
         // Sales Mini Chart
@@ -557,6 +560,7 @@ public class MiraDashboardFragment extends Fragment {
             miniChartSales.getXAxis().setEnabled(false);
             miniChartSales.setTouchEnabled(false);
             miniChartSales.setDrawGridBackground(false);
+            miniChartSales.setNoDataText("");
         }
     }
 
@@ -589,7 +593,7 @@ public class MiraDashboardFragment extends Fragment {
                     entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
                     labels.add(day.optString("date", ""));
                 }
-                int goldColor = Color.parseColor("#D4AF37");
+                int goldColor = Color.parseColor("#C49B3F");
                 LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
                 dataSet.setColor(goldColor);
                 dataSet.setCircleColor(goldColor);
@@ -614,8 +618,7 @@ public class MiraDashboardFragment extends Fragment {
                 // Update Mini Sales Chart
                 if (miniChartSales != null) {
                     LineDataSet miniDataSet = new LineDataSet(entries, "المبيعات");
-                    int primaryColor = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorPrimary, Color.GRAY);
-                    miniDataSet.setColor(primaryColor);
+                    miniDataSet.setColor(Color.parseColor("#C49B3F"));
                     miniDataSet.setDrawCircles(false);
                     miniDataSet.setDrawValues(false);
                     miniDataSet.setLineWidth(2f);
@@ -662,15 +665,13 @@ public class MiraDashboardFragment extends Fragment {
         if (anchor == null) return;
         Context ctx = requireContext();
         try {
-            int onSurface, onSurfaceVariant, surfaceColor;
+            int onSurface, onSurfaceVariant;
             try {
                 onSurface        = MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorOnSurface, isNightMode() ? 0xFFFFFFFF : 0xFF212121);
                 onSurfaceVariant = MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorOnSurfaceVariant, isNightMode() ? 0xFFBBBBBB : 0xFF666666);
-                surfaceColor     = MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorSurface, isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF);
             } catch (Throwable t) {
                 onSurface        = isNightMode() ? 0xFFFFFFFF : 0xFF212121;
                 onSurfaceVariant = isNightMode() ? 0xFFBBBBBB : 0xFF666666;
-                surfaceColor     = isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF;
             }
             int chartGrid, chartAxisText;
             try { chartGrid = ContextCompat.getColor(ctx, R.color.chart_grid); } catch (Exception e) { chartGrid = isNightMode() ? 0x33FFFFFF : 0x33000000; }
@@ -768,6 +769,7 @@ public class MiraDashboardFragment extends Fragment {
             if (items == null || items.isEmpty()) {
                 if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.VISIBLE);
                 llInventoryByKarat.setVisibility(View.GONE);
+                if (miniChartInventory != null) miniChartInventory.setVisibility(View.GONE);
                 return;
             }
             if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
@@ -777,6 +779,7 @@ public class MiraDashboardFragment extends Fragment {
             
             // Update Mini Pie Chart for Inventory
             if (miniChartInventory != null && !items.isEmpty()) {
+                miniChartInventory.setVisibility(View.VISIBLE);
                 List<PieEntry> entries = new ArrayList<>();
                 for (KaratInventory inv : sorted) {
                     entries.add(new PieEntry((float) inv.itemCount, inv.karat + "K"));
@@ -1588,4 +1591,4 @@ public class MiraDashboardFragment extends Fragment {
         if (permissionManager == null) return false;
         return permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin() || permissionManager.isFinanceManager();
     }
-}
+            }
