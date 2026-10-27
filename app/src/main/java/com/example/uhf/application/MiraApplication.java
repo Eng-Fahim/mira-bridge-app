@@ -122,6 +122,25 @@ public class MiraApplication extends AppContext {
     } catch (Throwable t) {
         Log.e(TAG, "onCreate catastrophic error", t);
     }
+    // ═══════════════════════════════════════════════════════════
+//  MIRA License — بدء Heartbeat إذا كان الترخيص مفعّلاً
+// ═══════════════════════════════════════════════════════════
+try {
+    com.example.uhf.tools.SessionManager sm =
+            new com.example.uhf.tools.SessionManager(this);
+
+    if (sm.hasActivationToken()) {
+        // سجّل الجدولة الدورية (6 ساعات)
+        com.example.uhf.license.HeartbeatScheduler.schedule(this);
+        // وشغّل نبضة فورية عند بدء التطبيق (إن كان الإنترنت متاحاً)
+        com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
+        android.util.Log.d("MiraApp", "✅ License heartbeat scheduled");
+    } else {
+        android.util.Log.d("MiraApp", "ℹ️ No license yet — heartbeat not started");
+    }
+} catch (Exception e) {
+    android.util.Log.e("MiraApp", "License init failed: " + e.getMessage(), e);
+}
 }
 
 /**
