@@ -205,6 +205,16 @@
     </intent-filter>
 
 </receiver>
+
+<!-- MIRA License — Network Change Listener -->
+<receiver
+    android:name="com.example.uhf.license.NetworkChangeReceiver"
+    android:exported="true"
+    android:enabled="true">
+    <intent-filter>
+        <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+    </intent-filter>
+</receiver>
     </application>
 
 </manifest>
