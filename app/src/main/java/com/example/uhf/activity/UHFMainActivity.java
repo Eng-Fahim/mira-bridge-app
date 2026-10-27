@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -1541,43 +1542,62 @@ private void performConnectionTest() {
 @Override
 public void onResume() {
     super.onResume();
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ⚡ MIRA License Heartbeat — في الأعلى ليعمل دائماً
+    //  السبب: يجب أن يُشغَّل حتى في حالة:
+    //    - فتح الجلسة بالبصمة (justUnlockedWithBiometric)
+    //    - قفل الجلسة (auto-lock)
+    // ═══════════════════════════════════════════════════════════════
+    try {
+        com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
+    } catch (Exception e) {
+        Log.w(TAG, "onResume heartbeat failed: " + e.getMessage());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  تصفير حالة التحميل — يمنع تعليق الشاشة بعد العودة
+    // ═══════════════════════════════════════════════════════════════
     loadingCounter = 0;
     forceHideLoadingImmediate();
 
+    // ═══════════════════════════════════════════════════════════════
+    //  الحالة 1: فتح الجلسة بالبصمة — نتخطى فحص Auto-Lock
+    // ═══════════════════════════════════════════════════════════════
     if (justUnlockedWithBiometric) {
         Log.d(TAG, "✅ Skipping Auto-Lock check (just unlocked with biometric)");
         justUnlockedWithBiometric = false;
         updateToolbarTitle();
         if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
 
-        // ✅ [جديد] زامن cachedTag + currentFragment
+        // ✅ مزامنة cachedTag + currentFragment
         if (navigationManager != null) {
             navigationManager.notifyExternalChange();
         }
-        syncCurrentFragment();   // ← ✅ أضف هذا السطر
+        syncCurrentFragment();
 
         checkSetupStampOnResume();
         return;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    //  الحالة 2: فحص Auto-Lock (يتخطى نفسه إذا قفل)
+    // ═══════════════════════════════════════════════════════════════
     if (!checkAutoLock()) return;
 
+    // ═══════════════════════════════════════════════════════════════
+    //  الحالة 3: الوضع الطبيعي
+    // ═══════════════════════════════════════════════════════════════
     updateToolbarTitle();
     if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
 
-    // ✅ [جديد] زامن cachedTag + currentFragment
+    // ✅ مزامنة cachedTag + currentFragment
     if (navigationManager != null) {
         navigationManager.notifyExternalChange();
     }
-    syncCurrentFragment();   // ← ✅ أضف هذا السطر
+    syncCurrentFragment();
 
     checkSetupStampOnResume();
-    // ═══ تحديث حالة الترخيص عند كل عودة للشاشة ═══
-try {
-    com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
-} catch (Exception e) {
-    android.util.Log.w("UHFMainActivity", "onResume heartbeat failed: " + e.getMessage());
-}
 }
 
     private void checkSetupStampOnResume() {
