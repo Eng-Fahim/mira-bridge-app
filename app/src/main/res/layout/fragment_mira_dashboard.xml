@@ -76,7 +76,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="@android:color/transparent" <!-- جعل الخلفية شفافة ليظهر الألماس -->
+        android:background="@android:color/transparent" 
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
