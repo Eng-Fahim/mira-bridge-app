@@ -500,4 +500,62 @@ public class SessionManager {
         invalidateCache();   // ✅ حرج
         Log.d(TAG, "Login session created for user: " + username);
     }
+    // ═══════════════════════════════════════════════════════
+// ✅ License (MIRA License Center) — تمرير للطبقة الآمنة
+// ═══════════════════════════════════════════════════════
+
+public void saveActivationToken(String token) {
+    secureManager.saveActivationToken(token);
+}
+
+public String getActivationToken() {
+    return secureManager.getActivationToken();
+}
+
+public boolean hasActivationToken() {
+    return secureManager.hasActivationToken();
+}
+
+public void saveDeviceUuid(String uuid) {
+    secureManager.saveDeviceUuid(uuid);
+}
+
+public String getDeviceUuid() {
+    return secureManager.getDeviceUuid();
+}
+
+public void saveLicenseInfo(String type, String validFrom, String validUntil,
+                            int maxDevices, int maxUsers) {
+    secureManager.saveLicenseInfo(type, validFrom, validUntil, maxDevices, maxUsers);
+}
+
+public String getLicenseType() { return secureManager.getLicenseType(); }
+public String getLicenseValidFrom() { return secureManager.getLicenseValidFrom(); }
+public String getLicenseValidUntil() { return secureManager.getLicenseValidUntil(); }
+public int getLicenseMaxDevices() { return secureManager.getLicenseMaxDevices(); }
+public int getLicenseMaxUsers() { return secureManager.getLicenseMaxUsers(); }
+
+public void saveLastHeartbeat(long timestampMs) {
+    secureManager.saveLastHeartbeat(timestampMs);
+}
+
+public long getLastHeartbeat() {
+    return secureManager.getLastHeartbeat();
+}
+
+public void saveOfflineSettings(int graceDays, int warnDay, int restrictDay) {
+    secureManager.saveOfflineSettings(graceDays, warnDay, restrictDay);
+}
+
+public int getOfflineGraceDays()   { return secureManager.getOfflineGraceDays(); }
+public int getOfflineWarningDay()  { return secureManager.getOfflineWarningDay(); }
+public int getOfflineRestrictDay() { return secureManager.getOfflineRestrictDay(); }
+public int getDaysSinceLastHeartbeat() { return secureManager.getDaysSinceLastHeartbeat(); }
+public String getOfflineStatus() { return secureManager.getOfflineStatus(); }
+public long getActivationTimestamp() { return secureManager.getActivationTimestamp(); }
+
+public void clearLicense() {
+    secureManager.clearLicense();
+    invalidateCache();
+}
 }
