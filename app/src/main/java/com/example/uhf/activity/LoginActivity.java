@@ -105,7 +105,9 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate started");
 
+        // ═══════════════════════════════════════════════════════════════
         // 1. حماية الشاشة من الالتقاط
+        // ═══════════════════════════════════════════════════════════════
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE
@@ -119,14 +121,65 @@ public class LoginActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_login);
 
-        // 2. تحديث اللغة الحالية
+        // ═══════════════════════════════════════════════════════════════
+        // 2. اللغة الحالية
+        // ═══════════════════════════════════════════════════════════════
         String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
         isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
 
+        // ═══════════════════════════════════════════════════════════════
+        // ⚠️ 3. التهيئة الأساسية — يجب أن تكون قبل أي فحص يستخدمها
+        // ═══════════════════════════════════════════════════════════════
         sessionManager = new SessionManager(getApplicationContext());
         soundManager = MiraSoundManager.getInstance(getApplicationContext());
 
-        // 3. التحقق المباشر من الجلسة
+        // ═══════════════════════════════════════════════════════════════
+        // 4. فحص الترخيص (MIRA License Center) — قبل أي شيء آخر
+        // ═══════════════════════════════════════════════════════════════
+        if (!sessionManager.hasActivationToken()) {
+            Log.w(TAG, "⚠️ No activation token — redirecting to ActivationActivity");
+            Intent intent = new Intent(this, ActivationActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
+        // ✅ فحص انتهاء فترة السماح دون اتصال
+        String offlineStatus = sessionManager.getOfflineStatus();
+        if ("BLOCKED".equals(offlineStatus)) {
+            long days = sessionManager.getDaysSinceLastHeartbeat();
+            Log.w(TAG, "🚫 License BLOCKED — offline for " + days + " days");
+            new AlertDialog.Builder(this)
+                    .setTitle(isArabic ? "🔴 الترخيص يحتاج اتصالاً" : "🔴 License Needs Connection")
+                    .setMessage(isArabic
+                            ? "انقطع الاتصال بالخادم لأكثر من " + sessionManager.getOfflineGraceDays()
+                                + " أيام.\n\nيرجى الاتصال بالإنترنت لتجديد الترخيص.\n\nقد يكون هذا بسبب تغيير في الجهاز أو محاولة تلاعب."
+                            : "Offline for more than " + sessionManager.getOfflineGraceDays()
+                                + " days.\n\nPlease connect to internet to renew license.")
+                    .setCancelable(false)
+                    .setPositiveButton(isArabic ? "إعادة المحاولة" : "Retry", (d, w) -> recreate())
+                    .setNeutralButton(isArabic ? "إعادة التفعيل" : "Re-Activate", (d, w) -> {
+                        sessionManager.clearLicense();
+                        startActivity(new Intent(this, ActivationActivity.class));
+                        finish();
+                    })
+                    .show();
+            return;
+        }
+
+        if ("WARNING".equals(offlineStatus) || "RESTRICTED".equals(offlineStatus)) {
+            long daysLeft = sessionManager.getOfflineGraceDays() - sessionManager.getDaysSinceLastHeartbeat();
+            Log.w(TAG, "⚠️ License warning — " + daysLeft + " days left offline");
+            Toast.makeText(this,
+                    isArabic ? "⚠️ تحذير: انقطع الاتصال بـ " + daysLeft + " أيام. اتصل بالإنترنت."
+                            : "⚠️ Warning: offline for " + daysLeft + " days. Please connect.",
+                    Toast.LENGTH_LONG).show();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 5. التحقق المباشر من الجلسة (منطق قديم — لم يُمس)
+        // ═══════════════════════════════════════════════════════════════
         if (sessionManager.isLoggedIn()) {
             if (sessionManager.hasValidToken()) {
                 navigateToMainDirect();
@@ -136,7 +189,9 @@ public class LoginActivity extends AppCompatActivity {
             }
         }
 
-        // 4. معالجة انتهاء الجلسة إن وجدت
+        // ═══════════════════════════════════════════════════════════════
+        // 6. معالجة انتهاء الجلسة إن وجدت
+        // ═══════════════════════════════════════════════════════════════
         if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
             Toast.makeText(this,
                     isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again",
@@ -148,16 +203,22 @@ public class LoginActivity extends AppCompatActivity {
 
         orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
 
-        // 5. تهيئة عناصر الواجهة والأحداث
+        // ═══════════════════════════════════════════════════════════════
+        // 7. تهيئة الواجهة والأحداث
+        // ═══════════════════════════════════════════════════════════════
         initViews();
         setupTextWatchers();
         setupServerConfigToggle();
         setupLanguageToggle();
 
-        // 6. تهيئة التشفير في الخلفية
+        // ═══════════════════════════════════════════════════════════════
+        // 8. تهيئة التشفير في الخلفية
+        // ═══════════════════════════════════════════════════════════════
         initializeEncryption();
 
-        // 7. تحريك الواجهة وتحميل البيانات
+        // ═══════════════════════════════════════════════════════════════
+        // 9. تحريك الواجهة وتحميل البيانات
+        // ═══════════════════════════════════════════════════════════════
         animateEntrance();
         setupProfileListener();
 
@@ -276,16 +337,14 @@ public class LoginActivity extends AppCompatActivity {
                 if (!url.endsWith("/")) url += "/";
                 sessionManager.setServerUrl(url);
                 MiraServerConfig.getInstance(this).setBaseUrl(url);
-                
-                // ✅ إصلاح: استخدام refreshUrl بدلاً من reloadInstance
-                // هذا يضمن استخدام نفس instance مع تحديث الـ URL
+
                 MiraApiClient client = MiraApiClient.getInstance(getApplicationContext());
                 if (client != null) {
                     client.refreshUrl();
                     client.invalidateTokenCache();
                 }
                 apiClient = client;
-                
+
                 Log.d(TAG, "✅ Server URL saved, using same instance: " + url);
 
                 Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
@@ -606,21 +665,10 @@ public class LoginActivity extends AppCompatActivity {
         tilServerUrl.setError(null);
         showLoading(true);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ✅✅✅ الإصلاح الجذري: لا نُعيد إنشاء MiraApiClient
-        // ═══════════════════════════════════════════════════════════════
-        // 
-        // السبب: استخدام reloadInstance() كان يُنشئ instance جديد،
-        // بينما MiraBranchesManager يحتفظ بمرجع للـ instance القديم
-        // → تعارض → طلبات مزدوجة → ANR عند Login بعد Logout
-        //
-        // الحل: استخدام نفس الـ instance دائماً + تحديث credentials
-        //
         apiClient = MiraApiClient.getInstance(getApplicationContext());
         if (apiClient != null) {
-            // ✅ إجبار قراءة credentials الجديدة من SessionManager
             apiClient.invalidateTokenCache();
-            apiClient.refreshUrl();  // ← تحديث URL أيضاً (احتياط)
+            apiClient.refreshUrl();
             Log.d(TAG, "✅ Using same MiraApiClient instance, cache invalidated");
         }
 
@@ -700,7 +748,6 @@ public class LoginActivity extends AppCompatActivity {
         Log.d(TAG, "Login Success for user: " + username);
         playTone(true);
 
-        // ✅ تصفير Auto-Lock بعد login ناجح
         if (sessionManager != null) {
             sessionManager.resetAutoLock();
         }
@@ -758,17 +805,13 @@ public class LoginActivity extends AppCompatActivity {
         bm.setActiveBranch(branchId, branchName, branchCode, "", "");
         bm.setUserBranchLocked(true);
 
-        // ═══════════════════════════════════════════════════════════════
-        // ✅✅✅ الإصلاح: لا نُعيد إنشاء MiraApiClient — فقط نحدّث credentials
-        // ═══════════════════════════════════════════════════════════════
         MiraApiClient client = MiraApiClient.getInstance(appContext);
         if (client != null) {
-            // ✅ إجبار قراءة credentials الجديدة (API Key, Token, URL)
             client.invalidateTokenCache();
             client.refreshUrl();
             Log.d(TAG, "✅ Token cache invalidated, using same instance");
         }
-        
+
         showSuccessOverlayAndNavigate();
     }
 
@@ -791,53 +834,48 @@ public class LoginActivity extends AppCompatActivity {
             Executor executor = ContextCompat.getMainExecutor(this);
             biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
                 @Override
-public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-    String lastUser        = sessionManager.getLastBiometricUser();
-    String lastRole        = sessionManager.getLastBiometricRole();
-    String lastDisplayName = sessionManager.getLastBiometricDisplayName();
-    int    lastUserId      = sessionManager.getLastBiometricUserId();
-    String lastToken       = sessionManager.getLastBiometricToken();
+                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                    String lastUser        = sessionManager.getLastBiometricUser();
+                    String lastRole        = sessionManager.getLastBiometricRole();
+                    String lastDisplayName = sessionManager.getLastBiometricDisplayName();
+                    int    lastUserId      = sessionManager.getLastBiometricUserId();
+                    String lastToken       = sessionManager.getLastBiometricToken();
 
-    if (lastUser.isEmpty()) {
-        playTone(false);
-        Toast.makeText(LoginActivity.this,
-                isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
-                Toast.LENGTH_LONG).show();
-        return;
-    }
+                    if (lastUser.isEmpty()) {
+                        playTone(false);
+                        Toast.makeText(LoginActivity.this,
+                                isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
 
-    // ✅ 1) أعد الجلسة دائماً (لا تعتمد على isLoggedIn المخزّن مؤقتاً)
-    sessionManager.createLoginSession(
-            lastUser,
-            lastRole,
-            lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
-            sessionManager.getServerUrl()
-    );
-    sessionManager.setDisplayName(lastDisplayName);
-    sessionManager.setUserId(lastUserId);
+                    sessionManager.createLoginSession(
+                            lastUser,
+                            lastRole,
+                            lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
+                            sessionManager.getServerUrl()
+                    );
+                    sessionManager.setDisplayName(lastDisplayName);
+                    sessionManager.setUserId(lastUserId);
 
-    // ✅ 2) استعد الفرع
-    int savedBranchId = sessionManager.getLastBiometricBranchId();
-    String savedBranchName = sessionManager.getLastBiometricBranchName();
-    if (savedBranchId > 0) {
-        MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
-        bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
-        bm.setUserBranchLocked(true);
-    }
+                    int savedBranchId = sessionManager.getLastBiometricBranchId();
+                    String savedBranchName = sessionManager.getLastBiometricBranchName();
+                    if (savedBranchId > 0) {
+                        MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+                        bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                        bm.setUserBranchLocked(true);
+                    }
 
-    // ✅ 3) أنشئ مستخدماً بيومترياً احتياطياً لو غير موجود
-    if (sessionManager.getLastBiometricUser().isEmpty() == false) {
-        sessionManager.saveBiometricUser(lastUser, lastRole, lastDisplayName, lastUserId, lastToken);
-    }
+                    if (sessionManager.getLastBiometricUser().isEmpty() == false) {
+                        sessionManager.saveBiometricUser(lastUser, lastRole, lastDisplayName, lastUserId, lastToken);
+                    }
 
-    // ✅ 4) صفّر Auto-Lock + أخطاء
-    sessionManager.resetAutoLock();
-    resetFailedAttempts();
-    playTone(true);
+                    sessionManager.resetAutoLock();
+                    resetFailedAttempts();
+                    playTone(true);
 
-    // ✅ 5) انتقل
-    showSuccessOverlayAndNavigate();
-}
+                    showSuccessOverlayAndNavigate();
+                }
 
                 @Override
                 public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
@@ -929,7 +967,6 @@ public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationRes
                     bm.setUserBranchLocked(true);
                 }
 
-                // ✅ تصفير Auto-Lock بعد offline login ناجح
                 sessionManager.resetAutoLock();
 
                 return true;
@@ -960,11 +997,6 @@ public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationRes
         return salt;
     }
 
-    /**
-     * ✅ Wrapper حول MiraSoundManager
-     *    isSuccess=true  → LOGIN_SUCCESS
-     *    isSuccess=false → LOGIN_FAILED
-     */
     private void playTone(boolean isSuccess) {
         if (soundManager == null) return;
         soundManager.play(isSuccess
