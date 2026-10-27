@@ -45,7 +45,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:indeterminate="true"
-            app:indicatorColor="?attr/colorPrimary"
+            app:indicatorColor="@color/luxury_gold_accent"
             app:indicatorSize="48dp"
             app:trackThickness="4dp" />
     </LinearLayout>
@@ -114,13 +114,13 @@
                                 
                                 <!-- النقشة المائية -->
                                 <ImageView
-                                    android:layout_width="160dp"
-                                    android:layout_height="160dp"
+                                    android:layout_width="140dp"
+                                    android:layout_height="140dp"
                                     android:layout_gravity="bottom|start"
                                     android:layout_marginStart="-20dp"
                                     android:layout_marginBottom="-20dp"
                                     android:src="@drawable/bg_gold_watermark"
-                                    android:alpha="0.08" />
+                                    android:alpha="0.04" />
 
                                 <androidx.constraintlayout.widget.ConstraintLayout
                                     android:layout_width="match_parent"
@@ -144,7 +144,7 @@
                                         android:layout_height="28dp"
                                         android:background="?attr/selectableItemBackgroundBorderless"
                                         android:src="@android:drawable/ic_popup_sync"
-                                        app:tint="#C49B3F"
+                                        app:tint="@color/luxury_gold_accent"
                                         app:layout_constraintTop_toTopOf="parent"
                                         app:layout_constraintEnd_toEndOf="parent" />
                                         
@@ -154,7 +154,7 @@
                                         android:layout_height="wrap_content"
                                         android:indeterminate="true"
                                         android:visibility="gone"
-                                        app:indicatorColor="#C49B3F"
+                                        app:indicatorColor="@color/luxury_gold_accent"
                                         app:indicatorSize="16dp"
                                         app:trackThickness="2dp"
                                         app:layout_constraintTop_toTopOf="@id/btnRefreshGold"
@@ -167,7 +167,7 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="$0.00"
-                                        android:textColor="#C49B3F"
+                                        android:textColor="@color/luxury_gold_accent"
                                         android:textSize="34sp"
                                         android:textStyle="bold"
                                         app:layout_constraintTop_toBottomOf="@id/tvGoldTitle"
@@ -207,7 +207,6 @@
                                         app:layout_constraintStart_toEndOf="@id/tvGoldPrice21"
                                         tools:text="18K: $0.00" />
 
-                                    <!-- Mini Chart for Gold Trend -->
                                     <com.github.mikephil.charting.charts.LineChart
                                         android:id="@+id/miniChartGold"
                                         android:layout_width="match_parent"
@@ -243,13 +242,13 @@
                                 
                                 <!-- النقشة المائية -->
                                 <ImageView
-                                    android:layout_width="200dp"
-                                    android:layout_height="200dp"
+                                    android:layout_width="180dp"
+                                    android:layout_height="180dp"
                                     android:layout_gravity="top|end"
-                                    android:layout_marginEnd="-30dp"
-                                    android:layout_marginTop="-30dp"
+                                    android:layout_marginEnd="-40dp"
+                                    android:layout_marginTop="-40dp"
                                     android:src="@drawable/bg_gold_watermark"
-                                    android:alpha="0.08" />
+                                    android:alpha="0.04" />
 
                                 <androidx.constraintlayout.widget.ConstraintLayout
                                     android:layout_width="match_parent"
@@ -273,7 +272,7 @@
                                         android:layout_height="28dp"
                                         android:background="?attr/selectableItemBackgroundBorderless"
                                         android:src="@drawable/ic_eye_off"
-                                        app:tint="#C49B3F"
+                                        app:tint="@color/luxury_gold_accent"
                                         app:layout_constraintTop_toTopOf="parent"
                                         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -282,7 +281,7 @@
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text="••••••••"
-                                        android:textColor="?attr/colorOnSurface"
+                                        android:textColor="@color/luxury_gold_accent"
                                         android:textSize="34sp"
                                         android:textStyle="bold"
                                         app:layout_constraintTop_toBottomOf="@id/tvHeroTitle"
@@ -300,7 +299,7 @@
                                         app:layout_constraintStart_toStartOf="parent"
                                         android:layout_marginTop="4dp"/>
 
-                                    <!-- Mini Chart for Inventory Karats -->
+                                    <!-- إخفاء الرسم الدائري هنا لتجنب الحلقة الفارغة -->
                                     <com.github.mikephil.charting.charts.PieChart
                                         android:id="@+id/miniChartInventory"
                                         android:layout_width="80dp"
@@ -335,12 +334,12 @@
                                 android:background="@drawable/bg_luxury_card">
 
                                 <ImageView
-                                    android:layout_width="180dp"
-                                    android:layout_height="180dp"
+                                    android:layout_width="160dp"
+                                    android:layout_height="160dp"
                                     android:layout_gravity="center"
                                     android:layout_marginTop="40dp"
                                     android:src="@drawable/bg_gold_watermark"
-                                    android:alpha="0.08" />
+                                    android:alpha="0.04" />
 
                                 <androidx.constraintlayout.widget.ConstraintLayout
                                     android:layout_width="match_parent"
@@ -364,7 +363,7 @@
                                         android:layout_height="28dp"
                                         android:background="?attr/selectableItemBackgroundBorderless"
                                         android:src="@drawable/ic_eye_off"
-                                        app:tint="#C49B3F"
+                                        app:tint="@color/luxury_gold_accent"
                                         app:layout_constraintTop_toTopOf="parent"
                                         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -383,7 +382,7 @@
                                             android:layout_weight="1"
                                             android:orientation="vertical">
                                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="اليوم" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                            <TextView android:id="@+id/tvSalesToday" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
+                                            <TextView android:id="@+id/tvSalesToday" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/luxury_gold_accent" android:textSize="16sp" android:textStyle="bold"/>
                                         </LinearLayout>
 
                                         <LinearLayout
@@ -392,7 +391,7 @@
                                             android:layout_weight="1"
                                             android:orientation="vertical">
                                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الشهر" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                            <TextView android:id="@+id/tvSalesMonth" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
+                                            <TextView android:id="@+id/tvSalesMonth" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/luxury_gold_accent" android:textSize="16sp" android:textStyle="bold"/>
                                         </LinearLayout>
 
                                         <LinearLayout
@@ -401,7 +400,7 @@
                                             android:layout_weight="1"
                                             android:orientation="vertical">
                                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="السنة" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                            <TextView android:id="@+id/tvSalesYear" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
+                                            <TextView android:id="@+id/tvSalesYear" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/luxury_gold_accent" android:textSize="16sp" android:textStyle="bold"/>
                                         </LinearLayout>
                                     </LinearLayout>
 
