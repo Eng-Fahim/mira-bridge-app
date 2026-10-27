@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -68,7 +67,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.widget.LinearLayout;
-
+import android.view.ViewGroup;
+/**
+ * MiraDashboardFragment v3.0 — Carousel Edition & Charts (Theme-Aware)
+ */
 public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboardFragment";
@@ -97,9 +99,6 @@ public class MiraDashboardFragment extends Fragment {
     private View dot1, dot2, dot3;
     private LineChart lineChartSales;
     private PieChart pieChartKarat;
-    
-    // ✅ تمت إضافة متغيرات النصوص البديلة
-    private TextView tvNoSalesData, tvNoPieData;
 
     private double currentScrapWeight = 0;
     private double currentScrapValue = 0;
@@ -115,6 +114,7 @@ public class MiraDashboardFragment extends Fragment {
 
     // UI Elements
     private ImageButton btnToggleHeroVisibility, btnToggleSalesVisibility, btnToggleInventoryVisibility;
+
     private android.widget.LinearLayout llInventoryByKarat;
     private TextView tvKaratEmptyState;
     private final List<KaratInventory> currentInventoryByKarat = new ArrayList<>();
@@ -141,9 +141,6 @@ public class MiraDashboardFragment extends Fragment {
     private android.widget.LinearLayout llRecentActivity;
     private TextView tvViewAllActivity;
 
-    // Quick Actions
-    private View btnQuickPos, btnQuickInventory, btnQuickScrap, btnQuickReports;
-
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
@@ -168,7 +165,6 @@ public class MiraDashboardFragment extends Fragment {
     private final AtomicBoolean isGoldRefreshing = new AtomicBoolean(false);
     private boolean isDataLoaded = false;
     private long lastDataFetchTime = 0, lastGoldFetchTime = 0;
-    private boolean isFirstLoad = true;
 
     private double currentInventoryValue = 0;
     private int currentItemCount = 0;
@@ -319,53 +315,18 @@ public class MiraDashboardFragment extends Fragment {
             startAutoRefresh();
             lastDataFetchTime = 0;
 
+            // جلب البيانات والرسوم البيانية فوراً
             fetchData();
             fetchDashboardCharts();
             fetchRecentActivity();
             if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
 
-            if (isFirstLoad) {
-                animateViewsIn(view);
-                isFirstLoad = false;
-            }
-
         } catch (Throwable e) { logNonFatal("onViewCreated", e); }
-    }
-
-    private void animateViewsIn(View root) {
-        if (root == null || !isAdded()) return;
-        try {
-            View[] views = {
-                root.findViewById(R.id.horizontalScrollCarousel), 
-                root.findViewById(R.id.dot1) != null ? (View)root.findViewById(R.id.dot1).getParent() : null, 
-                root.findViewById(R.id.alertsStrip), 
-                root.findViewById(R.id.cardInventoryByKarat), 
-                root.findViewById(R.id.cardScrapGold), 
-                root.findViewById(R.id.cardScrapAging), 
-                root.findViewById(R.id.cardSalesTrend),
-                root.findViewById(R.id.btnQuickPos) != null ? (View)root.findViewById(R.id.btnQuickPos).getParent() : null
-            };
-            
-            int delay = 100;
-            for (View view : views) {
-                if (view != null) {
-                    view.setAlpha(0f);
-                    view.setTranslationY(50f);
-                    view.animate()
-                        .alpha(1f)
-                        .translationY(0f)
-                        .setDuration(400)
-                        .setStartDelay(delay)
-                        .setInterpolator(new android.view.animation.DecelerateInterpolator())
-                        .start();
-                    delay += 100;
-                }
-            }
-        } catch (Exception e) { logNonFatal("animateViewsIn", e); }
     }
 
     private void initViews(View v) {
         try {
+            // 1. ربط عناصر الكاروسيل (HorizontalScrollView)
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
             dot1 = v.findViewById(R.id.dot1);
             dot2 = v.findViewById(R.id.dot2);
@@ -373,7 +334,9 @@ public class MiraDashboardFragment extends Fragment {
 
             heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-            
+            View salesSummaryCard = v.findViewById(R.id.salesSummaryCard);
+
+            // بطاقة المخزون
             tvHeroBalance   = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend     = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle  = v.findViewById(R.id.tvHeroSubtitle);
@@ -383,11 +346,13 @@ public class MiraDashboardFragment extends Fragment {
             tvHeroItemCount = v.findViewById(R.id.tvHeroItemCount);
             btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
 
+            // بطاقة المبيعات
             tvSalesToday = v.findViewById(R.id.tvSalesToday);
             tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
             tvSalesYear  = v.findViewById(R.id.tvSalesYear);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
+            // بطاقة الذهب
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
@@ -399,6 +364,7 @@ public class MiraDashboardFragment extends Fragment {
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             pbGoldLoading  = v.findViewById(R.id.pbGoldLoading);
 
+            // باقي العناصر
             llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
             tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
@@ -410,6 +376,7 @@ public class MiraDashboardFragment extends Fragment {
             tvAlertAction = v.findViewById(R.id.tvAlertAction);
             btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility);
 
+            // Scrap Gold
             tvScrapWeight = v.findViewById(R.id.tvScrapWeight);
             tvScrapValue = v.findViewById(R.id.tvScrapValue);
             btnToggleScrapVisibility = v.findViewById(R.id.btnToggleScrapVisibility);
@@ -417,6 +384,7 @@ public class MiraDashboardFragment extends Fragment {
             View btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
             View btnOpenScrapBatches = v.findViewById(R.id.btnOpenScrapBatches);
 
+            // Scrap Aging
             cardScrapAging = v.findViewById(R.id.cardScrapAging);
             tvAgingStatusIcon = v.findViewById(R.id.tvAgingStatusIcon);
             tvAgingStatusLabel = v.findViewById(R.id.tvAgingStatusLabel);
@@ -426,65 +394,71 @@ public class MiraDashboardFragment extends Fragment {
             tvAgingAlertText = v.findViewById(R.id.tvAgingAlertText);
             btnOpenAgingReport = v.findViewById(R.id.btnOpenAgingReport);
 
+            // Recent Activity & Charts
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
             lineChartSales = v.findViewById(R.id.lineChartSales);
             pieChartKarat = v.findViewById(R.id.pieChartKarat);
-            
-            // ✅ ربط النصوص البديلة
-            tvNoSalesData = v.findViewById(R.id.tvNoSalesData);
-            tvNoPieData = v.findViewById(R.id.tvNoPieData);
 
-            btnQuickPos = v.findViewById(R.id.btnQuickPos);
-            btnQuickInventory = v.findViewById(R.id.btnQuickInventory);
-            btnQuickScrap = v.findViewById(R.id.btnQuickScrap);
-            btnQuickReports = v.findViewById(R.id.btnQuickReports);
-
+            // ═══════ إعداد الأحداث (Listeners) ═══════
             if (hsvCarousel != null) {
                 final android.widget.LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
 
+                // 1. التأثير الهندسي عند السحب
                 hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
                     if (!isAdded() || getContext() == null) return;
+
                     int screenWidth = getResources().getDisplayMetrics().widthPixels;
-                    int screenCenter = scrollX + (screenWidth / 2);
+                    int screenCenter = screenWidth / 2;
                     int activeCardIndex = 0;
                     float minDistance = Float.MAX_VALUE;
 
                     for (int i = 0; i < cardsContainer.getChildCount(); i++) {
                         View card = cardsContainer.getChildAt(i);
-                        int cardCenter = card.getLeft() + (card.getWidth() / 2);
-                        int distance = Math.abs(cardCenter - screenCenter);
 
-                        if (distance < minDistance) {
-                            minDistance = distance;
+                        int cardCenter = card.getLeft() + (card.getWidth() / 2) - scrollX;
+                        int distance = cardCenter - screenCenter;
+
+                        if (Math.abs(distance) < minDistance) {
+                            minDistance = Math.abs(distance);
                             activeCardIndex = i;
                         }
 
-                        float percent = Math.min(1f, (float) distance / (screenWidth / 2.0f));
-                        card.setRotationY(0f); 
-                        
-                        float minScale = 0.92f; 
+                        float percent = Math.min(1f, Math.abs((float) distance / (screenWidth / 2.0f)));
+
+                        float maxRotation = 12f;
+                        float rotation = (distance > 0 ? 1 : -1) * (percent * maxRotation);
+                        card.setRotationY(rotation);
+                        card.setCameraDistance(8000f);
+
+                        float minScale = 0.85f;
                         float scale = 1f - (percent * (1f - minScale));
                         card.setScaleX(scale);
                         card.setScaleY(scale);
 
-                        float minAlpha = 0.75f; 
-                        card.setAlpha(1f - (percent * (1f - minAlpha)));
+                        card.setAlpha(1f);
                     }
 
-                    if (dot1 != null) dot1.setBackgroundResource(activeCardIndex == 0 ? R.drawable.dot_active : R.drawable.dot_inactive);
-                    if (dot2 != null) dot2.setBackgroundResource(activeCardIndex == 1 ? R.drawable.dot_active : R.drawable.dot_inactive);
-                    if (dot3 != null) dot3.setBackgroundResource(activeCardIndex == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
+                    dot1.setBackgroundResource(activeCardIndex == 0 ? R.drawable.dot_active : R.drawable.dot_inactive);
+                    dot2.setBackgroundResource(activeCardIndex == 1 ? R.drawable.dot_active : R.drawable.dot_inactive);
+                    dot3.setBackgroundResource(activeCardIndex == 2 ? R.drawable.dot_active : R.drawable.dot_inactive);
                 });
 
+                // 2. التمرير التلقائي للبطاقة الوسطى (المخزون) عند فتح الشاشة
                 hsvCarousel.post(() -> {
                     if (!isAdded() || getContext() == null) return;
+
                     if (cardsContainer != null && cardsContainer.getChildCount() > 1) {
                         View middleCard = cardsContainer.getChildAt(1);
                         if (middleCard != null) {
                             int screenWidth = getResources().getDisplayMetrics().widthPixels;
                             int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
+
                             hsvCarousel.smoothScrollTo(scrollToX, 0);
+
+                            if (dot1 != null) dot1.setBackgroundResource(R.drawable.dot_inactive);
+                            if (dot2 != null) dot2.setBackgroundResource(R.drawable.dot_active);
+                            if (dot3 != null) dot3.setBackgroundResource(R.drawable.dot_inactive);
                         }
                     }
                 });
@@ -507,24 +481,22 @@ public class MiraDashboardFragment extends Fragment {
                 else btnRefreshGold.setOnClickListener(v2 -> { if (!isGoldRefreshing.get()) fetchLiveGoldPrices(true); });
             }
 
-            if (btnQuickPos != null) btnQuickPos.setOnClickListener(v2 -> navigateToFragment(new MiraPosFragment(), "Sales"));
-            if (btnQuickInventory != null) btnQuickInventory.setOnClickListener(v2 -> navigateToFragment(new MiraInventoryFragment(), "Inventory"));
-            if (btnQuickScrap != null) btnQuickScrap.setOnClickListener(v2 -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
-            if (btnQuickReports != null) btnQuickReports.setOnClickListener(v2 -> navigateToFragment(new MiraReportsFragment(), "Reports"));
-
             if (cardGoldPrices != null && permissionManager != null && !permissionManager.canAccessFragment("GoldRates")) cardGoldPrices.setVisibility(View.GONE);
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
                 swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
+            // إخفاء القيم افتراضياً
             isHeroHidden = true; isSalesHidden = true; isInventoryHidden = true; isScrapHidden = true;
             if (btnToggleHeroVisibility != null) btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null) btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleInventoryVisibility != null) btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleScrapVisibility != null) btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
 
+            // ✅ تطبيق الثيم على الرسوم البيانية عند إنشاء الواجهة
             applyCarouselLayout();
+            // ✅ تطبيق الثيم على الرسوم البيانية عند إنشاء الواجهة
             applyChartTheme();
 
             updateHeroBalance();
@@ -548,192 +520,217 @@ public class MiraDashboardFragment extends Fragment {
         });
     }
 
+    // ✅ نسخة محسّنة تحترم الثيم (Light / Dark)
     private void renderCharts(JSONObject data) {
         try {
+            // تطبيق الثيم أولاً (قبل ضبط البيانات) لضمان محاور صحيحة
             applyChartTheme();
 
-            // ✅ التعديل الأول: التحقق من وجود بيانات المبيعات
+            // ═══════ LineChart: المبيعات آخر 7 أيام ═══════
             JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
-            if (sales7Days == null || sales7Days.length() == 0) {
-                if (lineChartSales != null) lineChartSales.setVisibility(View.GONE);
-                if (tvNoSalesData != null) tvNoSalesData.setVisibility(View.VISIBLE);
-            } else {
-                if (lineChartSales != null) lineChartSales.setVisibility(View.VISIBLE);
-                if (tvNoSalesData != null) tvNoSalesData.setVisibility(View.GONE);
-
-                if (lineChartSales != null) {
-                    List<Entry> entries = new ArrayList<>();
-                    final List<String> labels = new ArrayList<>();
-                    for (int i = 0; i < sales7Days.length(); i++) {
-                        JSONObject day = sales7Days.getJSONObject(i);
-                        entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
-                        labels.add(day.optString("date", ""));
-                    }
-
-                    int goldColor = Color.parseColor("#C49B3F");
-                    LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-                    dataSet.setColor(goldColor);
-                    dataSet.setCircleColor(goldColor);
-                    dataSet.setLineWidth(2.5f);
-                    dataSet.setCircleRadius(4f);
-                    dataSet.setDrawValues(false);
-                    dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-
-                    dataSet.setDrawFilled(true);
-                    try {
-                        Drawable drawable = ContextCompat.getDrawable(requireContext(), R.drawable.bg_chart_gradient_gold);
-                        dataSet.setFillDrawable(drawable);
-                    } catch (Exception e) {
-                        dataSet.setFillColor(goldColor);
-                        dataSet.setFillAlpha(40);
-                    }
-
-                    LineData lineData = new LineData(dataSet);
-                    lineChartSales.setData(lineData);
-
-                    XAxis xAxis = lineChartSales.getXAxis();
-                    xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-                    xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-                    xAxis.setGranularity(1f);
-                    xAxis.setDrawGridLines(false);
-
-                    lineChartSales.getAxisRight().setEnabled(false);
-                    lineChartSales.getAxisLeft().setDrawGridLines(true);
-                    lineChartSales.getDescription().setEnabled(false);
-                    lineChartSales.getLegend().setEnabled(false);
-                    lineChartSales.animateX(1000);
-                    lineChartSales.invalidate();
+            if (sales7Days != null && lineChartSales != null) {
+                List<Entry> entries = new ArrayList<>();
+                final List<String> labels = new ArrayList<>();
+                for (int i = 0; i < sales7Days.length(); i++) {
+                    JSONObject day = sales7Days.getJSONObject(i);
+                    entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                    labels.add(day.optString("date", ""));
                 }
+
+                int goldColor = Color.parseColor("#D4AF37");
+                LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+                dataSet.setColor(goldColor);
+                dataSet.setCircleColor(goldColor);
+                dataSet.setLineWidth(2.5f);
+                dataSet.setCircleRadius(4f);
+                dataSet.setDrawValues(false);
+                dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+
+                LineData lineData = new LineData(dataSet);
+                lineChartSales.setData(lineData);
+
+                XAxis xAxis = lineChartSales.getXAxis();
+                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setGranularity(1f);
+                xAxis.setDrawGridLines(false);
+
+                lineChartSales.getAxisRight().setEnabled(false);
+                lineChartSales.getAxisLeft().setDrawGridLines(true);
+                lineChartSales.getDescription().setEnabled(false);
+                lineChartSales.getLegend().setEnabled(false);
+                lineChartSales.animateX(1000);
+                lineChartSales.invalidate();
             }
 
-            // ✅ التعديل الثاني: التحقق من وجود بيانات العيارات
+            // ═══════ PieChart: المبيعات حسب العيار ═══════
             JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
-            if (salesByKarat == null || salesByKarat.length() == 0) {
-                if (pieChartKarat != null) pieChartKarat.setVisibility(View.GONE);
-                if (tvNoPieData != null) tvNoPieData.setVisibility(View.VISIBLE);
-            } else {
-                if (pieChartKarat != null) pieChartKarat.setVisibility(View.VISIBLE);
-                if (tvNoPieData != null) tvNoPieData.setVisibility(View.GONE);
+            if (salesByKarat != null && pieChartKarat != null) {
+                List<PieEntry> entries = new ArrayList<>();
+                for (int i = 0; i < salesByKarat.length(); i++) {
+                    JSONObject k = salesByKarat.getJSONObject(i);
+                    entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
+                }
+                if (!entries.isEmpty()) {
+                    PieDataSet dataSet = new PieDataSet(entries, "");
+                    List<Integer> colors = new ArrayList<>();
+                    colors.add(Color.parseColor("#D4AF37"));
+                    colors.add(Color.parseColor("#E6B800"));
+                    colors.add(Color.parseColor("#CD853F"));
+                    colors.add(Color.parseColor("#A0522D"));
+                    dataSet.setColors(colors);
+                    dataSet.setValueTextSize(12f);
 
-                if (pieChartKarat != null) {
-                    List<PieEntry> entries = new ArrayList<>();
-                    for (int i = 0; i < salesByKarat.length(); i++) {
-                        JSONObject k = salesByKarat.getJSONObject(i);
-                        entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
-                    }
-                    if (!entries.isEmpty()) {
-                        PieDataSet dataSet = new PieDataSet(entries, "");
-                        List<Integer> colors = new ArrayList<>();
-                        colors.add(Color.parseColor("#D4AF37"));
-                        colors.add(Color.parseColor("#E6B800"));
-                        colors.add(Color.parseColor("#CD853F"));
-                        colors.add(Color.parseColor("#A0522D"));
-                        dataSet.setColors(colors);
-                        dataSet.setValueTextSize(12f);
-
-                        PieData pieData = new PieData(dataSet);
-                        pieChartKarat.setData(pieData);
-                        pieChartKarat.getDescription().setEnabled(false);
-                        pieChartKarat.setUsePercentValues(true);
-                        pieChartKarat.setHoleRadius(40f);
-                        pieChartKarat.setTransparentCircleRadius(45f);
-                        pieChartKarat.animateY(1000);
-                        pieChartKarat.invalidate();
-                    }
+                    PieData pieData = new PieData(dataSet);
+                    pieChartKarat.setData(pieData);
+                    pieChartKarat.getDescription().setEnabled(false);
+                    pieChartKarat.setUsePercentValues(true);
+                    pieChartKarat.setHoleRadius(40f);
+                    pieChartKarat.setTransparentCircleRadius(45f);
+                    pieChartKarat.animateY(1000);
+                    pieChartKarat.invalidate();
                 }
             }
+
+            // ✅ تطبيق الثيم ثانية بعد setData() لأن هذه الألوان تُعاد كتابتها
             applyChartTheme();
+
         } catch (Exception e) { logNonFatal("renderCharts", e); }
     }
 
+    /**
+     * ✅ دالة تطبيق الثيم على الرسوم البيانية
+     * تقرأ الألوان من Material Theme (Light/Dark تلقائياً)
+     * وتستخدم احتياطياً قيم افتراضية في حال عدم توفر السمة
+     */
     private void applyChartTheme() {
         if (!isAdded() || getContext() == null) return;
         View anchor = getView();
         if (anchor == null) return;
+
         Context ctx = requireContext();
         try {
-            int onSurface, onSurfaceVariant;
+            // ألوان من Material Theme مع fallback آمن
+            int onSurface, onSurfaceVariant, surfaceColor;
             try {
-                onSurface        = MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorOnSurface, isNightMode() ? 0xFFFFFFFF : 0xFF212121);
-                onSurfaceVariant = MaterialColors.getColor(anchor, com.google.android.material.R.attr.colorOnSurfaceVariant, isNightMode() ? 0xFFBBBBBB : 0xFF666666);
+                onSurface        = MaterialColors.getColor(anchor,
+                        com.google.android.material.R.attr.colorOnSurface,
+                        isNightMode() ? 0xFFFFFFFF : 0xFF212121);
+                onSurfaceVariant = MaterialColors.getColor(anchor,
+                        com.google.android.material.R.attr.colorOnSurfaceVariant,
+                        isNightMode() ? 0xFFBBBBBB : 0xFF666666);
+                surfaceColor     = MaterialColors.getColor(anchor,
+                        com.google.android.material.R.attr.colorSurface,
+                        isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF);
             } catch (Throwable t) {
                 onSurface        = isNightMode() ? 0xFFFFFFFF : 0xFF212121;
                 onSurfaceVariant = isNightMode() ? 0xFFBBBBBB : 0xFF666666;
+                surfaceColor     = isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF;
             }
-            int chartGrid, chartAxisText;
-            try { chartGrid = ContextCompat.getColor(ctx, R.color.chart_grid); } catch (Exception e) { chartGrid = isNightMode() ? 0x33FFFFFF : 0x33000000; }
-            try { chartAxisText = ContextCompat.getColor(ctx, R.color.chart_axis_text); } catch (Exception e) { chartAxisText = isNightMode() ? 0xFFBBBBBB : 0xFF666666; }
 
+            // ألوان الشبكة والمحاور من resources أو احتياطياً
+            int chartGrid;
+            int chartAxisText;
+            try { chartGrid = ContextCompat.getColor(ctx, R.color.chart_grid); }
+            catch (Exception e) { chartGrid = isNightMode() ? 0x33FFFFFF : 0x33000000; }
+
+            try { chartAxisText = ContextCompat.getColor(ctx, R.color.chart_axis_text); }
+            catch (Exception e) { chartAxisText = isNightMode() ? 0xFFBBBBBB : 0xFF666666; }
+
+            // ═══════ LineChart ═══════
             if (lineChartSales != null) {
                 XAxis x = lineChartSales.getXAxis();
                 x.setTextColor(chartAxisText);
                 x.setAxisLineColor(chartGrid);
                 x.setTextSize(10f);
+
                 lineChartSales.getAxisLeft().setTextColor(chartAxisText);
                 lineChartSales.getAxisLeft().setGridColor(chartGrid);
                 lineChartSales.getAxisLeft().setAxisLineColor(chartGrid);
                 lineChartSales.getAxisLeft().setTextSize(10f);
+
                 lineChartSales.getAxisRight().setTextColor(chartAxisText);
                 lineChartSales.getLegend().setTextColor(onSurface);
                 lineChartSales.setNoDataTextColor(onSurfaceVariant);
                 lineChartSales.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
             }
+
+            // ═══════ PieChart ═══════
             if (pieChartKarat != null) {
+                // النص داخل القطاعات (النسب المئوية)
                 if (pieChartKarat.getData() != null && pieChartKarat.getData().getDataSet() != null) {
                     pieChartKarat.getData().getDataSet().setValueTextColor(onSurface);
                 }
+                // النص خارج القطاعات (تسميات العيار)
                 pieChartKarat.setEntryLabelColor(onSurfaceVariant);
-                pieChartKarat.setHoleColor(Color.TRANSPARENT);
-                pieChartKarat.setTransparentCircleColor(Color.TRANSPARENT);
+                // لون "ثقب" الدونات = سطح الثيم
+                pieChartKarat.setHoleColor(surfaceColor);
+                pieChartKarat.setTransparentCircleColor(surfaceColor);
+                pieChartKarat.setTransparentCircleAlpha(120);
                 pieChartKarat.getLegend().setTextColor(onSurface);
                 pieChartKarat.setNoDataTextColor(onSurfaceVariant);
                 pieChartKarat.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
             }
-        } catch (Exception e) { logNonFatal("applyChartTheme", e); }
+        } catch (Exception e) {
+            logNonFatal("applyChartTheme", e);
+        }
+    }
+/**
+ * ✅ يحسب عرض البطاقات ديناميكياً بناءً على حجم الشاشة
+ * - البطاقة تشغل ~78% من عرض الشاشة
+ * - الحد الأدنى 260dp، الأقصى 340dp
+ * - يضبط paddingHorizontal للـ ScrollView بحيث تكون البطاقة الوسطى متمركزة
+ */
+private void applyCarouselLayout() {
+    if (!isAdded() || getContext() == null) return;
+    if (hsvCarousel == null) return;
+
+    View cardsContainer = hsvCarousel.findViewById(R.id.cardsContainer);
+    if (cardsContainer == null || !(cardsContainer instanceof ViewGroup)) return;
+    ViewGroup container = (ViewGroup) cardsContainer;
+
+    float density = getResources().getDisplayMetrics().density;
+    int screenWidth = getResources().getDisplayMetrics().widthPixels;
+
+    // عرض البطاقة = 78% من الشاشة، بين 260dp و 340dp
+    int cardWidthPx = (int) (screenWidth * 0.78f);
+    int minWidth = (int) (260 * density);
+    int maxWidth = (int) (340 * density);
+    if (cardWidthPx < minWidth) cardWidthPx = minWidth;
+    if (cardWidthPx > maxWidth) cardWidthPx = maxWidth;
+
+    // الهامش الجانبي = (عرض الشاشة - عرض البطاقة) / 2
+    int sidePadding = (screenWidth - cardWidthPx) / 2;
+    if (sidePadding < (int) (24 * density)) sidePadding = (int) (24 * density);
+
+    hsvCarousel.setClipToPadding(false);
+    hsvCarousel.setPadding(sidePadding, 0, sidePadding, 0);
+
+    // تطبيق العرض على البطاقات
+    for (int i = 0; i < container.getChildCount(); i++) {
+        View child = container.getChildAt(i);
+        ViewGroup.LayoutParams lp = child.getLayoutParams();
+        if (lp.width != cardWidthPx) {
+            lp.width = cardWidthPx;
+            child.setLayoutParams(lp);
+        }
     }
 
-    private void applyCarouselLayout() {
+    // إعادة تمركز البطاقة الوسطى
+    hsvCarousel.post(() -> {
         if (!isAdded() || getContext() == null) return;
-        if (hsvCarousel == null) return;
-
-        View cardsContainer = hsvCarousel.findViewById(R.id.cardsContainer);
-        if (cardsContainer == null || !(cardsContainer instanceof ViewGroup)) return;
-        ViewGroup container = (ViewGroup) cardsContainer;
-
-        float density = getResources().getDisplayMetrics().density;
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-
-        int cardWidthPx = (int) (screenWidth * 0.80f);
-        int minWidth = (int) (260 * density);
-        if (cardWidthPx < minWidth) cardWidthPx = minWidth;
-
-        int sidePadding = (screenWidth - cardWidthPx) / 2;
-        if (sidePadding < (int) (16 * density)) sidePadding = (int) (16 * density);
-
-        hsvCarousel.setClipToPadding(false);
-        hsvCarousel.setPadding(sidePadding, 0, sidePadding, 0);
-
-        for (int i = 0; i < container.getChildCount(); i++) {
-            View child = container.getChildAt(i);
-            ViewGroup.LayoutParams lp = child.getLayoutParams();
-            if (lp.width != cardWidthPx) {
-                lp.width = cardWidthPx;
-                child.setLayoutParams(lp);
+        if (container.getChildCount() > 1) {
+            View middleCard = container.getChildAt(1);
+            if (middleCard != null) {
+                int scrollToX = middleCard.getLeft()
+                        - (screenWidth / 2)
+                        + (middleCard.getWidth() / 2);
+                hsvCarousel.smoothScrollTo(scrollToX, 0);
             }
         }
-
-        hsvCarousel.post(() -> {
-            if (!isAdded() || getContext() == null) return;
-            if (container.getChildCount() > 1) {
-                View middleCard = container.getChildAt(1);
-                if (middleCard != null) {
-                    int scrollToX = middleCard.getLeft() - (screenWidth / 2) + (middleCard.getWidth() / 2);
-                    hsvCarousel.smoothScrollTo(scrollToX, 0);
-                }
-            }
-        });
-    }
-
+    });
+}
+    /** ✅ كشف الوضع الليلي */
     private boolean isNightMode() {
         try {
             int nightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
@@ -742,7 +739,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void updateHeader() {}
-    
+
     private void renderInventoryByKarat(List<KaratInventory> items) {
         if (llInventoryByKarat == null) return;
         try {
@@ -1475,6 +1472,7 @@ public class MiraDashboardFragment extends Fragment {
             }
             startAutoRefresh();
 
+            // ✅ إعادة تطبيق الثيم على الرسوم عند العودة (في حال تغيّر الوضع الليلي)
             mainHandler.post(() -> {
                 if (isAdded() && isViewInitialized) applyChartTheme();
             });
@@ -1499,23 +1497,24 @@ public class MiraDashboardFragment extends Fragment {
     @Override
     public void onStop() { super.onStop(); hideSensitiveValuesOnExit(); }
 
+    // ✅ معالجة تغيير الثيم (Dark/Light) أثناء التشغيل دون الحاجة لإعادة إنشاء الشاشة
     @Override
-    public void onConfigurationChanged(@NonNull Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        try {
-            isArabic = newConfig.getLocales().get(0).getLanguage().equals("ar");
-            mainHandler.post(() -> {
-                if (isAdded() && isViewInitialized) {
-                    applyCarouselLayout();
-                    applyChartTheme();
-                    if (lineChartSales != null) lineChartSales.invalidate();
-                    if (pieChartKarat != null) pieChartKarat.invalidate();
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("onConfigurationChanged", e);
-        }
+public void onConfigurationChanged(@NonNull Configuration newConfig) {
+    super.onConfigurationChanged(newConfig);
+    try {
+        isArabic = newConfig.getLocales().get(0).getLanguage().equals("ar");
+        mainHandler.post(() -> {
+            if (isAdded() && isViewInitialized) {
+                applyCarouselLayout();  // ✅ لإعادة الحساب عند الدوران
+                applyChartTheme();
+                if (lineChartSales != null) lineChartSales.invalidate();
+                if (pieChartKarat != null) pieChartKarat.invalidate();
+            }
+        });
+    } catch (Exception e) {
+        logNonFatal("onConfigurationChanged", e);
     }
+}
 
     @Override
     public void onDestroyView() {
