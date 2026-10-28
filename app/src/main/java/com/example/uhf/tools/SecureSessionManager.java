@@ -378,7 +378,15 @@ public class SecureSessionManager {
         String serverUrl    = getServerUrl();
         String lastUsername = getLastUsername();
         String gateId       = getGateId();
-
+        // ⚡ MIRA License: preserve device activation
+String activationToken = getActivationToken();
+String deviceUuid      = getDeviceUuid();
+String licenseType     = getLicenseType();
+String licenseFrom     = getLicenseValidFrom();
+String licenseUntil    = getLicenseValidUntil();
+int    licenseMaxDev   = getLicenseMaxDevices();
+int    licenseMaxUsr   = getLicenseMaxUsers();
+long   activationAt    = getActivationTimestamp();  
         String biometricUser        = getLastBiometricUser();
         String biometricRole        = getLastBiometricRole();
         String biometricDisplayName = getLastBiometricDisplayName();
@@ -403,7 +411,21 @@ public class SecureSessionManager {
             userEditor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, biometricBranchName);
             secureEditor.putString(KEY_LAST_BIOMETRIC_TOKEN, biometricToken);
         }
-
+        // ⚡ MIRA License: restore device activation
+if (activationToken != null && !activationToken.isEmpty()) {
+    secureEditor.putString(KEY_ACTIVATION_TOKEN, activationToken);
+    secureEditor.putLong(KEY_ACTIVATION_AT, activationAt);   // ← بدلاً من System.currentTimeMillis()
+}
+if (deviceUuid != null && !deviceUuid.isEmpty()) {
+    secureEditor.putString(KEY_DEVICE_UUID, deviceUuid);
+}
+if (licenseType != null && !licenseType.isEmpty()) {
+    userEditor.putString(KEY_LICENSE_TYPE, licenseType);
+    userEditor.putString(KEY_LICENSE_VALID_FROM, licenseFrom);
+    userEditor.putString(KEY_LICENSE_VALID_UNTIL, licenseUntil);
+    userEditor.putInt(KEY_LICENSE_MAX_DEVICES, licenseMaxDev);
+    userEditor.putInt(KEY_LICENSE_MAX_USERS, licenseMaxUsr);
+}
         if (apiKey != null && !apiKey.isEmpty()) secureEditor.putString(KEY_API_KEY, apiKey);
         if (serverUrl != null && !serverUrl.isEmpty()) userEditor.putString(KEY_SERVER_URL, serverUrl);
         if (lastUsername != null && !lastUsername.isEmpty()) userEditor.putString(KEY_LAST_USERNAME, lastUsername);
