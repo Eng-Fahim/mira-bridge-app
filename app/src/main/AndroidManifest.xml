@@ -78,10 +78,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-<!-- ⚠️ TEST ONLY — احذفه بعد التحقق -->
+
+        <!-- MIRA License Status -->
 <activity
-    android:name=".license.LicenseTestActivity"
+    android:name=".license.LicenseStatusActivity"
     android:exported="true"
+    android:label="حالة الترخيص"
     android:theme="@style/Theme.Uhfuartdemo">
     <intent-filter>
         <action android:name="android.intent.action.MAIN" />
