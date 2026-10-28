@@ -161,9 +161,16 @@ public class LicenseStatusActivity extends AppCompatActivity {
                 : "All checks passed");
         tvStatusSubtitle.setTextColor(Color.parseColor("#2E7D32"));
 
-        // Info cards
-        tvUsersValue.setText("—/" + data.maxUsers);
-        tvDevicesValue.setText("—/" + data.maxDevices);
+        // Info cards — عرض الأعداد الفعلية
+String usersText = (data.activeUsers >= 0)
+        ? data.activeUsers + "/" + data.maxUsers
+        : "—/" + data.maxUsers;
+tvUsersValue.setText(usersText);
+
+String devicesText = (data.activeDevices >= 0)
+        ? data.activeDevices + "/" + data.maxDevices
+        : "—/" + data.maxDevices;
+tvDevicesValue.setText(devicesText);
         tvTypeValue.setText(formatLicenseType(data));
 
         // Days left
@@ -226,8 +233,10 @@ public class LicenseStatusActivity extends AppCompatActivity {
 
         // Fill known info
         if (data != null) {
-            tvUsersValue.setText("—/" + data.maxUsers);
-            tvDevicesValue.setText("—/" + data.maxDevices);
+    tvUsersValue.setText((data.activeUsers >= 0 ? data.activeUsers : "—") 
+            + "/" + data.maxUsers);
+    tvDevicesValue.setText((data.activeDevices >= 0 ? data.activeDevices : "—") 
+            + "/" + data.maxDevices);
             tvTypeValue.setText(formatLicenseType(data));
             tvValidUntil.setText(formatDate(data.validUntil));
             int daysLeft = calculateDaysLeft(data.validUntil);
