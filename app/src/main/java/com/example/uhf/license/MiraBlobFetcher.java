@@ -17,11 +17,16 @@ import javax.net.ssl.HttpsURLConnection;
 
 /**
  * MiraBlobFetcher — يجلب الـ blob من خادم العميل ويخزّنه بعد التحقق
+ *
+ * v1.1 — إصلاح: serverUrl قد يحتوي على /wp-json بالفعل
  */
 public final class MiraBlobFetcher {
 
     private static final String TAG = "MiraBlobFetcher";
     private static final int TIMEOUT_MS = 15_000;
+
+    // المسار النسبي بعد /wp-json
+    private static final String ENDPOINT_PATH = "/mira-license/v1/client-blob";
 
     private MiraBlobFetcher() {}
 
@@ -52,6 +57,26 @@ public final class MiraBlobFetcher {
     }
 
     // ═══════════════════════════════════════════════════════
+    //  Build URL (يتعامل مع /wp-json المكرر)
+    // ═══════════════════════════════════════════════════════
+    private static String buildClientBlobUrl(String serverUrl) {
+        String base = serverUrl.trim();
+
+        // إزالة slash نهائي
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+
+        // إذا كانت تنتهي بـ /wp-json → فقط نضيف المسار النسبي
+        if (base.endsWith("/wp-json")) {
+            return base + ENDPOINT_PATH;
+        }
+
+        // إذا كانت لا تحتوي /wp-json → نضيفها
+        return base + "/wp-json" + ENDPOINT_PATH;
+    }
+
+    // ═══════════════════════════════════════════════════════
     //  Fetch from server
     // ═══════════════════════════════════════════════════════
     public static FetchResult fetch(Context ctx) {
@@ -63,12 +88,8 @@ public final class MiraBlobFetcher {
             if (serverUrl == null || serverUrl.trim().isEmpty()) {
                 return FetchResult.error("no_server_url", "عنوان الخادم غير محدد");
             }
-            serverUrl = serverUrl.trim();
-            if (serverUrl.endsWith("/")) {
-                serverUrl = serverUrl.substring(0, serverUrl.length() - 1);
-            }
 
-            String fullUrl = serverUrl + "/wp-json/mira-license/v1/client-blob";
+            String fullUrl = buildClientBlobUrl(serverUrl);
             Log.d(TAG, "Fetching: " + fullUrl);
 
             URL url = new URL(fullUrl);
@@ -77,7 +98,11 @@ public final class MiraBlobFetcher {
             }
 
             HttpsURLConnection https = (HttpsURLConnection) url.openConnection();
-            CertificatePinningManager.applyPinning(https);
+            try {
+                CertificatePinningManager.applyPinning(https);
+            } catch (Exception pinEx) {
+                Log.w(TAG, "Certificate pinning skipped: " + pinEx.getMessage());
+            }
             conn = https;
 
             conn.setRequestMethod("GET");
@@ -104,7 +129,8 @@ public final class MiraBlobFetcher {
                 }
             }
 
-            Log.d(TAG, "HTTP " + code + " | " + (body.length() > 200 ? body.substring(0, 200) : body));
+            Log.d(TAG, "HTTP " + code + " | "
+                    + (body.length() > 200 ? body.substring(0, 200) : body));
 
             if (code < 200 || code >= 300) {
                 try {
@@ -114,7 +140,8 @@ public final class MiraBlobFetcher {
                             err.optString("message", "HTTP " + code));
                 } catch (Exception e) {
                     return FetchResult.error("http_" + code,
-                            "HTTP " + code + ": " + (body.length() > 100 ? body.substring(0, 100) : body));
+                            "HTTP " + code + ": "
+                                    + (body.length() > 100 ? body.substring(0, 100) : body));
                 }
             }
 
@@ -152,9 +179,19 @@ public final class MiraBlobFetcher {
 
             return FetchResult.success(data);
 
+        } catch (java.net.UnknownHostException e) {
+            Log.e(TAG, "DNS failed: " + e.getMessage());
+            return FetchResult.error("dns", "تعذر الوصول للخادم — تحقق من الإنترنت");
+        } catch (java.net.SocketTimeoutException e) {
+            Log.e(TAG, "Timeout: " + e.getMessage());
+            return FetchResult.error("timeout", "انتهت مهلة الاتصال");
+        } catch (javax.net.ssl.SSLException e) {
+            Log.e(TAG, "SSL failed: " + e.getMessage(), e);
+            return FetchResult.error("ssl", "فشل SSL: " + e.getMessage());
         } catch (Exception e) {
             Log.e(TAG, "fetch error: " + e.getMessage(), e);
-            return FetchResult.error("network", e.getMessage() != null ? e.getMessage() : "فشل الاتصال");
+            return FetchResult.error("network",
+                    e.getMessage() != null ? e.getMessage() : "فشل الاتصال");
         } finally {
             if (conn != null) conn.disconnect();
         }
