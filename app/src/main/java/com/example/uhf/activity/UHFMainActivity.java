@@ -331,14 +331,15 @@ protected void onCreate(Bundle savedInstanceState) {
         setContentView(R.layout.activity_main);
         
         // ═══ MIRA License Banner ═══
-try {
-    ViewGroup rootView = findViewById(android.R.id.content);
-    if (rootView != null) {
-        com.example.uhf.license.LicenseBannerHelper.attach(this, rootView);
-    }
-} catch (Exception e) {
-    android.util.Log.w("UHFMainActivity", "Banner attach failed: " + e.getMessage());
-}
+        try {
+            ViewGroup rootView = findViewById(android.R.id.content);
+            if (rootView != null) {
+                com.example.uhf.license.LicenseBannerHelper.attach(this, rootView);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("UHFMainActivity", "Banner attach failed: " + e.getMessage());
+        }
+        
         // ✅ العودة للسطر الأصلي الذي يمنع التداخل مع شريط الحالة
         findViewById(android.R.id.content).setFitsSystemWindows(true);
 
@@ -351,7 +352,9 @@ try {
         setupKeyboardBehavior();
         setupSecondaryToolbar();
 
-
+        // ═══════════════════════════════════════════════════════════════
+        //  Setup Toolbar + License Status Shortcut
+        // ═══════════════════════════════════════════════════════════════
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             setSupportActionBar(toolbar);
@@ -359,6 +362,25 @@ try {
                 getSupportActionBar().setDisplayShowTitleEnabled(false);
             }
             updateToolbarTitle();
+
+            // ═══════════════════════════════════════════════════════════
+            //  ⚡ MIRA License — الضغط المطول يفتح شاشة الترخيص
+            // ═══════════════════════════════════════════════════════════
+            toolbar.setOnLongClickListener(v -> {
+                try {
+                    Intent intent = new Intent(this,
+                            com.example.uhf.license.LicenseStatusActivity.class);
+                    startActivity(intent);
+                    Log.d(TAG, "✅ LicenseStatusActivity opened");
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to open LicenseStatusActivity", e);
+                    Toast.makeText(this,
+                            "تعذر فتح شاشة الترخيص",
+                            Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            });
+            Log.d(TAG, "✅ Long-press on toolbar → License Status");
         }
 
         AppWatchdog.getInstance().startMonitoring(() -> {
@@ -1556,6 +1578,23 @@ public void onResume() {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  ⚡ MIRA License: تحديث blob من الخادم في الخلفية
+    //  - يجلب blob الحالي ويحفظه في EncryptedStorage
+    //  - يتحقق من التوقيع Ed25519
+    //  - يكتشف التلاعب فوراً
+    // ═══════════════════════════════════════════════════════════════
+    final android.content.Context appCtx = getApplicationContext();
+    new Thread(() -> {
+        try {
+            boolean updated = com.example.uhf.license.MiraBlobFetcher
+                    .fetchVerifyAndStore(appCtx);
+            Log.d(TAG, "Background blob refresh: " + (updated ? "✅" : "⚠️"));
+        } catch (Exception e) {
+            Log.w(TAG, "Background blob refresh failed: " + e.getMessage());
+        }
+    }, "LicenseRefresh").start();
+
+    // ═══════════════════════════════════════════════════════════════
     //  تصفير حالة التحميل — يمنع تعليق الشاشة بعد العودة
     // ═══════════════════════════════════════════════════════════════
     loadingCounter = 0;
@@ -1598,70 +1637,6 @@ public void onResume() {
     syncCurrentFragment();
 
     checkSetupStampOnResume();
-}
-
-    private void checkSetupStampOnResume() {
-    // ⭐✅ تجاهل كل شيء خلال فترة السماح
-    if (isWithinSetupGracePeriod()) {
-        Log.d(TAG, "🛡️ Skipping stamp check during grace period");
-        return;
-    }
-
-    String cachedStatus = getCachedSetupStatus();
-    if (cachedStatus == null) return;
-
-    new Thread(() -> {
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
-
-            if (response == null || !response.isSuccess || response.data == null) return;
-
-            String serverStatus = response.data.optString("status", SETUP_PENDING);
-            String serverStamp  = response.data.optString("setup_stamp", null);
-            String localStamp   = getCachedSetupStamp();
-            String localStatus  = getCachedSetupStatus();
-
-            boolean stampMismatch = (localStamp != null && serverStamp != null
-                    && !localStamp.equals(serverStamp));
-
-            // ⭐✅ الحماية: منع الرجوع من completed → pending بدون تغيير الختم
-            if (SETUP_COMPLETED.equals(localStatus)
-                    && !SETUP_COMPLETED.equals(serverStatus)
-                    && !SETUP_LOCKED.equals(serverStatus)
-                    && !stampMismatch) {
-                Log.w(TAG, "🛡️ Ignoring server downgrade (no stamp change)");
-                return;
-            }
-
-            if (stampMismatch) {
-                Log.w(TAG, "🔄 Stamp mismatch in onResume!");
-
-                // ⭐✅ حماية إضافية: إذا كنا محلياً completed والسيرفر يقول pending
-                //      بسبب تأخير → احتفظ بـ completed
-                if (SETUP_COMPLETED.equals(localStatus)
-                        && (SETUP_PENDING.equals(serverStatus)
-                            || SETUP_IN_PROGRESS.equals(serverStatus))) {
-                    Log.w(TAG, "🛡️ Server pending but local completed → keeping completed");
-                    cacheSetupStatus(SETUP_COMPLETED, serverStamp);
-                    return;
-                }
-
-                invalidateSetupCache();
-                cacheSetupStatus(serverStatus, serverStamp);
-
-                mainHandler.post(() -> {
-                    if (isActivityAlive()) {
-                        Log.w(TAG, "🔄 Re-navigating after stamp mismatch");
-                        enableNavigationAfterSetup();
-                        navigateBySetupStatus(serverStatus);
-                    }
-                });
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "checkSetupStampOnResume error: " + e.getMessage());
-        }
-    }).start();
 }
 
     @Override
