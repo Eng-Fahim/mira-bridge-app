@@ -489,106 +489,34 @@ public class PermissionManager {
     }
     
     // ═══════════════════════════════════════════════════════
-//  Dashboard Widgets — Role-based Visibility
-//  المصفوفة: كل دور يرى ما يناسبه + يمكن التجاوز عبر JSON
+//  Dashboard Widgets (Role-based)
 // ═══════════════════════════════════════════════════════
+public boolean canViewDashboardHero()            { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+                                                     || isInventoryManager() || isBranchManager() || isAuditor()
+                                                     || canView(FEATURE_DASHBOARD + "_hero"); }
+public boolean canViewDashboardSales()           { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+                                                     || isBranchManager() || isAccountant() || isAuditor()
+                                                     || canView(FEATURE_DASHBOARD + "_sales"); }
+public boolean canViewDashboardGoldPrices()      { return canViewGoldRates(); }
+public boolean canViewDashboardInventoryByKarat(){ return canViewInventory(); }
+public boolean canViewDashboardScrap()           { return isSystemAdmin() || isOrgAdmin()
+                                                     || isInventoryManager() || isBranchManager()
+                                                     || canView(FEATURE_INVENTORY); }
+public boolean canViewDashboardScrapAging()      { return canViewDashboardScrap() || isAuditor(); }
+public boolean canViewDashboardCharts()          { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+                                                     || isBranchManager() || isAccountant() || isAuditor()
+                                                     || canView(FEATURE_REPORTS); }
+public boolean canViewDashboardAlerts()          { return isSystemAdmin() || isOrgAdmin()
+                                                     || isInventoryManager() || isBranchManager()
+                                                     || canEdit(FEATURE_INVENTORY); }
+public boolean canViewDashboardRecentActivity()  { return true; }
+public boolean canRefreshGoldManually()          { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+                                                     || canEdit(FEATURE_GOLD_RATES); }
+public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+                                                     || isInventoryManager() || isBranchManager()
+                                                     || isAccountant() || isAuditor()
+                                                     || canView(FEATURE_DASHBOARD + "_sensitive"); }
 
-/** 1. بطاقة المخزون الرئيسية (القيمة/الوزن/عدد القطع) */
-public boolean canViewDashboardHero() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isFinanceManager() || isInventoryManager()
-        || isBranchManager() || isAuditor()
-        || canView(FEATURE_DASHBOARD + "_hero");
-}
-
-/** 2. بطاقة المبيعات (اليوم / الشهر / السنة) */
-public boolean canViewDashboardSales() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isFinanceManager() || isBranchManager()
-        || isAccountant() || isAuditor()
-        || canView(FEATURE_DASHBOARD + "_sales");
-}
-
-/** 3. بطاقة أسعار الذهب */
-public boolean canViewDashboardGoldPrices() {
-    return canViewGoldRates();
-}
-
-/** 4. قسم المخزون حسب العيار */
-public boolean canViewDashboardInventoryByKarat() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isInventoryManager() || isBranchManager()
-        || isAuditor()
-        || canView(FEATURE_INVENTORY);
-}
-
-/** 5. بطاقة كسر الذهب (الوزن/القيمة) */
-public boolean canViewDashboardScrap() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isInventoryManager() || isBranchManager()
-        || canView(FEATURE_INVENTORY);
-}
-
-/** 6. بطاقة تقادم الكسر (Aging) */
-public boolean canViewDashboardScrapAging() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isInventoryManager() || isBranchManager()
-        || isAuditor()
-        || canView(FEATURE_INVENTORY);
-}
-
-/** 7. الرسوم البيانية (LineChart + PieChart) */
-public boolean canViewDashboardCharts() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isFinanceManager() || isBranchManager()
-        || isAccountant() || isAuditor()
-        || canView(FEATURE_REPORTS);
-}
-
-/** 8. شريط التنبيهات */
-public boolean canViewDashboardAlerts() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isInventoryManager() || isBranchManager()
-        || canEdit(FEATURE_INVENTORY);
-}
-
-/** 9. النشاطات الأخيرة — متاح للجميع */
-public boolean canViewDashboardRecentActivity() { return true; }
-
-/** 10. زر التحديث اليدوي لأسعار الذهب */
-public boolean canRefreshGoldManually() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isFinanceManager()
-        || canEdit(FEATURE_GOLD_RATES);
-}
-
-/** 11. إظهار/إخفاء القيم الحساسة (أزرار العين) */
-public boolean canRevealSensitiveValues() {
-    return isSystemAdmin() || isOrgAdmin()
-        || isFinanceManager() || isInventoryManager()
-        || isBranchManager() || isAccountant() || isAuditor()
-        || canView(FEATURE_DASHBOARD + "_sensitive");
-}
-
-/** 12. عرض اسم الدور (للهيدر) */
-public String getRoleDisplayName(boolean arabic) {
-    String r = role();
-    if (r == null) return arabic ? "غير معروف" : "Unknown";
-    switch (r.toUpperCase()) {
-        case ROLE_SYSTEM_ADMIN:    return arabic ? "مدير النظام" : "System Admin";
-        case ROLE_ORG_ADMIN:       return arabic ? "مدير المؤسسة" : "Org Admin";
-        case ROLE_FINANCE_MANAGER: return arabic ? "مدير مالي" : "Finance Manager";
-        case ROLE_INVENTORY_MGR:   return arabic ? "مدير مخزون" : "Inventory Manager";
-        case ROLE_BRANCH_MANAGER:  return arabic ? "مدير فرع" : "Branch Manager";
-        case ROLE_ACCOUNTANT:      return arabic ? "محاسب" : "Accountant";
-        case ROLE_AUDITOR:         return arabic ? "مدقق" : "Auditor";
-        case ROLE_POS_OPERATOR:    return arabic ? "كاشير" : "POS Operator";
-        case ROLE_GATE_SECURITY:   return arabic ? "أمن البوابة" : "Gate Security";
-        case ROLE_SECURITY:        return arabic ? "أمن" : "Security";
-        case ROLE_ADMIN:           return arabic ? "مدير (Legacy)" : "Admin (Legacy)";
-        default: return r;
-    }
-}
 
     // ═══════════════════════════════════════════════════════
     //  Master Gate — canAccessFragment (Whitelist — Safe Default)
