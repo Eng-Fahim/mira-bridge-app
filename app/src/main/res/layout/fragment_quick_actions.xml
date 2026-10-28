@@ -96,236 +96,260 @@
         android:background="?attr/colorOutlineVariant"
         android:alpha="0.4" />
 
-    <!-- ═══ SCROLL VIEW للشبكة (لضمان التمرير) ═══ -->
+    <!-- ═══ SCROLL VIEW للشبكة ═══ -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true">
 
-        <GridLayout
-            android:id="@+id/qaGrid"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnCount="4"
-            android:paddingHorizontal="12dp"
-            android:useDefaultMargins="false">
-
-            <!-- ═══ ROW 1: التكويد والأمان ═══ -->
-            <LinearLayout android:id="@+id/cardRfidWrite" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_rfid_write" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="RFID" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardRadarLocation" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_radar" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="رادار" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardRfidBindings" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_rfid_bindings" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="شرائح" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardSecureGate" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_security_gate" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="بوابات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-
-            <!-- ═══ ROW 2: المالية والمبيعات ═══ -->
-            <LinearLayout android:id="@+id/cardReports" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_reports" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تقارير" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardAccounting" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_accounting" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="مالية" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardVouchers" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_accounting" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="سندات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardTransfer" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_transfer" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تحويلات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-
-            <!-- ═══ ROW 3: المبيعات والذهب ═══ -->
-            <LinearLayout android:id="@+id/cardSalesHistory" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_sales_history" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="مبيعات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardGoldConversion" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="أمر صياغة" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardGoldRates" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="أسعار الذهب" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardScrapBuy" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="شراء كسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-
-            <!-- ═══ ROW 4: إدارة الكسر والعملاء ═══ -->
-            <LinearLayout android:id="@+id/cardScrapHistory" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_sales_history" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="سجل الكسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardScrapBatches" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_inventory_items" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="دفعات الكسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardScrapAging" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_reports" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="أعمار الكسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardParties" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_users" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="عملاء وموردين" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-
-            <!-- ═══ ROW 5: الإدارة والإعدادات ═══ -->
-            <LinearLayout android:id="@+id/cardCashReconciliation" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_accounting" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تقفيل الخزينة" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardAdminHub" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_admin_hub" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="إداري" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardServerConfig" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_server" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="سيرفر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardAdminUsers" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_users" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="مستخدمين" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-
-            <!-- ═══ ROW 6: إعدادات إضافية ═══ -->
-            <LinearLayout android:id="@+id/cardAdminBranches" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_branches" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="فروع" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardReaderSetup" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_server" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="إعداد القارئ" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-            <LinearLayout android:id="@+id/cardQuickAccess" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
-                <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_settings" app:tint="?attr/colorPrimary" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تخصيص الوصول" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
-            </LinearLayout>
-
-<!-- ═══ ROW 7: المشتريات ═══ -->
-<LinearLayout
-    android:id="@+id/cardPurchaseInvoice"
-    android:layout_width="0dp"
-    android:layout_height="wrap_content"
-    android:layout_columnWeight="1"
-    android:layout_margin="4dp"
-    android:background="?attr/selectableItemBackground"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:paddingVertical="12dp">
-    <ImageView
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_inventory_items"
-        app:tint="?attr/colorPrimary" />
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center"
-        android:maxLines="2"
-        android:text="فاتورة مشتريات"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="11sp" />
-</LinearLayout>
-<!-- ═══ ROW 8: License Status ═══ -->
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="12dp"
-    android:baselineAligned="false"
-    android:orientation="horizontal">
-
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardLicenseStatus"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="4dp"
-        android:layout_marginEnd="4dp"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="2dp"
-        app:cardBackgroundColor="#1A237E">
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="16dp">
+            android:orientation="vertical">
 
-            <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@android:drawable/ic_lock_lock"
-                app:tint="#FFFFFF" />
-
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!--  GRID — كل الأيقونات (بدون cardLicenseStatus)      -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <GridLayout
+                android:id="@+id/qaGrid"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="حالة الترخيص"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+                android:columnCount="4"
+                android:paddingHorizontal="12dp"
+                android:useDefaultMargins="false">
 
-            <TextView
-                android:layout_width="wrap_content"
+                <!-- ═══ ROW 1: التكويد والأمان ═══ -->
+                <LinearLayout android:id="@+id/cardRfidWrite" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_rfid_write" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="RFID" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardRadarLocation" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_radar" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="رادار" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardRfidBindings" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_rfid_bindings" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="شرائح" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardSecureGate" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_security_gate" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="بوابات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ ROW 2: المالية والمبيعات ═══ -->
+                <LinearLayout android:id="@+id/cardReports" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_reports" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تقارير" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardAccounting" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_accounting" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="مالية" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardVouchers" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_accounting" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="سندات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardTransfer" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_transfer" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تحويلات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ ROW 3: المبيعات والذهب ═══ -->
+                <LinearLayout android:id="@+id/cardSalesHistory" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_sales_history" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="مبيعات" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardGoldConversion" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="أمر صياغة" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardGoldRates" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="أسعار الذهب" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardScrapBuy" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="شراء كسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ ROW 4: إدارة الكسر والعملاء ═══ -->
+                <LinearLayout android:id="@+id/cardScrapHistory" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_sales_history" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="سجل الكسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardScrapBatches" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_inventory_items" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="دفعات الكسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardScrapAging" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_reports" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="أعمار الكسر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardParties" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_users" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="عملاء وموردين" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ ROW 5: الإدارة والإعدادات ═══ -->
+                <LinearLayout android:id="@+id/cardCashReconciliation" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_accounting" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تقفيل الخزينة" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardAdminHub" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_admin_hub" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="إداري" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardServerConfig" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_server" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="سيرفر" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardAdminUsers" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_users" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="مستخدمين" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ ROW 6: إعدادات إضافية (4 أيقونات كاملة) ═══ -->
+                <LinearLayout android:id="@+id/cardAdminBranches" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_branches" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="فروع" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardReaderSetup" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_server" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="إعداد القارئ" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/cardQuickAccess" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:layout_margin="4dp" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingVertical="12dp">
+                    <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_settings" app:tint="?attr/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center" android:text="تخصيص الوصول" android:textColor="?attr/colorOnSurface" android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ cardAuditLogs — الآن في ROW 6 (مع الثلاثة فوقه) ═══ -->
+                <LinearLayout
+                    android:id="@+id/cardAuditLogs"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="12dp">
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_reports"
+                        app:tint="?attr/colorPrimary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center"
+                        android:maxLines="2"
+                        android:text="سجل التدقيق"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- ═══ ROW 7: المشتريات ═══ -->
+                <LinearLayout
+                    android:id="@+id/cardPurchaseInvoice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:layout_margin="4dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="12dp">
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_inventory_items"
+                        app:tint="?attr/colorPrimary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center"
+                        android:maxLines="2"
+                        android:text="فاتورة مشتريات"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+            </GridLayout>
+
+            <!-- ═══════════════════════════════════════════════════ -->
+            <!--  ⚡ License Status Card — خارج GridLayout، عرض كامل  -->
+            <!-- ═══════════════════════════════════════════════════ -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardLicenseStatus"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🔐"
-                android:textSize="11sp"
-                android:layout_marginTop="2dp" />
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardBackgroundColor="#1A237E"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="16dp">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:importantForAccessibility="no"
+                        android:src="@android:drawable/ic_lock_lock"
+                        app:tint="#FFFFFF" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="حالة الترخيص"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="عرض تفاصيل ترخيص MIRA ID"
+                            android:textColor="#B3C5FF"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_arrow_forward"
+                        app:tint="#FFFFFF" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-</LinearLayout>
-<!-- ═══ سجل التدقيق ═══ -->
-<LinearLayout
-    android:id="@+id/cardAuditLogs"
-    android:layout_width="0dp"
-    android:layout_height="wrap_content"
-    android:layout_columnWeight="1"
-    android:layout_margin="4dp"
-    android:background="?attr/selectableItemBackground"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:paddingVertical="12dp">
-    <ImageView
-        android:layout_width="28dp"
-        android:layout_height="28dp"
-        android:importantForAccessibility="no"
-        android:src="@drawable/ic_reports"
-        app:tint="?attr/colorPrimary" />
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center"
-        android:maxLines="2"
-        android:text="سجل التدقيق"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="11sp" />
-</LinearLayout>
-        </GridLayout>
     </ScrollView>
 
     <!-- ═══ CLOSE BUTTON ═══ -->
