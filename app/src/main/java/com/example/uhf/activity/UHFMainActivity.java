@@ -329,7 +329,17 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         setContentView(R.layout.activity_main);
-        
+        // ═══ MIRA License Status shortcut ═══
+try {
+    MaterialToolbar toolbar = findViewById(R.id.toolbar);
+    if (toolbar != null) {
+        toolbar.setOnLongClickListener(v -> {
+            startActivity(new android.content.Intent(this,
+                com.example.uhf.license.LicenseStatusActivity.class));
+            return true;
+        });
+    }
+} catch (Exception e) { /* ignore */ }
         // ═══ MIRA License Banner ═══
         try {
             ViewGroup rootView = findViewById(android.R.id.content);
