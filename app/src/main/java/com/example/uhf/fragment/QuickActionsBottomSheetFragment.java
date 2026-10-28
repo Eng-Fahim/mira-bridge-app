@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -20,6 +21,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.license.LicenseStatusActivity;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.navigation.FragmentFactory;
@@ -64,67 +66,43 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             permissionManager   = PermissionManager.getInstance(context);
             quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
 
-            // ═══════════════════════════════════════════════════
-            //  PRIMARY CTA — استوديو التكويد
-            // ═══════════════════════════════════════════════════
             setupPrimaryCta(view);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 1: التكويد والأمان
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardRfidWrite, "rfid_write", NavigationManager.TAG_RFID_WRITE);
             setupGridAction(view, R.id.cardRadarLocation, "radar", NavigationManager.TAG_RADAR);
             setupGridAction(view, R.id.cardRfidBindings, "rfid", NavigationManager.TAG_RFID_BINDINGS);
             setupGridAction(view, R.id.cardSecureGate, "gate", NavigationManager.TAG_GATES);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 2: المالية والمبيعات
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardReports, "reports", NavigationManager.TAG_REPORTS);
             setupGridAction(view, R.id.cardAccounting, "accounting", NavigationManager.TAG_ACCOUNTING);
             setupGridAction(view, R.id.cardVouchers, "vouchers", NavigationManager.TAG_VOUCHERS);
             setupGridAction(view, R.id.cardTransfer, "transfers", NavigationManager.TAG_TRANSFERS);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 3: المبيعات والذهب
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardSalesHistory, "sales_history", NavigationManager.TAG_SALES_HISTORY);
             setupGridAction(view, R.id.cardGoldConversion, "gold_conversion", NavigationManager.TAG_GOLD_CONVERSION);
             setupGridAction(view, R.id.cardGoldRates, "gold_rates", NavigationManager.TAG_GOLD_RATES);
             setupGridAction(view, R.id.cardScrapBuy, "scrap_buy", NavigationManager.TAG_SCRAP_GOLD_BUY);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 4: إدارة الكسر والعملاء
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardScrapHistory, "scrap_history", NavigationManager.TAG_SCRAP_HISTORY);
             setupGridAction(view, R.id.cardScrapBatches, "scrap_batches", NavigationManager.TAG_SCRAP_BATCHES);
             setupGridAction(view, R.id.cardScrapAging, "scrap_aging", NavigationManager.TAG_SCRAP_AGING);
             setupGridAction(view, R.id.cardParties, "parties", NavigationManager.TAG_PARTIES);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 5: الإدارة والإعدادات
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardCashReconciliation, "cash_reconciliation", NavigationManager.TAG_CASH_RECONCILIATION);
             setupGridAction(view, R.id.cardAdminHub, "admin_hub", NavigationManager.TAG_ADMIN_HUB);
             setupGridAction(view, R.id.cardServerConfig, "server_config", NavigationManager.TAG_SERVER_CONFIG);
             setupGridAction(view, R.id.cardAdminUsers, "admin_users", NavigationManager.TAG_USERS_MANAGEMENT);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 6: إعدادات إضافية
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardAdminBranches, "admin_branches", NavigationManager.TAG_BRANCHES);
             setupGridAction(view, R.id.cardReaderSetup, "reader_setup", NavigationManager.TAG_READER_SETUP);
             setupGridAction(view, R.id.cardQuickAccess, "quick_access", NavigationManager.TAG_QUICK_ACCESS);
             setupGridAction(view, R.id.cardAuditLogs, "audit_logs", NavigationManager.TAG_AUDIT_LOGS);
 
-            // ═══════════════════════════════════════════════════
-            //  ROW 7: المشتريات
-            // ═══════════════════════════════════════════════════
             setupGridAction(view, R.id.cardPurchaseInvoice, "purchase_invoice", NavigationManager.TAG_PURCHASE_INVOICE);
 
-            // ═══════════════════════════════════════════════════
-            //  CLOSE BUTTON
-            // ═══════════════════════════════════════════════════
+            // ⚡ MIRA License Status — بطاقة جديدة
+            setupLicenseStatusCard(view);
+
             View btnClose = view.findViewById(R.id.btnClose);
             if (btnClose != null) {
                 animatedViews.add(btnClose);
@@ -138,6 +116,53 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
 
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error", e);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ⚡ License Status Card — يفتح Activity مباشرة
+    // ═══════════════════════════════════════════════════════════════
+    private void setupLicenseStatusCard(View view) {
+        try {
+            View card = view.findViewById(R.id.cardLicenseStatus);
+            if (card == null) {
+                Log.d(TAG, "cardLicenseStatus not found in layout — skipped");
+                return;
+            }
+
+            if (card instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) card;
+                vg.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+                vg.setClickable(true);
+                vg.setFocusable(true);
+            }
+
+            // يظهر للمدراء فقط (إذا أردت للجميع، احذف هذا الفحص)
+            boolean canSee = permissionManager.isAnyAdmin()
+                    || permissionManager.isOrgAdmin()
+                    || permissionManager.isBranchManager();
+
+            if (!canSee) {
+                card.setVisibility(View.GONE);
+                return;
+            }
+
+            card.setVisibility(View.VISIBLE);
+            animatedViews.add(card);
+
+            card.setOnClickListener(v -> {
+                performHaptic();
+                try {
+                    Intent intent = new Intent(requireContext(), LicenseStatusActivity.class);
+                    startActivity(intent);
+                    dismiss();
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to open LicenseStatusActivity", e);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "setupLicenseStatusCard error: " + e.getMessage(), e);
         }
     }
 
@@ -181,8 +206,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             boolean hasPermission = permissionManager.canAccessFragment(tag);
             boolean quickAccessAllowed = quickAccessSettings == null || quickAccessSettings.isActionEnabled(actionKey);
 
-            // ✅ [إصلاح مؤقت]: إجبار الشاشات الجديدة على الظهور للتجربة
-            if (NavigationManager.TAG_GOLD_CONVERSION.equals(tag) || 
+            if (NavigationManager.TAG_GOLD_CONVERSION.equals(tag) ||
                 NavigationManager.TAG_PURCHASE_INVOICE.equals(tag)) {
                 hasPermission = true;
                 quickAccessAllowed = true;
