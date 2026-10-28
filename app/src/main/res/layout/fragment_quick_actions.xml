@@ -244,6 +244,58 @@
         android:textColor="?attr/colorOnSurface"
         android:textSize="11sp" />
 </LinearLayout>
+<!-- ═══ ROW 8: License Status ═══ -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:baselineAligned="false"
+    android:orientation="horizontal">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardLicenseStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#1A237E">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="16dp">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_lock_lock"
+                app:tint="#FFFFFF" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="حالة الترخيص"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔐"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</LinearLayout>
 <!-- ═══ سجل التدقيق ═══ -->
 <LinearLayout
     android:id="@+id/cardAuditLogs"
