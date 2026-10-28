@@ -3027,14 +3027,26 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ═══════════════════════════════════════════════════════
 
     private void showQuickActionMenu() {
-        try {
-            QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
-            sheet.show(getSupportFragmentManager(), "QuickActions");
-            Log.d(TAG, "✅ QuickActions bottom sheet shown");
-        } catch (Exception e) {
-            Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
-        }
+    try {
+        QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
+        sheet.show(getSupportFragmentManager(), "QuickActions");
+        Log.d(TAG, "✅ QuickActions bottom sheet shown");
+    } catch (Exception e) {
+        Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
     }
+}
+
+// ⚡ فتح شاشة الترخيص من أي مكان
+public void openLicenseStatus() {
+    try {
+        Intent intent = new Intent(this,
+                com.example.uhf.license.LicenseStatusActivity.class);
+        startActivity(intent);
+    } catch (Exception e) {
+        Log.e(TAG, "openLicenseStatus error: " + e.getMessage());
+        Toast.makeText(this, "تعذر فتح شاشة الترخيص", Toast.LENGTH_SHORT).show();
+    }
+}
 
     // ═══════════════════════════════════════════════════════
     //  حالة الجرد
