@@ -131,6 +131,10 @@ dependencies {
     implementation 'androidx.preference:preference:1.2.1'
     implementation 'androidx.vectordrawable:vectordrawable:1.2.0'
 
+    // ═══════════════════════════════════════════════════════════
+//  ⚡ MIRA License — Ed25519 Verification
+// ═══════════════════════════════════════════════════════════
+implementation 'net.i2p.crypto:eddsa:0.3.0'
     implementation 'androidx.multidex:multidex:2.0.1'
 
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
