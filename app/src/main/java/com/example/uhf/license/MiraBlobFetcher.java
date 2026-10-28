@@ -164,19 +164,20 @@ public final class MiraBlobFetcher {
             }
 
             MiraBlobStorage.BlobData data = new MiraBlobStorage.BlobData(
-                    blobJson,
-                    json.optString("signature", ""),
-                    json.optString("public_key", ""),
-                    json.optString("fingerprint", ""),
-                    json.optInt("version", values.version),
-                    json.optString("key_id", ""),
-                    json.optInt("license_id", values.licenseId),
-                    values.maxUsers,
-                    values.maxDevices,
-                    values.validUntil,
-                    System.currentTimeMillis()
-            );
-
+        blobJson,
+        json.optString("signature", ""),
+        json.optString("public_key", ""),
+        json.optString("fingerprint", ""),
+        json.optInt("version", values.version),
+        json.optString("key_id", ""),
+        json.optInt("license_id", values.licenseId),
+        values.maxUsers,
+        values.maxDevices,
+        values.validUntil,
+        System.currentTimeMillis(),
+        json.optInt("active_users", -1),    // ← جديد
+        json.optInt("active_devices", -1)   // ← جديد
+);
             return FetchResult.success(data);
 
         } catch (java.net.UnknownHostException e) {
