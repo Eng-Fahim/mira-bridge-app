@@ -35,34 +35,40 @@ public final class MiraBlobStorage {
     //  Data class
     // ═══════════════════════════════════════════════════════
     public static class BlobData {
-        public final String blobJson;
-        public final String signatureB64;
-        public final String publicKeyB64;
-        public final String fingerprintB64;
-        public final int    version;
-        public final String keyId;
-        public final int    licenseId;
-        public final int    maxUsers;
-        public final int    maxDevices;
-        public final String validUntil;
-        public final long   storedAt;
+    public final String blobJson;
+    public final String signatureB64;
+    public final String publicKeyB64;
+    public final String fingerprintB64;
+    public final int    version;
+    public final String keyId;
+    public final int    licenseId;
+    public final int    maxUsers;
+    public final int    maxDevices;
+    public final String validUntil;
+    public final long   storedAt;
+    // ⚡ جديد
+    public final int    activeUsers;
+    public final int    activeDevices;
 
-        public BlobData(String blobJson, String signatureB64, String publicKeyB64,
-                        String fingerprintB64, int version, String keyId, int licenseId,
-                        int maxUsers, int maxDevices, String validUntil, long storedAt) {
-            this.blobJson      = blobJson;
-            this.signatureB64  = signatureB64;
-            this.publicKeyB64  = publicKeyB64;
-            this.fingerprintB64 = fingerprintB64;
-            this.version       = version;
-            this.keyId         = keyId;
-            this.licenseId     = licenseId;
-            this.maxUsers      = maxUsers;
-            this.maxDevices    = maxDevices;
-            this.validUntil    = validUntil;
-            this.storedAt      = storedAt;
-        }
+    public BlobData(String blobJson, String signatureB64, String publicKeyB64,
+                    String fingerprintB64, int version, String keyId, int licenseId,
+                    int maxUsers, int maxDevices, String validUntil, long storedAt,
+                    int activeUsers, int activeDevices) {
+        this.blobJson       = blobJson;
+        this.signatureB64   = signatureB64;
+        this.publicKeyB64   = publicKeyB64;
+        this.fingerprintB64 = fingerprintB64;
+        this.version        = version;
+        this.keyId          = keyId;
+        this.licenseId      = licenseId;
+        this.maxUsers       = maxUsers;
+        this.maxDevices     = maxDevices;
+        this.validUntil     = validUntil;
+        this.storedAt       = storedAt;
+        this.activeUsers    = activeUsers;
+        this.activeDevices  = activeDevices;
     }
+}
 
     // ═══════════════════════════════════════════════════════
     //  SharedPreferences
@@ -90,68 +96,73 @@ public final class MiraBlobStorage {
     //  Save
     // ═══════════════════════════════════════════════════════
     public static boolean save(Context ctx, BlobData data) {
-        try {
-            boolean ok = prefs(ctx).edit()
-                    .putString(KEY_BLOB_JSON,    data.blobJson)
-                    .putString(KEY_SIGNATURE,    data.signatureB64)
-                    .putString(KEY_PUBLIC_KEY,   data.publicKeyB64)
-                    .putString(KEY_FINGERPRINT,  data.fingerprintB64)
-                    .putInt   (KEY_VERSION,      data.version)
-                    .putString(KEY_KEY_ID,       data.keyId)
-                    .putInt   (KEY_LICENSE_ID,   data.licenseId)
-                    .putInt   (KEY_MAX_USERS,    data.maxUsers)
-                    .putInt   (KEY_MAX_DEVICES,  data.maxDevices)
-                    .putString(KEY_VALID_UNTIL,  data.validUntil)
-                    .putLong  (KEY_STORED_AT,    data.storedAt)
-                    .putLong  (KEY_LAST_VERIFIED, System.currentTimeMillis())
-                    .commit();
+    try {
+        boolean ok = prefs(ctx).edit()
+                .putString(KEY_BLOB_JSON,    data.blobJson)
+                .putString(KEY_SIGNATURE,    data.signatureB64)
+                .putString(KEY_PUBLIC_KEY,   data.publicKeyB64)
+                .putString(KEY_FINGERPRINT,  data.fingerprintB64)
+                .putInt   (KEY_VERSION,      data.version)
+                .putString(KEY_KEY_ID,       data.keyId)
+                .putInt   (KEY_LICENSE_ID,   data.licenseId)
+                .putInt   (KEY_MAX_USERS,    data.maxUsers)
+                .putInt   (KEY_MAX_DEVICES,  data.maxDevices)
+                .putString(KEY_VALID_UNTIL,  data.validUntil)
+                .putLong  (KEY_STORED_AT,    data.storedAt)
+                .putLong  (KEY_LAST_VERIFIED, System.currentTimeMillis())
+                .putInt   ("active_users",   data.activeUsers)      // ← جديد
+                .putInt   ("active_devices", data.activeDevices)    // ← جديد
+                .commit();
 
-            if (ok) {
-                Log.d(TAG, "✅ Blob saved (v" + data.version + ", max_users=" + data.maxUsers + ")");
-            } else {
-                Log.e(TAG, "🚨 Blob commit FAILED");
-            }
-            return ok;
-        } catch (Exception e) {
-            Log.e(TAG, "save error: " + e.getMessage(), e);
-            return false;
+        if (ok) {
+            Log.d(TAG, "✅ Blob saved (v" + data.version 
+                    + ", users=" + data.activeUsers + "/" + data.maxUsers + ")");
+        } else {
+            Log.e(TAG, "🚨 Blob commit FAILED");
         }
+        return ok;
+    } catch (Exception e) {
+        Log.e(TAG, "save error: " + e.getMessage(), e);
+        return false;
     }
+}
 
     // ═══════════════════════════════════════════════════════
     //  Load
     // ═══════════════════════════════════════════════════════
     public static BlobData load(Context ctx) {
-        try {
-            SharedPreferences p = prefs(ctx);
-            String blobJson  = p.getString(KEY_BLOB_JSON,  null);
-            String signature = p.getString(KEY_SIGNATURE,  null);
-            String publicKey = p.getString(KEY_PUBLIC_KEY, null);
+    try {
+        SharedPreferences p = prefs(ctx);
+        String blobJson  = p.getString(KEY_BLOB_JSON,  null);
+        String signature = p.getString(KEY_SIGNATURE,  null);
+        String publicKey = p.getString(KEY_PUBLIC_KEY, null);
 
-            if (blobJson == null || blobJson.isEmpty()
-                    || signature == null || signature.isEmpty()
-                    || publicKey == null || publicKey.isEmpty()) {
-                return null;
-            }
-
-            return new BlobData(
-                    blobJson,
-                    signature,
-                    publicKey,
-                    safeString(p.getString(KEY_FINGERPRINT, "")),
-                    p.getInt(KEY_VERSION, 0),
-                    safeString(p.getString(KEY_KEY_ID, "")),
-                    p.getInt(KEY_LICENSE_ID, 0),
-                    p.getInt(KEY_MAX_USERS, 0),
-                    p.getInt(KEY_MAX_DEVICES, 0),
-                    safeString(p.getString(KEY_VALID_UNTIL, "")),
-                    p.getLong(KEY_STORED_AT, 0L)
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "load error: " + e.getMessage(), e);
+        if (blobJson == null || blobJson.isEmpty()
+                || signature == null || signature.isEmpty()
+                || publicKey == null || publicKey.isEmpty()) {
             return null;
         }
+
+        return new BlobData(
+                blobJson,
+                signature,
+                publicKey,
+                safeString(p.getString(KEY_FINGERPRINT, "")),
+                p.getInt(KEY_VERSION, 0),
+                safeString(p.getString(KEY_KEY_ID, "")),
+                p.getInt(KEY_LICENSE_ID, 0),
+                p.getInt(KEY_MAX_USERS, 0),
+                p.getInt(KEY_MAX_DEVICES, 0),
+                safeString(p.getString(KEY_VALID_UNTIL, "")),
+                p.getLong(KEY_STORED_AT, 0L),
+                p.getInt("active_users", 0),     // ← جديد
+                p.getInt("active_devices", 0)    // ← جديد
+        );
+    } catch (Exception e) {
+        Log.e(TAG, "load error: " + e.getMessage(), e);
+        return null;
     }
+}
 
     public static boolean hasBlob(Context ctx) {
         return load(ctx) != null;
