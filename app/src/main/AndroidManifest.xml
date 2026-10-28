@@ -78,7 +78,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
+        <activity
+    android:name=".license.LicenseTestActivity"
+    android:exported="true"
+    android:theme="@style/Theme.Uhfuartdemo">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
         <!-- ==================== ReportsActivity ==================== -->
         <activity 
             android:name=".ReportsActivity"
