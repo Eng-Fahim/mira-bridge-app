@@ -23,11 +23,13 @@ import javax.net.ssl.HttpsURLConnection;
 /**
  * LicenseManager — التواصل مع MIRA License Center
  *
+ * v1.1 — إصلاح بناء الرابط + إرسال blob_version في heartbeat
+ *
  * Endpoints:
- *   POST {serverUrl}/mira-license/v1/activate
- *   POST {serverUrl}/mira-license/v1/heartbeat
- *   POST {serverUrl}/mira-license/v1/deactivate
- *   GET  {serverUrl}/mira-license/v1/status
+ *   POST {serverUrl}/wp-json/mira-license/v1/activate
+ *   POST {serverUrl}/wp-json/mira-license/v1/heartbeat
+ *   POST {serverUrl}/wp-json/mira-license/v1/deactivate
+ *   GET  {serverUrl}/wp-json/mira-license/v1/status
  */
 public class LicenseManager {
 
@@ -43,6 +45,27 @@ public class LicenseManager {
     }
 
     // ═══════════════════════════════════════════════════════
+    //  Build URL (يتعامل مع /wp-json المكرر)
+    // ═══════════════════════════════════════════════════════
+    private static String buildUrl(String serverUrl, String endpointPath) {
+        if (serverUrl == null) return "";
+        String base = serverUrl.trim();
+
+        // إزالة slash نهائي
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+
+        // إذا كان يحتوي /wp-json بالفعل
+        if (base.endsWith("/wp-json")) {
+            return base + "/" + ENDPOINT_PREFIX + endpointPath;
+        }
+
+        // إذا لم يكن، نضيفه
+        return base + "/wp-json/" + ENDPOINT_PREFIX + endpointPath;
+    }
+
+    // ═══════════════════════════════════════════════════════
     //  Activate
     // ═══════════════════════════════════════════════════════
 
@@ -54,8 +77,7 @@ public class LicenseManager {
             HttpURLConnection conn = null;
             try {
                 // ═══ 1. بناء الطلب ═══
-                String baseUrl = normalizeUrl(serverUrl);
-                String fullUrl = baseUrl + "/" + ENDPOINT_PREFIX + "/activate";
+                String fullUrl = buildUrl(serverUrl, "/activate");
 
                 JSONObject device = new JSONObject();
                 device.put("device_name", (Build.MANUFACTURER + " " + Build.MODEL).trim());
@@ -96,7 +118,11 @@ public class LicenseManager {
                 }
 
                 HttpsURLConnection https = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(https);
+                try {
+                    CertificatePinningManager.applyPinning(https);
+                } catch (Exception pinEx) {
+                    Log.w(TAG, "Certificate pinning skipped: " + pinEx.getMessage());
+                }
                 conn = https;
 
                 conn.setRequestMethod("POST");
@@ -167,6 +193,49 @@ public class LicenseManager {
                         Log.d(TAG, "✅ Activation saved successfully");
                     }
 
+                    // ⚡ v1.1 — إذا رجع license_blob، نخزّنه فوراً
+                    JSONObject blobPayload = json.optJSONObject("license_blob");
+                    if (blobPayload != null) {
+                        JSONObject blob = blobPayload.optJSONObject("blob");
+                        if (blob != null) {
+                            MiraBlobVerifier.BlobValues values =
+                                    MiraBlobVerifier.extractBlobValues(blob.toString());
+
+                            if (values != null) {
+                                MiraBlobStorage.BlobData blobData =
+                                        new MiraBlobStorage.BlobData(
+                                                blob.toString(),
+                                                blobPayload.optString("signature", ""),
+                                                blobPayload.optString("public_key", ""),
+                                                blobPayload.optString("fingerprint", ""),
+                                                blobPayload.optInt("version", values.version),
+                                                blobPayload.optString("key_id", ""),
+                                                blobPayload.optInt("license_id", values.licenseId),
+                                                values.maxUsers,
+                                                values.maxDevices,
+                                                values.validUntil,
+                                                System.currentTimeMillis()
+                                        );
+
+                                MiraBlobVerifier.VerifyResult blobVerify =
+                                        MiraBlobVerifier.verify(
+                                                blobData.blobJson,
+                                                blobData.signatureB64,
+                                                blobData.publicKeyB64
+                                        );
+
+                                if (blobVerify.valid) {
+                                    MiraBlobStorage.save(context, blobData);
+                                    Log.d(TAG, "✅ Blob stored from activation (v"
+                                            + blobData.version + ")");
+                                } else {
+                                    Log.e(TAG, "⚠️ Blob from activation invalid: "
+                                            + blobVerify.message);
+                                }
+                            }
+                        }
+                    }
+
                     callback.onSuccess(json);
                 } else {
                     String errCode = json.optString("code", "http_" + code);
@@ -175,12 +244,14 @@ public class LicenseManager {
                 }
 
             } catch (java.net.UnknownHostException e) {
-                callback.onError("network", "تعذر الوصول للخادم. تحقق من الإنترنت وعنوان الخادم", 0);
+                callback.onError("network",
+                        "تعذر الوصول للخادم. تحقق من الإنترنت وعنوان الخادم", 0);
             } catch (java.net.SocketTimeoutException e) {
                 callback.onError("timeout", "انتهت مهلة الاتصال بالخادم", 0);
             } catch (Exception e) {
                 Log.e(TAG, "Activate exception", e);
-                callback.onError("unknown", e.getMessage() != null ? e.getMessage() : "خطأ غير متوقع", 0);
+                callback.onError("unknown",
+                        e.getMessage() != null ? e.getMessage() : "خطأ غير متوقع", 0);
             } finally {
                 if (conn != null) conn.disconnect();
             }
@@ -205,15 +276,37 @@ public class LicenseManager {
                     return;
                 }
 
-                String baseUrl = normalizeUrl(serverUrl);
-                String fullUrl = baseUrl + "/" + ENDPOINT_PREFIX + "/heartbeat";
+                String fullUrl = buildUrl(serverUrl, "/heartbeat");
 
                 JSONObject payload = new JSONObject();
                 payload.put("app_version", getAppVersion(context));
 
+                // ═══════════════════════════════════════════════════════
+                //  ⚡ v1.1 — إرسال blob_version + user_count للمركز
+                //  يُستخدم في تقارير السلامة لكشف التلاعب
+                // ═══════════════════════════════════════════════════════
+                try {
+                    MiraBlobStorage.BlobData blob = MiraBlobStorage.load(context);
+                    if (blob != null) {
+                        payload.put("blob_version", blob.version);
+                        payload.put("license_id", blob.licenseId);
+                        Log.d(TAG, "Heartbeat with blob_version=" + blob.version);
+                    } else {
+                        payload.put("blob_version", 0);
+                        Log.w(TAG, "Heartbeat without local blob");
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not add blob_version: " + e.getMessage());
+                    payload.put("blob_version", 0);
+                }
+
                 URL url = new URL(fullUrl);
                 HttpsURLConnection https = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(https);
+                try {
+                    CertificatePinningManager.applyPinning(https);
+                } catch (Exception pinEx) {
+                    Log.w(TAG, "Certificate pinning skipped: " + pinEx.getMessage());
+                }
                 conn = https;
 
                 conn.setRequestMethod("POST");
@@ -253,6 +346,7 @@ public class LicenseManager {
                     if ("revoke_access".equals(action)) {
                         // الترخيص أُلغي/عُلّق → مسح محلي
                         sm.clearLicense();
+                        MiraBlobStorage.clear(context);
                         callback.onError(
                                 "revoked",
                                 json.optString("reason", "الترخيص موقوف. تواصل مع ميرا"),
@@ -274,6 +368,17 @@ public class LicenseManager {
                         );
                     }
 
+                    // ⚡ قراءة تقرير السلامة من المركز (إن وُجد)
+                    JSONObject integrity = json.optJSONObject("integrity");
+                    if (integrity != null) {
+                        int reportedCount = integrity.optInt("user_count", -1);
+                        int maxUsers = integrity.optInt("max_users", -1);
+                        if (reportedCount >= 0 && maxUsers > 0) {
+                            Log.d(TAG, "Server integrity: users=" + reportedCount
+                                    + "/" + maxUsers);
+                        }
+                    }
+
                     callback.onSuccess(json);
                 } else {
                     String errCode = json.optString("code", "http_" + code);
@@ -281,9 +386,16 @@ public class LicenseManager {
                     callback.onError(errCode, errMsg, code);
                 }
 
+            } catch (java.net.UnknownHostException e) {
+                Log.w(TAG, "Heartbeat: DNS failed");
+                callback.onError("network", "تعذر الوصول للخادم", 0);
+            } catch (java.net.SocketTimeoutException e) {
+                Log.w(TAG, "Heartbeat: timeout");
+                callback.onError("timeout", "انتهت مهلة الاتصال", 0);
             } catch (Exception e) {
                 Log.w(TAG, "Heartbeat failed: " + e.getMessage());
-                callback.onError("network", e.getMessage(), 0);
+                callback.onError("network",
+                        e.getMessage() != null ? e.getMessage() : "فشل الاتصال", 0);
             } finally {
                 if (conn != null) conn.disconnect();
             }
@@ -293,13 +405,6 @@ public class LicenseManager {
     // ═══════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════
-
-    private static String normalizeUrl(String url) {
-        if (url == null) return "";
-        String u = url.trim();
-        if (u.endsWith("/")) u = u.substring(0, u.length() - 1);
-        return u;
-    }
 
     private static String getAppVersion(Context ctx) {
         try {
