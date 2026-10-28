@@ -131,7 +131,16 @@ public class LoginActivity extends AppCompatActivity {
         // ⚠️ 3. التهيئة الأساسية — يجب أن تكون قبل أي فحص يستخدمها
         // ═══════════════════════════════════════════════════════════════
         sessionManager = new SessionManager(getApplicationContext());
-        soundManager = MiraSoundManager.getInstance(getApplicationContext());
+soundManager = MiraSoundManager.getInstance(getApplicationContext());
+
+// ═══════════════════════════════════════════════════════
+//  ⚡ MIRA License — فحص سلامة الترخيص
+// ═══════════════════════════════════════════════════════
+if (!checkLicenseIntegrity()) {
+    Log.w(TAG, "🚫 License integrity check failed — blocking app");
+    // Dialog يُظهر + ينهي النشاط
+    return;
+}
 
         // ═══════════════════════════════════════════════════════════════
         // 4. فحص الترخيص (MIRA License Center) — قبل أي شيء آخر
@@ -1077,4 +1086,94 @@ public class LoginActivity extends AppCompatActivity {
         mainHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
+    // ═══════════════════════════════════════════════════════
+//  ⚡ MIRA License Integrity Check
+// ═══════════════════════════════════════════════════════
+
+/**
+ * يفحص سلامة الترخيص محلياً (بدون اتصال بالإنترنت).
+ * 
+ * @return true إذا الترخيص سليم أو تم جلبه بنجاح.
+ */
+private boolean checkLicenseIntegrity() {
+    // [1] فحص وجود blob مخزّن محلياً
+    MiraBlobStorage.BlobData storedBlob = MiraBlobStorage.load(this);
+    
+    if (storedBlob != null) {
+        // تحقق محلي فقط (بدون إنترنت)
+        MiraBlobVerifier.VerifyResult result = MiraBlobVerifier.verify(
+                storedBlob.blobJson,
+                storedBlob.signatureB64,
+                storedBlob.publicKeyB64
+        );
+        
+        if (result.valid) {
+            // فحص الصلاحية الزمنية
+            MiraBlobVerifier.VerifyResult fullResult =
+                    MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob);
+            
+            if (fullResult.valid) {
+                Log.d(TAG, "✅ License valid (local verify, v" + storedBlob.version + ")");
+                return true;
+            } else {
+                Log.w(TAG, "⏰ License expired: " + fullResult.message);
+                showBlockingDialog(
+                        isArabic ? "⏰ انتهى الترخيص" : "⏰ License Expired",
+                        fullResult.message
+                );
+                return false;
+            }
+        } else {
+            Log.e(TAG, "🚨 License tampered: " + result.message);
+            showBlockingDialog(
+                    isArabic ? "⚠️ ترخيص مُعدَّل" : "⚠️ License Tampered",
+                    result.message
+            );
+            return false;
+        }
+    }
+    
+    // [2] لا يوجد blob مخزّن — محاولة جلب من الخادم
+    Log.d(TAG, "📥 No local blob — fetching from server...");
+    
+    if (MiraBlobFetcher.fetchVerifyAndStore(this)) {
+        Log.d(TAG, "✅ License fetched and verified");
+        return true;
+    }
+    
+    // [3] فشل الجلب والتحقق
+    Log.e(TAG, "❌ License check failed entirely");
+    showBlockingDialog(
+            isArabic ? "❌ لا يوجد ترخيص صالح" : "❌ No Valid License",
+            isArabic
+                    ? "لم نتمكن من التحقق من ترخيصك.\n\n"
+                    + "تحقق من اتصالك بالإنترنت، ثم أعد المحاولة.\n"
+                    + "إذا استمرت المشكلة، تواصل مع ميرا تكنولوجي."
+                    : "Could not verify your license.\n\n"
+                    + "Check your internet connection and try again.\n"
+                    + "If the issue persists, contact MIRA Technology."
+    );
+    return false;
+}
+
+/**
+ * حوار مانع — يُغلق التطبيق بعد الضغط
+ */
+private void showBlockingDialog(String title, String message) {
+    if (isFinishing()) return;
+    
+    new AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton(
+                    isArabic ? "حسناً" : "OK",
+                    (d, w) -> finish()
+            )
+            .setNeutralButton(
+                    isArabic ? "إعادة المحاولة" : "Retry",
+                    (d, w) -> recreate()
+            )
+            .show();
+}
 }
