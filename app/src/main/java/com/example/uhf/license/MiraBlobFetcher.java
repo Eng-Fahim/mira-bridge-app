@@ -1,165 +1,206 @@
-package com.example.uhf.license
+package com.example.uhf.license;
 
-import android.content.Context
-import android.util.Log
-import com.example.uhf.tools.CertificatePinningManager
-import com.example.uhf.tools.SessionManager
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+import android.content.Context;
+import android.util.Log;
+
+import com.example.uhf.tools.CertificatePinningManager;
+import com.example.uhf.tools.SessionManager;
+
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+import javax.net.ssl.HttpsURLConnection;
 
 /**
- * MiraBlobFetcher — يجلب الـ blob من خادم العميل ويخزّنه
+ * MiraBlobFetcher — يجلب الـ blob من خادم العميل ويخزّنه بعد التحقق
  */
-object MiraBlobFetcher {
+public final class MiraBlobFetcher {
 
-    private const val TAG = "MiraBlobFetcher"
-    private const val TIMEOUT_MS = 15_000
+    private static final String TAG = "MiraBlobFetcher";
+    private static final int TIMEOUT_MS = 15_000;
 
-    sealed class FetchResult {
-        data class Success(val blobData: MiraBlobStorage.BlobData) : FetchResult()
-        data class Error(val code: String, val message: String) : FetchResult()
-    }
+    private MiraBlobFetcher() {}
 
-    /**
-     * جلب الـ blob من /wp-json/mira-license/v1/client-blob
-     */
-    fun fetch(context: Context): FetchResult {
-        var conn: HttpURLConnection? = null
-        try {
-            val session = SessionManager(context)
-            val serverUrl = session.serverUrl?.trimEnd('/') ?: return FetchResult.Error(
-                "no_server_url", "عنوان الخادم غير محدد"
-            )
+    // ═══════════════════════════════════════════════════════
+    //  Result
+    // ═══════════════════════════════════════════════════════
+    public static class FetchResult {
+        public final boolean success;
+        public final MiraBlobStorage.BlobData blobData;
+        public final String code;
+        public final String message;
 
-            val fullUrl = "$serverUrl/wp-json/mira-license/v1/client-blob"
-            Log.d(TAG, "Fetching: $fullUrl")
+        private FetchResult(boolean success, MiraBlobStorage.BlobData data,
+                            String code, String message) {
+            this.success  = success;
+            this.blobData = data;
+            this.code     = code;
+            this.message  = message;
+        }
 
-            val url = URL(fullUrl)
-            if (!"https".equals(url.protocol, ignoreCase = true)) {
-                return FetchResult.Error("insecure", "يُشترط HTTPS")
-            }
+        public static FetchResult success(MiraBlobStorage.BlobData data) {
+            return new FetchResult(true, data, "ok", "");
+        }
 
-            val https = url.openConnection() as HttpsURLConnection
-            CertificatePinningManager.applyPinning(https)
-            conn = https
-
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("User-Agent", "MIRA-Android/${appVersion(context)}")
-            conn.connectTimeout = TIMEOUT_MS
-            conn.readTimeout = TIMEOUT_MS
-
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-
-            val body = stream?.let {
-                BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r ->
-                    r.readText()
-                }
-            } ?: ""
-
-            Log.d(TAG, "HTTP $code | ${body.take(200)}")
-
-            if (code !in 200..299) {
-                return try {
-                    val err = JSONObject(body)
-                    FetchResult.Error(
-                        err.optString("code", "http_$code"),
-                        err.optString("message", "HTTP $code")
-                    )
-                } catch (e: Exception) {
-                    FetchResult.Error("http_$code", "HTTP $code: ${body.take(100)}")
-                }
-            }
-
-            val json = JSONObject(body)
-            if (!json.optBoolean("success", false)) {
-                return FetchResult.Error(
-                    json.optString("code", "failed"),
-                    json.optString("message", "Unknown error")
-                )
-            }
-
-            val blobObj = json.optJSONObject("blob")
-                ?: return FetchResult.Error("no_blob", "Blob مفقود في الاستجابة")
-
-            val blobJson = blobObj.toString()
-            val values = MiraBlobVerifier.extractBlobValues(blobJson)
-                ?: return FetchResult.Error("invalid_blob", "Blob JSON غير صالح")
-
-            val data = MiraBlobStorage.BlobData(
-                blobJson = blobJson,
-                signatureB64 = json.optString("signature"),
-                publicKeyB64 = json.optString("public_key"),
-                fingerprintB64 = json.optString("fingerprint"),
-                version = json.optInt("version", values.version),
-                keyId = json.optString("key_id"),
-                licenseId = json.optInt("license_id", values.licenseId),
-                maxUsers = values.maxUsers,
-                maxDevices = values.maxDevices,
-                validUntil = values.validUntil,
-                storedAt = System.currentTimeMillis()
-            )
-
-            return FetchResult.Success(data)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "fetch error: ${e.message}", e)
-            return FetchResult.Error("network", e.message ?: "فشل الاتصال")
-        } finally {
-            conn?.disconnect()
+        public static FetchResult error(String code, String message) {
+            return new FetchResult(false, null, code, message);
         }
     }
 
-    /**
-     * جلب + تحقق + تخزين
-     * 
-     * هذه هي الدالة التي تُستدعى من أماكن متعددة
-     */
-    fun fetchVerifyAndStore(context: Context): Boolean {
-        Log.d(TAG, "🔄 fetchVerifyAndStore started")
+    // ═══════════════════════════════════════════════════════
+    //  Fetch from server
+    // ═══════════════════════════════════════════════════════
+    public static FetchResult fetch(Context ctx) {
+        HttpURLConnection conn = null;
+        try {
+            SessionManager session = new SessionManager(ctx);
+            String serverUrl = session.getServerUrl();
+
+            if (serverUrl == null || serverUrl.trim().isEmpty()) {
+                return FetchResult.error("no_server_url", "عنوان الخادم غير محدد");
+            }
+            serverUrl = serverUrl.trim();
+            if (serverUrl.endsWith("/")) {
+                serverUrl = serverUrl.substring(0, serverUrl.length() - 1);
+            }
+
+            String fullUrl = serverUrl + "/wp-json/mira-license/v1/client-blob";
+            Log.d(TAG, "Fetching: " + fullUrl);
+
+            URL url = new URL(fullUrl);
+            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                return FetchResult.error("insecure", "يُشترط HTTPS");
+            }
+
+            HttpsURLConnection https = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(https);
+            conn = https;
+
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("User-Agent", "MIRA-Android/" + appVersion(ctx));
+            conn.setConnectTimeout(TIMEOUT_MS);
+            conn.setReadTimeout(TIMEOUT_MS);
+
+            int code = conn.getResponseCode();
+            java.io.InputStream stream = (code >= 200 && code < 300)
+                    ? conn.getInputStream()
+                    : conn.getErrorStream();
+
+            String body = "";
+            if (stream != null) {
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(stream, "UTF-8"))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    body = sb.toString();
+                }
+            }
+
+            Log.d(TAG, "HTTP " + code + " | " + (body.length() > 200 ? body.substring(0, 200) : body));
+
+            if (code < 200 || code >= 300) {
+                try {
+                    JSONObject err = new JSONObject(body);
+                    return FetchResult.error(
+                            err.optString("code", "http_" + code),
+                            err.optString("message", "HTTP " + code));
+                } catch (Exception e) {
+                    return FetchResult.error("http_" + code,
+                            "HTTP " + code + ": " + (body.length() > 100 ? body.substring(0, 100) : body));
+                }
+            }
+
+            JSONObject json = new JSONObject(body);
+            if (!json.optBoolean("success", false)) {
+                return FetchResult.error(
+                        json.optString("code", "failed"),
+                        json.optString("message", "Unknown error"));
+            }
+
+            JSONObject blobObj = json.optJSONObject("blob");
+            if (blobObj == null) {
+                return FetchResult.error("no_blob", "Blob مفقود في الاستجابة");
+            }
+
+            String blobJson = blobObj.toString();
+            MiraBlobVerifier.BlobValues values = MiraBlobVerifier.extractBlobValues(blobJson);
+            if (values == null) {
+                return FetchResult.error("invalid_blob", "Blob JSON غير صالح");
+            }
+
+            MiraBlobStorage.BlobData data = new MiraBlobStorage.BlobData(
+                    blobJson,
+                    json.optString("signature", ""),
+                    json.optString("public_key", ""),
+                    json.optString("fingerprint", ""),
+                    json.optInt("version", values.version),
+                    json.optString("key_id", ""),
+                    json.optInt("license_id", values.licenseId),
+                    values.maxUsers,
+                    values.maxDevices,
+                    values.validUntil,
+                    System.currentTimeMillis()
+            );
+
+            return FetchResult.success(data);
+
+        } catch (Exception e) {
+            Log.e(TAG, "fetch error: " + e.getMessage(), e);
+            return FetchResult.error("network", e.getMessage() != null ? e.getMessage() : "فشل الاتصال");
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Fetch + Verify + Store (all-in-one)
+    // ═══════════════════════════════════════════════════════
+    public static boolean fetchVerifyAndStore(Context ctx) {
+        Log.d(TAG, "🔄 fetchVerifyAndStore started");
 
         // [1] جلب
-        val fetchResult = fetch(context)
-        val newBlob = when (fetchResult) {
-            is FetchResult.Error -> {
-                Log.w(TAG, "❌ Fetch failed: ${fetchResult.code} — ${fetchResult.message}")
-                return false
-            }
-            is FetchResult.Success -> fetchResult.blobData
+        FetchResult result = fetch(ctx);
+        if (!result.success) {
+            Log.w(TAG, "❌ Fetch failed: " + result.code + " — " + result.message);
+            return false;
         }
 
-        // [2] قراءة blob الحالي (للـ anti-rollback)
-        val currentBlob = MiraBlobStorage.load(context)
+        MiraBlobStorage.BlobData newBlob = result.blobData;
+        MiraBlobStorage.BlobData currentBlob = MiraBlobStorage.load(ctx);
 
-        // [3] تحقق شامل
-        val verifyResult = MiraBlobVerifier.verifyAndValidate(newBlob, currentBlob)
-        if (!verifyResult.valid) {
-            Log.e(TAG, "❌ Verify failed: ${verifyResult.code} — ${verifyResult.message}")
-            return false
+        // [2] تحقق شامل
+        MiraBlobVerifier.VerifyResult verify =
+                MiraBlobVerifier.verifyAndValidate(newBlob, currentBlob);
+        if (!verify.valid) {
+            Log.e(TAG, "❌ Verify failed: " + verify.code + " — " + verify.message);
+            return false;
         }
 
-        // [4] تخزين
-        val saved = MiraBlobStorage.save(context, newBlob)
-        if (!saved) {
-            Log.e(TAG, "❌ Storage failed")
-            return false
+        // [3] تخزين
+        if (!MiraBlobStorage.save(ctx, newBlob)) {
+            Log.e(TAG, "❌ Storage failed");
+            return false;
         }
 
-        Log.d(TAG, "✅ Blob v${newBlob.version} verified and stored " +
-                "(max_users=${newBlob.maxUsers})")
-        return true
+        Log.d(TAG, "✅ Blob v" + newBlob.version + " verified and stored (max_users="
+                + newBlob.maxUsers + ")");
+        return true;
     }
 
-    private fun appVersion(context: Context): String {
-        return try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0"
-        } catch (e: Exception) {
-            "1.0"
+    private static String appVersion(Context ctx) {
+        try {
+            return ctx.getPackageManager()
+                    .getPackageInfo(ctx.getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "1.0";
         }
     }
 }
