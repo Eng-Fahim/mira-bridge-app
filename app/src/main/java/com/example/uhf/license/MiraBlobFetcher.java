@@ -244,4 +244,103 @@ public final class MiraBlobFetcher {
             return "1.0";
         }
     }
+    
+    /**
+ * Lookup: يجلب server_url من المركز بناءً على License Key
+ *
+ * @param centralUrl URL المركز (id.ibreg.org/wp-json)
+ * @param licenseKey رقم الترخيص
+ * @return LookupResult مع server_url
+ */
+public static LookupResult lookupServerUrl(Context context,
+                                            String centralUrl,
+                                            String licenseKey) {
+    HttpURLConnection conn = null;
+    try {
+        String url = centralUrl.trim();
+        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+
+        String endpoint = url + "/mira-license/v1/lookup";
+
+        JSONObject payload = new JSONObject();
+        payload.put("license_key", licenseKey.toUpperCase().trim());
+
+        URL u = new URL(endpoint);
+        HttpsURLConnection https = (HttpsURLConnection) u.openConnection();
+        try {
+            CertificatePinningManager.applyPinning(https);
+        } catch (Exception ignored) {}
+
+        conn = https;
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("User-Agent", "MIRA-Android/" + appVersion(context));
+        conn.setConnectTimeout(15_000);
+        conn.setReadTimeout(15_000);
+        conn.setDoOutput(true);
+
+        try (java.io.OutputStream os = conn.getOutputStream()) {
+            os.write(payload.toString().getBytes("UTF-8"));
+        }
+
+        int code = conn.getResponseCode();
+        java.io.InputStream stream = (code >= 200 && code < 300)
+                ? conn.getInputStream()
+                : conn.getErrorStream();
+
+        StringBuilder sb = new StringBuilder();
+        if (stream != null) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(stream, "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) sb.append(line);
+            }
+        }
+
+        JSONObject json = new JSONObject(sb.toString());
+
+        if (code >= 200 && code < 300 && json.optBoolean("success", false)) {
+            return new LookupResult(
+                    true,
+                    json.optString("server_url", ""),
+                    json.optBoolean("server_ready", false),
+                    json.optString("customer_name", ""),
+                    json.optString("license_type", ""),
+                    null
+            );
+        }
+
+        return new LookupResult(
+                false, null, false, null, null,
+                json.optString("message", "خطأ غير معروف")
+        );
+
+    } catch (Exception e) {
+        Log.e(TAG, "lookupServerUrl error: " + e.getMessage(), e);
+        return new LookupResult(false, null, false, null, null,
+                e.getMessage() != null ? e.getMessage() : "فشل الاتصال");
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
+
+public static class LookupResult {
+    public final boolean success;
+    public final String serverUrl;
+    public final boolean serverReady;
+    public final String customerName;
+    public final String licenseType;
+    public final String error;
+
+    public LookupResult(boolean success, String serverUrl, boolean serverReady,
+                        String customerName, String licenseType, String error) {
+        this.success      = success;
+        this.serverUrl    = serverUrl;
+        this.serverReady  = serverReady;
+        this.customerName = customerName;
+        this.licenseType  = licenseType;
+        this.error        = error;
+    }
+}
 }
