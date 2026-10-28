@@ -88,6 +88,13 @@
         android:icon="@android:drawable/ic_menu_agenda"
         android:title="المحاسبة"
         app:showAsAction="never" />
+
+    <!-- 🔐 حالة الترخيص -->
+<item
+    android:id="@+id/action_license_status"
+    android:icon="@android:drawable/ic_lock_lock"
+    android:title="حالة الترخيص"
+    app:showAsAction="never" />
 </group>
 
     <!-- حول الجهاز والنظام -->
