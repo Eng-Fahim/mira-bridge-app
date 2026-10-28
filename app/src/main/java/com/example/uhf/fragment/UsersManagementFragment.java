@@ -34,6 +34,9 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.license.MiraBlobFetcher;
+import com.example.uhf.license.MiraBlobStorage;
+import com.example.uhf.license.MiraBlobVerifier;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.SecureSessionManager;
@@ -170,6 +173,19 @@ public class UsersManagementFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+
+        // ⚡ تحديث blob من الخادم في الخلفية (لا يوقف الشاشة)
+        if (ioExecutor != null && !ioExecutor.isShutdown()) {
+            ioExecutor.execute(() -> {
+                try {
+                    boolean updated = MiraBlobFetcher.fetchVerifyAndStore(requireContext());
+                    Log.d(TAG, "Blob refresh: " + (updated ? "✅" : "⚠️"));
+                } catch (Exception e) {
+                    Log.w(TAG, "Blob refresh failed: " + e.getMessage());
+                }
+            });
+        }
+
         loadUsers();
     }
 
@@ -235,13 +251,20 @@ public class UsersManagementFragment extends Fragment {
         if (btnAddUser != null) {
             btnAddUser.setOnClickListener(v -> {
                 try {
-                    if (canManageUsers()) {
-                        showUserDialog(null);
-                    } else {
+                    if (!canManageUsers()) {
                         showToast(isArabic
                                 ? "❌ ليس لديك صلاحية لإضافة مستخدمين"
                                 : "❌ You don't have permission to add users");
+                        return;
                     }
+
+                    // ⚡ فحص الترخيص أولاً
+                    if (!checkLicenseBeforeAction()) {
+                        return;
+                    }
+
+                    showUserDialog(null);
+
                 } catch (Exception e) {
                     showToast("Error: " + e.getMessage());
                 }
@@ -360,6 +383,65 @@ public class UsersManagementFragment extends Fragment {
             }
         }
         return role;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  ⚡ فحص الترخيص قبل العمليات الحساسة
+    // ═══════════════════════════════════════════════════════
+    private boolean checkLicenseBeforeAction() {
+        try {
+            MiraBlobStorage.BlobData blob = MiraBlobStorage.load(requireContext());
+
+            // [1] لا يوجد blob
+            if (blob == null) {
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(isArabic ? "⚠️ لا يوجد ترخيص" : "⚠️ No License")
+                        .setMessage(isArabic
+                                ? "لم يتم تفعيل الترخيص على هذا الجهاز.\n\nأعد فتح التطبيق أو تواصل مع ميرا."
+                                : "License not activated on this device.\n\nReopen the app or contact MIRA.")
+                        .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                        .show();
+                return false;
+            }
+
+            // [2] التحقق من التوقيع
+            MiraBlobVerifier.VerifyResult verify = MiraBlobVerifier.verify(
+                    blob.blobJson, blob.signatureB64, blob.publicKeyB64
+            );
+
+            if (!verify.valid) {
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(isArabic ? "🚨 ترخيص مُعدَّل" : "🚨 License Tampered")
+                        .setMessage(isArabic
+                                ? "التوقيع الرقمي غير صحيح — قد تكون ملفات الترخيص مُعدَّلة.\n\nتواصل مع ميرا فوراً."
+                                : "Invalid digital signature — license files may be tampered.\n\nContact MIRA immediately.")
+                        .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                        .setCancelable(false)
+                        .show();
+                return false;
+            }
+
+            // [3] التحقق من الصلاحية الزمنية
+            MiraBlobVerifier.VerifyResult full =
+                    MiraBlobVerifier.verifyAndValidate(blob, blob);
+
+            if (!full.valid) {
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(isArabic ? "⏰ ترخيص غير صالح" : "⏰ License Invalid")
+                        .setMessage(full.message)
+                        .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                        .setCancelable(false)
+                        .show();
+                return false;
+            }
+
+            return true;
+
+        } catch (Exception e) {
+            Log.e(TAG, "checkLicenseBeforeAction error", e);
+            showToast(isArabic ? "خطأ في فحص الترخيص" : "License check error");
+            return false;
+        }
     }
 
     // ═══════════════════════════════════════════════════════
@@ -593,7 +675,19 @@ public class UsersManagementFragment extends Fragment {
     private void updateUserLimitBadge() {
         if (tvUserLimitBadge == null) return;
 
-        int maxUsers = sessionManager.getLicenseMaxUsers();
+        // ⚡ استخدام Blob المحلي (أحدث من SessionManager)
+        int maxUsers = 0;
+        try {
+            MiraBlobStorage.BlobData blob = MiraBlobStorage.load(requireContext());
+            if (blob != null) {
+                maxUsers = blob.maxUsers;
+            } else {
+                maxUsers = sessionManager.getLicenseMaxUsers();
+            }
+        } catch (Exception e) {
+            maxUsers = sessionManager.getLicenseMaxUsers();
+        }
+
         if (maxUsers <= 0) {
             tvUserLimitBadge.setVisibility(View.GONE);
             return;
@@ -629,6 +723,16 @@ public class UsersManagementFragment extends Fragment {
 
         tvUserLimitBadge.setText(text);
         tvUserLimitBadge.setTextColor(color);
+
+        // ⚡ تعطيل زر الإضافة عند الحد الأقصى
+        if (btnAddUser != null) {
+            boolean canAdd = remaining > 0;
+            btnAddUser.setEnabled(canAdd);
+            btnAddUser.setAlpha(canAdd ? 1.0f : 0.5f);
+            btnAddUser.setText(isArabic
+                    ? (canAdd ? "+ إضافة مستخدم" : "🚫 الحد الأقصى")
+                    : (canAdd ? "+ Add User" : "🚫 Limit Reached"));
+        }
     }
 
     private void showToast(String message) {
