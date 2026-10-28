@@ -24,21 +24,21 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * LicenseStatusActivity — v2.0
- * 
- * إصلاحات v2.0:
- *   - onResume() يبدأ auto-refresh كل 30 ثانية
- *   - onPause() يوقف auto-refresh (يوفر البطارية)
- *   - onDestroy() ينظف handler
- *   - عرض عدد المستخدمين والأجهزة الفعلي (activeUsers/activeDevices)
- *   - loadLicenseStatus() لا يعمل في onCreate (يعمل في onResume)
+ * LicenseStatusActivity — v3.0 (نهائي)
+ *
+ * يشمل:
+ *   - Auto-refresh كل 30 ثانية (عند فتح الشاشة)
+ *   - زر الرجوع (Header) + زر الإغلاق (أسفل) + Back الفيزيائي
+ *   - عرض عدد المستخدمين والأجهزة الفعلي (live)
+ *   - تحديث لحظي لجميع الحقول (لأن الخادم يعيد توليد blob عند أي تغيير)
+ *   - احترام الثيم (Light/Dark)
  */
 public class LicenseStatusActivity extends AppCompatActivity {
 
     private static final String TAG = "LicenseStatus";
 
     // ═══ Auto-Refresh ═══
-    private static final long AUTO_REFRESH_INTERVAL_MS = 30_000L; // 30 ثانية
+    private static final long AUTO_REFRESH_INTERVAL_MS = 30_000L;
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable autoRefreshRunnable = new Runnable() {
         @Override
@@ -56,12 +56,16 @@ public class LicenseStatusActivity extends AppCompatActivity {
     private TextView tvUsersValue, tvDevicesValue, tvTypeValue, tvDaysValue;
     private TextView tvValidUntil, tvTechnicalDetails;
     private LinearLayout layoutTechnicalDetails;
-    private android.widget.Button btnRefresh, btnShowDetails;
-    private ImageButton btnRefreshHeader;
+    private android.widget.Button btnRefresh, btnShowDetails, btnClose;
+    private ImageButton btnRefreshHeader, btnBackHeader;
 
     // ═══ State ═══
     private boolean isArabic = true;
     private boolean detailsVisible = false;
+
+    // ═══════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,21 +77,14 @@ public class LicenseStatusActivity extends AppCompatActivity {
 
         initViews();
         attachListeners();
-        // ⚠️ لا نُحمّل هنا — سنُحمّل في onResume
+        // loadLicenseStatus() ← في onResume
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Lifecycle — Auto-refresh يُدار هنا
-    // ═══════════════════════════════════════════════════════
     @Override
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "▶️ onResume — starting auto-refresh");
-
-        // 1) تحديث فوري عند العودة للشاشة
         loadLicenseStatus();
-
-        // 2) ثم تحديث تلقائي كل 30 ثانية
         refreshHandler.removeCallbacks(autoRefreshRunnable);
         refreshHandler.postDelayed(autoRefreshRunnable, AUTO_REFRESH_INTERVAL_MS);
     }
@@ -105,9 +102,28 @@ public class LicenseStatusActivity extends AppCompatActivity {
         refreshHandler.removeCallbacksAndMessages(null);
     }
 
+    @Override
+    public void onBackPressed() {
+        // إذا كانت التفاصيل مفتوحة → أغلقها أولاً
+        if (detailsVisible) {
+            detailsVisible = false;
+            if (layoutTechnicalDetails != null) {
+                layoutTechnicalDetails.setVisibility(View.GONE);
+            }
+            if (btnShowDetails != null) {
+                btnShowDetails.setText("🔍  تفاصيل");
+            }
+            Log.d(TAG, "Back: closed technical details");
+        } else {
+            Log.d(TAG, "Back: closing activity");
+            super.onBackPressed();
+        }
+    }
+
     // ═══════════════════════════════════════════════════════
     //  Init
     // ═══════════════════════════════════════════════════════
+
     private void initViews() {
         statusCard              = findViewById(R.id.statusCard);
         progressLoading         = findViewById(R.id.progressLoading);
@@ -123,42 +139,55 @@ public class LicenseStatusActivity extends AppCompatActivity {
         layoutTechnicalDetails  = findViewById(R.id.layoutTechnicalDetails);
         btnRefresh              = findViewById(R.id.btnRefresh);
         btnShowDetails          = findViewById(R.id.btnShowDetails);
+        btnClose                = findViewById(R.id.btnClose);
         btnRefreshHeader        = findViewById(R.id.btnRefreshHeader);
+        btnBackHeader           = findViewById(R.id.btnBackHeader);
     }
 
     private void attachListeners() {
-        btnRefresh.setOnClickListener(v -> {
-            animateButton(v);
-            loadLicenseStatus();
-        });
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> {
+                animateButton(v);
+                loadLicenseStatus();
+            });
+        }
 
-        btnRefreshHeader.setOnClickListener(v -> loadLicenseStatus());
+        if (btnRefreshHeader != null) {
+            btnRefreshHeader.setOnClickListener(v -> loadLicenseStatus());
+        }
 
-        btnShowDetails.setOnClickListener(v -> {
-            detailsVisible = !detailsVisible;
-            layoutTechnicalDetails.setVisibility(detailsVisible ? View.VISIBLE : View.GONE);
-            if (detailsVisible) {
-                layoutTechnicalDetails.setAlpha(0f);
-                layoutTechnicalDetails.animate()
-                        .alpha(1f)
-                        .setDuration(200)
-                        .start();
-            }
-            btnShowDetails.setText(detailsVisible
-                    ? "🔍  إخفاء"
-                    : "🔍  تفاصيل");
-        });
+        if (btnBackHeader != null) {
+            btnBackHeader.setOnClickListener(v -> finish());
+        }
+
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> finish());
+        }
+
+        if (btnShowDetails != null) {
+            btnShowDetails.setOnClickListener(v -> {
+                detailsVisible = !detailsVisible;
+                if (layoutTechnicalDetails != null) {
+                    layoutTechnicalDetails.setVisibility(detailsVisible ? View.VISIBLE : View.GONE);
+                    if (detailsVisible) {
+                        layoutTechnicalDetails.setAlpha(0f);
+                        layoutTechnicalDetails.animate().alpha(1f).setDuration(200).start();
+                    }
+                }
+                btnShowDetails.setText(detailsVisible ? "🔍  إخفاء" : "🔍  تفاصيل");
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Load License Status (background thread)
+    //  Load License Status
     // ═══════════════════════════════════════════════════════
+
     private void loadLicenseStatus() {
         showLoading();
 
         new Thread(() -> {
             try {
-                // [1] جلب blob من الخادم
                 MiraBlobFetcher.FetchResult fetch = MiraBlobFetcher.fetch(this);
 
                 if (!fetch.success) {
@@ -167,20 +196,15 @@ public class LicenseStatusActivity extends AppCompatActivity {
                 }
 
                 MiraBlobStorage.BlobData data = fetch.blobData;
-
-                // [2] قراءة blob الحالي (للـ anti-rollback)
                 MiraBlobStorage.BlobData current = MiraBlobStorage.load(this);
 
-                // [3] تحقق شامل
                 MiraBlobVerifier.VerifyResult verify =
                         MiraBlobVerifier.verifyAndValidate(data, current);
 
-                // [4] حفظ إذا نجح
                 if (verify.valid) {
                     MiraBlobStorage.save(this, data);
                 }
 
-                // [5] تحديث الواجهة
                 runOnUiThread(() -> {
                     if (verify.valid) {
                         showValidState(data);
@@ -191,30 +215,28 @@ public class LicenseStatusActivity extends AppCompatActivity {
 
             } catch (Exception e) {
                 Log.e(TAG, "loadLicenseStatus error", e);
-                runOnUiThread(() ->
-                        showErrorState("exception", e.getMessage() != null
-                                ? e.getMessage()
-                                : "خطأ غير متوقع"));
+                runOnUiThread(() -> showErrorState("exception",
+                        e.getMessage() != null ? e.getMessage() : "خطأ غير متوقع"));
             }
         }, "LicenseStatusLoader").start();
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Show Valid
+    //  Show States
     // ═══════════════════════════════════════════════════════
+
     private void showValidState(MiraBlobStorage.BlobData data) {
         hideLoading();
 
-        statusCard.setBackgroundResource(R.drawable.bg_status_valid);
+        if (statusCard != null) {
+            statusCard.setBackgroundResource(R.drawable.bg_status_valid);
+        }
         tvStatusIcon.setText("✅");
         tvStatusTitle.setText(isArabic ? "الترخيص سليم" : "License Valid");
         tvStatusTitle.setTextColor(Color.parseColor("#1B5E20"));
-        tvStatusSubtitle.setText(isArabic
-                ? "جميع الفحوصات ناجحة"
-                : "All checks passed");
+        tvStatusSubtitle.setText(isArabic ? "جميع الفحوصات ناجحة" : "All checks passed");
         tvStatusSubtitle.setTextColor(Color.parseColor("#2E7D32"));
 
-        // ═══ Info cards — عرض الأعداد الفعلية ═══
         // المستخدمون
         if (data.activeUsers >= 0 && data.maxUsers > 0) {
             tvUsersValue.setText(data.activeUsers + "/" + data.maxUsers);
@@ -235,25 +257,18 @@ public class LicenseStatusActivity extends AppCompatActivity {
 
         tvTypeValue.setText(formatLicenseType(data));
 
-        // Days left
         int daysLeft = calculateDaysLeft(data.validUntil);
         tvDaysValue.setText(String.valueOf(Math.max(0, daysLeft)));
         tvDaysValue.setTextColor(daysLeft > 30
                 ? Color.parseColor("#1A237E")
                 : Color.parseColor("#E65100"));
 
-        // Valid until
         tvValidUntil.setText(formatDate(data.validUntil));
-
-        // Technical details
         tvTechnicalDetails.setText(buildTechnicalDetails(data));
 
         animateStatusCard();
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Show Invalid
-    // ═══════════════════════════════════════════════════════
     private void showInvalidState(String code, String message, MiraBlobStorage.BlobData data) {
         hideLoading();
 
@@ -263,16 +278,14 @@ public class LicenseStatusActivity extends AppCompatActivity {
                 || "version_rollback".equals(code);
 
         if (isExpired) {
-            statusCard.setBackgroundResource(R.drawable.bg_status_warning);
+            if (statusCard != null) statusCard.setBackgroundResource(R.drawable.bg_status_warning);
             tvStatusIcon.setText("⏰");
             tvStatusTitle.setText(isArabic ? "انتهى الترخيص" : "License Expired");
             tvStatusTitle.setTextColor(Color.parseColor("#E65100"));
-            tvStatusSubtitle.setText(isArabic
-                    ? "تواصل مع ميرا للتجديد"
-                    : "Contact MIRA to renew");
+            tvStatusSubtitle.setText(isArabic ? "تواصل مع ميرا للتجديد" : "Contact MIRA to renew");
             tvStatusSubtitle.setTextColor(Color.parseColor("#EF6C00"));
         } else if (isTampered) {
-            statusCard.setBackgroundResource(R.drawable.bg_status_invalid);
+            if (statusCard != null) statusCard.setBackgroundResource(R.drawable.bg_status_invalid);
             tvStatusIcon.setText("⚠️");
             tvStatusTitle.setText(isArabic ? "ترخيص مُعدَّل" : "License Tampered");
             tvStatusTitle.setTextColor(Color.parseColor("#B71C1C"));
@@ -281,7 +294,7 @@ public class LicenseStatusActivity extends AppCompatActivity {
                     : "Invalid signature — file may be tampered");
             tvStatusSubtitle.setTextColor(Color.parseColor("#C62828"));
         } else {
-            statusCard.setBackgroundResource(R.drawable.bg_status_invalid);
+            if (statusCard != null) statusCard.setBackgroundResource(R.drawable.bg_status_invalid);
             tvStatusIcon.setText("❌");
             tvStatusTitle.setText(isArabic ? "ترخيص غير صالح" : "License Invalid");
             tvStatusTitle.setTextColor(Color.parseColor("#B71C1C"));
@@ -315,13 +328,10 @@ public class LicenseStatusActivity extends AppCompatActivity {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  Show Error (network)
-    // ═══════════════════════════════════════════════════════
     private void showErrorState(String code, String message) {
         hideLoading();
 
-        statusCard.setBackgroundResource(R.drawable.bg_status_warning);
+        if (statusCard != null) statusCard.setBackgroundResource(R.drawable.bg_status_warning);
         tvStatusIcon.setText("📡");
         tvStatusTitle.setText(isArabic ? "فشل الاتصال" : "Connection Failed");
         tvStatusTitle.setTextColor(Color.parseColor("#E65100"));
@@ -330,24 +340,16 @@ public class LicenseStatusActivity extends AppCompatActivity {
         switch (code) {
             case "dns":
             case "network":
-                friendlyMessage = isArabic
-                        ? "تحقق من اتصالك بالإنترنت"
-                        : "Check your internet connection";
+                friendlyMessage = isArabic ? "تحقق من اتصالك بالإنترنت" : "Check your internet connection";
                 break;
             case "timeout":
-                friendlyMessage = isArabic
-                        ? "انتهت مهلة الاتصال — حاول مرة أخرى"
-                        : "Connection timed out — try again";
+                friendlyMessage = isArabic ? "انتهت مهلة الاتصال — حاول مرة أخرى" : "Connection timed out — try again";
                 break;
             case "ssl":
-                friendlyMessage = isArabic
-                        ? "فشل الاتصال الآمن — قد تكون الشهادة منتهية"
-                        : "Secure connection failed — certificate issue";
+                friendlyMessage = isArabic ? "فشل الاتصال الآمن" : "Secure connection failed";
                 break;
             default:
-                friendlyMessage = isArabic
-                        ? "تعذر الاتصال بالخادم"
-                        : "Could not connect to server";
+                friendlyMessage = isArabic ? "تعذر الاتصال بالخادم" : "Could not connect to server";
         }
 
         tvStatusSubtitle.setText(friendlyMessage);
@@ -364,25 +366,27 @@ public class LicenseStatusActivity extends AppCompatActivity {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Loading state
+    //  Loading
     // ═══════════════════════════════════════════════════════
+
     private void showLoading() {
-        progressLoading.setVisibility(View.VISIBLE);
-        tvStatusIcon.setVisibility(View.GONE);
+        if (progressLoading != null) progressLoading.setVisibility(View.VISIBLE);
+        if (tvStatusIcon != null) tvStatusIcon.setVisibility(View.GONE);
         tvStatusTitle.setText(isArabic ? "جارٍ التحقق..." : "Verifying...");
         tvStatusSubtitle.setText(isArabic ? "يتم الاتصال بالخادم" : "Connecting to server");
-        btnRefresh.setEnabled(false);
+        if (btnRefresh != null) btnRefresh.setEnabled(false);
     }
 
     private void hideLoading() {
-        progressLoading.setVisibility(View.GONE);
-        tvStatusIcon.setVisibility(View.VISIBLE);
-        btnRefresh.setEnabled(true);
+        if (progressLoading != null) progressLoading.setVisibility(View.GONE);
+        if (tvStatusIcon != null) tvStatusIcon.setVisibility(View.VISIBLE);
+        if (btnRefresh != null) btnRefresh.setEnabled(true);
     }
 
     // ═══════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════
+
     private String formatLicenseType(MiraBlobStorage.BlobData data) {
         try {
             org.json.JSONObject obj = new org.json.JSONObject(data.blobJson);
@@ -444,24 +448,22 @@ public class LicenseStatusActivity extends AppCompatActivity {
     // ═══════════════════════════════════════════════════════
     //  Animations
     // ═══════════════════════════════════════════════════════
+
     private void animateStatusCard() {
+        if (statusCard == null) return;
         statusCard.setAlpha(0f);
         statusCard.setScaleX(0.95f);
         statusCard.setScaleY(0.95f);
-
         statusCard.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
+                .alpha(1f).scaleX(1f).scaleY(1f)
                 .setDuration(300)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
 
     private void animateButton(View v) {
-        ObjectAnimator.ofFloat(v, "scaleX", 1f, 0.95f, 1f)
-                .setDuration(150).start();
-        ObjectAnimator.ofFloat(v, "scaleY", 1f, 0.95f, 1f)
-                .setDuration(150).start();
+        if (v == null) return;
+        ObjectAnimator.ofFloat(v, "scaleX", 1f, 0.95f, 1f).setDuration(150).start();
+        ObjectAnimator.ofFloat(v, "scaleY", 1f, 0.95f, 1f).setDuration(150).start();
     }
 }
