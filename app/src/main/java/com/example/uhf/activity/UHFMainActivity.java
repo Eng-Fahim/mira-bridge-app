@@ -2297,6 +2297,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         setMenuVisible(menu, R.id.action_locator, pm.canViewRadar());
 
         setMenuVisible(menu, R.id.action_accounting,       pm.canViewAccounting());
+        // ═══════════════════════════════════════════════════════
+//  9. حالة الترخيص (للمدراء فقط)
+// ═══════════════════════════════════════════════════════
+setMenuVisible(menu, R.id.action_license_status,
+        pm.isAdmin() || pm.isManager());
         setMenuVisible(menu, R.id.action_accounting_setup, pm.canPerformAccountingSetup());
 
         setMenuVisible(menu, R.id.action_export_data, pm.canExportReports());
@@ -2349,6 +2354,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             frag.setArguments(args);
             loadFragment(frag, "AccountingSetup");
             return true;
+        } else if (id == R.id.action_license_status) {
+    try {
+        Intent intent = new Intent(this,
+                com.example.uhf.license.LicenseStatusActivity.class);
+        startActivity(intent);
+        Log.d(TAG, "✅ License status opened from menu");
+    } catch (Exception e) {
+        Log.e(TAG, "Failed to open LicenseStatusActivity", e);
+        Toast.makeText(this,
+                "شاشة الترخيص غير متاحة — أعد بناء التطبيق",
+                Toast.LENGTH_LONG).show();
+    }
+    return true;
         } else if (id == R.id.action_accounting) {
             openAccounting();
             return true;
