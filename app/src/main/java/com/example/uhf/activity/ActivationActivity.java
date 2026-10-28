@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.uhf.R;
 import com.example.uhf.license.LicenseManager;
+import com.example.uhf.license.MiraBlobFetcher;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -77,10 +78,18 @@ public class ActivationActivity extends AppCompatActivity {
             sessionManager.setServerUrl(savedUrl);
         }
         etServerUrl.setText(savedUrl);
+        // ⚡ placeholder للشفافية
+if (etServerUrl != null) {
+    etServerUrl.setHint(isArabic 
+            ? "سيُكتشف تلقائياً من الترخيص"
+            : "Auto-detected from license");
+}
 
         // إذا لم يوجد server_url محفوظ، أظهر الحقل
-        boolean hasServerUrl = sessionManager.hasServerUrl();
-        tilServerUrl.setVisibility(hasServerUrl ? View.GONE : View.VISIBLE);
+        // ⚡ دائماً مُخفي — سيُكتشف تلقائياً من المركز
+if (tilServerUrl != null) {
+    tilServerUrl.setVisibility(View.GONE);
+}
 
         // ═══ الأحداث ═══
         btnActivate.setOnClickListener(v -> attemptActivation());
@@ -104,60 +113,171 @@ public class ActivationActivity extends AppCompatActivity {
     }
 
     private void attemptActivation() {
-        String serverUrl = getText(etServerUrl);
-        String licenseKey = getText(etLicenseKey).toUpperCase();
+    String licenseKey = getText(etLicenseKey).toUpperCase();
 
-        // ═══ Validation ═══
-        if (serverUrl.isEmpty()) {
-            tilServerUrl.setError(isArabic ? "أدخل عنوان الخادم" : "Enter server URL");
-            return;
-        }
-        if (!serverUrl.startsWith("https://")) {
-            tilServerUrl.setError(isArabic ? "يجب أن يبدأ بـ https://" : "Must start with https://");
-            return;
-        }
-        if (licenseKey.isEmpty()) {
-            tilLicenseKey.setError(isArabic ? "أدخل رقم الترخيص" : "Enter license key");
-            return;
-        }
-        if (!LICENSE_KEY_PATTERN.matcher(licenseKey).matches()) {
+    // ═══════════════════════════════════════════════════════════════
+    //  ⚡ Validation — الترخيص فقط مطلوب
+    //  (server_url يُكتشف تلقائياً من المركز)
+    // ═══════════════════════════════════════════════════════════════
+    if (licenseKey.isEmpty()) {
+        if (tilLicenseKey != null) {
             tilLicenseKey.setError(
-                    isArabic ? "الصيغة: MIRA-XXXX-XXXX-XXXX" : "Format: MIRA-XXXX-XXXX-XXXX");
-            return;
+                    isArabic ? "أدخل رقم الترخيص" : "Enter license key");
         }
-
-        // ═══ حفظ server_url قبل التفعيل ═══
-        sessionManager.setServerUrl(serverUrl);
-
-        showLoading(true);
-        hideError();
-
-        // ═══ استدعاء API ═══
-        LicenseManager.activate(
-                getApplicationContext(),
-                serverUrl,
-                licenseKey,
-                new LicenseManager.Callback() {
-                    @Override
-                    public void onSuccess(JSONObject response) {
-                        runOnUiThread(() -> {
-                            showLoading(false);
-                            showSuccessAndGoToLogin(response);
-                        });
-                    }
-
-                    @Override
-                    public void onError(String code, String message, int httpCode) {
-                        runOnUiThread(() -> {
-                            showLoading(false);
-                            showError(message);
-                            Log.e(TAG, "Activation failed: " + code + " | " + message);
-                        });
-                    }
-                }
-        );
+        return;
     }
 
+    if (!LICENSE_KEY_PATTERN.matcher(licenseKey).matches()) {
+        if (tilLicenseKey != null) {
+            tilLicenseKey.setError(
+                    isArabic ? "الصيغة: MIRA-XXXX-XXXX-XXXX" : "Format: MIRA-XXXX-XXXX-XXXX");
+        }
+        return;
+    }
+
+    showLoading(true);
+    hideError();
+
+    if (tvStatus != null) {
+        tvStatus.setVisibility(View.VISIBLE);
+        tvStatus.setText(isArabic 
+                ? "جارٍ التحقق من الترخيص..." 
+                : "Verifying license...");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ⚡ الخطوة 1: Lookup server_url من المركز (في الخلفية)
+    // ═══════════════════════════════════════════════════════════════
+    new Thread(() -> {
+        String centralUrl = getCentralUrl();
+        Log.d(TAG, "🔍 Lookup: central=" + centralUrl + ", key=" + licenseKey);
+
+        MiraBlobFetcher.LookupResult lookup = MiraBlobFetcher.lookupServerUrl(
+                getApplicationContext(),
+                centralUrl,
+                licenseKey
+        );
+
+        runOnUiThread(() -> handleLookupResult(lookup, licenseKey));
+
+    }, "Activation-Lookup").start();
+}
+
+/**
+ * ⚡ معالجة نتيجة الـ Lookup (على main thread)
+ */
+private void handleLookupResult(MiraBlobFetcher.LookupResult lookup, String licenseKey) {
+    // ═══ فشل الـ Lookup ═══
+    if (!lookup.success) {
+        showLoading(false);
+
+        String err = lookup.error != null
+                ? lookup.error
+                : (isArabic ? "فشل التحقق من الترخيص" : "License lookup failed");
+
+        showError(err);
+        Log.e(TAG, "❌ Lookup failed: " + err);
+        return;
+    }
+
+    // ═══ الخادم غير جاهز ═══
+    if (!lookup.serverReady) {
+        showLoading(false);
+
+        String msg = isArabic
+                ? "خادم المنشأة غير جاهز للتفعيل.\n\n"
+                  + "قد يكون:"
+                  + "\n• تحت الصيانة"
+                  + "\n• لم يُثبَّت بعد"
+                  + "\n\nتواصل مع ميرا تكنولوجي."
+                : "Customer server not ready.\n\n"
+                  + "It might be:"
+                  + "\n• Under maintenance"
+                  + "\n• Not installed yet"
+                  + "\n\nContact MIRA Technology.";
+
+        showError(msg);
+        Log.e(TAG, "❌ Server not ready: " + lookup.serverUrl);
+        return;
+    }
+
+    // ═══ نجاح الـ Lookup ═══
+    Log.d(TAG, "✅ Lookup OK: server=" + lookup.serverUrl
+            + ", customer=" + lookup.customerName);
+
+    // احفظ server_url تلقائياً
+    sessionManager.setServerUrl(lookup.serverUrl);
+
+    // اعرض للعميل (شفافية — يرى أين يتصل)
+    if (etServerUrl != null) {
+        etServerUrl.setText(lookup.serverUrl);
+        etServerUrl.setEnabled(false);
+    }
+
+    // ═══ عرض معلومات العميل ═══
+    if (tvStatus != null) {
+        String customerInfo = lookup.customerName != null 
+                && !lookup.customerName.isEmpty()
+                ? lookup.customerName
+                : (isArabic ? "منشأتك" : "Your Facility");
+        tvStatus.setText(isArabic
+                ? "تم التعرف على: " + customerInfo + "\nجارٍ التفعيل..."
+                : "Identified: " + customerInfo + "\nActivating...");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ⚡ الخطوة 2: Activation على الخادم المكتشف
+    // ═══════════════════════════════════════════════════════════════
+    LicenseManager.activate(
+            getApplicationContext(),
+            lookup.serverUrl,
+            licenseKey,
+            new LicenseManager.Callback() {
+                @Override
+                public void onSuccess(JSONObject response) {
+                    runOnUiThread(() -> {
+                        showLoading(false);
+                        Log.d(TAG, "✅ Activation successful on " + lookup.serverUrl);
+                        showSuccessAndGoToLogin(response);
+                    });
+                }
+
+                @Override
+                public void onError(String code, String message, int httpCode) {
+                    runOnUiThread(() -> {
+                        showLoading(false);
+                        showError(message);
+                        Log.e(TAG, "❌ Activation failed: " + code + " | " + message);
+
+                        // في حالة الفشل، أعطِ فرصة للعميل لإعادة المحاولة
+                        if (tilLicenseKey != null) {
+                            tilLicenseKey.setError(isArabic 
+                                    ? "فشل التفعيل — حاول مرة أخرى"
+                                    : "Activation failed — try again");
+                        }
+                    });
+                }
+            }
+    );
+}
+
+/**
+ * ⚡ جلب Central URL — BuildConfig أو Fallback
+ */
+private String getCentralUrl() {
+    // حاول BuildConfig أولاً (إن وُجد)
+    try {
+        java.lang.reflect.Field f = com.example.uhf.BuildConfig.class
+                .getField("MIRA_LICENSE_BASE_URL");
+        String v = (String) f.get(null);
+        if (v != null && !v.isEmpty()) {
+            return v;
+        }
+    } catch (Exception ignored) {
+        // BuildConfig لا يحتوي عليه — استخدم الافتراضي
+    }
+    return DEFAULT_SERVER_URL;
+}
     private void showSuccessAndGoToLogin(JSONObject response) {
         String facilityName = "";
         try {
