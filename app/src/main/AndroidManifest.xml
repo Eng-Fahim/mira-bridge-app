@@ -78,7 +78,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
+<!-- ⚠️ TEST ONLY — احذفه بعد التحقق -->
+<activity
     android:name=".license.LicenseTestActivity"
     android:exported="true"
     android:theme="@style/Theme.Uhfuartdemo">
