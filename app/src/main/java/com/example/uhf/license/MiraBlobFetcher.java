@@ -189,10 +189,13 @@ public final class MiraBlobFetcher {
             Log.e(TAG, "SSL failed: " + e.getMessage(), e);
             return FetchResult.error("ssl", "فشل SSL: " + e.getMessage());
         } catch (Exception e) {
-            Log.e(TAG, "fetch error: " + e.getMessage(), e);
-            return FetchResult.error("network",
-                    e.getMessage() != null ? e.getMessage() : "فشل الاتصال");
-        } finally {
+    String msg = e.getMessage();
+    if (msg == null || msg.isEmpty()) {
+        msg = e.getClass().getSimpleName();
+    }
+    Log.e(TAG, "fetch error: " + msg, e);
+    return FetchResult.error("network", msg);
+} finally {
             if (conn != null) conn.disconnect();
         }
     }
