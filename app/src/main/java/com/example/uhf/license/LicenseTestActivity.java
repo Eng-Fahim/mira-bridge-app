@@ -32,13 +32,23 @@ public class LicenseTestActivity extends AppCompatActivity {
         scroll.addView(textView);
         setContentView(scroll);
 
-        runTests();
+        // ✅ التشغيل على Background Thread
+        new Thread(() -> {
+            try {
+                runTests();
+            } catch (Exception e) {
+                Log.e(TAG, "Fatal test error", e);
+                log("❌ Fatal: " + e.getClass().getSimpleName()
+                        + " — " + e.getMessage());
+            }
+        }, "LicenseTest-Thread").start();
     }
 
     private void log(String msg) {
         Log.d(TAG, msg);
         logBuffer.append(msg).append("\n");
-        textView.setText(logBuffer.toString());
+        final String current = logBuffer.toString();
+        runOnUiThread(() -> textView.setText(current));
     }
 
     private void runTests() {
@@ -64,7 +74,7 @@ public class LicenseTestActivity extends AppCompatActivity {
         }
 
         // ─────────────────────────────────
-        // [2] Fetch
+        // [2] Fetch Blob
         // ─────────────────────────────────
         log("[2] Fetch Blob");
         MiraBlobFetcher.FetchResult fetch = MiraBlobFetcher.fetch(ctx);
@@ -92,7 +102,9 @@ public class LicenseTestActivity extends AppCompatActivity {
         String canonical = MiraBlobVerifier.toCanonicalJson(data.blobJson);
         if (canonical != null) {
             log("    ✅ " + canonical.length() + " chars");
-            log("    " + (canonical.length() > 120 ? canonical.substring(0, 120) + "..." : canonical));
+            log("    " + (canonical.length() > 120
+                    ? canonical.substring(0, 120) + "..."
+                    : canonical));
         } else {
             log("    ❌ Failed");
         }
