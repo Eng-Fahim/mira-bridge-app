@@ -138,9 +138,9 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
             }
 
             // يظهر للمدراء فقط (إذا أردت للجميع، احذف هذا الفحص)
-            boolean canSee = permissionManager.isAnyAdmin()
-                    || permissionManager.isOrgAdmin()
-                    || permissionManager.isBranchManager();
+            // يظهر للمدراء فقط
+            boolean canSee = permissionManager.isAdmin()
+        || permissionManager.isManager();
 
             if (!canSee) {
                 card.setVisibility(View.GONE);
