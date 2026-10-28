@@ -203,20 +203,21 @@ public class LicenseManager {
 
                             if (values != null) {
                                 MiraBlobStorage.BlobData blobData =
-                                        new MiraBlobStorage.BlobData(
-                                                blob.toString(),
-                                                blobPayload.optString("signature", ""),
-                                                blobPayload.optString("public_key", ""),
-                                                blobPayload.optString("fingerprint", ""),
-                                                blobPayload.optInt("version", values.version),
-                                                blobPayload.optString("key_id", ""),
-                                                blobPayload.optInt("license_id", values.licenseId),
-                                                values.maxUsers,
-                                                values.maxDevices,
-                                                values.validUntil,
-                                                System.currentTimeMillis()
-                                        );
-
+        new MiraBlobStorage.BlobData(
+                blob.toString(),
+                blobPayload.optString("signature", ""),
+                blobPayload.optString("public_key", ""),
+                blobPayload.optString("fingerprint", ""),
+                blobPayload.optInt("version", values.version),
+                blobPayload.optString("key_id", ""),
+                blobPayload.optInt("license_id", values.licenseId),
+                values.maxUsers,
+                values.maxDevices,
+                values.validUntil,
+                System.currentTimeMillis(),
+                json.optInt("active_users", -1),      // ← جديد
+                json.optInt("active_devices", -1)     // ← جديد
+        );
                                 MiraBlobVerifier.VerifyResult blobVerify =
                                         MiraBlobVerifier.verify(
                                                 blobData.blobJson,
