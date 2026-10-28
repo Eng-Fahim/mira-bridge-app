@@ -14,10 +14,10 @@ import org.json.JSONObject;
 /**
  * HeartbeatWorker — يعمل كل 6 ساعات في الخلفية
  *
- * المهام:
- *   1. إرسال heartbeat إلى خادم ميرا
- *   2. تحديث last_heartbeat (يُستخدم لحساب فترة السماح offline)
- *   3. إذا رجع action=revoke_access → مسح الترخيص محلياً
+ * v2.0 — يدمج:
+ *   1. جلب الـ blob من خادم العميل
+ *   2. التحقق من التوقيع الرقمي
+ *   3. إرسال heartbeat للمركز مع blob_version
  */
 public class HeartbeatWorker extends Worker {
 
@@ -34,16 +34,55 @@ public class HeartbeatWorker extends Worker {
         Context ctx = getApplicationContext();
         SessionManager sm = new SessionManager(ctx);
 
-        // ═══ 1. تحقق من وجود ترخيص ═══
+        // ═══════════════════════════════════════════════════════
+        //  [1] فحص وجود ترخيص (activation token)
+        // ═══════════════════════════════════════════════════════
         String token = sm.getActivationToken();
         if (token == null || token.isEmpty()) {
             Log.w(TAG, "⚠️ No activation token — nothing to heartbeat");
-            return Result.success(); // لا حاجة لإعادة المحاولة
+            return Result.success();
         }
 
+        // ═══════════════════════════════════════════════════════
+        //  [2] جلب وتحديث الـ blob من خادم العميل
+        // ═══════════════════════════════════════════════════════
+        Log.d(TAG, "🔄 Fetching latest license blob from server");
+        boolean blobUpdated = false;
+        try {
+            blobUpdated = MiraBlobFetcher.fetchVerifyAndStore(ctx);
+        } catch (Exception e) {
+            Log.e(TAG, "Blob fetch error: " + e.getMessage(), e);
+        }
+
+        if (!blobUpdated) {
+            Log.w(TAG, "⚠️ Could not fetch fresh blob — verifying stored one");
+
+            MiraBlobStorage.BlobData stored = MiraBlobStorage.load(ctx);
+            if (stored == null) {
+                Log.e(TAG, "🚫 No license at all — blocking app");
+                sm.clearLicense();
+                return Result.failure();
+            }
+
+            MiraBlobVerifier.VerifyResult verify = MiraBlobVerifier.verify(
+                    stored.blobJson, stored.signatureB64, stored.publicKeyB64
+            );
+            if (!verify.valid) {
+                Log.e(TAG, "🚨 Stored license tampered — blocking app");
+                sm.clearLicense();
+                return Result.failure();
+            }
+
+            Log.d(TAG, "✅ Stored license valid (v" + stored.version + ")");
+        } else {
+            Log.d(TAG, "✅ Fresh license verified and stored");
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  [3] إرسال heartbeat (blocking — ننتظر النتيجة)
+        // ═══════════════════════════════════════════════════════
         Log.d(TAG, "💓 Sending heartbeat...");
 
-        // ═══ 2. إرسال heartbeat (blocking — ننتظر النتيجة) ═══
         final Object lock = new Object();
         final boolean[] done = {false};
         final boolean[] success = {false};
@@ -95,26 +134,29 @@ public class HeartbeatWorker extends Worker {
             return Result.success();
         }
 
-        // ═══ 3. تحليل الفشل ═══
+        // ═══════════════════════════════════════════════════════
+        //  [4] تحليل الفشل
+        // ═══════════════════════════════════════════════════════
         String code = failureCode[0];
         Log.w(TAG, "❌ Heartbeat failed: " + code);
 
         if ("revoked".equals(code) || "kill_switch".equals(code)
                 || "license_killed".equals(code)) {
-            // الترخيص أُلغي — سجّل خروجاً كاملاً
             Log.e(TAG, "🚨 License revoked remotely — clearing local state");
             sm.clearLicense();
+            MiraBlobStorage.clear(ctx);
             sm.logoutUser();
             return Result.failure();
         }
 
         if ("license_expired".equals(code) || "license_inactive".equals(code)) {
-            // الترخيص منتهي — امسح فقط الترخيص
+            Log.e(TAG, "⏰ License expired/inactive — clearing");
             sm.clearLicense();
+            MiraBlobStorage.clear(ctx);
             return Result.failure();
         }
 
-        // فشل شبكة أو فشل مؤقت — أعد المحاولة لاحقاً
+        // فشل شبكة أو مؤقت — أعد المحاولة لاحقاً
         return Result.retry();
     }
 }
