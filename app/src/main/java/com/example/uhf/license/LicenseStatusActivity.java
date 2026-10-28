@@ -3,9 +3,12 @@ package com.example.uhf.license;
 import android.animation.ObjectAnimator;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -20,11 +23,33 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+/**
+ * LicenseStatusActivity — v2.0
+ * 
+ * إصلاحات v2.0:
+ *   - onResume() يبدأ auto-refresh كل 30 ثانية
+ *   - onPause() يوقف auto-refresh (يوفر البطارية)
+ *   - onDestroy() ينظف handler
+ *   - عرض عدد المستخدمين والأجهزة الفعلي (activeUsers/activeDevices)
+ *   - loadLicenseStatus() لا يعمل في onCreate (يعمل في onResume)
+ */
 public class LicenseStatusActivity extends AppCompatActivity {
 
     private static final String TAG = "LicenseStatus";
 
-    // Views
+    // ═══ Auto-Refresh ═══
+    private static final long AUTO_REFRESH_INTERVAL_MS = 30_000L; // 30 ثانية
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable autoRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            Log.d(TAG, "⏰ Auto-refresh tick");
+            loadLicenseStatus();
+            refreshHandler.postDelayed(this, AUTO_REFRESH_INTERVAL_MS);
+        }
+    };
+
+    // ═══ Views ═══
     private LinearLayout statusCard;
     private ProgressBar progressLoading;
     private TextView tvStatusIcon, tvStatusTitle, tvStatusSubtitle;
@@ -32,9 +57,9 @@ public class LicenseStatusActivity extends AppCompatActivity {
     private TextView tvValidUntil, tvTechnicalDetails;
     private LinearLayout layoutTechnicalDetails;
     private android.widget.Button btnRefresh, btnShowDetails;
-    private android.widget.ImageButton btnRefreshHeader;
+    private ImageButton btnRefreshHeader;
 
-    // State
+    // ═══ State ═══
     private boolean isArabic = true;
     private boolean detailsVisible = false;
 
@@ -48,7 +73,36 @@ public class LicenseStatusActivity extends AppCompatActivity {
 
         initViews();
         attachListeners();
+        // ⚠️ لا نُحمّل هنا — سنُحمّل في onResume
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Lifecycle — Auto-refresh يُدار هنا
+    // ═══════════════════════════════════════════════════════
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "▶️ onResume — starting auto-refresh");
+
+        // 1) تحديث فوري عند العودة للشاشة
         loadLicenseStatus();
+
+        // 2) ثم تحديث تلقائي كل 30 ثانية
+        refreshHandler.removeCallbacks(autoRefreshRunnable);
+        refreshHandler.postDelayed(autoRefreshRunnable, AUTO_REFRESH_INTERVAL_MS);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.d(TAG, "⏸️ onPause — stopping auto-refresh");
+        refreshHandler.removeCallbacks(autoRefreshRunnable);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        refreshHandler.removeCallbacksAndMessages(null);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -151,7 +205,6 @@ public class LicenseStatusActivity extends AppCompatActivity {
     private void showValidState(MiraBlobStorage.BlobData data) {
         hideLoading();
 
-        // Status card — green
         statusCard.setBackgroundResource(R.drawable.bg_status_valid);
         tvStatusIcon.setText("✅");
         tvStatusTitle.setText(isArabic ? "الترخيص سليم" : "License Valid");
@@ -161,16 +214,25 @@ public class LicenseStatusActivity extends AppCompatActivity {
                 : "All checks passed");
         tvStatusSubtitle.setTextColor(Color.parseColor("#2E7D32"));
 
-        // Info cards — عرض الأعداد الفعلية
-String usersText = (data.activeUsers >= 0)
-        ? data.activeUsers + "/" + data.maxUsers
-        : "—/" + data.maxUsers;
-tvUsersValue.setText(usersText);
+        // ═══ Info cards — عرض الأعداد الفعلية ═══
+        // المستخدمون
+        if (data.activeUsers >= 0 && data.maxUsers > 0) {
+            tvUsersValue.setText(data.activeUsers + "/" + data.maxUsers);
+        } else if (data.maxUsers > 0) {
+            tvUsersValue.setText("—/" + data.maxUsers);
+        } else {
+            tvUsersValue.setText("—");
+        }
 
-String devicesText = (data.activeDevices >= 0)
-        ? data.activeDevices + "/" + data.maxDevices
-        : "—/" + data.maxDevices;
-tvDevicesValue.setText(devicesText);
+        // الأجهزة
+        if (data.activeDevices >= 0 && data.maxDevices > 0) {
+            tvDevicesValue.setText(data.activeDevices + "/" + data.maxDevices);
+        } else if (data.maxDevices > 0) {
+            tvDevicesValue.setText("—/" + data.maxDevices);
+        } else {
+            tvDevicesValue.setText("—");
+        }
+
         tvTypeValue.setText(formatLicenseType(data));
 
         // Days left
@@ -186,7 +248,6 @@ tvDevicesValue.setText(devicesText);
         // Technical details
         tvTechnicalDetails.setText(buildTechnicalDetails(data));
 
-        // Animate entrance
         animateStatusCard();
     }
 
@@ -202,7 +263,6 @@ tvDevicesValue.setText(devicesText);
                 || "version_rollback".equals(code);
 
         if (isExpired) {
-            // Warning — orange
             statusCard.setBackgroundResource(R.drawable.bg_status_warning);
             tvStatusIcon.setText("⏰");
             tvStatusTitle.setText(isArabic ? "انتهى الترخيص" : "License Expired");
@@ -212,7 +272,6 @@ tvDevicesValue.setText(devicesText);
                     : "Contact MIRA to renew");
             tvStatusSubtitle.setTextColor(Color.parseColor("#EF6C00"));
         } else if (isTampered) {
-            // Invalid — red
             statusCard.setBackgroundResource(R.drawable.bg_status_invalid);
             tvStatusIcon.setText("⚠️");
             tvStatusTitle.setText(isArabic ? "ترخيص مُعدَّل" : "License Tampered");
@@ -222,7 +281,6 @@ tvDevicesValue.setText(devicesText);
                     : "Invalid signature — file may be tampered");
             tvStatusSubtitle.setTextColor(Color.parseColor("#C62828"));
         } else {
-            // Invalid — red (generic)
             statusCard.setBackgroundResource(R.drawable.bg_status_invalid);
             tvStatusIcon.setText("❌");
             tvStatusTitle.setText(isArabic ? "ترخيص غير صالح" : "License Invalid");
@@ -231,12 +289,13 @@ tvDevicesValue.setText(devicesText);
             tvStatusSubtitle.setTextColor(Color.parseColor("#C62828"));
         }
 
-        // Fill known info
         if (data != null) {
-    tvUsersValue.setText((data.activeUsers >= 0 ? data.activeUsers : "—") 
-            + "/" + data.maxUsers);
-    tvDevicesValue.setText((data.activeDevices >= 0 ? data.activeDevices : "—") 
-            + "/" + data.maxDevices);
+            tvUsersValue.setText((data.activeUsers >= 0 && data.maxUsers > 0)
+                    ? data.activeUsers + "/" + data.maxUsers
+                    : (data.maxUsers > 0 ? "—/" + data.maxUsers : "—"));
+            tvDevicesValue.setText((data.activeDevices >= 0 && data.maxDevices > 0)
+                    ? data.activeDevices + "/" + data.maxDevices
+                    : (data.maxDevices > 0 ? "—/" + data.maxDevices : "—"));
             tvTypeValue.setText(formatLicenseType(data));
             tvValidUntil.setText(formatDate(data.validUntil));
             int daysLeft = calculateDaysLeft(data.validUntil);
@@ -253,8 +312,6 @@ tvDevicesValue.setText(devicesText);
         }
 
         animateStatusCard();
-
-        // Toast
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
@@ -296,7 +353,6 @@ tvDevicesValue.setText(devicesText);
         tvStatusSubtitle.setText(friendlyMessage);
         tvStatusSubtitle.setTextColor(Color.parseColor("#EF6C00"));
 
-        // Clear info cards
         tvUsersValue.setText("—");
         tvDevicesValue.setText("—");
         tvTypeValue.setText("—");
