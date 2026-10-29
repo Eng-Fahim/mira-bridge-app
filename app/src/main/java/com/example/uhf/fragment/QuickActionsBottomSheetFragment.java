@@ -157,7 +157,7 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     //  ⭐ إعادة بناء GridLayout — لا فراغات
     // ═══════════════════════════════════════════════════════════
     private void rebuildGridWithPermissions(View root) {
-        GridLayout grid = root.findViewById(R.id.qaGrid);
+        ViewGroup grid = root.findViewById(R.id.qaGrid);
         if (grid == null) {
             Log.w(TAG, "qaGrid not found — skipping");
             return;
