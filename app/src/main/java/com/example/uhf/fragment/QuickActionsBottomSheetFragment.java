@@ -408,20 +408,36 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
-        try {
-            View bottomSheet = (getDialog() != null)
-                ? getDialog().findViewById(
-                    com.google.android.material.R.id.design_bottom_sheet)
-                : null;
-            if (bottomSheet != null) {
-                bottomSheet.getLayoutParams().height =
-                    (int) (getResources().getDisplayMetrics().heightPixels * 0.90);
-                bottomSheet.requestLayout();
+public void onStart() {
+    super.onStart();
+    try {
+        View bottomSheet = (getDialog() != null)
+            ? getDialog().findViewById(com.google.android.material.R.id.design_bottom_sheet)
+            : null;
+            
+        if (bottomSheet != null) {
+            // ✅ 1. إزالة الارتفاع الثابت 90%
+            // نجعله يعتمد على حجم المحتوى (wrap_content)
+            bottomSheet.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            
+            com.google.android.material.bottomsheet.BottomSheetBehavior<View> behavior = 
+                    com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet);
+            
+            if (behavior != null) {
+                behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
+                behavior.setSkipCollapsed(true);
+                
+                // ✅ 2. نضع حد أقصى للارتفاع (85% من الشاشة) حتى لا يغطي الشاشة بالكامل إذا كانت الأيقونات كثيرة
+                int maxHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.85);
+                behavior.setMaxHeight(maxHeight);
             }
-        } catch (Exception ignored) {}
+            
+            bottomSheet.requestLayout();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onStart error: " + e.getMessage());
     }
+}
 
     @Override
     public void onDestroyView() {
