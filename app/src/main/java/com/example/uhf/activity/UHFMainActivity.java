@@ -786,36 +786,42 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     }
 
     private void navigateByRole() {
-        try {
-            enableNavigationAfterSetup();
+    try {
+        enableNavigationAfterSetup();
 
-            Fragment targetFragment;
-            String targetTag;
+        Fragment targetFragment;
+        String targetTag;
 
-            if (permissionManager.isPosOperator()) {
-                targetFragment = new MiraPosFragment();
-                targetTag = NavigationManager.TAG_POS;
-            } else if (permissionManager.isInventoryManager()) {
-                targetFragment = new MiraInventoryProFragment();
-                targetTag = NavigationManager.TAG_INVENTORY;
-            } else if (permissionManager.isSecurity() || permissionManager.isGateSecurity()) {
-                targetFragment = new MiraSecureGateFragment();
-                targetTag = NavigationManager.TAG_GATES;
-            } else {
-                targetFragment = new MiraDashboardFragment();
-                targetTag = NavigationManager.TAG_DASHBOARD;
-            }
-
-            loadFragmentDirectly(targetFragment, targetTag);
-            Log.d(TAG, "✅ Navigated by role to: " + targetTag);
-
-        } catch (Exception e) {
-            Log.e(TAG, "navigateByRole error: " + e.getMessage());
-            enableNavigationAfterSetup();
-            loadFragmentDirectly(new MiraDashboardFragment(),
-                    NavigationManager.TAG_DASHBOARD);
+        if (permissionManager.isPosOperator()) {
+            targetFragment = new MiraPosFragment();
+            targetTag = NavigationManager.TAG_POS;
+        } else if (permissionManager.isInventoryManager()) {
+            targetFragment = new MiraInventoryProFragment();
+            targetTag = NavigationManager.TAG_INVENTORY;
+        } else if (permissionManager.isSecurity() || permissionManager.isGateSecurity()) {
+            targetFragment = new MiraSecureGateFragment();
+            targetTag = NavigationManager.TAG_GATES;
+            
+        // ✅ [جديد] توجيه المحاسب والمدير المالي مباشرة لصفحة المالية
+        } else if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
+            targetFragment = new MiraAccountingFragment();
+            targetTag = NavigationManager.TAG_ACCOUNTING;
+            
+        } else {
+            targetFragment = new MiraDashboardFragment();
+            targetTag = NavigationManager.TAG_DASHBOARD;
         }
+
+        loadFragmentDirectly(targetFragment, targetTag);
+        Log.d(TAG, "✅ Navigated by role to: " + targetTag);
+
+    } catch (Exception e) {
+        Log.e(TAG, "navigateByRole error: " + e.getMessage());
+        enableNavigationAfterSetup();
+        loadFragmentDirectly(new MiraDashboardFragment(),
+                NavigationManager.TAG_DASHBOARD);
     }
+}
 
     private void showSetupBlockedScreen() {
         if (isFinishing() || isDestroyed()) return;
@@ -2227,6 +2233,7 @@ private void attachNavListener(@NonNull BottomNavigationView nav) {
 // ═══════════════════════════════════════════════════════════
 //  ⭐ الفلترة + إعادة البناء + تكييف الفاب
 // ═══════════════════════════════════════════════════════════
+
 private void applyNavPermissions() {
     try {
         BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
@@ -2246,11 +2253,19 @@ private void applyNavPermissions() {
         nav.getMenu().clear();
 
         int index = 0;
-        int added = 0;
-        for (NavItemCfg cfg : NAV_CONFIGS) {
-            boolean allowed = cfg.alwaysAllowed
-                    || permissionManager.canAccessFragment(cfg.tag);
-            if (!allowed) continue;
+int added = 0;
+for (NavItemCfg cfg : NAV_CONFIGS) {
+    boolean allowed = cfg.alwaysAllowed
+            || permissionManager.canAccessFragment(cfg.tag);
+    
+    // ✅ [جديد] إخفاء زر "الرئيسية" عن المحاسب والمدير المالي
+    if (cfg.itemId == R.id.nav_home) {
+        if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
+            allowed = false; // إخفاء الرئيسية
+        }
+    }
+    
+    if (!allowed) continue;
 
             MenuItem item = nav.getMenu().add(Menu.NONE, cfg.itemId, index++, "");
             item.setIcon(cfg.iconRes);
@@ -3646,4 +3661,4 @@ public void openLicenseStatus() {
             return 0;
         }
     }
-                                }
+                        }
