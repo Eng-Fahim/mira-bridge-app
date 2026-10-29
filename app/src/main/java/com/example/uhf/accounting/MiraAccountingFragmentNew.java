@@ -296,24 +296,34 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Permissions
-    // ═══════════════════════════════════════════════════════════
-    private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
-        if (permissionManager == null) return true;
-        try {
-            boolean base = permissionManager.canView(MiraAccountingScreens.BASE_PERMISSION)
-                    || permissionManager.isAdmin()
-                    || permissionManager.isBranchManager()
-                    || (sessionManager != null
-                        && "AUDITOR".equals(sessionManager.getRoleString()));
-            if (!base) return false;
-            return permissionManager.isAdmin()
-                    || permissionManager.canView(screen.permissionKey);
-        } catch (Exception e) {
-            Log.e(TAG, "canOpen: " + e.getMessage());
-            return false;
+//  Permissions
+// ═══════════════════════════════════════════════════════════
+private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
+    if (permissionManager == null) return true;
+    try {
+        // ✅ [تطوير] إضافة المحاسب والمدير المالي صراحةً
+        boolean base = permissionManager.canView(MiraAccountingScreens.BASE_PERMISSION)
+                || permissionManager.isAdmin()
+                || permissionManager.isBranchManager()
+                || permissionManager.isAccountant()      // مضاف
+                || permissionManager.isFinanceManager()  // مضاف
+                || (sessionManager != null
+                    && "AUDITOR".equals(sessionManager.getRoleString()));
+                    
+        if (!base) return false;
+        
+        // المحاسب والمدير المالي يملكان صلاحية الوصول لكل الشاشات المحاسبية
+        if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
+            return true;
         }
+        
+        return permissionManager.isAdmin()
+                || permissionManager.canView(screen.permissionKey);
+    } catch (Exception e) {
+        Log.e(TAG, "canOpen: " + e.getMessage());
+        return false;
     }
+}
 
     // ═══════════════════════════════════════════════════════════
     //  Helpers
