@@ -31,13 +31,12 @@ import java.util.Deque;
 import java.util.Locale;
 
 /**
- * MIRA Accounting — New Container (Enterprise v2.0)
+ * MIRA Accounting — New Container (Enterprise v2.1)
  * 
  * التحديثات:
- * - استخدام MaterialToolbar القياسي (بدون حقن XML).
- * - دمج أزرار التحديث والحساب في الشريط العلوي.
- * - تصحيح دالة الرجوع handleOnBackPressed.
- * - دعم كامل للتوافق الخلفي مع MiraAccountingFragment القديم.
+ * - إخفاء الهيدر الرئيسي وشريط التنقل السفلي أثناء التواجد في المحاسبة.
+ * - منع تكرار أيقونات القائمة العلوية (مسح القائمة قبل الإضافة).
+ * - ضبط زر القائمة (Hamburger) بدقة.
  */
 public class MiraAccountingFragmentNew extends Fragment {
 
@@ -122,8 +121,37 @@ public class MiraAccountingFragmentNew extends Fragment {
         return v;
     }
 
+    @Override
+    public void onStart() {
+        super.onStart();
+        // ✅ إخفاء شريط التطبيق الرئيسي وشريط التنقل السفلي لمنع التداخل
+        if (getActivity() != null) {
+            View appBar = getActivity().findViewById(R.id.appBarLayout);
+            if (appBar != null) appBar.setVisibility(View.GONE);
+            
+            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+            if (bottomNav != null) bottomNav.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // ✅ إعادة إظهار الشريط الرئيسي عند الخروج من المحاسبة
+        if (getActivity() != null) {
+            View appBar = getActivity().findViewById(R.id.appBarLayout);
+            if (appBar != null) appBar.setVisibility(View.VISIBLE);
+            
+            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+            if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
+        }
+    }
+
     private void setupStandardToolbar() {
-        // 1. إعداد أيقونة القائمة (Hamburger)
+        // ✅ 1. تنظيف الـ Toolbar من أي قوائم سابقة لمنع التكرار
+        toolbar.getMenu().clear();
+        
+        // 2. إعداد أيقونة القائمة (Hamburger)
         toolbar.setNavigationIcon(R.drawable.ic_menu); 
         toolbar.setNavigationOnClickListener(v -> {
             if (drawerLayout != null) {
@@ -131,7 +159,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         });
 
-        // 2. جلب اسم الجهة
+        // 3. جلب اسم الجهة
         String orgName = "MIRA TECHNOLOGY";
         try {
             MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
@@ -143,14 +171,14 @@ public class MiraAccountingFragmentNew extends Fragment {
             Log.w(TAG, "Failed to load org name");
         }
 
-        // 3. إعداد العنوان والفرع
+        // 4. إعداد العنوان والفرع
         toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
         toolbar.setSubtitle(orgName);
 
-        // 4. تحميل القائمة (التحديث + الحساب)
+        // 5. تحميل القائمة (التحديث + الحساب)
         toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
         
-        // 5. استقبال ضغطات الأزرار
+        // 6. استقبال ضغطات الأزرار
         toolbar.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             
@@ -165,7 +193,6 @@ public class MiraAccountingFragmentNew extends Fragment {
                 Toast.makeText(requireContext(), 
                         isArabic ? "الملف الشخصي" : "Profile", 
                         Toast.LENGTH_SHORT).show();
-                // يمكنك هنا استدعاء شاشة الملف الشخصي
                 return true;
             }
             return false;
