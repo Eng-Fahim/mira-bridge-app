@@ -301,7 +301,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 private static final class NavItemCfg {
     final int     itemId;
     final int     iconRes;
-    final int     titleRes;
     final int     titleArRes;
     final int     titleEnRes;
     final String  tag;
@@ -3639,4 +3638,4 @@ public void openLicenseStatus() {
             return 0;
         }
     }
-}
+                        }
