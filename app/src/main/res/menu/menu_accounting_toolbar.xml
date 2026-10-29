@@ -2,9 +2,19 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- زر التحديث (الموجود مسبقاً) -->
     <item
         android:id="@+id/action_refresh"
         android:icon="@drawable/ic_refresh"
         android:title="تحديث"
         app:showAsAction="ifRoom" />
+
+    <!-- زر الملف الشخصي (الجديد) -->
+    <item
+        android:id="@+id/action_profile"
+        android:icon="@drawable/ic_users" 
+        android:title="الملف الشخصي"
+        app:showAsAction="always" />
+        <!-- ملاحظة: تأكد من وجود أيقونة ic_users في مجلد drawable -->
+
 </menu>
