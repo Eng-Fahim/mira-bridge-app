@@ -38,15 +38,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * MIRA Accounting — Dashboard (Stage 4.6)
+ * MIRA Accounting — Dashboard (Enterprise v3.0)
  *
- * الإصلاح الحاسم في هذه النسخة:
- *  ✅ فك تغليف `data.data` قبل قراءة الحقول
- *     — كل استجابات السيرفر مغلّفة: {"success":true, "data":{...}}
- *     — الكود السابق كان يقرأ من الطبقة الخارجية فيجد الحقول فارغة
- *  ✅ المصروفات = cogs + operating_expenses (الإجمالي الكامل)
- *  ✅ Balance Sheet: قراءة المصفوفات مباشرة (assets[], liabilities[])
- *  ✅ Recent Activity: ترجمة types المعروفة إلى العربية
+ * التحديثات:
+ * - التوافق التام مع التصميم الجديد (Material 3).
+ * - إدارة ذكية لإخفاء/إظهار حالات التنبيهات والأنشطة الفارغة (Empty States).
+ * - حماية من الانهيار (Null Safety) عند تحديث الواجهة.
  */
 public class MiraAccountingDashboardFragment extends Fragment {
 
@@ -302,7 +299,7 @@ public class MiraAccountingDashboardFragment extends Fragment {
     private void loadDashboardData() {
         if (api == null) return;
         debugResponses.clear();
-        swipeRefresh.setRefreshing(true);
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(true);
 
         for (String k : kpiViews.keySet()) {
             AccountingKpi template = kpiMap.get(k);
@@ -545,10 +542,16 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     private void renderAlerts(JSONArray alerts) {
+        if (containerAlerts == null) return;
         containerAlerts.removeAllViews();
         if (alerts.length() == 0) { showAlertsEmpty(); return; }
+        
+        // ✅ إخفاء البطاقة الفارغة
+        View tvAlertsEmptyCard = getView() != null ? getView().findViewById(R.id.tvAlertsEmptyCard) : null;
+        if (tvAlertsEmptyCard != null) tvAlertsEmptyCard.setVisibility(View.GONE);
+        if (tvAlertsEmpty != null) tvAlertsEmpty.setVisibility(View.GONE);
+
         containerAlerts.setVisibility(View.VISIBLE);
-        tvAlertsEmpty.setVisibility(View.GONE);
         LayoutInflater inf = LayoutInflater.from(requireContext());
         for (int i = 0; i < alerts.length(); i++) {
             JSONObject a = alerts.optJSONObject(i);
@@ -574,7 +577,6 @@ public class MiraAccountingDashboardFragment extends Fragment {
             captureResponse("getUnifiedActivity(branch=" + branch + ")", resp);
             if (!resp.isSuccess || resp.data == null) { postUi(this::showRecentEmpty); return; }
 
-            // محاولات متعددة للمسارات
             JSONArray items = null;
             JSONObject inner = resp.data.optJSONObject("data");
             if (inner != null) {
@@ -595,9 +597,15 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     private void renderRecent(JSONArray items) {
+        if (containerRecent == null) return;
         containerRecent.removeAllViews();
+        
+        // ✅ إخفاء الحاوية الفارغة
+        View tvRecentEmptyContainer = getView() != null ? getView().findViewById(R.id.tvRecentEmptyContainer) : null;
+        if (tvRecentEmptyContainer != null) tvRecentEmptyContainer.setVisibility(View.GONE);
+        if (tvRecentEmpty != null) tvRecentEmpty.setVisibility(View.GONE);
+
         containerRecent.setVisibility(View.VISIBLE);
-        tvRecentEmpty.setVisibility(View.GONE);
         LayoutInflater inf = LayoutInflater.from(requireContext());
         for (int i = 0; i < items.length(); i++) {
             JSONObject it = items.optJSONObject(i);
@@ -608,7 +616,6 @@ public class MiraAccountingDashboardFragment extends Fragment {
             if (icon.isEmpty()) icon = "📝";
             ((TextView) row.findViewById(R.id.tvRecentIcon)).setText(icon);
 
-            // ✅ العنوان: مع ترجمة أنواع معروفة
             String title = firstNonEmpty(it, "title", "action", "event_type", "name");
             if (title.isEmpty() || title.equals("sale") || title.equals("refund")
                     || title.equals("purchase")) {
@@ -625,12 +632,10 @@ public class MiraAccountingDashboardFragment extends Fragment {
             }
             ((TextView) row.findViewById(R.id.tvRecentTitle)).setText(title);
 
-            // ✅ التفاصيل
             String subtitle = firstNonEmpty(it, "details", "description",
                     "message", "reference", "item_name", "username");
             ((TextView) row.findViewById(R.id.tvRecentSubtitle)).setText(subtitle);
 
-            // ✅ التاريخ
             ((TextView) row.findViewById(R.id.tvRecentDate))
                     .setText(shortDate(firstNonEmpty(it, "timestamp", "created_at", "date", "time")));
 
@@ -647,14 +652,33 @@ public class MiraAccountingDashboardFragment extends Fragment {
     }
 
     private void showAlertsEmpty() {
-        containerAlerts.removeAllViews();
-        containerAlerts.setVisibility(View.GONE);
-        tvAlertsEmpty.setVisibility(View.VISIBLE);
+        if (containerAlerts != null) {
+            containerAlerts.removeAllViews();
+            containerAlerts.setVisibility(View.GONE);
+        }
+        
+        // ✅ إظهار بطاقة التنبيهات الفارغة
+        View tvAlertsEmptyCard = getView() != null ? getView().findViewById(R.id.tvAlertsEmptyCard) : null;
+        if (tvAlertsEmptyCard != null) {
+            tvAlertsEmptyCard.setVisibility(View.VISIBLE);
+        } else if (tvAlertsEmpty != null) {
+            tvAlertsEmpty.setVisibility(View.VISIBLE);
+        }
     }
+
     private void showRecentEmpty() {
-        containerRecent.removeAllViews();
-        containerRecent.setVisibility(View.GONE);
-        tvRecentEmpty.setVisibility(View.VISIBLE);
+        if (containerRecent != null) {
+            containerRecent.removeAllViews();
+            containerRecent.setVisibility(View.GONE);
+        }
+        
+        // ✅ إظهار حاوية الأنشطة الفارغة
+        View tvRecentEmptyContainer = getView() != null ? getView().findViewById(R.id.tvRecentEmptyContainer) : null;
+        if (tvRecentEmptyContainer != null) {
+            tvRecentEmptyContainer.setVisibility(View.VISIBLE);
+        } else if (tvRecentEmpty != null) {
+            tvRecentEmpty.setVisibility(View.VISIBLE);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -766,4 +790,4 @@ public class MiraAccountingDashboardFragment extends Fragment {
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
-}
+                }
