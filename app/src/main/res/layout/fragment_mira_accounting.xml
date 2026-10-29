@@ -16,18 +16,20 @@
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorPrimary"
-            android:fitsSystemWindows="true">
+            android:background="?attr/colorSurface" 
+            android:fitsSystemWindows="true"
+            app:elevation="2dp">
 
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/accountingToolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
-                android:background="?attr/colorPrimary"
+                android:background="?attr/colorSurface"
                 app:navigationIcon="@drawable/ic_menu_accounting"
-                app:title="المحاسبة"
-                app:titleTextColor="?attr/colorOnPrimary"
+                app:titleTextColor="?attr/colorOnSurface"
+                app:subtitleTextColor="?attr/colorOnSurfaceVariant"
                 app:menu="@menu/menu_accounting_toolbar" />
+                <!-- ملاحظة: حذفنا app:title لأن الجافا سيتكفل به -->
 
         </com.google.android.material.appbar.AppBarLayout>
 
