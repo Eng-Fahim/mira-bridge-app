@@ -579,9 +579,10 @@ if (licenseType != null && !licenseType.isEmpty()) {
             return Role.INVENTORY_MGR;
         }
     }
+    
 
     public String getRoleString() {
-        return userPrefs.getString(KEY_USER_ROLE, Role.INVENTORY_MGR.name());
+    return userPrefs.getString(KEY_USER_ROLE, "UNKNOWN_ROLE");
     }
 
     public String getRole() {
