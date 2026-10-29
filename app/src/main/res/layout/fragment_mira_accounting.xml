@@ -5,7 +5,7 @@
     android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"> <!-- ✅ مهم جداً لمنع التداخل مع شريط الحالة -->
+    android:fitsSystemWindows="true">
 
     <!-- ═══════ المحتوى الرئيسي ═══════ -->
     <androidx.coordinatorlayout.widget.CoordinatorLayout
@@ -18,7 +18,7 @@
             android:id="@+id/accountingAppBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorSurface" 
+            android:background="?attr/colorSurface"
             android:fitsSystemWindows="true"
             app:elevation="2dp">
 
@@ -39,6 +39,65 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+        <!-- ═══════ الزر العائم متعدد الخيارات (Speed Dial) ═══════ -->
+        <LinearLayout
+            android:id="@+id/fabMenuContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="24dp"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <!-- 1. زر الإجراءات السريعة (المزيد) -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabMore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:src="@drawable/ic_settings"
+                android:visibility="gone"
+                app:backgroundTint="?attr/colorSecondaryContainer"
+                app:fabSize="mini"
+                app:tint="?attr/colorOnSecondaryContainer" />
+
+            <!-- 2. زر المبيعات (POS) -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabPos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:src="@drawable/ic_sales"
+                android:visibility="gone"
+                app:backgroundTint="?attr/colorSecondaryContainer"
+                app:fabSize="mini"
+                app:tint="?attr/colorOnSecondaryContainer" />
+
+            <!-- 3. زر الرئيسية -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabHome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:src="@drawable/ic_home"
+                android:visibility="gone"
+                app:backgroundTint="?attr/colorSecondaryContainer"
+                app:fabSize="mini"
+                app:tint="?attr/colorOnSecondaryContainer" />
+
+            <!-- 4. الزر الرئيسي (الذي يفتح ويغلق القائمة) -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabMain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/ic_diamond"
+                app:backgroundTint="?attr/colorPrimary"
+                app:elevation="6dp"
+                app:fabSize="normal"
+                app:tint="?attr/colorOnPrimary" />
+
+        </LinearLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
