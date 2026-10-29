@@ -107,7 +107,7 @@
                         android:orientation="horizontal"
                         android:gravity="center_vertical">
 
-                        <!-- 1. LIVE GOLD PRICES (بدون نقشة، نظيف) -->
+                        <!-- 1. LIVE GOLD PRICES -->
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/cardGoldPrices"
                             android:layout_width="310dp"
@@ -270,7 +270,7 @@
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
-                        <!-- 2. HERO BALANCE CARD (النقشة خففت إلى 2% لتبدو كأنها محفورة) -->
+                        <!-- 2. HERO BALANCE CARD -->
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/heroBalanceCard"
                             android:layout_width="310dp"
@@ -288,7 +288,6 @@
                                 android:minHeight="240dp"
                                 android:background="@drawable/bg_hero_gold_gradient">
 
-                                <!-- النقشة المائية المخففة جداً -->
                                 <ImageView
                                     android:layout_width="180dp"
                                     android:layout_height="180dp"
@@ -339,17 +338,17 @@
                                         android:textColor="@color/hero_text_primary"
                                         android:textSize="36sp"
                                         android:textStyle="bold" />
-                                        <TextView
-    android:id="@+id/tvHeroTrend"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="4dp"
-    android:textSize="12sp"
-    android:textColor="@color/hero_text_secondary"
-    android:visibility="gone"
-    tools:text="▲ 2.5%" />
+                                        
+                                    <TextView
+                                        android:id="@+id/tvHeroTrend"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:textSize="12sp"
+                                        android:textColor="@color/hero_text_secondary"
+                                        android:visibility="gone"
+                                        tools:text="▲ 2.5%" />
 
-                                    <!-- تفاصيل الوزن والقطع -->
                                     <LinearLayout
                                         android:layout_width="match_parent"
                                         android:layout_height="wrap_content"
@@ -403,7 +402,6 @@
                                         </LinearLayout>
                                     </LinearLayout>
                                     
-                                    <!-- عملات أخرى -->
                                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="3">
                                         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
                                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="USD" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
@@ -422,7 +420,7 @@
                             </FrameLayout>
                         </com.google.android.material.card.MaterialCardView>
 
-                        <!-- 3. SALES SUMMARY CARD (بدون نقشة، نظيف) -->
+                        <!-- 3. SALES SUMMARY CARD -->
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/salesSummaryCard"
                             android:layout_width="310dp"
@@ -581,7 +579,9 @@
                     <View android:id="@+id/dot3" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
                 </LinearLayout>
 
-                <!-- Quick Actions -->
+                <!-- ═══════════════════════════════════════════════════
+                     QUICK ACTIONS (تم التعديل هنا)
+                     ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -590,28 +590,28 @@
                     android:layout_marginBottom="24dp"
                     android:weightSum="4">
 
-                    <LinearLayout android:id="@+id/btnQuickPos" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+                    <LinearLayout android:id="@+id/btnQuickPos" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:padding="4dp">
                         <ImageView android:layout_width="52dp" android:layout_height="52dp" android:src="@android:drawable/ic_menu_agenda" android:background="@drawable/bg_quick_action" android:padding="14dp" app:tint="@color/gold_text_accent" />
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="نقطة بيع" android:textSize="12sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_marginTop="8dp" />
                     </LinearLayout>
 
-                    <LinearLayout android:id="@+id/btnQuickInventory" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+                    <LinearLayout android:id="@+id/btnQuickInventory" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:padding="4dp">
                         <ImageView android:layout_width="52dp" android:layout_height="52dp" android:src="@drawable/ic_inventory_items" android:background="@drawable/bg_quick_action" android:padding="14dp" app:tint="@color/gold_text_accent" />
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الجرد" android:textSize="12sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_marginTop="8dp" />
                     </LinearLayout>
 
-                    <LinearLayout android:id="@+id/btnQuickScrap" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+                    <LinearLayout android:id="@+id/btnQuickScrap" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:padding="4dp">
                         <ImageView android:layout_width="52dp" android:layout_height="52dp" android:src="@drawable/ic_gold_scrap" android:background="@drawable/bg_quick_action" android:padding="14dp" app:tint="@color/gold_text_accent" />
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="شراء كسر" android:textSize="12sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_marginTop="8dp" />
                     </LinearLayout>
 
-                    <LinearLayout android:id="@+id/btnQuickReports" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+                    <LinearLayout android:id="@+id/btnQuickReports" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:padding="4dp">
                         <ImageView android:layout_width="52dp" android:layout_height="52dp" android:src="@android:drawable/ic_menu_sort_by_size" android:background="@drawable/bg_quick_action" android:padding="14dp" app:tint="@color/gold_text_accent" />
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="التقارير" android:textSize="12sp" android:textColor="?attr/colorOnSurfaceVariant" android:layout_marginTop="8dp" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- بقية الأقسام (كروت بيضاء نقية بدون أي نقوش) -->
+                <!-- بقية الأقسام -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
