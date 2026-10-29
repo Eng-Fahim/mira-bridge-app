@@ -36,12 +36,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
 
-/**
- * MIRA Accounting — New Container (Enterprise v2.5)
- * 
- * التحديثات:
- * - إضافة نافذة تأكيد احترافية عند الخروج من شاشة المحاسبة (زر X و زر الرجوع).
- */
 public class MiraAccountingFragmentNew extends Fragment {
 
     private static final String TAG = "MiraAccountingNew";
@@ -95,13 +89,8 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         View v = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
 
-        if (getActivity() != null) {
-            View appBar = getActivity().findViewById(R.id.appBarLayout);
-            if (appBar != null) appBar.setVisibility(View.GONE);
-            
-            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
-            if (bottomNav != null) bottomNav.setVisibility(View.GONE);
-        }
+        // ✅ إخفاء كل عناصر الواجهة الرئيسية فوراً
+        hideMainUI();
 
         drawerLayout = v.findViewById(R.id.drawerLayout);
         navView = v.findViewById(R.id.navView);
@@ -130,16 +119,77 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     @Override
-    public void onStop() {
-        super.onStop();
-        if (getActivity() != null) {
-            View appBar = getActivity().findViewById(R.id.appBarLayout);
-            if (appBar != null) appBar.setVisibility(View.VISIBLE);
-            
-            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
-            if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
+    public void onDestroyView() {
+        super.onDestroyView();
+        // ✅ إعادة إظهار عناصر الواجهة عند تدمير الشاشة
+        showMainUI();
+        
+        drawerLayout = null;
+        navView = null;
+        toolbar = null;
+        contentContainer = null;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  إخفاء وإظهار الواجهة الرئيسية (الحل الجذري للتداخل)
+    // ═══════════════════════════════════════════════════════════
+    
+    private void hideMainUI() {
+        if (getActivity() == null) return;
+        
+        // 1. إخفاء الشريط العلوي الرئيسي
+        View appBar = getActivity().findViewById(R.id.appBarLayout);
+        if (appBar != null) appBar.setVisibility(View.GONE);
+        
+        // 2. إخفاء الشريط الثانوي (النقاط الثلاث)
+        View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
+        if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.GONE);
+
+        // 3. إخفاء شريط التنقل السفلي
+        View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+        if (bottomNav != null) bottomNav.setVisibility(View.GONE);
+        
+        // 4. إخفاء الزر العائم (FAB) الذي كان يظهر فوق البطاقات
+        View fab = getActivity().findViewById(R.id.fabActionCenter);
+        if (fab != null) fab.setVisibility(View.GONE);
+
+        // 5. تصفير الحافة السفلية للحاوية لمنع قطع البطاقات
+        View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
+        if (fragmentContainer != null) {
+            fragmentContainer.setPadding(0, 0, 0, 0);
         }
     }
+
+    private void showMainUI() {
+        if (getActivity() == null) return;
+        
+        // 1. إظهار الشريط العلوي
+        View appBar = getActivity().findViewById(R.id.appBarLayout);
+        if (appBar != null) appBar.setVisibility(View.VISIBLE);
+        
+        // 2. إظهار الشريط الثانوي
+        View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
+        if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.VISIBLE);
+
+        // 3. إظهار شريط التنقل السفلي
+        View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+        if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
+
+        // 4. إظهار الزر العائم
+        View fab = getActivity().findViewById(R.id.fabActionCenter);
+        if (fab != null) fab.setVisibility(View.VISIBLE);
+
+        // 5. إعادة الحافة السفلية الأصلية
+        View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
+        if (fragmentContainer != null) {
+            int paddingBottomPx = (int) (90 * getResources().getDisplayMetrics().density);
+            fragmentContainer.setPadding(0, 0, 0, paddingBottomPx);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Toolbar & Actions
+    // ═══════════════════════════════════════════════════════════
 
     private void setupStandardToolbar() {
         toolbar.getMenu().clear();
@@ -180,16 +230,12 @@ public class MiraAccountingFragmentNew extends Fragment {
                 return true;
             }
             else if (id == R.id.action_exit) {
-                showExitConfirmationDialog(); // ✅ استدعاء نافذة التأكيد
+                showExitConfirmationDialog();
                 return true;
             }
             return false;
         });
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Actions (Profile, Logout, Exit)
-    // ═══════════════════════════════════════════════════════════
 
     private void openProfile() {
         try {
@@ -227,14 +273,13 @@ public class MiraAccountingFragmentNew extends Fragment {
                 .show();
     }
 
-    // ✅ دالة الخروج الاحترافية (تظهر نافذة تأكيد)
     private void showExitConfirmationDialog() {
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "تأكيد الخروج من المحاسبة" : "Confirm Exit")
                 .setMessage(isArabic 
                         ? "أنت على وشك الخروج من مركز المحاسبة والعودة إلى لوحة التحكم الرئيسية. هل تريد المتابعة؟" 
                         : "You are about to exit the Accounting Center and return to the main dashboard. Do you want to proceed?")
-                .setIcon(android.R.drawable.ic_dialog_alert) // أيقونة تنبيه احترافية
+                .setIcon(android.R.drawable.ic_dialog_alert)
                 .setPositiveButton(isArabic ? "خروج" : "Exit", (dialog, which) -> {
                     if (backCallback != null) backCallback.setEnabled(false);
                     requireActivity().getOnBackPressedDispatcher().onBackPressed();
@@ -271,15 +316,6 @@ public class MiraAccountingFragmentNew extends Fragment {
         super.onSaveInstanceState(out);
         out.putString(KEY_SCREEN_ID, currentScreenId);
         out.putStringArray(KEY_HISTORY, history.toArray(new String[0]));
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        drawerLayout = null;
-        navView = null;
-        toolbar = null;
-        contentContainer = null;
     }
 
     private void navigateTo(@NonNull String screenId, boolean pushHistory) {
@@ -354,7 +390,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             return;
         }
         
-        // ✅ إذا كان في الشاشة الرئيسية للمحاسبة وضغط زر الرجوع، نعرض نافذة التأكيد
         if (MiraAccountingScreens.ID_DASHBOARD.equals(currentScreenId)) {
             showExitConfirmationDialog();
             return;
