@@ -13,8 +13,13 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v3.1 — Enterprise Role Matrix (Complete)
+ *  PermissionManager v3.2 — Enterprise Role Matrix (Complete)
  * ═══════════════════════════════════════════════════════════════════
+ *
+ *  التغييرات في v3.2:
+ *   ✅ تقييد canViewGoldRates() للإدارة العليا والمالية فقط.
+ *   ✅ إزالة BranchManager من canViewAccounting().
+ *   ✅ إضافة Auditor إلى canPerformAccountingSetup() للتدقيق.
  *
  *  التغييرات في v3.1:
  *   ✅ إضافة System Admin bypass في بداية canAccessFragment
@@ -25,7 +30,6 @@ import java.util.List;
  *   ✅ مصفوفة أدوار صريحة (Explicit Role Matrix)
  *   ✅ إلغاء isManager() الشامل من الدوال الحساسة
  *   ✅ canAccessFragment ترجع false افتراضياً (Whitelist)
- *   ✅ إزالة التكرار في الفحوصات
  */
 public class PermissionManager {
 
@@ -223,9 +227,12 @@ public class PermissionManager {
     // ═══════════════════════════════════════════════════════
     //  Setup
     // ═══════════════════════════════════════════════════════
+    
+    // ✅ [v3.2] يشمل المدقق للتدقيق
     public boolean canPerformAccountingSetup() {
         return isSystemAdmin() || isOrgAdmin()
-            || isFinanceManager() || isAccountant();
+            || isFinanceManager() || isAccountant()
+            || isAuditor();
     }
 
     public boolean canManageUsersAdvanced() {
@@ -344,9 +351,9 @@ public class PermissionManager {
     }
 
     // ─── Accounting ───
+    // ✅ [v3.2] إزالة BranchManager (المحاسبة مركزية)
     public boolean canViewAccounting() {
         return isSystemAdmin() || isOrgAdmin()
-            || isBranchManager()
             || isFinanceManager()
             || isAccountant()
             || isAuditor()
@@ -395,10 +402,9 @@ public class PermissionManager {
     }
 
     // ─── Gold Rates ───
+    // ✅ [v3.2] مقتصرة على الإدارة والمالية فقط (حذف المحاسب، مدير المخزون، مدير الفرع)
     public boolean canViewGoldRates() {
-        return isSystemAdmin() || isOrgAdmin()
-            || isBranchManager() || isFinanceManager()
-            || isAccountant() || isInventoryManager()
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
             || canView(FEATURE_GOLD_RATES);
     }
 
@@ -452,7 +458,7 @@ public class PermissionManager {
     public boolean canViewSnapshots() { return canViewInventory(); }
 
     // ═══════════════════════════════════════════════════════
-    //  Scrap Gold (كسر الذهب) — Business Functions
+    //  Scrap Gold (كسر الذهب)
     // ═══════════════════════════════════════════════════════
     public boolean canViewScrapGold() {
         return isSystemAdmin() || isOrgAdmin()
@@ -617,10 +623,8 @@ public class PermissionManager {
 
         final String tag = fragmentTag.trim();
 
-        // ✅ [v3.1] System Admin يتخطى كل الفحوصات
         if (isSystemAdmin()) return true;
 
-        // ─── 1. متاح دائماً للجميع ───
         switch (tag.toLowerCase()) {
             case "dashboard":
             case "home":
@@ -633,12 +637,10 @@ public class PermissionManager {
                 return true;
         }
 
-        // ─── 2. شاشات النظام الحساسة ───
         if (tag.equalsIgnoreCase("ServerConfig"))      return canViewServerConfig();
         if (tag.equalsIgnoreCase("AccountingSetup"))   return canPerformAccountingSetup();
         if (tag.equalsIgnoreCase("ReaderControl"))     return canViewReaderSetup();
 
-        // ─── 3. Scrap Gold (كسر الذهب) ───
         if (tag.equalsIgnoreCase("ScrapGoldBuy") || tag.equalsIgnoreCase("MiraScrapGoldBuy"))
             return canBuyScrapGold();
 
@@ -654,7 +656,6 @@ public class PermissionManager {
         if (tag.equalsIgnoreCase("ScrapProfitReport"))
             return canViewScrapGold();
 
-        // ─── 4. Business ───
         if (tag.equalsIgnoreCase("Parties") || tag.equalsIgnoreCase("MiraParties"))
             return canViewParties();
 
@@ -673,7 +674,6 @@ public class PermissionManager {
         if (tag.equalsIgnoreCase("Vouchers"))
             return canViewAccounting();
 
-        // ─── 5. الفحوصات المنطقية ───
         if (tag.equalsIgnoreCase("Scan") || tag.equalsIgnoreCase("Inventory")
                 || tag.equalsIgnoreCase("InventoryPro") || tag.equalsIgnoreCase("MiraInventory"))
             return canViewInventory();
@@ -742,7 +742,6 @@ public class PermissionManager {
         if (tag.equalsIgnoreCase("NxpSecurity"))
             return isSystemAdmin() || isOrgAdmin();
 
-        // ─── 6. Default: DENY (آمن) ───
         Log.w(TAG, "🚫 Unknown fragment tag denied: " + tag);
         return false;
     }
