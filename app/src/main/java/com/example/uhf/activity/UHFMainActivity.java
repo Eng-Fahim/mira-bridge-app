@@ -2253,19 +2253,29 @@ private void applyNavPermissions() {
         nav.getMenu().clear();
 
         int index = 0;
-int added = 0;
-for (NavItemCfg cfg : NAV_CONFIGS) {
-    boolean allowed = cfg.alwaysAllowed
-            || permissionManager.canAccessFragment(cfg.tag);
-    
-    // ✅ [جديد] إخفاء زر "الرئيسية" عن المحاسب والمدير المالي
-    if (cfg.itemId == R.id.nav_home) {
-        if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
-            allowed = false; // إخفاء الرئيسية
-        }
-    }
-    
-    if (!allowed) continue;
+        int added = 0;
+        
+        for (NavItemCfg cfg : NAV_CONFIGS) {
+            boolean allowed = cfg.alwaysAllowed
+                    || permissionManager.canAccessFragment(cfg.tag);
+            
+            // ✅ [تعديل 1] إخفاء زر "الرئيسية" عن المحاسب والمدير المالي
+            // ليصبحوا مركزين فقط على شاشة المالية
+            if (cfg.itemId == R.id.nav_home) {
+                if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
+                    allowed = false; 
+                }
+            }
+
+            // ✅ [تعديل 2] إظهار زر "المالية" فقط للمحاسب، المدير المالي، والإدارة العليا
+            if (cfg.itemId == R.id.nav_accounting) {
+                allowed = permissionManager.isAccountant() 
+                       || permissionManager.isFinanceManager()
+                       || permissionManager.isSystemAdmin()
+                       || permissionManager.isOrgAdmin();
+            }
+            
+            if (!allowed) continue;
 
             MenuItem item = nav.getMenu().add(Menu.NONE, cfg.itemId, index++, "");
             item.setIcon(cfg.iconRes);
@@ -2275,7 +2285,6 @@ for (NavItemCfg cfg : NAV_CONFIGS) {
 
         // ═══════════════════════════════════════════════════════
         // 3) ⚠️ لا تغيّر الرؤية أثناء Setup Pending
-        //    (يتركها للـ Setup Flow الذي يتحكم بها)
         // ═══════════════════════════════════════════════════════
         String setupStatus = getCachedSetupStatus();
         boolean setupComplete = SETUP_COMPLETED.equals(setupStatus)
@@ -2289,21 +2298,18 @@ for (NavItemCfg cfg : NAV_CONFIGS) {
 
             } else if (added == 1) {
                 nav.setVisibility(View.GONE);
-                // ⚠️ لا نُظهر bottomContainer إذا كان الفاب مخفياً أيضاً
                 boolean fabVisible = (fab != null && fab.getVisibility() == View.VISIBLE);
                 bottomContainer.setVisibility(fabVisible ? View.VISIBLE : View.GONE);
                 if (fab != null && fabVisible) {
                     anchorFabToContainerCenter(fab, bottomContainer);
                 }
-
             } else {
                 bottomContainer.setVisibility(View.GONE);
             }
         }
 
         // ═══════════════════════════════════════════════════════
-        // 4) ⚠️ اضبط التحديد بناءً على الشاشة الحالية (ليس السابقة)
-        //    هذا يمنع التنقل القسري من شاشات داخلية مثل Reports
+        // 4) ⚠️ اضبط التحديد بناءً على الشاشة الحالية
         // ═══════════════════════════════════════════════════════
         String currentTag = (navigationManager != null)
                 ? navigationManager.getCurrentFragmentTag()
@@ -2320,8 +2326,6 @@ for (NavItemCfg cfg : NAV_CONFIGS) {
                 break;
             }
         }
-        // إذا لم يطابق أي عنصر (مثل Reports/AccountingSetup/Profile)
-        // → لا نُغيّر التحديد — Material سيختار أول عنصر تلقائياً بدون trigger
 
         // ═══════════════════════════════════════════════════════
         // 5) أعِد إرفاق الـ listener
