@@ -137,8 +137,7 @@ public class MiraAccountingFragmentNew extends Fragment {
         });
 
         // Build drawer from registry
-        MiraAccountingNavDrawerHelper.build(navView, isArabic,
-                screen -> navigateTo(screen.id, true));
+        MiraAccountingNavDrawerHelper.build(navView, isArabic, permissionManager, screen -> navigateTo(screen.id, true));
 
         // Responsive — permanent drawer on tablets
         // ✅ [حماية]: نقرأ الـ bool بأمان؛ إن لم يكن موجوداً نستخدم false
