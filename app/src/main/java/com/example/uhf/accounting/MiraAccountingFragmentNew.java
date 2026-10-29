@@ -71,7 +71,7 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         backCallback = new OnBackPressedCallback(true) {
             @Override
-            public void onBackPressed() {
+            public void handleOnBackPressed() { // ✅ تم تصحيح اسم الدالة هنا
                 handleBackPress();
             }
         };
@@ -95,7 +95,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             return v;
         }
 
-        // ✅ إعداد الـ Toolbar القياسي (بدون حقن XML)
+        // ✅ إعداد الـ Toolbar القياسي
         setupStandardToolbar();
 
         // إعداد القائمة الجانبية
@@ -112,15 +112,15 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void setupStandardToolbar() {
-        // 1. إعداد أيقونة القائمة (Hamburger) على اليمين (لأننا في RTL)
-        toolbar.setNavigationIcon(R.drawable.ic_menu); // تأكد من وجود الأيقونة
+        // 1. إعداد أيقونة القائمة (Hamburger)
+        toolbar.setNavigationIcon(R.drawable.ic_menu); 
         toolbar.setNavigationOnClickListener(v -> {
             if (drawerLayout != null) {
                 drawerLayout.openDrawer(GravityCompat.START);
             }
         });
 
-        // 2. جلب اسم الجهة لوضعه في السطر الثانوي (Subtitle)
+        // 2. جلب اسم الجهة
         String orgName = "MIRA TECHNOLOGY";
         try {
             MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
@@ -132,12 +132,12 @@ public class MiraAccountingFragmentNew extends Fragment {
             Log.w(TAG, "Failed to load org name");
         }
 
-        // 3. إعداد العنوان (Title) والفرع (Subtitle)
+        // 3. إعداد العنوان والفرع
         toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
         toolbar.setSubtitle(orgName);
 
-        // 4. إضافة أيقونة الحساب/الإشعارات على اليسار
-        toolbar.inflateMenu(R.menu.menu_accounting_toolbar); // سننشئ هذا الملف
+        // 4. إضافة أيقونة الحساب
+        toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
         toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_profile) {
                 Toast.makeText(requireContext(), "الملف الشخصي", Toast.LENGTH_SHORT).show();
@@ -225,7 +225,6 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
-            // ✅ تحديث العنوان في الـ Toolbar القياسي
             if (toolbar != null) {
                 toolbar.setTitle(target.title(isArabic));
             }
@@ -288,10 +287,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             return false;
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Public API (Backward Compatibility)
-    // ═══════════════════════════════════════════════════════════
 
     @Deprecated
     public void navigateToTab(int tabIndex) {
