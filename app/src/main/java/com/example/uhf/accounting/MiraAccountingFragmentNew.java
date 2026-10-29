@@ -1,12 +1,11 @@
 package com.example.uhf.accounting;
 
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -16,22 +15,33 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.GravityCompat;
+import androidx.core.view.ViewCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.LoginActivity;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.fragment.MiraGeneralLedgerFragment;
+import com.example.uhf.fragment.MiraProfileFragment;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.navigation.NavigationView;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
 
+/**
+ * MIRA Accounting — New Container (Enterprise v2.5)
+ * 
+ * التحديثات:
+ * - إضافة نافذة تأكيد احترافية عند الخروج من شاشة المحاسبة (زر X و زر الرجوع).
+ */
 public class MiraAccountingFragmentNew extends Fragment {
 
     private static final String TAG = "MiraAccountingNew";
@@ -56,8 +66,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // ✅ 1. منع الـ Activity من إضافة قائمته (هذا سبب التكرار)
         setHasOptionsMenu(false); 
 
         if (getContext() != null) {
@@ -81,8 +89,20 @@ public class MiraAccountingFragmentNew extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+
         View v = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
+
+        if (getActivity() != null) {
+            View appBar = getActivity().findViewById(R.id.appBarLayout);
+            if (appBar != null) appBar.setVisibility(View.GONE);
+            
+            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+            if (bottomNav != null) bottomNav.setVisibility(View.GONE);
+        }
+
         drawerLayout = v.findViewById(R.id.drawerLayout);
         navView = v.findViewById(R.id.navView);
         toolbar = v.findViewById(R.id.accountingToolbar);
@@ -104,22 +124,9 @@ public class MiraAccountingFragmentNew extends Fragment {
             drawerLayout.setScrimColor(Color.TRANSPARENT);
         }
 
-        return v;
-    }
+        ViewCompat.requestApplyInsets(v);
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        // ✅ 2. إخفاء الشريط الأصفر وشريط التنقل السفلي
-        if (getActivity() != null) {
-            // إخفاء الـ AppBar (الشريط الأصفر)
-            View appBar = getActivity().findViewById(R.id.appBarLayout);
-            if (appBar != null) appBar.setVisibility(View.GONE);
-            
-            // إخفاء شريط التنقل السفلي
-            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
-            if (bottomNav != null) bottomNav.setVisibility(View.GONE);
-        }
+        return v;
     }
 
     @Override
@@ -135,10 +142,8 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void setupStandardToolbar() {
-        // ✅ 3. تنظيف القائمة تماماً لمنع تكرار (تحديث)
         toolbar.getMenu().clear();
         
-        // 4. إعداد أيقونة القائمة (Hamburger)
         toolbar.setNavigationIcon(R.drawable.ic_menu); 
         toolbar.setNavigationOnClickListener(v -> {
             if (drawerLayout != null) {
@@ -146,26 +151,18 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         });
 
-        // 5. جلب اسم الجهة
         String orgName = "MIRA TECHNOLOGY";
         try {
             MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
             String name = profileMgr.getDisplayName();
-            if (name != null && !name.isEmpty()) {
-                orgName = name;
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to load org name");
-        }
+            if (name != null && !name.isEmpty()) orgName = name;
+        } catch (Exception e) { Log.w(TAG, "Failed to load org name"); }
 
-        // 6. إعداد العنوان والفرع
         toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
         toolbar.setSubtitle(orgName);
 
-        // 7. تحميل القائمة
         toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
         
-        // 8. استقبال ضغطات الأزرار
         toolbar.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             
@@ -175,21 +172,80 @@ public class MiraAccountingFragmentNew extends Fragment {
                 return true;
             } 
             else if (id == R.id.action_profile) {
-                Toast.makeText(requireContext(), isArabic ? "الملف الشخصي" : "Profile", Toast.LENGTH_SHORT).show();
+                openProfile();
+                return true;
+            }
+            else if (id == R.id.action_logout) {
+                performLogout();
                 return true;
             }
             else if (id == R.id.action_exit) {
-                exitAccounting();
+                showExitConfirmationDialog(); // ✅ استدعاء نافذة التأكيد
                 return true;
             }
             return false;
         });
     }
 
-    private void exitAccounting() {
-        if (backCallback != null) backCallback.setEnabled(false);
-        requireActivity().getOnBackPressedDispatcher().onBackPressed();
+    // ═══════════════════════════════════════════════════════════
+    //  Actions (Profile, Logout, Exit)
+    // ═══════════════════════════════════════════════════════════
+
+    private void openProfile() {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity mainActivity = (UHFMainActivity) getActivity();
+                mainActivity.loadFragment(new MiraProfileFragment(), "Profile");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening profile", e);
+            Toast.makeText(requireContext(), "لا يمكن فتح الملف الشخصي", Toast.LENGTH_SHORT).show();
+        }
     }
+
+    private void performLogout() {
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
+                .setMessage(isArabic ? "هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟" 
+                                     : "Are you sure you want to log out of your account?")
+                .setIcon(R.drawable.ic_logout)
+                .setPositiveButton(isArabic ? "تسجيل الخروج" : "Logout", (dialog, which) -> {
+                    try {
+                        if (sessionManager != null) sessionManager.logoutUser();
+                        if (permissionManager != null) permissionManager.clearPermissions();
+
+                        Intent intent = new Intent(requireContext(), LoginActivity.class);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        startActivity(intent);
+                        requireActivity().finish();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Logout error", e);
+                        Toast.makeText(requireContext(), "حدث خطأ أثناء الخروج", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+    }
+
+    // ✅ دالة الخروج الاحترافية (تظهر نافذة تأكيد)
+    private void showExitConfirmationDialog() {
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "تأكيد الخروج من المحاسبة" : "Confirm Exit")
+                .setMessage(isArabic 
+                        ? "أنت على وشك الخروج من مركز المحاسبة والعودة إلى لوحة التحكم الرئيسية. هل تريد المتابعة؟" 
+                        : "You are about to exit the Accounting Center and return to the main dashboard. Do you want to proceed?")
+                .setIcon(android.R.drawable.ic_dialog_alert) // أيقونة تنبيه احترافية
+                .setPositiveButton(isArabic ? "خروج" : "Exit", (dialog, which) -> {
+                    if (backCallback != null) backCallback.setEnabled(false);
+                    requireActivity().getOnBackPressedDispatcher().onBackPressed();
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Navigation Logic
+    // ═══════════════════════════════════════════════════════════
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -207,7 +263,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         }
 
-        navigateTo(startId, false);
+        navigateTo(startId, /*pushHistory=*/false);
     }
 
     @Override
@@ -291,17 +347,20 @@ public class MiraAccountingFragmentNew extends Fragment {
             drawerLayout.closeDrawer(GravityCompat.START);
             return;
         }
+        
         if (!history.isEmpty()) {
             String prev = history.pop();
-            navigateTo(prev, false);
+            navigateTo(prev, /*pushHistory=*/false);
             return;
         }
+        
+        // ✅ إذا كان في الشاشة الرئيسية للمحاسبة وضغط زر الرجوع، نعرض نافذة التأكيد
         if (MiraAccountingScreens.ID_DASHBOARD.equals(currentScreenId)) {
-            if (backCallback != null) backCallback.setEnabled(false);
-            requireActivity().getOnBackPressedDispatcher().onBackPressed();
+            showExitConfirmationDialog();
             return;
         }
-        navigateTo(MiraAccountingScreens.ID_DASHBOARD, false);
+        
+        navigateTo(MiraAccountingScreens.ID_DASHBOARD, /*pushHistory=*/false);
     }
 
     private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
