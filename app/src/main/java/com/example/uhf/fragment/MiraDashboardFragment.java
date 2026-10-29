@@ -71,7 +71,7 @@ import android.widget.LinearLayout;
 import android.view.ViewGroup;
 
 /**
- * MiraDashboardFragment v3.1 — Role-Aware Carousel & Charts (Theme-Aware)
+ * MiraDashboardFragment v3.2 — Role-Aware Carousel & Charts (Theme-Aware + Dynamic Quick Buttons)
  */
 public class MiraDashboardFragment extends Fragment {
 
@@ -96,7 +96,6 @@ public class MiraDashboardFragment extends Fragment {
     private boolean isInventoryHidden = true;
     private boolean isScrapHidden = true;
 
-    // Carousel & Charts
     private HorizontalScrollView hsvCarousel;
     private View dot1, dot2, dot3;
     private LineChart lineChartSales;
@@ -109,14 +108,12 @@ public class MiraDashboardFragment extends Fragment {
 
     private DashboardRoleController roleController;
 
-    // Aging Variables
     private View cardScrapAging;
     private TextView tvAgingStatusIcon, tvAgingStatusLabel, tvAgingWeight, tvAgingCount;
     private View llAgingAlert;
     private TextView tvAgingAlertText;
     private View btnOpenAgingReport;
 
-    // UI Elements
     private ImageButton btnToggleHeroVisibility, btnToggleSalesVisibility, btnToggleInventoryVisibility;
 
     private android.widget.LinearLayout llInventoryByKarat;
@@ -329,7 +326,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
-            // 1. ربط عناصر الكاروسيل
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
             dot1 = v.findViewById(R.id.dot1);
             dot2 = v.findViewById(R.id.dot2);
@@ -339,7 +335,6 @@ public class MiraDashboardFragment extends Fragment {
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
             View salesSummaryCard = v.findViewById(R.id.salesSummaryCard);
 
-            // بطاقة المخزون
             tvHeroBalance   = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend     = v.findViewById(R.id.tvHeroTrend);
             tvHeroSubtitle  = v.findViewById(R.id.tvHeroSubtitle);
@@ -349,13 +344,11 @@ public class MiraDashboardFragment extends Fragment {
             tvHeroItemCount = v.findViewById(R.id.tvHeroItemCount);
             btnToggleHeroVisibility = v.findViewById(R.id.btnToggleHeroVisibility);
 
-            // بطاقة المبيعات
             tvSalesToday = v.findViewById(R.id.tvSalesToday);
             tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
             tvSalesYear  = v.findViewById(R.id.tvSalesYear);
             btnToggleSalesVisibility = v.findViewById(R.id.btnToggleSalesVisibility);
 
-            // بطاقة الذهب
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
@@ -367,7 +360,6 @@ public class MiraDashboardFragment extends Fragment {
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             pbGoldLoading  = v.findViewById(R.id.pbGoldLoading);
 
-            // باقي العناصر
             llInventoryByKarat = v.findViewById(R.id.llInventoryByKarat);
             tvKaratEmptyState  = v.findViewById(R.id.tvKaratEmptyState);
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
@@ -379,7 +371,6 @@ public class MiraDashboardFragment extends Fragment {
             tvAlertAction = v.findViewById(R.id.tvAlertAction);
             btnToggleInventoryVisibility = v.findViewById(R.id.btnToggleInventoryVisibility);
 
-            // Scrap Gold
             tvScrapWeight = v.findViewById(R.id.tvScrapWeight);
             tvScrapValue = v.findViewById(R.id.tvScrapValue);
             btnToggleScrapVisibility = v.findViewById(R.id.btnToggleScrapVisibility);
@@ -387,7 +378,6 @@ public class MiraDashboardFragment extends Fragment {
             View btnOpenScrapHistory = v.findViewById(R.id.btnOpenScrapHistory);
             View btnOpenScrapBatches = v.findViewById(R.id.btnOpenScrapBatches);
 
-            // Scrap Aging
             cardScrapAging = v.findViewById(R.id.cardScrapAging);
             tvAgingStatusIcon = v.findViewById(R.id.tvAgingStatusIcon);
             tvAgingStatusLabel = v.findViewById(R.id.tvAgingStatusLabel);
@@ -397,13 +387,11 @@ public class MiraDashboardFragment extends Fragment {
             tvAgingAlertText = v.findViewById(R.id.tvAgingAlertText);
             btnOpenAgingReport = v.findViewById(R.id.btnOpenAgingReport);
 
-            // Recent Activity & Charts
             llRecentActivity = v.findViewById(R.id.llRecentActivity);
             tvViewAllActivity = v.findViewById(R.id.tvViewAllActivity);
             lineChartSales = v.findViewById(R.id.lineChartSales);
             pieChartKarat = v.findViewById(R.id.pieChartKarat);
 
-            // ═══════ إعداد مستمع التمرير ═══════
             if (hsvCarousel != null) {
                 final android.widget.LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
 
@@ -467,24 +455,80 @@ public class MiraDashboardFragment extends Fragment {
                 swipeRefresh.setColorSchemeResources(R.color.colorPrimary, R.color.gray1);
             }
 
-            // إخفاء القيم افتراضياً
             isHeroHidden = true; isSalesHidden = true; isInventoryHidden = true; isScrapHidden = true;
             if (btnToggleHeroVisibility != null) btnToggleHeroVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleSalesVisibility != null) btnToggleSalesVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleInventoryVisibility != null) btnToggleInventoryVisibility.setImageResource(R.drawable.ic_eye_off);
             if (btnToggleScrapVisibility != null) btnToggleScrapVisibility.setImageResource(R.drawable.ic_eye_off);
 
-            // ① أخفِ العناصر حسب الدور أولاً
             if (roleController != null) roleController.applyVisibility(v);
 
-            // ② ثم احسب التمركز وطبّق الثيم
             applyCarouselLayout();
             applyChartTheme();
             updateHeroBalance();
             applySalesVisibility();
             updateScrapUI();
+            setupQuickActionButtons(v);
 
         } catch (Exception e) { logNonFatal("initViews", e); }
+    }
+
+    private void setupQuickActionButtons(View root) {
+        if (root == null || permissionManager == null) return;
+
+        bindQuickButton(root, R.id.btnQuickPos,
+                permissionManager.canUsePos(),
+                new MiraPosFragment(), NavigationManager.TAG_POS);
+
+        bindQuickButton(root, R.id.btnQuickInventory,
+                permissionManager.canViewInventory(),
+                new MiraInventoryProFragment(), NavigationManager.TAG_INVENTORY);
+
+        bindQuickButton(root, R.id.btnQuickScrap,
+                permissionManager.canBuyScrapGold(),
+                new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+
+        bindQuickButton(root, R.id.btnQuickReports,
+                permissionManager.canViewReports(),
+                new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+    }
+
+    private void bindQuickButton(@Nullable View root,
+                                 int buttonId,
+                                 boolean hasPermission,
+                                 @NonNull Fragment targetFragment,
+                                 @NonNull String tag) {
+        if (root == null) return;
+
+        View btn = root.findViewById(buttonId);
+        if (btn == null) {
+            Log.w(TAG, "Quick button not found: " + buttonId);
+            return;
+        }
+
+        if (!hasPermission) {
+            btn.setVisibility(View.GONE);
+            return;
+        }
+
+        btn.setVisibility(View.VISIBLE);
+        btn.setClickable(true);
+        btn.setFocusable(true);
+
+        if (btn instanceof ViewGroup) {
+            ((ViewGroup) btn).setDescendantFocusability(
+                    ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        }
+
+        btn.setOnClickListener(v -> {
+            try {
+                v.performHapticFeedback(
+                        android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                navigateToFragment(targetFragment, tag);
+            } catch (Exception e) {
+                Log.e(TAG, "Quick action click error: " + tag, e);
+            }
+        });
     }
 
     private void fetchDashboardCharts() {
@@ -699,7 +743,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private void renderInventoryByKarat(List<KaratInventory> items) {
         if (llInventoryByKarat == null) return;
-        // 🔒 فحص الصلاحية
         if (permissionManager != null && !permissionManager.canViewDashboardInventoryByKarat()) {
             llInventoryByKarat.setVisibility(View.GONE);
             if (tvKaratEmptyState != null) tvKaratEmptyState.setVisibility(View.GONE);
@@ -876,7 +919,6 @@ public class MiraDashboardFragment extends Fragment {
     private void updateAlerts(int count, String message) {
         try {
             if (alertsStrip == null) return;
-            // 🔒 فحص الصلاحية
             if (permissionManager != null && !permissionManager.canViewDashboardAlerts()) {
                 alertsStrip.setVisibility(View.GONE);
                 return;
@@ -1345,6 +1387,9 @@ public class MiraDashboardFragment extends Fragment {
             swipeTimeoutRunnable = () -> { if (swipeRefresh != null && swipeRefresh.isRefreshing()) swipeRefresh.setRefreshing(false); };
             mainHandler.postDelayed(swipeTimeoutRunnable, SWIPE_REFRESH_TIMEOUT_MS);
 
+            // ✅ [جديد v3.2] تحديث أزرار الوصول السريع عند السحب للتحديث
+            if (getView() != null) setupQuickActionButtons(getView());
+
             fetchData(); fetchRecentActivity();
             if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
             fetchDashboardCharts();
@@ -1405,6 +1450,9 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setText(TextView tv, String text) { if (tv != null) tv.setText(text); }
 
+    // ═══════════════════════════════════════════════════════════════
+    //  ✅ التعديل #2: onBranchChanged() — مع تحديث الأزرار
+    // ═══════════════════════════════════════════════════════════════
     public void onBranchChanged() {
         try {
             if (!isAdded()) return;
@@ -1412,6 +1460,10 @@ public class MiraDashboardFragment extends Fragment {
             if (newBranchId != currentBranchId) {
                 currentBranchId = newBranchId; initBranchCache(currentBranchId); updateHeader();
                 if (roleController != null && getView() != null) roleController.applyVisibility(getView());
+
+                // ✅ [جديد v3.2] تحديث أزرار الوصول السريع عند تغيير الفرع
+                if (getView() != null) setupQuickActionButtons(getView());
+
                 syncOrgProfileFromServer(true); loadOfflineData();
                 if (offlineCache == null || offlineCache.getInt("total_items", 0) == 0) showShimmer(true);
                 fetchData(); fetchRecentActivity();
@@ -1420,6 +1472,9 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) {}
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    //  ✅ التعديل #1: onResume() — مع تحديث الأزرار
+    // ═══════════════════════════════════════════════════════════════
     @Override
     public void onResume() {
         super.onResume();
@@ -1438,6 +1493,10 @@ public class MiraDashboardFragment extends Fragment {
             else if (isViewInitialized) {
                 updateHeader(); syncOrgProfileFromServer(false);
                 if (roleController != null && getView() != null) roleController.applyVisibility(getView());
+
+                // ✅ [جديد v3.2] تحديث أزرار الوصول السريع عند العودة للشاشة
+                if (getView() != null) setupQuickActionButtons(getView());
+
                 long now = System.currentTimeMillis();
                 long timeSinceLastFetch = now - lastDataFetchTime; long timeSinceLastGoldFetch = now - lastGoldFetchTime;
                 boolean isCacheValid = activityCache != null && activityCache.isValid();
@@ -1533,4 +1592,4 @@ public class MiraDashboardFragment extends Fragment {
     private boolean canManuallyRefreshGold() {
         return permissionManager != null && permissionManager.canRefreshGoldManually();
     }
-}
+                    }
