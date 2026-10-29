@@ -13,15 +13,19 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v3.0 — Enterprise Role Matrix
+ *  PermissionManager v3.1 — Enterprise Role Matrix (Complete)
  * ═══════════════════════════════════════════════════════════════════
  *
- *  التغييرات الجوهرية:
+ *  التغييرات في v3.1:
+ *   ✅ إضافة System Admin bypass في بداية canAccessFragment
+ *   ✅ إضافة 8 دوال جديدة (Scrap Gold + Parties + Cash + Purchase + Audit)
+ *   ✅ إضافة if blocks لهذه الشاشات في canAccessFragment
+ *
+ *  التغييرات في v3.0:
  *   ✅ مصفوفة أدوار صريحة (Explicit Role Matrix)
- *   ✅ إلغاء "isManager()" الشامل من كل الدوال الحساسة
- *   ✅ canAccessFragment() ترجع false افتراضياً (Whitelist)
+ *   ✅ إلغاء isManager() الشامل من الدوال الحساسة
+ *   ✅ canAccessFragment ترجع false افتراضياً (Whitelist)
  *   ✅ إزالة التكرار في الفحوصات
- *   ✅ دوال جديدة لكل شاشة في التطبيق
  */
 public class PermissionManager {
 
@@ -48,10 +52,10 @@ public class PermissionManager {
     public static final String ROLE_POS_OPERATOR    = "POS_OPERATOR";
     public static final String ROLE_GATE_SECURITY   = "GATE_SECURITY";
     public static final String ROLE_SECURITY        = "SECURITY";
-    public static final String ROLE_ADMIN           = "ADMIN"; // legacy
+    public static final String ROLE_ADMIN           = "ADMIN";
 
     // ═══════════════════════════════════════════════════════
-    //  Features (Keys)
+    //  Features
     // ═══════════════════════════════════════════════════════
     public static final String FEATURE_DASHBOARD      = "dashboard";
     public static final String FEATURE_INVENTORY      = "inventory";
@@ -137,7 +141,7 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Low-level Feature Checks (JSON-driven)
+    //  Low-level Feature Checks
     // ═══════════════════════════════════════════════════════
     public boolean hasPermission(String feature, String action) {
         if (isSystemAdmin()) return true;
@@ -178,7 +182,6 @@ public class PermissionManager {
     // ═══════════════════════════════════════════════════════
     //  Role Checks
     // ═══════════════════════════════════════════════════════
-
     private String role() {
         return sessionManager.getRoleString();
     }
@@ -194,7 +197,6 @@ public class PermissionManager {
     public boolean isSecurity()       { return ROLE_SECURITY.equalsIgnoreCase(role()); }
     public boolean isGateSecurity()   { return ROLE_GATE_SECURITY.equalsIgnoreCase(role()); }
 
-    /** Legacy — يشمل كل الأدوار الإدارية */
     public boolean isAdmin() {
         String r = role();
         if (r == null) return false;
@@ -204,7 +206,6 @@ public class PermissionManager {
             || isFinanceManager();
     }
 
-    /** مجموعة "المدراء" — للاستخدامات العامة فقط */
     public boolean isManager() {
         return isAdmin()
             || isBranchManager()
@@ -220,7 +221,7 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  إعدادات النظام (Setup)
+    //  Setup
     // ═══════════════════════════════════════════════════════
     public boolean canPerformAccountingSetup() {
         return isSystemAdmin() || isOrgAdmin()
@@ -232,20 +233,17 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Feature Checks — Individual (مصفوفة صريحة)
+    //  Feature Checks — Individual
     // ═══════════════════════════════════════════════════════
 
-    // ─── Dashboard — متاح للجميع ───
     public boolean canViewDashboard() { return true; }
-
-    // ─── Profile — متاح للجميع ───
-    public boolean canViewProfile() { return true; }
+    public boolean canViewProfile()   { return true; }
 
     // ─── Inventory ───
     public boolean canViewInventory() {
         return isSystemAdmin() || isOrgAdmin()
             || isInventoryManager() || isBranchManager()
-            || isAuditor()                          // read-only
+            || isAuditor()
             || canView(FEATURE_INVENTORY);
     }
 
@@ -264,7 +262,7 @@ public class PermissionManager {
     public boolean canViewPos() {
         return isSystemAdmin() || isOrgAdmin()
             || isBranchManager() || isPosOperator()
-            || isAuditor()                          // read-only
+            || isAuditor()
             || canView(FEATURE_POS);
     }
 
@@ -278,7 +276,7 @@ public class PermissionManager {
     public boolean canViewTransfers() {
         return isSystemAdmin() || isOrgAdmin()
             || isBranchManager() || isInventoryManager()
-            || isAuditor() || isFinanceManager()    // finance can view
+            || isAuditor() || isFinanceManager()
             || canView(FEATURE_TRANSFERS);
     }
 
@@ -319,7 +317,7 @@ public class PermissionManager {
     public boolean canViewGates() {
         return isSystemAdmin() || isOrgAdmin()
             || isBranchManager() || isGateUser()
-            || isAuditor()                          // read-only
+            || isAuditor()
             || canView(FEATURE_GATES);
     }
 
@@ -373,7 +371,7 @@ public class PermissionManager {
     // ─── Users ───
     public boolean canManageUsers() {
         return isSystemAdmin() || isOrgAdmin()
-            || isBranchManager()                    // limited (his branch)
+            || isBranchManager()
             || canEdit(FEATURE_USERS);
     }
 
@@ -447,18 +445,80 @@ public class PermissionManager {
             || canView(FEATURE_READER_SETUP);
     }
 
-    // ─── Sound Settings ───
-    public boolean canViewSoundSettings() {
-        return true; // متاح للجميع
-    }
+    // ─── Sound ───
+    public boolean canViewSoundSettings() { return true; }
 
     // ─── Snapshots ───
-    public boolean canViewSnapshots() {
-        return canViewInventory();
+    public boolean canViewSnapshots() { return canViewInventory(); }
+
+    // ═══════════════════════════════════════════════════════
+    //  Scrap Gold (كسر الذهب) — Business Functions
+    // ═══════════════════════════════════════════════════════
+    public boolean canViewScrapGold() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isInventoryManager() || isBranchManager()
+            || isAuditor()
+            || canView(FEATURE_INVENTORY);
+    }
+
+    public boolean canBuyScrapGold() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isInventoryManager() || isBranchManager()
+            || canEdit(FEATURE_INVENTORY);
+    }
+
+    public boolean canViewScrapAging() {
+        return canViewScrapGold() || isAuditor();
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Legacy Aliases (للتوافق مع الكود القديم)
+    //  Parties (عملاء وموردين)
+    // ═══════════════════════════════════════════════════════
+    public boolean canViewParties() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isInventoryManager() || isBranchManager()
+            || isFinanceManager() || isAccountant()
+            || canView(FEATURE_REPORTS);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Cash Reconciliation (تقفيل الخزينة)
+    // ═══════════════════════════════════════════════════════
+    public boolean canViewCashReconciliation() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isFinanceManager() || isBranchManager()
+            || isAccountant()
+            || canView(FEATURE_ACCOUNTING);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Purchase Invoice (فاتورة مشتريات)
+    // ═══════════════════════════════════════════════════════
+    public boolean canCreatePurchaseInvoice() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isInventoryManager() || isBranchManager()
+            || isAccountant()
+            || canEdit(FEATURE_ACCOUNTING);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Audit Logs (سجل التدقيق)
+    // ═══════════════════════════════════════════════════════
+    public boolean canViewAuditLogs() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isAuditor() || isBranchManager()
+            || canView(FEATURE_ADMIN);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Gold Conversion (أمر صياغة) — متاح للجميع
+    // ═══════════════════════════════════════════════════════
+    public boolean canViewGoldConversion() {
+        return true;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Legacy Aliases
     // ═══════════════════════════════════════════════════════
     public boolean canAccessIdentityStudio() { return canUseIdentity(); }
     public boolean canAccessRadar()          { return canViewRadar(); }
@@ -487,36 +547,67 @@ public class PermissionManager {
         if (canAccessFragment("RfidBindings"))      allowed.add("rfid_bindings");
         return allowed;
     }
-    
-    // ═══════════════════════════════════════════════════════
-//  Dashboard Widgets (Role-based)
-// ═══════════════════════════════════════════════════════
-public boolean canViewDashboardHero()            { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
-                                                     || isInventoryManager() || isBranchManager() || isAuditor()
-                                                     || canView(FEATURE_DASHBOARD + "_hero"); }
-public boolean canViewDashboardSales()           { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
-                                                     || isBranchManager() || isAccountant() || isAuditor()
-                                                     || canView(FEATURE_DASHBOARD + "_sales"); }
-public boolean canViewDashboardGoldPrices()      { return canViewGoldRates(); }
-public boolean canViewDashboardInventoryByKarat(){ return canViewInventory(); }
-public boolean canViewDashboardScrap()           { return isSystemAdmin() || isOrgAdmin()
-                                                     || isInventoryManager() || isBranchManager()
-                                                     || canView(FEATURE_INVENTORY); }
-public boolean canViewDashboardScrapAging()      { return canViewDashboardScrap() || isAuditor(); }
-public boolean canViewDashboardCharts()          { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
-                                                     || isBranchManager() || isAccountant() || isAuditor()
-                                                     || canView(FEATURE_REPORTS); }
-public boolean canViewDashboardAlerts()          { return isSystemAdmin() || isOrgAdmin()
-                                                     || isInventoryManager() || isBranchManager()
-                                                     || canEdit(FEATURE_INVENTORY); }
-public boolean canViewDashboardRecentActivity()  { return true; }
-public boolean canRefreshGoldManually()          { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
-                                                     || canEdit(FEATURE_GOLD_RATES); }
-public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
-                                                     || isInventoryManager() || isBranchManager()
-                                                     || isAccountant() || isAuditor()
-                                                     || canView(FEATURE_DASHBOARD + "_sensitive"); }
 
+    // ═══════════════════════════════════════════════════════
+    //  Dashboard Widgets (Role-based)
+    // ═══════════════════════════════════════════════════════
+    public boolean canViewDashboardHero() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+            || isInventoryManager() || isBranchManager() || isAuditor()
+            || canView(FEATURE_DASHBOARD + "_hero");
+    }
+
+    public boolean canViewDashboardSales() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+            || isBranchManager() || isAccountant() || isAuditor()
+            || canView(FEATURE_DASHBOARD + "_sales");
+    }
+
+    public boolean canViewDashboardGoldPrices() {
+        return canViewGoldRates();
+    }
+
+    public boolean canViewDashboardInventoryByKarat() {
+        return canViewInventory();
+    }
+
+    public boolean canViewDashboardScrap() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isInventoryManager() || isBranchManager()
+            || canView(FEATURE_INVENTORY);
+    }
+
+    public boolean canViewDashboardScrapAging() {
+        return canViewDashboardScrap() || isAuditor();
+    }
+
+    public boolean canViewDashboardCharts() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+            || isBranchManager() || isAccountant() || isAuditor()
+            || canView(FEATURE_REPORTS);
+    }
+
+    public boolean canViewDashboardAlerts() {
+        return isSystemAdmin() || isOrgAdmin()
+            || isInventoryManager() || isBranchManager()
+            || canEdit(FEATURE_INVENTORY);
+    }
+
+    public boolean canViewDashboardRecentActivity() {
+        return true;
+    }
+
+    public boolean canRefreshGoldManually() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+            || canEdit(FEATURE_GOLD_RATES);
+    }
+
+    public boolean canRevealSensitiveValues() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+            || isInventoryManager() || isBranchManager()
+            || isAccountant() || isAuditor()
+            || canView(FEATURE_DASHBOARD + "_sensitive");
+    }
 
     // ═══════════════════════════════════════════════════════
     //  Master Gate — canAccessFragment (Whitelist — Safe Default)
@@ -525,6 +616,9 @@ public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isO
         if (fragmentTag == null || fragmentTag.trim().isEmpty()) return false;
 
         final String tag = fragmentTag.trim();
+
+        // ✅ [v3.1] System Admin يتخطى كل الفحوصات
+        if (isSystemAdmin()) return true;
 
         // ─── 1. متاح دائماً للجميع ───
         switch (tag.toLowerCase()) {
@@ -535,6 +629,7 @@ public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isO
             case "soundsettings":
             case "notifications":
             case "receipt":
+            case "goldconversion":
                 return true;
         }
 
@@ -543,7 +638,42 @@ public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isO
         if (tag.equalsIgnoreCase("AccountingSetup"))   return canPerformAccountingSetup();
         if (tag.equalsIgnoreCase("ReaderControl"))     return canViewReaderSetup();
 
-        // ─── 3. الفحوصات المنطقية ───
+        // ─── 3. Scrap Gold (كسر الذهب) ───
+        if (tag.equalsIgnoreCase("ScrapGoldBuy") || tag.equalsIgnoreCase("MiraScrapGoldBuy"))
+            return canBuyScrapGold();
+
+        if (tag.equalsIgnoreCase("ScrapHistory") || tag.equalsIgnoreCase("MiraScrapHistory"))
+            return canViewScrapGold();
+
+        if (tag.equalsIgnoreCase("ScrapBatches") || tag.equalsIgnoreCase("MiraScrapBatches"))
+            return canViewScrapGold();
+
+        if (tag.equalsIgnoreCase("ScrapAging") || tag.equalsIgnoreCase("MiraScrapAging"))
+            return canViewScrapAging();
+
+        if (tag.equalsIgnoreCase("ScrapProfitReport"))
+            return canViewScrapGold();
+
+        // ─── 4. Business ───
+        if (tag.equalsIgnoreCase("Parties") || tag.equalsIgnoreCase("MiraParties"))
+            return canViewParties();
+
+        if (tag.equalsIgnoreCase("CashReconciliation"))
+            return canViewCashReconciliation();
+
+        if (tag.equalsIgnoreCase("PurchaseInvoice"))
+            return canCreatePurchaseInvoice();
+
+        if (tag.equalsIgnoreCase("AuditLogs"))
+            return canViewAuditLogs();
+
+        if (tag.equalsIgnoreCase("GoldConversion"))
+            return canViewGoldConversion();
+
+        if (tag.equalsIgnoreCase("Vouchers"))
+            return canViewAccounting();
+
+        // ─── 5. الفحوصات المنطقية ───
         if (tag.equalsIgnoreCase("Scan") || tag.equalsIgnoreCase("Inventory")
                 || tag.equalsIgnoreCase("InventoryPro") || tag.equalsIgnoreCase("MiraInventory"))
             return canViewInventory();
@@ -567,7 +697,7 @@ public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isO
         if (tag.equalsIgnoreCase("Reports") || tag.equalsIgnoreCase("ReportsPro"))
             return canViewReports();
 
-        if (tag.equalsIgnoreCase("Accounting") || tag.equalsIgnoreCase("Vouchers")
+        if (tag.equalsIgnoreCase("Accounting")
                 || tag.equalsIgnoreCase("FiscalYears") || tag.equalsIgnoreCase("OpeningBalances")
                 || tag.equalsIgnoreCase("FinancialReports") || tag.equalsIgnoreCase("ProfitReport")
                 || tag.equalsIgnoreCase("AccountingCharts") || tag.equalsIgnoreCase("AccountingAuditLog"))
@@ -612,7 +742,7 @@ public boolean canRevealSensitiveValues()        { return isSystemAdmin() || isO
         if (tag.equalsIgnoreCase("NxpSecurity"))
             return isSystemAdmin() || isOrgAdmin();
 
-        // ─── 4. Default: DENY (آمن) ───
+        // ─── 6. Default: DENY (آمن) ───
         Log.w(TAG, "🚫 Unknown fragment tag denied: " + tag);
         return false;
     }
