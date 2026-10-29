@@ -24,12 +24,15 @@ import com.example.uhf.R;
 import com.example.uhf.activity.LoginActivity;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.fragment.MiraGeneralLedgerFragment;
+import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
+import com.example.uhf.fragment.QuickActionsBottomSheetFragment;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationView;
 
 import java.util.ArrayDeque;
@@ -51,6 +54,9 @@ public class MiraAccountingFragmentNew extends Fragment {
     private final Deque<String> history = new ArrayDeque<>();
     private boolean isNavigating = false;
     private boolean isArabic = true;
+    
+    // حالة الزر العائم
+    private boolean isFabOpen = false;
 
     private PermissionManager permissionManager;
     private SessionManager sessionManager;
@@ -89,7 +95,7 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         View v = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
 
-        // ✅ إخفاء كل عناصر الواجهة الرئيسية فوراً
+        // إخفاء عناصر الواجهة الرئيسية فوراً
         hideMainUI();
 
         drawerLayout = v.findViewById(R.id.drawerLayout);
@@ -103,6 +109,7 @@ public class MiraAccountingFragmentNew extends Fragment {
         }
 
         setupStandardToolbar();
+        setupSpeedDial(v);
 
         MiraAccountingNavDrawerHelper.build(navView, isArabic, permissionManager,
                 screen -> navigateTo(screen.id, true));
@@ -117,19 +124,18 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         return v;
     }
-    
+
     @Override
     public void onResume() {
-    super.onResume();
-    // ✅ شبكة الأمان: إخفاء واجهة التطبيق الرئيسية في كل مرة تستعيد فيها الشاشة نشاطها
-    hideMainUI();
-}
+        super.onResume();
+        // شبكة أمان لمنع تداخل الهيدر
+        hideMainUI();
+    }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // ✅ إعادة إظهار عناصر الواجهة عند تدمير الشاشة
-        showMainUI();
+        showMainUI(); // إعادة إظهار واجهة التطبيق
         
         drawerLayout = null;
         navView = null;
@@ -138,55 +144,129 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  إخفاء وإظهار الواجهة الرئيسية (الحل الجذري للتداخل)
+    //  إدارة الزر العائم (Speed Dial FAB)
     // ═══════════════════════════════════════════════════════════
-    
+    private void setupSpeedDial(View view) {
+        FloatingActionButton fabMain = view.findViewById(R.id.fabMain);
+        FloatingActionButton fabHome = view.findViewById(R.id.fabHome);
+        FloatingActionButton fabPos = view.findViewById(R.id.fabPos);
+        FloatingActionButton fabMore = view.findViewById(R.id.fabMore);
+
+        if (fabMain == null || fabHome == null || fabPos == null || fabMore == null) return;
+
+        // إخفاء الأزرار بناءً على الصلاحيات
+        if (!permissionManager.canUsePos()) {
+            fabPos.setVisibility(View.GONE);
+        }
+        
+        if (permissionManager.getAllowedQuickActions().isEmpty()) {
+            fabMore.setVisibility(View.GONE);
+        }
+
+        // إعداد الأنيميشن للفتح والإغلاق
+        android.animation.AnimatorSet openSet = new android.animation.AnimatorSet();
+        android.animation.AnimatorSet closeSet = new android.animation.AnimatorSet();
+
+        android.animation.ObjectAnimator rotateOpen = android.animation.ObjectAnimator.ofFloat(fabMain, "rotation", 0f, 45f);
+        android.animation.ObjectAnimator rotateClose = android.animation.ObjectAnimator.ofFloat(fabMain, "rotation", 45f, 0f);
+
+        android.animation.ObjectAnimator translateHome = android.animation.ObjectAnimator.ofFloat(fabHome, "translationY", 200f, 0f);
+        android.animation.ObjectAnimator translatePos = android.animation.ObjectAnimator.ofFloat(fabPos, "translationY", 200f, 0f);
+        android.animation.ObjectAnimator translateMore = android.animation.ObjectAnimator.ofFloat(fabMore, "translationY", 200f, 0f);
+        
+        android.animation.ObjectAnimator alphaHome = android.animation.ObjectAnimator.ofFloat(fabHome, "alpha", 0f, 1f);
+        android.animation.ObjectAnimator alphaPos = android.animation.ObjectAnimator.ofFloat(fabPos, "alpha", 0f, 1f);
+        android.animation.ObjectAnimator alphaMore = android.animation.ObjectAnimator.ofFloat(fabMore, "alpha", 0f, 1f);
+
+        android.animation.ObjectAnimator translateHomeClose = android.animation.ObjectAnimator.ofFloat(fabHome, "translationY", 0f, 200f);
+        android.animation.ObjectAnimator translatePosClose = android.animation.ObjectAnimator.ofFloat(fabPos, "translationY", 0f, 200f);
+        android.animation.ObjectAnimator translateMoreClose = android.animation.ObjectAnimator.ofFloat(fabMore, "translationY", 0f, 200f);
+        
+        android.animation.ObjectAnimator alphaHomeClose = android.animation.ObjectAnimator.ofFloat(fabHome, "alpha", 1f, 0f);
+        android.animation.ObjectAnimator alphaPosClose = android.animation.ObjectAnimator.ofFloat(fabPos, "alpha", 1f, 0f);
+        android.animation.ObjectAnimator alphaMoreClose = android.animation.ObjectAnimator.ofFloat(fabMore, "alpha", 1f, 0f);
+
+        openSet.playTogether(rotateOpen, translateHome, translatePos, translateMore, alphaHome, alphaPos, alphaMore);
+        openSet.setDuration(250);
+        
+        closeSet.playTogether(rotateClose, translateHomeClose, translatePosClose, translateMoreClose, alphaHomeClose, alphaPosClose, alphaMoreClose);
+        closeSet.setDuration(250);
+
+        // النقر على الزر الرئيسي (فتح/إغلاق)
+        fabMain.setOnClickListener(v -> {
+            if (!isFabOpen) {
+                if (fabHome.getVisibility() == View.VISIBLE) { fabHome.setVisibility(View.VISIBLE); }
+                if (fabPos.getVisibility() == View.VISIBLE) { fabPos.setVisibility(View.VISIBLE); }
+                if (fabMore.getVisibility() == View.VISIBLE) { fabMore.setVisibility(View.VISIBLE); }
+                
+                openSet.start();
+                isFabOpen = true;
+            } else {
+                closeSet.start();
+                closeSet.addListener(new android.animation.AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(android.animation.Animator animation) {
+                        if (!permissionManager.canUsePos()) fabPos.setVisibility(View.GONE);
+                        if (permissionManager.getAllowedQuickActions().isEmpty()) fabMore.setVisibility(View.GONE);
+                        fabHome.setVisibility(View.GONE);
+                    }
+                });
+                isFabOpen = false;
+            }
+        });
+
+        // النقر على زر الرئيسية
+        fabHome.setOnClickListener(v -> {
+            fabMain.performClick(); // إغلاق القائمة
+            showExitConfirmationDialog();
+        });
+
+        // النقر على زر المبيعات (POS)
+        fabPos.setOnClickListener(v -> {
+            fabMain.performClick();
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                if (backCallback != null) backCallback.setEnabled(false);
+                requireActivity().getOnBackPressedDispatcher().onBackPressed();
+                activity.loadFragment(new MiraPosFragment(), "POS");
+            }
+        });
+
+        // النقر على زر الإجراءات السريعة
+        fabMore.setOnClickListener(v -> {
+            fabMain.performClick();
+            QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
+            sheet.show(getChildFragmentManager(), "QuickActions");
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  إخفاء وإظهار واجهة التطبيق الرئيسية (لمنع التداخل)
+    // ═══════════════════════════════════════════════════════════
     private void hideMainUI() {
         if (getActivity() == null) return;
-        
-        // 1. إخفاء الشريط العلوي الرئيسي
         View appBar = getActivity().findViewById(R.id.appBarLayout);
         if (appBar != null) appBar.setVisibility(View.GONE);
-        
-        // 2. إخفاء الشريط الثانوي (النقاط الثلاث)
         View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
         if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.GONE);
-
-        // 3. إخفاء شريط التنقل السفلي
         View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
         if (bottomNav != null) bottomNav.setVisibility(View.GONE);
-        
-        // 4. إخفاء الزر العائم (FAB) الذي كان يظهر فوق البطاقات
         View fab = getActivity().findViewById(R.id.fabActionCenter);
         if (fab != null) fab.setVisibility(View.GONE);
-
-        // 5. تصفير الحافة السفلية للحاوية لمنع قطع البطاقات
         View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
-        if (fragmentContainer != null) {
-            fragmentContainer.setPadding(0, 0, 0, 0);
-        }
+        if (fragmentContainer != null) fragmentContainer.setPadding(0, 0, 0, 0);
     }
 
     private void showMainUI() {
         if (getActivity() == null) return;
-        
-        // 1. إظهار الشريط العلوي
         View appBar = getActivity().findViewById(R.id.appBarLayout);
         if (appBar != null) appBar.setVisibility(View.VISIBLE);
-        
-        // 2. إظهار الشريط الثانوي
         View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
         if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.VISIBLE);
-
-        // 3. إظهار شريط التنقل السفلي
         View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
         if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
-
-        // 4. إظهار الزر العائم
         View fab = getActivity().findViewById(R.id.fabActionCenter);
         if (fab != null) fab.setVisibility(View.VISIBLE);
-
-        // 5. إعادة الحافة السفلية الأصلية
         View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
         if (fragmentContainer != null) {
             int paddingBottomPx = (int) (90 * getResources().getDisplayMetrics().density);
@@ -197,15 +277,11 @@ public class MiraAccountingFragmentNew extends Fragment {
     // ═══════════════════════════════════════════════════════════
     //  Toolbar & Actions
     // ═══════════════════════════════════════════════════════════
-
     private void setupStandardToolbar() {
         toolbar.getMenu().clear();
-        
         toolbar.setNavigationIcon(R.drawable.ic_menu); 
         toolbar.setNavigationOnClickListener(v -> {
-            if (drawerLayout != null) {
-                drawerLayout.openDrawer(GravityCompat.START);
-            }
+            if (drawerLayout != null) drawerLayout.openDrawer(GravityCompat.START);
         });
 
         String orgName = "MIRA TECHNOLOGY";
@@ -219,10 +295,8 @@ public class MiraAccountingFragmentNew extends Fragment {
         toolbar.setSubtitle(orgName);
 
         toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
-        
         toolbar.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
-            
             if (id == R.id.action_refresh) {
                 refreshCurrentTab(); 
                 Toast.makeText(requireContext(), isArabic ? "جاري التحديث..." : "Refreshing...", Toast.LENGTH_SHORT).show();
@@ -298,7 +372,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     // ═══════════════════════════════════════════════════════════
     //  Navigation Logic
     // ═══════════════════════════════════════════════════════════
-
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
