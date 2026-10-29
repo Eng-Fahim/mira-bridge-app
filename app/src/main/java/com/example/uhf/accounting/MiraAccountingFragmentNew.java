@@ -55,12 +55,10 @@ public class MiraAccountingFragmentNew extends Fragment {
     private boolean isNavigating = false;
     private boolean isArabic = true;
     
-    // حالة الزر العائم
     private boolean isFabOpen = false;
 
     private PermissionManager permissionManager;
     private SessionManager sessionManager;
-
     private OnBackPressedCallback backCallback;
 
     @Override
@@ -95,7 +93,7 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         View v = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
 
-        // إخفاء عناصر الواجهة الرئيسية فوراً
+        // ✅ إخفاء واجهة التطبيق الرئيسية بالكامل
         hideMainUI();
 
         drawerLayout = v.findViewById(R.id.drawerLayout);
@@ -128,14 +126,14 @@ public class MiraAccountingFragmentNew extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // شبكة أمان لمنع تداخل الهيدر
+        // شبكة أمان للتأكد من إخفاء الهيدر عند العودة للشاشة
         hideMainUI();
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        showMainUI(); // إعادة إظهار واجهة التطبيق
+        showMainUI(); // إرجاع واجهة التطبيق الأساسية
         
         drawerLayout = null;
         navView = null;
@@ -144,7 +142,67 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  إدارة الزر العائم (Speed Dial FAB)
+    //  إخفاء وإظهار واجهة التطبيق الرئيسية (الحل الجذري)
+    // ═══════════════════════════════════════════════════════════
+    private void hideMainUI() {
+        if (getActivity() == null) return;
+        
+        getActivity().runOnUiThread(() -> {
+            View appBar = getActivity().findViewById(R.id.appBarLayout);
+            if (appBar != null) appBar.setVisibility(View.GONE);
+            
+            androidx.appcompat.widget.Toolbar mainToolbar = getActivity().findViewById(R.id.toolbar);
+            if (mainToolbar != null) {
+                mainToolbar.getMenu().clear(); // مسح القائمة لمنع النقاط الثلاث
+                mainToolbar.setVisibility(View.GONE);
+            }
+            
+            androidx.appcompat.widget.Toolbar secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
+            if (secondaryToolbar != null) {
+                secondaryToolbar.getMenu().clear();
+                secondaryToolbar.setVisibility(View.GONE);
+            }
+
+            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+            if (bottomNav != null) bottomNav.setVisibility(View.GONE);
+            
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) fab.setVisibility(View.GONE);
+
+            View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
+            if (fragmentContainer != null) fragmentContainer.setPadding(0, 0, 0, 0);
+        });
+    }
+
+    private void showMainUI() {
+        if (getActivity() == null) return;
+        
+        getActivity().runOnUiThread(() -> {
+            View appBar = getActivity().findViewById(R.id.appBarLayout);
+            if (appBar != null) appBar.setVisibility(View.VISIBLE);
+            
+            androidx.appcompat.widget.Toolbar mainToolbar = getActivity().findViewById(R.id.toolbar);
+            if (mainToolbar != null) mainToolbar.setVisibility(View.VISIBLE);
+
+            View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
+            if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.VISIBLE);
+
+            View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
+            if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
+
+            View fab = getActivity().findViewById(R.id.fabActionCenter);
+            if (fab != null) fab.setVisibility(View.VISIBLE);
+
+            View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
+            if (fragmentContainer != null) {
+                int paddingBottomPx = (int) (90 * getResources().getDisplayMetrics().density);
+                fragmentContainer.setPadding(0, 0, 0, paddingBottomPx);
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  إعداد الزر العائم (Speed Dial FAB)
     // ═══════════════════════════════════════════════════════════
     private void setupSpeedDial(View view) {
         FloatingActionButton fabMain = view.findViewById(R.id.fabMain);
@@ -154,7 +212,6 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         if (fabMain == null || fabHome == null || fabPos == null || fabMore == null) return;
 
-        // إخفاء الأزرار بناءً على الصلاحيات
         if (!permissionManager.canUsePos()) {
             fabPos.setVisibility(View.GONE);
         }
@@ -163,7 +220,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             fabMore.setVisibility(View.GONE);
         }
 
-        // إعداد الأنيميشن للفتح والإغلاق
         android.animation.AnimatorSet openSet = new android.animation.AnimatorSet();
         android.animation.AnimatorSet closeSet = new android.animation.AnimatorSet();
 
@@ -192,12 +248,11 @@ public class MiraAccountingFragmentNew extends Fragment {
         closeSet.playTogether(rotateClose, translateHomeClose, translatePosClose, translateMoreClose, alphaHomeClose, alphaPosClose, alphaMoreClose);
         closeSet.setDuration(250);
 
-        // النقر على الزر الرئيسي (فتح/إغلاق)
         fabMain.setOnClickListener(v -> {
             if (!isFabOpen) {
-                if (fabHome.getVisibility() == View.VISIBLE) { fabHome.setVisibility(View.VISIBLE); }
-                if (fabPos.getVisibility() == View.VISIBLE) { fabPos.setVisibility(View.VISIBLE); }
-                if (fabMore.getVisibility() == View.VISIBLE) { fabMore.setVisibility(View.VISIBLE); }
+                if (fabHome.getVisibility() == View.VISIBLE) fabHome.setVisibility(View.VISIBLE);
+                if (fabPos.getVisibility() == View.VISIBLE) fabPos.setVisibility(View.VISIBLE);
+                if (fabMore.getVisibility() == View.VISIBLE) fabMore.setVisibility(View.VISIBLE);
                 
                 openSet.start();
                 isFabOpen = true;
@@ -215,13 +270,11 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         });
 
-        // النقر على زر الرئيسية
         fabHome.setOnClickListener(v -> {
-            fabMain.performClick(); // إغلاق القائمة
+            fabMain.performClick();
             showExitConfirmationDialog();
         });
 
-        // النقر على زر المبيعات (POS)
         fabPos.setOnClickListener(v -> {
             fabMain.performClick();
             if (getActivity() instanceof UHFMainActivity) {
@@ -232,46 +285,11 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         });
 
-        // النقر على زر الإجراءات السريعة
         fabMore.setOnClickListener(v -> {
             fabMain.performClick();
             QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
             sheet.show(getChildFragmentManager(), "QuickActions");
         });
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  إخفاء وإظهار واجهة التطبيق الرئيسية (لمنع التداخل)
-    // ═══════════════════════════════════════════════════════════
-    private void hideMainUI() {
-        if (getActivity() == null) return;
-        View appBar = getActivity().findViewById(R.id.appBarLayout);
-        if (appBar != null) appBar.setVisibility(View.GONE);
-        View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
-        if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.GONE);
-        View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
-        if (bottomNav != null) bottomNav.setVisibility(View.GONE);
-        View fab = getActivity().findViewById(R.id.fabActionCenter);
-        if (fab != null) fab.setVisibility(View.GONE);
-        View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
-        if (fragmentContainer != null) fragmentContainer.setPadding(0, 0, 0, 0);
-    }
-
-    private void showMainUI() {
-        if (getActivity() == null) return;
-        View appBar = getActivity().findViewById(R.id.appBarLayout);
-        if (appBar != null) appBar.setVisibility(View.VISIBLE);
-        View secondaryToolbar = getActivity().findViewById(R.id.secondaryToolbar);
-        if (secondaryToolbar != null) secondaryToolbar.setVisibility(View.VISIBLE);
-        View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
-        if (bottomNav != null) bottomNav.setVisibility(View.VISIBLE);
-        View fab = getActivity().findViewById(R.id.fabActionCenter);
-        if (fab != null) fab.setVisibility(View.VISIBLE);
-        View fragmentContainer = getActivity().findViewById(R.id.fragment_container);
-        if (fragmentContainer != null) {
-            int paddingBottomPx = (int) (90 * getResources().getDisplayMetrics().density);
-            fragmentContainer.setPadding(0, 0, 0, paddingBottomPx);
-        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -301,16 +319,13 @@ public class MiraAccountingFragmentNew extends Fragment {
                 refreshCurrentTab(); 
                 Toast.makeText(requireContext(), isArabic ? "جاري التحديث..." : "Refreshing...", Toast.LENGTH_SHORT).show();
                 return true;
-            } 
-            else if (id == R.id.action_profile) {
+            } else if (id == R.id.action_profile) {
                 openProfile();
                 return true;
-            }
-            else if (id == R.id.action_logout) {
+            } else if (id == R.id.action_logout) {
                 performLogout();
                 return true;
-            }
-            else if (id == R.id.action_exit) {
+            } else if (id == R.id.action_exit) {
                 showExitConfirmationDialog();
                 return true;
             }
@@ -333,20 +348,17 @@ public class MiraAccountingFragmentNew extends Fragment {
     private void performLogout() {
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
-                .setMessage(isArabic ? "هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟" 
-                                     : "Are you sure you want to log out of your account?")
+                .setMessage(isArabic ? "هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟" : "Are you sure you want to log out of your account?")
                 .setIcon(R.drawable.ic_logout)
                 .setPositiveButton(isArabic ? "تسجيل الخروج" : "Logout", (dialog, which) -> {
                     try {
                         if (sessionManager != null) sessionManager.logoutUser();
                         if (permissionManager != null) permissionManager.clearPermissions();
-
                         Intent intent = new Intent(requireContext(), LoginActivity.class);
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                         startActivity(intent);
                         requireActivity().finish();
                     } catch (Exception e) {
-                        Log.e(TAG, "Logout error", e);
                         Toast.makeText(requireContext(), "حدث خطأ أثناء الخروج", Toast.LENGTH_SHORT).show();
                     }
                 })
@@ -357,9 +369,7 @@ public class MiraAccountingFragmentNew extends Fragment {
     private void showExitConfirmationDialog() {
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(isArabic ? "تأكيد الخروج من المحاسبة" : "Confirm Exit")
-                .setMessage(isArabic 
-                        ? "أنت على وشك الخروج من مركز المحاسبة والعودة إلى لوحة التحكم الرئيسية. هل تريد المتابعة؟" 
-                        : "You are about to exit the Accounting Center and return to the main dashboard. Do you want to proceed?")
+                .setMessage(isArabic ? "أنت على وشك الخروج من مركز المحاسبة والعودة إلى لوحة التحكم الرئيسية. هل تريد المتابعة؟" : "You are about to exit the Accounting Center and return to the main dashboard. Do you want to proceed?")
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .setPositiveButton(isArabic ? "خروج" : "Exit", (dialog, which) -> {
                     if (backCallback != null) backCallback.setEnabled(false);
@@ -388,7 +398,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         }
 
-        navigateTo(startId, /*pushHistory=*/false);
+        navigateTo(startId, false);
     }
 
     @Override
@@ -441,9 +451,7 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
-            if (toolbar != null) {
-                toolbar.setTitle(target.title(isArabic));
-            }
+            if (toolbar != null) toolbar.setTitle(target.title(isArabic));
             
             MiraAccountingNavDrawerHelper.setChecked(navView, screenId);
             closeDrawerIfOpen();
@@ -466,7 +474,7 @@ public class MiraAccountingFragmentNew extends Fragment {
         
         if (!history.isEmpty()) {
             String prev = history.pop();
-            navigateTo(prev, /*pushHistory=*/false);
+            navigateTo(prev, false);
             return;
         }
         
@@ -475,7 +483,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             return;
         }
         
-        navigateTo(MiraAccountingScreens.ID_DASHBOARD, /*pushHistory=*/false);
+        navigateTo(MiraAccountingScreens.ID_DASHBOARD, false);
     }
 
     private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
