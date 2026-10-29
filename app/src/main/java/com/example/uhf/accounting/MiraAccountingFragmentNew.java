@@ -37,8 +37,6 @@ import java.util.Locale;
  *
  * الحاوية الجديدة للواجهة المحاسبية. تستخدم DrawerLayout + NavigationView
  * مع تصميم هيدر مخصص (Custom Header) يعرض اسم الجهة وعنوان الشاشة.
- *
- * @version 1.3.0 — Added Custom Header (Org Name + Dynamic Title)
  */
 public class MiraAccountingFragmentNew extends Fragment {
 
@@ -112,9 +110,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             return v;
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  ✅ [جديد] إعداد الهيدر المخصص (Custom Header)
-        // ═══════════════════════════════════════════════════════════
+        // ✅ إعداد الهيدر المخصص (Custom Header)
         setupCustomHeader(inflater);
 
         // Build drawer from registry (مع تمرير PermissionManager)
@@ -160,7 +156,6 @@ public class MiraAccountingFragmentNew extends Fragment {
                 Toast.makeText(requireContext(), 
                         isArabic ? "الملف الشخصي" : "Profile", 
                         Toast.LENGTH_SHORT).show();
-                // يمكنك هنا فتح شاشة الملف الشخصي أو الإشعارات
             });
         }
 
@@ -195,7 +190,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         }
 
-        // ✅ الانتقال للشاشة الأولى (سيقوم بتحديث عنوان الهيدر تلقائياً)
         navigateTo(startId, /*pushHistory=*/false);
     }
 
@@ -271,12 +265,12 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
-            // ✅ [جديد] تحديث عنوان الشاشة في الهيدر المخصص
+            // تحديث عنوان الشاشة في الهيدر المخصص
             if (tvScreenTitleHeader != null) {
                 tvScreenTitleHeader.setText(target.title(isArabic));
             }
             
-            // تحديث الـ Toolbar الافتراضي أيضاً (للاحتياط)
+            // تحديث الـ Toolbar الافتراضي أيضاً
             toolbar.setTitle(target.title(isArabic));
             
             MiraAccountingNavDrawerHelper.setChecked(navView, screenId);
@@ -354,8 +348,20 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Public API
+    //  ✅ Public API (Backward Compatibility)
     // ═══════════════════════════════════════════════════════════
+
+    /**
+     * ⚡ دالة جسر للتوافق مع الكود القديم (MiraAccountingFragment.java)
+     * تستقبل رقم التبويب القديم وتحوله إلى معرف الشاشة الجديد.
+     */
+    @Deprecated
+    public void navigateToTab(int tabIndex) {
+        MiraAccountingScreens.Screen s = MiraAccountingScreens.byLegacyTab(tabIndex);
+        if (s != null) {
+            navigateTo(s.id, true);
+        }
+    }
 
     public void navigateToScreen(@NonNull String screenId) {
         navigateTo(screenId, true);
