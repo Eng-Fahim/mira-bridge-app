@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- لون خلفية النافذة يتبع ثيم التطبيق (أبيض أو أسود) -->
+    <solid android:color="?attr/colorSurface" />
+    
+    <!-- زوايا علوية دائرية -->
+    <corners
+        android:topLeftRadius="28dp"
+        android:topRightRadius="28dp" />
+</shape>
