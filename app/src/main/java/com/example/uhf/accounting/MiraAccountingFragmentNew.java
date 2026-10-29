@@ -31,12 +31,11 @@ import java.util.Deque;
 import java.util.Locale;
 
 /**
- * MIRA Accounting — New Container (Enterprise v2.1)
+ * MIRA Accounting — New Container (Enterprise v2.2)
  * 
  * التحديثات:
- * - إخفاء الهيدر الرئيسي وشريط التنقل السفلي أثناء التواجد في المحاسبة.
- * - منع تكرار أيقونات القائمة العلوية (مسح القائمة قبل الإضافة).
- * - ضبط زر القائمة (Hamburger) بدقة.
+ * - إضافة زر إغلاق/رجوع في الشريط العلوي.
+ * - إخفاء الهيدر الرئيسي لمنع التداخل.
  */
 public class MiraAccountingFragmentNew extends Fragment {
 
@@ -62,9 +61,6 @@ public class MiraAccountingFragmentNew extends Fragment {
 
     private OnBackPressedCallback backCallback;
 
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -105,10 +101,8 @@ public class MiraAccountingFragmentNew extends Fragment {
             return v;
         }
 
-        // ✅ إعداد الـ Toolbar القياسي
         setupStandardToolbar();
 
-        // إعداد القائمة الجانبية
         MiraAccountingNavDrawerHelper.build(navView, isArabic, permissionManager,
                 screen -> navigateTo(screen.id, true));
 
@@ -124,7 +118,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        // ✅ إخفاء شريط التطبيق الرئيسي وشريط التنقل السفلي لمنع التداخل
         if (getActivity() != null) {
             View appBar = getActivity().findViewById(R.id.appBarLayout);
             if (appBar != null) appBar.setVisibility(View.GONE);
@@ -137,7 +130,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     @Override
     public void onStop() {
         super.onStop();
-        // ✅ إعادة إظهار الشريط الرئيسي عند الخروج من المحاسبة
         if (getActivity() != null) {
             View appBar = getActivity().findViewById(R.id.appBarLayout);
             if (appBar != null) appBar.setVisibility(View.VISIBLE);
@@ -148,10 +140,10 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void setupStandardToolbar() {
-        // ✅ 1. تنظيف الـ Toolbar من أي قوائم سابقة لمنع التكرار
+        // 1. تنظيف القائمة
         toolbar.getMenu().clear();
         
-        // 2. إعداد أيقونة القائمة (Hamburger)
+        // 2. إعداد أيقونة القائمة
         toolbar.setNavigationIcon(R.drawable.ic_menu); 
         toolbar.setNavigationOnClickListener(v -> {
             if (drawerLayout != null) {
@@ -171,11 +163,11 @@ public class MiraAccountingFragmentNew extends Fragment {
             Log.w(TAG, "Failed to load org name");
         }
 
-        // 4. إعداد العنوان والفرع
+        // 4. إعداد العنوان
         toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
         toolbar.setSubtitle(orgName);
 
-        // 5. تحميل القائمة (التحديث + الحساب)
+        // 5. تحميل القائمة
         toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
         
         // 6. استقبال ضغطات الأزرار
@@ -184,19 +176,26 @@ public class MiraAccountingFragmentNew extends Fragment {
             
             if (id == R.id.action_refresh) {
                 refreshCurrentTab(); 
-                Toast.makeText(requireContext(), 
-                        isArabic ? "جاري التحديث..." : "Refreshing...", 
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), isArabic ? "جاري التحديث..." : "Refreshing...", Toast.LENGTH_SHORT).show();
                 return true;
             } 
             else if (id == R.id.action_profile) {
-                Toast.makeText(requireContext(), 
-                        isArabic ? "الملف الشخصي" : "Profile", 
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), isArabic ? "الملف الشخصي" : "Profile", Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            else if (id == R.id.action_exit) {
+                // ✅ الخروج من شاشة المحاسبة
+                exitAccounting();
                 return true;
             }
             return false;
         });
+    }
+
+    private void exitAccounting() {
+        // محاكاة ضغط زر الرجوع للخروج من شاشة المحاسبة والعودة للداشبورد
+        if (backCallback != null) backCallback.setEnabled(false);
+        requireActivity().getOnBackPressedDispatcher().onBackPressed();
     }
 
     @Override
@@ -234,9 +233,6 @@ public class MiraAccountingFragmentNew extends Fragment {
         contentContainer = null;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Navigation Logic
-    // ═══════════════════════════════════════════════════════════
     private void navigateTo(@NonNull String screenId, boolean pushHistory) {
         if (contentContainer == null || isNavigating) return;
 
@@ -280,7 +276,6 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
-            // تحديث العنوان في الشريط العلوي
             if (toolbar != null) {
                 toolbar.setTitle(target.title(isArabic));
             }
@@ -343,10 +338,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             return false;
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  Public API (Backward Compatibility)
-    // ═══════════════════════════════════════════════════════════
 
     @Deprecated
     public void navigateToTab(int tabIndex) {
