@@ -11,15 +11,15 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface"
-        android:fitsSystemWindows="true">
+        android:background="?attr/colorSurface">
+        <!-- ✅ تم إزالة fitsSystemWindows من هنا لحل مشكلة الفراغ العلوي -->
 
         <com.google.android.material.appbar.AppBarLayout
             android:id="@+id/accountingAppBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?attr/colorSurface"
-            android:fitsSystemWindows="true"
+            android:fitsSystemWindows="true" 
             app:elevation="2dp">
 
             <com.google.android.material.appbar.MaterialToolbar
@@ -40,7 +40,7 @@
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-        <!-- ═══════ الزر العائم متعدد الخيارات (Speed Dial) ═══════ -->
+        <!-- ═══════ الزر العائم متعدد الخيارات (للمحاسب) ═══════ -->
         <LinearLayout
             android:id="@+id/fabMenuContainer"
             android:layout_width="wrap_content"
@@ -50,7 +50,7 @@
             android:gravity="end"
             android:orientation="vertical">
 
-            <!-- 1. زر الإجراءات السريعة (المزيد) -->
+            <!-- 1. زر الإجراءات السريعة -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fabMore"
                 android:layout_width="wrap_content"
@@ -74,7 +74,7 @@
                 app:fabSize="mini"
                 app:tint="?attr/colorOnSecondaryContainer" />
 
-            <!-- 3. زر الرئيسية -->
+            <!-- 3. زر العودة للرئيسية -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fabHome"
                 android:layout_width="wrap_content"
@@ -86,7 +86,7 @@
                 app:fabSize="mini"
                 app:tint="?attr/colorOnSecondaryContainer" />
 
-            <!-- 4. الزر الرئيسي (الذي يفتح ويغلق القائمة) -->
+            <!-- 4. الزر الرئيسي (يفتح ويغلق القائمة) -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fabMain"
                 android:layout_width="wrap_content"
