@@ -319,12 +319,20 @@ private static final class NavItemCfg {
 }
 
 private static final NavItemCfg[] NAV_CONFIGS = {
-    new NavItemCfg(R.id.nav_home,      R.drawable.ic_home,      R.string.nav_home,      R.string.nav_home,      NavigationManager.TAG_DASHBOARD,    true),
-    new NavItemCfg(R.id.nav_inventory, R.drawable.ic_inventory, R.string.nav_inventory, R.string.nav_inventory, NavigationManager.TAG_INVENTORY,    false),
-    new NavItemCfg(R.id.nav_sales,     R.drawable.ic_sales,     R.string.nav_sales,     R.string.nav_sales,     NavigationManager.TAG_POS,          false),
-    new NavItemCfg(R.id.nav_scrap,     R.drawable.ic_diamond,   R.string.nav_scrap,     R.string.nav_scrap,     NavigationManager.TAG_SCRAP_GOLD_BUY, false),
-    // لإضافة عنصر مستقبلاً:
-    // new NavItemCfg(R.id.nav_transfers, R.drawable.ic_gate, R.string.nav_gates, R.string.nav_gates, NavigationManager.TAG_GATES, false),
+    // الرئيسية (للجميع)
+    new NavItemCfg(R.id.nav_home,       R.drawable.ic_home,       R.string.nav_home,       R.string.nav_home,       NavigationManager.TAG_DASHBOARD,    true),
+    
+    // المالية (للمحاسب والمدير المالي والإدارة)
+    new NavItemCfg(R.id.nav_accounting, R.drawable.ic_accounting, R.string.nav_accounting, R.string.nav_accounting, NavigationManager.TAG_ACCOUNTING,   false),
+    
+    // المخزون (لمدير المخزون ومدير الفرع)
+    new NavItemCfg(R.id.nav_inventory,  R.drawable.ic_inventory,  R.string.nav_inventory,  R.string.nav_inventory,  NavigationManager.TAG_INVENTORY,    false),
+    
+    // المبيعات (لموظف المبيعات ومدير الفرع)
+    new NavItemCfg(R.id.nav_sales,      R.drawable.ic_sales,      R.string.nav_sales,      R.string.nav_sales,      NavigationManager.TAG_POS,          false),
+    
+    // كسر الذهب (لمدير المخزون ومدير الفرع)
+    new NavItemCfg(R.id.nav_scrap,      R.drawable.ic_diamond,    R.string.nav_scrap,      R.string.nav_scrap,      NavigationManager.TAG_SCRAP_GOLD_BUY, false),
 };
 
     @Override
@@ -3638,4 +3646,4 @@ public void openLicenseStatus() {
             return 0;
         }
     }
-                        }
+                                }
