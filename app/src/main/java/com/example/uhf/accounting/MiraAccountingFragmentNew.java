@@ -5,11 +5,10 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -32,12 +31,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
 
-/**
- * MIRA Accounting — New Container
- *
- * الحاوية الجديدة للواجهة المحاسبية. تستخدم DrawerLayout + NavigationView
- * مع تصميم هيدر مخصص (Custom Header) يعرض اسم الجهة وعنوان الشاشة.
- */
 public class MiraAccountingFragmentNew extends Fragment {
 
     private static final String TAG = "MiraAccountingNew";
@@ -49,10 +42,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     private NavigationView navView;
     private MaterialToolbar toolbar;
     private FrameLayout contentContainer;
-
-    // ─── Header Custom Views ───
-    private TextView tvOrgNameHeader;
-    private TextView tvScreenTitleHeader;
 
     // ─── State ───
     private String currentScreenId = MiraAccountingScreens.ID_DASHBOARD;
@@ -66,9 +55,6 @@ public class MiraAccountingFragmentNew extends Fragment {
 
     private OnBackPressedCallback backCallback;
 
-    // ═══════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -85,8 +71,8 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         backCallback = new OnBackPressedCallback(true) {
             @Override
-            public void handleOnBackPressed() {
-                onBackPressed();
+            public void onBackPressed() {
+                handleBackPress();
             }
         };
         requireActivity().getOnBackPressedDispatcher().addCallback(this, backCallback);
@@ -104,20 +90,18 @@ public class MiraAccountingFragmentNew extends Fragment {
         toolbar = v.findViewById(R.id.accountingToolbar);
         contentContainer = v.findViewById(R.id.accountingContent);
 
-        if (drawerLayout == null || navView == null
-                || toolbar == null || contentContainer == null) {
+        if (drawerLayout == null || navView == null || toolbar == null || contentContainer == null) {
             Log.e(TAG, "❌ Missing views in fragment_mira_accounting.xml");
             return v;
         }
 
-        // ✅ إعداد الهيدر المخصص (Custom Header)
-        setupCustomHeader(inflater);
+        // ✅ إعداد الـ Toolbar القياسي (بدون حقن XML)
+        setupStandardToolbar();
 
-        // Build drawer from registry (مع تمرير PermissionManager)
+        // إعداد القائمة الجانبية
         MiraAccountingNavDrawerHelper.build(navView, isArabic, permissionManager,
                 screen -> navigateTo(screen.id, true));
 
-        // Responsive — permanent drawer on tablets
         boolean permanent = readPermanentDrawerFlag();
         if (permanent) {
             drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_OPEN);
@@ -127,57 +111,46 @@ public class MiraAccountingFragmentNew extends Fragment {
         return v;
     }
 
-    private void setupCustomHeader(LayoutInflater inflater) {
-        // 1. إخفاء العنوان الافتراضي للـ Toolbar
-        toolbar.setTitle("");
-        
-        // 2. حقن ملف التصميم المخصص داخل الـ Toolbar
-        View customHeader = inflater.inflate(R.layout.header_accounting_dashboard, toolbar, false);
-        toolbar.addView(customHeader);
-
-        // 3. ربط العناصر
-        ImageView btnMenu = customHeader.findViewById(R.id.btnMenu);
-        ImageView btnProfile = customHeader.findViewById(R.id.btnProfile);
-        tvOrgNameHeader = customHeader.findViewById(R.id.tvOrgName);
-        tvScreenTitleHeader = customHeader.findViewById(R.id.tvScreenTitle);
-
-        // 4. إعداد زر القائمة (Hamburger)
-        if (btnMenu != null) {
-            btnMenu.setOnClickListener(view -> {
-                if (drawerLayout != null) {
-                    drawerLayout.openDrawer(GravityCompat.START);
-                }
-            });
-        }
-
-        // 5. إعداد زر الحساب/الإشعارات
-        if (btnProfile != null) {
-            btnProfile.setOnClickListener(view -> {
-                Toast.makeText(requireContext(), 
-                        isArabic ? "الملف الشخصي" : "Profile", 
-                        Toast.LENGTH_SHORT).show();
-            });
-        }
-
-        // 6. جلب اسم الجهة من MiraOrgProfileManager
-        if (tvOrgNameHeader != null) {
-            try {
-                MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
-                String orgName = profileMgr.getDisplayName();
-                if (orgName != null && !orgName.isEmpty()) {
-                    tvOrgNameHeader.setText(orgName);
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Failed to load org name: " + e.getMessage());
+    private void setupStandardToolbar() {
+        // 1. إعداد أيقونة القائمة (Hamburger) على اليمين (لأننا في RTL)
+        toolbar.setNavigationIcon(R.drawable.ic_menu); // تأكد من وجود الأيقونة
+        toolbar.setNavigationOnClickListener(v -> {
+            if (drawerLayout != null) {
+                drawerLayout.openDrawer(GravityCompat.START);
             }
+        });
+
+        // 2. جلب اسم الجهة لوضعه في السطر الثانوي (Subtitle)
+        String orgName = "MIRA TECHNOLOGY";
+        try {
+            MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
+            String name = profileMgr.getDisplayName();
+            if (name != null && !name.isEmpty()) {
+                orgName = name;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to load org name");
         }
+
+        // 3. إعداد العنوان (Title) والفرع (Subtitle)
+        toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
+        toolbar.setSubtitle(orgName);
+
+        // 4. إضافة أيقونة الحساب/الإشعارات على اليسار
+        toolbar.inflateMenu(R.menu.menu_accounting_toolbar); // سننشئ هذا الملف
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_profile) {
+                Toast.makeText(requireContext(), "الملف الشخصي", Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            return false;
+        });
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Restore state
         String startId = MiraAccountingScreens.defaultScreenId();
         if (savedInstanceState != null) {
             startId = savedInstanceState.getString(KEY_SCREEN_ID, startId);
@@ -207,30 +180,19 @@ public class MiraAccountingFragmentNew extends Fragment {
         navView = null;
         toolbar = null;
         contentContainer = null;
-        tvOrgNameHeader = null;
-        tvScreenTitleHeader = null;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Navigation
-    // ═══════════════════════════════════════════════════════════
     private void navigateTo(@NonNull String screenId, boolean pushHistory) {
         if (contentContainer == null || isNavigating) return;
 
         MiraAccountingScreens.Screen target = MiraAccountingScreens.byId(screenId);
-        if (target == null) {
-            Log.w(TAG, "Unknown screen id: " + screenId);
-            return;
-        }
+        if (target == null) return;
         if (!canOpen(target)) {
-            Toast.makeText(requireContext(),
-                    isArabic ? "⛔ غير مصرح بالوصول" : "⛔ Access denied",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), isArabic ? "⛔ غير مصرح" : "⛔ Access denied", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Fragment existing = getChildFragmentManager()
-                .findFragmentByTag("SCR_" + screenId);
+        Fragment existing = getChildFragmentManager().findFragmentByTag("SCR_" + screenId);
         if (screenId.equals(currentScreenId) && existing != null) {
             closeDrawerIfOpen();
             return;
@@ -248,9 +210,7 @@ public class MiraAccountingFragmentNew extends Fragment {
                     .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out);
 
             for (Fragment f : getChildFragmentManager().getFragments()) {
-                if (f != existing && f.isVisible()) {
-                    tx.hide(f);
-                }
+                if (f != existing && f.isVisible()) tx.hide(f);
             }
 
             if (existing != null) {
@@ -265,16 +225,12 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
-            // تحديث عنوان الشاشة في الهيدر المخصص
-            if (tvScreenTitleHeader != null) {
-                tvScreenTitleHeader.setText(target.title(isArabic));
+            // ✅ تحديث العنوان في الـ Toolbar القياسي
+            if (toolbar != null) {
+                toolbar.setTitle(target.title(isArabic));
             }
             
-            // تحديث الـ Toolbar الافتراضي أيضاً
-            toolbar.setTitle(target.title(isArabic));
-            
             MiraAccountingNavDrawerHelper.setChecked(navView, screenId);
-
             closeDrawerIfOpen();
         } finally {
             isNavigating = false;
@@ -282,13 +238,12 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void closeDrawerIfOpen() {
-        if (drawerLayout != null
-                && drawerLayout.isDrawerOpen(GravityCompat.START)) {
+        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START);
         }
     }
 
-    private void onBackPressed() {
+    private void handleBackPress() {
         if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START);
             return;
@@ -299,18 +254,13 @@ public class MiraAccountingFragmentNew extends Fragment {
             return;
         }
         if (MiraAccountingScreens.ID_DASHBOARD.equals(currentScreenId)) {
-            if (backCallback != null) {
-                backCallback.setEnabled(false);
-            }
+            if (backCallback != null) backCallback.setEnabled(false);
             requireActivity().getOnBackPressedDispatcher().onBackPressed();
             return;
         }
         navigateTo(MiraAccountingScreens.ID_DASHBOARD, /*pushHistory=*/false);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Permissions
-    // ═══════════════════════════════════════════════════════════
     private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
         if (permissionManager == null) return true;
         try {
@@ -319,48 +269,34 @@ public class MiraAccountingFragmentNew extends Fragment {
                     || permissionManager.isBranchManager()
                     || permissionManager.isAccountant()
                     || permissionManager.isFinanceManager()
-                    || (sessionManager != null
-                        && "AUDITOR".equals(sessionManager.getRoleString()));
+                    || (sessionManager != null && "AUDITOR".equals(sessionManager.getRoleString()));
             if (!base) return false;
             
             if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
                 return true;
             }
-            
-            return permissionManager.isAdmin()
-                    || permissionManager.canView(screen.permissionKey);
+            return permissionManager.isAdmin() || permissionManager.canView(screen.permissionKey);
         } catch (Exception e) {
-            Log.e(TAG, "canOpen: " + e.getMessage());
             return false;
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════
     private boolean readPermanentDrawerFlag() {
         try {
             return getResources().getBoolean(R.bool.accounting_permanent_drawer);
         } catch (Resources.NotFoundException e) {
-            Log.w(TAG, "accounting_permanent_drawer resource missing — defaulting to false");
             return false;
         }
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ Public API (Backward Compatibility)
+    //  Public API (Backward Compatibility)
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * ⚡ دالة جسر للتوافق مع الكود القديم (MiraAccountingFragment.java)
-     * تستقبل رقم التبويب القديم وتحوله إلى معرف الشاشة الجديد.
-     */
     @Deprecated
     public void navigateToTab(int tabIndex) {
         MiraAccountingScreens.Screen s = MiraAccountingScreens.byLegacyTab(tabIndex);
-        if (s != null) {
-            navigateTo(s.id, true);
-        }
+        if (s != null) navigateTo(s.id, true);
     }
 
     public void navigateToScreen(@NonNull String screenId) {
@@ -368,39 +304,26 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     public void navigateToLedgerWithAccount(long accountId) {
-        Fragment ledger = getChildFragmentManager()
-                .findFragmentByTag("SCR_" + MiraAccountingScreens.ID_GENERAL_LEDGER);
-
+        Fragment ledger = getChildFragmentManager().findFragmentByTag("SCR_" + MiraAccountingScreens.ID_GENERAL_LEDGER);
         if (ledger instanceof MiraGeneralLedgerFragment) {
             ((MiraGeneralLedgerFragment) ledger).setAccountId(accountId);
         }
         navigateTo(MiraAccountingScreens.ID_GENERAL_LEDGER, true);
-
-        Fragment now = getChildFragmentManager()
-                .findFragmentByTag("SCR_" + MiraAccountingScreens.ID_GENERAL_LEDGER);
+        Fragment now = getChildFragmentManager().findFragmentByTag("SCR_" + MiraAccountingScreens.ID_GENERAL_LEDGER);
         if (now instanceof MiraGeneralLedgerFragment && now != ledger) {
             ((MiraGeneralLedgerFragment) now).setAccountId(accountId);
         }
     }
 
     public void refreshCurrentTab() {
-        Fragment current = getChildFragmentManager()
-                .findFragmentByTag("SCR_" + currentScreenId);
+        Fragment current = getChildFragmentManager().findFragmentByTag("SCR_" + currentScreenId);
         if (current instanceof MiraRefreshable) {
-            try {
-                ((MiraRefreshable) current).refresh();
-            } catch (Exception e) {
-                Log.e(TAG, "refresh: " + e.getMessage());
-            }
+            try { ((MiraRefreshable) current).refresh(); } catch (Exception e) { Log.e(TAG, "refresh: " + e.getMessage()); }
         }
     }
 
     @NonNull
-    public String getCurrentScreenId() {
-        return currentScreenId;
-    }
+    public String getCurrentScreenId() { return currentScreenId; }
 
-    public interface MiraRefreshable {
-        void refresh();
-    }
+    public interface MiraRefreshable { void refresh(); }
 }
