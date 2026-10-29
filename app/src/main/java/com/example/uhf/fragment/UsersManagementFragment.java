@@ -245,9 +245,10 @@ public class UsersManagementFragment extends Fragment {
             ioExecutor.execute(() -> {
                 MiraApiClient.ApiResponse response = null;
                 try {
-                    response = apiClient.getRolesList();
+                    // الصحيح
+                    response = apiClient.getRoles(); 
                 } catch (Throwable t) {
-                    Log.w(TAG, "getRolesList threw: " + t.getMessage());
+                    Log.w(TAG, "getRoles threw: " + t.getMessage());
                 }
                 final MiraApiClient.ApiResponse fResponse = response;
 
