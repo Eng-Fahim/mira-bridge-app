@@ -2,26 +2,30 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- زر التحديث -->
     <item
         android:id="@+id/action_refresh"
         android:icon="@drawable/ic_refresh"
         android:title="تحديث"
         app:showAsAction="ifRoom" />
 
-    <!-- زر الملف الشخصي -->
     <item
         android:id="@+id/action_profile"
-        android:icon="@drawable/ic_users" 
+        android:icon="@drawable/ic_users"
         android:title="الملف الشخصي"
         app:showAsAction="ifRoom" />
 
-    <!-- ✅ زر الخروج / العودة للرئيسية -->
+    <!-- ✅ أيقونة تسجيل الخروج الجديدة -->
+    <item
+        android:id="@+id/action_logout"
+        android:icon="@drawable/ic_logout"
+        android:title="تسجيل الخروج"
+        app:showAsAction="ifRoom" />
+
+    <!-- ✅ زر الخروج من واجهة المحاسبة (العودة للرئيسية) -->
     <item
         android:id="@+id/action_exit"
-        android:icon="@android:drawable/ic_menu_close_clear_cancel" 
+        android:icon="@android:drawable/ic_menu_close_clear_cancel"
         android:title="إغلاق"
         app:showAsAction="always" />
-        <!-- ملاحظة: استخدمت أيقونة إغلاق افتراضية من الأندرويد لتعمل فوراً -->
 
 </menu>
