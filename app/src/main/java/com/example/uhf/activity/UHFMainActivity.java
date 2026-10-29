@@ -294,6 +294,39 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             default: return "UNKNOWN(" + mode + ")";
         }
     }
+    // ═══════════════════════════════════════════════════════════
+//  ⭐ مصدر الحقيقة الوحيد لعناصر التنقّل
+//  إضافة عنصر = سطر واحد هنا فقط
+// ═══════════════════════════════════════════════════════════
+private static final class NavItemCfg {
+    final int     itemId;
+    final int     iconRes;
+    final int     titleRes;
+    final int     titleArRes;
+    final int     titleEnRes;
+    final String  tag;
+    final boolean alwaysAllowed;
+
+    NavItemCfg(int itemId, int iconRes,
+               int titleArRes, int titleEnRes,
+               String tag, boolean alwaysAllowed) {
+        this.itemId        = itemId;
+        this.iconRes       = iconRes;
+        this.titleArRes    = titleArRes;
+        this.titleEnRes    = titleEnRes;
+        this.tag           = tag;
+        this.alwaysAllowed = alwaysAllowed;
+    }
+}
+
+private static final NavItemCfg[] NAV_CONFIGS = {
+    new NavItemCfg(R.id.nav_home,      R.drawable.ic_home,      R.string.nav_home,      R.string.nav_home,      NavigationManager.TAG_DASHBOARD,    true),
+    new NavItemCfg(R.id.nav_inventory, R.drawable.ic_inventory, R.string.nav_inventory, R.string.nav_inventory, NavigationManager.TAG_INVENTORY,    false),
+    new NavItemCfg(R.id.nav_sales,     R.drawable.ic_sales,     R.string.nav_sales,     R.string.nav_sales,     NavigationManager.TAG_POS,          false),
+    new NavItemCfg(R.id.nav_scrap,     R.drawable.ic_diamond,   R.string.nav_scrap,     R.string.nav_scrap,     NavigationManager.TAG_SCRAP_GOLD_BUY, false),
+    // لإضافة عنصر مستقبلاً:
+    // new NavItemCfg(R.id.nav_transfers, R.drawable.ic_gate, R.string.nav_gates, R.string.nav_gates, NavigationManager.TAG_GATES, false),
+};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -1517,12 +1550,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             checkSetupStampOnResume();
             return;
+            
         }
-
         if (!checkAutoLock()) return;
 
-        updateToolbarTitle();
-        if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
+applyNavPermissions();   // ⭐ أضف هذا السطر
+
+updateToolbarTitle();
+if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
 
         if (navigationManager != null) {
             navigationManager.notifyExternalChange();
@@ -2098,136 +2133,258 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ═══════════════════════════════════════════════════════
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-            if (fabActionCenter != null) {
-                boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
-                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-                fabActionCenter.setEnabled(hasQuickActions);
-                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-                fabActionCenter.setOnLongClickListener(v -> {
-                    Toast.makeText(UHFMainActivity.this,
-                            isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
-                            Toast.LENGTH_SHORT).show();
-                    return true;
-                });
+        // ⭐ بناء القائمة حسب الصلاحيات (قبل إرفاق الـ listener)
+        applyNavPermissions();
 
-                if (hasQuickActions) {
-                    pulseFab(fabActionCenter);
-                }
-            }
-
-            if (quickNav != null) {
-                quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-                    String tag = getFragmentTagForNavItem(id);
-                    if (tag == null || tag.isEmpty()) return false;
-
-                    if (navigationManager != null
-                            && tag.equals(navigationManager.getCurrentFragmentTag())) {
-                        return true;
-                    }
-
-                    if (navigationLocked || isInventoryActive()) {
-                        new MaterialAlertDialogBuilder(this)
-                                .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل"
-                                        : "⚠️ Inventory Active")
-                                .setMessage(isArabic
-                                        ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
-                                        "هل تريد إيقاف الجرد والانتقال؟"
-                                        : "Cannot navigate during active inventory.\n\n" +
-                                        "Stop inventory and proceed?")
-                                .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
-                                        (d, w) -> {
-                                            stopActiveInventory();
-                                            setNavigationLocked(false);
-                                            mainHandler.postDelayed(() -> {
-                                                Fragment f = navigationManager != null
-                                                        ? navigationManager.createFragmentByTag(tag)
-                                                        : FragmentFactory.createFragmentByTag(tag);
-                                                if (f != null) {
-                                                    loadFragmentDirectly(f, tag);
-                                                }
-                                            }, 500);
-                                        })
-                                .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
-                                        (d, w) -> {
-                                            String currentTag = navigationManager != null
-                                                    ? navigationManager.getCurrentFragmentTag() : "";
-                                            updateBottomNavSelectionByTag(currentTag);
-                                        })
-                                .setCancelable(false)
-                                .show();
-                        return false;
-                    }
-
-                    Fragment fragment = navigationManager != null
-                            ? navigationManager.createFragmentByTag(tag)
-                            : FragmentFactory.createFragmentByTag(tag);
-
-                    if (fragment != null) {
-                        loadFragmentDirectly(fragment, tag);
-                        return true;
-                    }
-                    return false;
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+        if (fabActionCenter != null) {
+            boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
+            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            fabActionCenter.setEnabled(hasQuickActions);
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+            fabActionCenter.setOnLongClickListener(v -> {
+                Toast.makeText(UHFMainActivity.this,
+                        isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
+                        Toast.LENGTH_SHORT).show();
+                return true;
+            });
+            if (hasQuickActions) pulseFab(fabActionCenter);
         }
-    }
 
-    private String getFragmentTagForNavItem(int itemId) {
-        if (itemId == R.id.nav_home) return NavigationManager.TAG_DASHBOARD;
-        if (itemId == R.id.nav_inventory) return NavigationManager.TAG_INVENTORY;
-        if (itemId == R.id.nav_sales) return NavigationManager.TAG_POS;
-        if (itemId == R.id.nav_transfers) return NavigationManager.TAG_GATES;
-        if (itemId == R.id.nav_scrap) return NavigationManager.TAG_SCRAP_GOLD_BUY;
-        return "";
+        if (quickNav != null) {
+    attachNavListener(quickNav);
+}
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
+
+private void attachNavListener(@NonNull BottomNavigationView nav) {
+    nav.setOnItemSelectedListener(item -> {
+        int id = item.getItemId();
+        String tag = getFragmentTagForNavItem(id);
+        if (tag == null || tag.isEmpty()) return false;
+
+        // ✅ إذا كانت الشاشة الحالية هي نفسها — لا شيء
+        if (navigationManager != null
+                && tag.equals(navigationManager.getCurrentFragmentTag())) {
+            return true;
+        }
+
+        // حماية الجرد النشط
+        if (navigationLocked || isInventoryActive()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل"
+                            : "⚠️ Inventory Active")
+                    .setMessage(isArabic
+                            ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
+                            "هل تريد إيقاف الجرد والانتقال؟"
+                            : "Cannot navigate during active inventory.\n\n" +
+                            "Stop inventory and proceed?")
+                    .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
+                            (d, w) -> {
+                                stopActiveInventory();
+                                setNavigationLocked(false);
+                                mainHandler.postDelayed(() -> {
+                                    Fragment f = navigationManager != null
+                                            ? navigationManager.createFragmentByTag(tag)
+                                            : FragmentFactory.createFragmentByTag(tag);
+                                    if (f != null) loadFragmentDirectly(f, tag);
+                                }, 500);
+                            })
+                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
+                            (d, w) -> {
+                                String currentTag = navigationManager != null
+                                        ? navigationManager.getCurrentFragmentTag() : "";
+                                updateBottomNavSelectionByTag(currentTag);
+                            })
+                    .setCancelable(false)
+                    .show();
+            return false;
+        }
+
+        Fragment fragment = navigationManager != null
+                ? navigationManager.createFragmentByTag(tag)
+                : FragmentFactory.createFragmentByTag(tag);
+
+        if (fragment != null) {
+            loadFragmentDirectly(fragment, tag);
+            return true;
+        }
+        return false;
+    });
+}
+// ═══════════════════════════════════════════════════════════
+//  ⭐ الفلترة + إعادة البناء + تكييف الفاب
+// ═══════════════════════════════════════════════════════════
+private void applyNavPermissions() {
+    try {
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        View bottomContainer     = findViewById(R.id.bottomNavContainer);
+        FloatingActionButton fab = findViewById(R.id.fabActionCenter);
+
+        if (nav == null || bottomContainer == null || permissionManager == null) return;
+
+        // ═══════════════════════════════════════════════════════
+        // 1) افصل الـ listener مؤقتاً لمنع trigger غير مرغوب
+        // ═══════════════════════════════════════════════════════
+        nav.setOnItemSelectedListener(null);
+
+        // ═══════════════════════════════════════════════════════
+        // 2) امسح وأعد بناء القائمة
+        // ═══════════════════════════════════════════════════════
+        nav.getMenu().clear();
+
+        int index = 0;
+        int added = 0;
+        for (NavItemCfg cfg : NAV_CONFIGS) {
+            boolean allowed = cfg.alwaysAllowed
+                    || permissionManager.canAccessFragment(cfg.tag);
+            if (!allowed) continue;
+
+            MenuItem item = nav.getMenu().add(Menu.NONE, cfg.itemId, index++, "");
+            item.setIcon(cfg.iconRes);
+            item.setTitle(getString(isArabic ? cfg.titleArRes : cfg.titleEnRes));
+            added++;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 3) ⚠️ لا تغيّر الرؤية أثناء Setup Pending
+        //    (يتركها للـ Setup Flow الذي يتحكم بها)
+        // ═══════════════════════════════════════════════════════
+        String setupStatus = getCachedSetupStatus();
+        boolean setupComplete = SETUP_COMPLETED.equals(setupStatus)
+                || SETUP_LOCKED.equals(setupStatus);
+
+        if (setupComplete) {
+            if (added >= 2) {
+                nav.setVisibility(View.VISIBLE);
+                bottomContainer.setVisibility(View.VISIBLE);
+                if (fab != null) resetFabConstraintsToNav(fab);
+
+            } else if (added == 1) {
+                nav.setVisibility(View.GONE);
+                // ⚠️ لا نُظهر bottomContainer إذا كان الفاب مخفياً أيضاً
+                boolean fabVisible = (fab != null && fab.getVisibility() == View.VISIBLE);
+                bottomContainer.setVisibility(fabVisible ? View.VISIBLE : View.GONE);
+                if (fab != null && fabVisible) {
+                    anchorFabToContainerCenter(fab, bottomContainer);
+                }
+
+            } else {
+                bottomContainer.setVisibility(View.GONE);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 4) ⚠️ اضبط التحديد بناءً على الشاشة الحالية (ليس السابقة)
+        //    هذا يمنع التنقل القسري من شاشات داخلية مثل Reports
+        // ═══════════════════════════════════════════════════════
+        String currentTag = (navigationManager != null)
+                ? navigationManager.getCurrentFragmentTag()
+                : NavigationManager.TAG_DASHBOARD;
+
+        if (currentTag == null) currentTag = NavigationManager.TAG_DASHBOARD;
+
+        for (NavItemCfg cfg : NAV_CONFIGS) {
+            if (cfg.tag.equals(currentTag)) {
+                MenuItem mi = nav.getMenu().findItem(cfg.itemId);
+                if (mi != null) {
+                    nav.setSelectedItemId(cfg.itemId);
+                }
+                break;
+            }
+        }
+        // إذا لم يطابق أي عنصر (مثل Reports/AccountingSetup/Profile)
+        // → لا نُغيّر التحديد — Material سيختار أول عنصر تلقائياً بدون trigger
+
+        // ═══════════════════════════════════════════════════════
+        // 5) أعِد إرفاق الـ listener
+        // ═══════════════════════════════════════════════════════
+        attachNavListener(nav);
+
+        Log.i(TAG, "applyNavPermissions: added=" + added
+                + ", currentTag=" + currentTag
+                + ", setupComplete=" + setupComplete);
+
+    } catch (Exception e) {
+        Log.e(TAG, "applyNavPermissions error: " + e.getMessage(), e);
+    }
+}
+
+private void resetFabConstraintsToNav(FloatingActionButton fab) {
+    ViewGroup.LayoutParams lp = fab.getLayoutParams();
+    if (!(lp instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)) return;
+
+    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams clp =
+            (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) lp;
+    clp.topToTop       = R.id.bottomNavigationView;
+    clp.bottomToTop    = R.id.bottomNavigationView;
+    clp.startToStart   = R.id.bottomNavigationView;
+    clp.endToEnd       = R.id.bottomNavigationView;
+    clp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
+    clp.bottomMargin   = 0;
+    fab.setLayoutParams(clp);
+}
+
+private void anchorFabToContainerCenter(FloatingActionButton fab, View container) {
+    ViewGroup.LayoutParams lp = fab.getLayoutParams();
+    if (!(lp instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)) return;
+
+    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams clp =
+            (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) lp;
+    clp.topToTop       = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
+    clp.bottomToTop    = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
+    clp.startToStart   = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+    clp.endToEnd       = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+    clp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+
+    float density = getResources().getDisplayMetrics().density;
+    clp.bottomMargin = (int) (32 * density);
+    fab.setLayoutParams(clp);
+}
+    private String getFragmentTagForNavItem(int itemId) {
+    for (NavItemCfg cfg : NAV_CONFIGS) {
+        if (cfg.itemId == itemId) return cfg.tag;
+    }
+    return "";
+}
 
     private void updateBottomNavSelectionByTag(String tag) {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            if (quickNav == null || tag == null) return;
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        if (quickNav == null || tag == null) return;
 
-            if (tag.equals(NavigationManager.TAG_DASHBOARD)) {
-                MenuItem mi = quickNav.getMenu().findItem(R.id.nav_home);
+        for (NavItemCfg cfg : NAV_CONFIGS) {
+            if (cfg.tag.equals(tag)) {
+                MenuItem mi = quickNav.getMenu().findItem(cfg.itemId);
                 if (mi != null) mi.setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_INVENTORY)) {
-                MenuItem mi = quickNav.getMenu().findItem(R.id.nav_inventory);
-                if (mi != null) mi.setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_POS)) {
-                MenuItem mi = quickNav.getMenu().findItem(R.id.nav_sales);
-                if (mi != null) mi.setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_GATES)) {
-                MenuItem mi = quickNav.getMenu().findItem(R.id.nav_transfers);
-                if (mi != null) mi.setChecked(true);
-            } else if (tag.equals(NavigationManager.TAG_SCRAP_GOLD_BUY)) {
-                MenuItem mi = quickNav.getMenu().findItem(R.id.nav_scrap);
-                if (mi != null) mi.setChecked(true);
+                return;
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
         }
+    } catch (Exception e) {
+        Log.e(TAG, "updateBottomNavSelectionByTag error: " + e.getMessage());
     }
+}
 
     private void updateBottomNavLanguage() {
-        try {
-            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-            if (nav != null && nav.getMenu() != null) {
-                nav.getMenu().findItem(R.id.nav_home).setTitle(isArabic ? "الرئيسية" : "Home");
-                nav.getMenu().findItem(R.id.nav_inventory).setTitle(isArabic ? "الجرد" : "Inventory");
-                nav.getMenu().findItem(R.id.nav_sales).setTitle(isArabic ? "البيع" : "Sales");
-                nav.getMenu().findItem(R.id.nav_transfers).setTitle(
-                        isArabic ? "🛡️ البوابات" : "🛡️ Gates");
+    try {
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        if (nav == null || nav.getMenu() == null) return;
+
+        for (NavItemCfg cfg : NAV_CONFIGS) {
+            MenuItem item = nav.getMenu().findItem(cfg.itemId);
+            if (item != null) {
+                item.setTitle(getString(isArabic ? cfg.titleArRes : cfg.titleEnRes));
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
         }
+    } catch (Exception e) {
+        Log.e(TAG, "updateBottomNavLanguage error: " + e.getMessage());
     }
+}
 
     // ═══════════════════════════════════════════════════════
     //  القوائم
@@ -3398,32 +3555,37 @@ public void openLicenseStatus() {
     }
 
     private void updateTransfersBadge(int count) {
-        try {
-            this.incomingTransfersCount = count;
-            saveTransfersCountLocally(count);
+    try {
+        this.incomingTransfersCount = count;
+        saveTransfersCountLocally(count);
 
-            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-            if (nav == null) return;
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        if (nav == null) return;
 
-            BadgeDrawable badge = nav.getOrCreateBadge(R.id.nav_transfers);
-
-            if (count > 0) {
-                badge.setVisible(true);
-                badge.setNumber(count);
-                badge.setBackgroundColor(
-                        getResources().getColor(android.R.color.holo_red_dark));
-                badge.setBadgeTextColor(
-                        getResources().getColor(android.R.color.white));
-
-                pulseNavItem(nav, R.id.nav_transfers);
-            } else {
-                badge.setVisible(false);
-                badge.clearNumber();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "updateTransfersBadge error: " + e.getMessage());
+        // ⚠️ تحقق من وجود العنصر أولاً — قد لا يكون ضمن صلاحيات هذا المستخدم
+        MenuItem transfersItem = nav.getMenu().findItem(R.id.nav_transfers);
+        if (transfersItem == null) {
+            // العنصر غير موجود (معلق في XML أو محجوب بالصلاحيات) — لا شيء لإضافته
+            return;
         }
+
+        BadgeDrawable badge = nav.getOrCreateBadge(R.id.nav_transfers);
+        if (badge == null) return;
+
+        if (count > 0) {
+            badge.setVisible(true);
+            badge.setNumber(count);
+            badge.setBackgroundColor(getResources().getColor(android.R.color.holo_red_dark));
+            badge.setBadgeTextColor(getResources().getColor(android.R.color.white));
+            pulseNavItem(nav, R.id.nav_transfers);
+        } else {
+            badge.setVisible(false);
+            badge.clearNumber();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "updateTransfersBadge error: " + e.getMessage());
     }
+}
 
     private void pulseNavItem(BottomNavigationView nav, int itemId) {
         try {
