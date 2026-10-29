@@ -246,7 +246,7 @@ public class UsersManagementFragment extends Fragment {
                 MiraApiClient.ApiResponse response = null;
                 try {
                     // الصحيح
-                    response = apiClient.getRoles(); 
+                    response = apiClient.getRoles();
                 } catch (Throwable t) {
                     Log.w(TAG, "getRoles threw: " + t.getMessage());
                 }
@@ -1269,79 +1269,83 @@ public class UsersManagementFragment extends Fragment {
     //  ✅ FIX #3: Toggle User Status (بدلاً من الحذف)
     // ═══════════════════════════════════════════════════════
 
-    private void toggleUserStatus(int userId, String name, String currentStatus) {
-        try {
-            if (!isAdded() || getContext() == null) return;
-            if (userId <= 0) {
-                showToast(isArabic ? "⚠️ معرف غير صالح" : "⚠️ Invalid ID");
-                return;
-            }
-            if (!canEditUser(null)) {
-                showToast(isArabic ? "❌ ليس لديك صلاحية" : "❌ No permission");
-                return;
-            }
+    // ═══════════════════════════════════════════════════════
+//  ✅ Toggle User Status (بدلاً من الحذف)
+// ═══════════════════════════════════════════════════════
 
-            boolean isActive = "active".equals(currentStatus);
-            final String newStatus = isActive ? "inactive" : "active";
-            String action = isActive
-                    ? (isArabic ? "تعليق" : "Suspend")
-                    : (isArabic ? "تفعيل" : "Activate");
+private void toggleUserStatus(int userId, String name, String currentStatus) {
+    try {
+        if (!isAdded() || getContext() == null) return;
+        if (userId <= 0) {
+            showToast(isArabic ? "⚠️ معرف غير صالح" : "⚠️ Invalid ID");
+            return;
+        }
+        if (!canEditUser(null)) {
+            showToast(isArabic ? "❌ ليس لديك صلاحية" : "❌ No permission");
+            return;
+        }
 
-            new MaterialAlertDialogBuilder(
-                    new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
-                    .setTitle(action + " " + (isArabic ? "المستخدم" : "User"))
-                    .setMessage(isArabic
-                            ? "هل تريد " + action + " \"" + name + "\"؟"
-                            : "Do you want to " + action.toLowerCase() + " \"" + name + "\"?")
-                    .setPositiveButton(action, (d, w) -> {
-                        if (ioExecutor == null || ioExecutor.isShutdown()) {
-                            showToast(isArabic ? "❌ الخدمة غير متاحة" : "❌ Service unavailable");
-                            return;
-                        }
-                        try {
-                            ioExecutor.execute(() -> {
-                                MiraApiClient.ApiResponse response = null;
-                                String err = null;
-                                try {
-                                    // محاولة استخدام toggleUserStatus إن وُجد
-                                    response = apiClient.toggleUserStatus(userId, newStatus);
+        boolean isActive = "active".equals(currentStatus);
+        final String newStatus = isActive ? "inactive" : "active";
+        String action = isActive
+                ? (isArabic ? "تعليق" : "Suspend")
+                : (isArabic ? "تفعيل" : "Activate");
 
-                                    // fallback: updateUser
-                                    if (response == null || !response.isSuccess) {
-                                        JSONObject payload = new JSONObject();
-                                        payload.put("user_id", userId);
-                                        payload.put("id",      userId);
-                                        payload.put("status",  newStatus);
-                                        response = apiClient.updateUser(payload);
-                                    }
-                                } catch (Exception e) {
-                                    err = e.getMessage();
+        new MaterialAlertDialogBuilder(
+                new ContextThemeWrapper(requireContext(), R.style.MiraDialogTheme))
+                .setTitle(action + " " + (isArabic ? "المستخدم" : "User"))
+                .setMessage(isArabic
+                        ? "هل تريد " + action + " \"" + name + "\"؟"
+                        : "Do you want to " + action.toLowerCase() + " \"" + name + "\"?")
+                .setPositiveButton(action, (d, w) -> {
+                    if (ioExecutor == null || ioExecutor.isShutdown()) {
+                        showToast(isArabic ? "❌ الخدمة غير متاحة" : "❌ Service unavailable");
+                        return;
+                    }
+                    try {
+                        ioExecutor.execute(() -> {
+                            MiraApiClient.ApiResponse response = null;
+                            String err = null;
+                            try {
+                                // ✅ تصحيح اسم الدالة لتتطابق مع MiraApiClient
+                                response = apiClient.updateUserStatus(userId, newStatus);
+
+                                // fallback: updateUser في حال فشل المسار المخصص
+                                if (response == null || !response.isSuccess) {
+                                    JSONObject payload = new JSONObject();
+                                    payload.put("user_id", userId);
+                                    payload.put("id",      userId);
+                                    payload.put("status",  newStatus);
+                                    response = apiClient.updateUser(payload);
                                 }
-                                final MiraApiClient.ApiResponse fRes = response;
-                                final String fErr = err;
+                            } catch (Exception e) {
+                                err = e.getMessage();
+                            }
+                            final MiraApiClient.ApiResponse fRes = response;
+                            final String fErr = err;
 
-                                mainHandler.post(() -> {
-                                    if (!isAdded()) return;
-                                    if (fRes != null && fRes.isSuccess) {
-                                        showToast(isArabic
-                                                ? "✅ تم " + action + " المستخدم"
-                                                : "✅ User " + action.toLowerCase() + "d");
-                                        loadUsers();
-                                    } else {
-                                        showToast(fErr != null ? fErr
-                                                : (isArabic ? "❌ فشلت العملية" : "❌ Failed"));
-                                    }
-                                });
+                            mainHandler.post(() -> {
+                                if (!isAdded()) return;
+                                if (fRes != null && fRes.isSuccess) {
+                                    showToast(isArabic
+                                            ? "✅ تم " + action + " المستخدم"
+                                            : "✅ User " + action.toLowerCase() + "d");
+                                    loadUsers();
+                                } else {
+                                    showToast(fErr != null ? fErr
+                                            : (isArabic ? "❌ فشلت العملية" : "❌ Failed"));
+                                }
                             });
-                        } catch (RejectedExecutionException ignored) {
-                            showToast(isArabic ? "❌ الخدمة غير متاحة" : "❌ Service unavailable");
-                        }
-                    })
-                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                    .show();
+                        });
+                    } catch (RejectedExecutionException ignored) {
+                        showToast(isArabic ? "❌ الخدمة غير متاحة" : "❌ Service unavailable");
+                    }
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
 
-        } catch (Exception e) { Log.e(TAG, "toggleUserStatus error", e); }
-    }
+    } catch (Exception e) { Log.e(TAG, "toggleUserStatus error", e); }
+}
 
     // ═══════════════════════════════════════════════════════
     //  Data Classes
