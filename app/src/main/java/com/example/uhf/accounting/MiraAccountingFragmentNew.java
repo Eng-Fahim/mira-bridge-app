@@ -5,7 +5,6 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -31,6 +30,15 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
 
+/**
+ * MIRA Accounting — New Container (Enterprise v2.0)
+ * 
+ * التحديثات:
+ * - استخدام MaterialToolbar القياسي (بدون حقن XML).
+ * - دمج أزرار التحديث والحساب في الشريط العلوي.
+ * - تصحيح دالة الرجوع handleOnBackPressed.
+ * - دعم كامل للتوافق الخلفي مع MiraAccountingFragment القديم.
+ */
 public class MiraAccountingFragmentNew extends Fragment {
 
     private static final String TAG = "MiraAccountingNew";
@@ -55,6 +63,9 @@ public class MiraAccountingFragmentNew extends Fragment {
 
     private OnBackPressedCallback backCallback;
 
+    // ═══════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -71,7 +82,7 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         backCallback = new OnBackPressedCallback(true) {
             @Override
-            public void handleOnBackPressed() { // ✅ تم تصحيح اسم الدالة هنا
+            public void handleOnBackPressed() {
                 handleBackPress();
             }
         };
@@ -136,11 +147,25 @@ public class MiraAccountingFragmentNew extends Fragment {
         toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
         toolbar.setSubtitle(orgName);
 
-        // 4. إضافة أيقونة الحساب
+        // 4. تحميل القائمة (التحديث + الحساب)
         toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
+        
+        // 5. استقبال ضغطات الأزرار
         toolbar.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.action_profile) {
-                Toast.makeText(requireContext(), "الملف الشخصي", Toast.LENGTH_SHORT).show();
+            int id = item.getItemId();
+            
+            if (id == R.id.action_refresh) {
+                refreshCurrentTab(); 
+                Toast.makeText(requireContext(), 
+                        isArabic ? "جاري التحديث..." : "Refreshing...", 
+                        Toast.LENGTH_SHORT).show();
+                return true;
+            } 
+            else if (id == R.id.action_profile) {
+                Toast.makeText(requireContext(), 
+                        isArabic ? "الملف الشخصي" : "Profile", 
+                        Toast.LENGTH_SHORT).show();
+                // يمكنك هنا استدعاء شاشة الملف الشخصي
                 return true;
             }
             return false;
@@ -182,13 +207,16 @@ public class MiraAccountingFragmentNew extends Fragment {
         contentContainer = null;
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  Navigation Logic
+    // ═══════════════════════════════════════════════════════════
     private void navigateTo(@NonNull String screenId, boolean pushHistory) {
         if (contentContainer == null || isNavigating) return;
 
         MiraAccountingScreens.Screen target = MiraAccountingScreens.byId(screenId);
         if (target == null) return;
         if (!canOpen(target)) {
-            Toast.makeText(requireContext(), isArabic ? "⛔ غير مصرح" : "⛔ Access denied", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), isArabic ? "⛔ غير مصرح بالوصول" : "⛔ Access denied", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -225,6 +253,7 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
+            // تحديث العنوان في الشريط العلوي
             if (toolbar != null) {
                 toolbar.setTitle(target.title(isArabic));
             }
@@ -287,6 +316,10 @@ public class MiraAccountingFragmentNew extends Fragment {
             return false;
         }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Public API (Backward Compatibility)
+    // ═══════════════════════════════════════════════════════════
 
     @Deprecated
     public void navigateToTab(int tabIndex) {
