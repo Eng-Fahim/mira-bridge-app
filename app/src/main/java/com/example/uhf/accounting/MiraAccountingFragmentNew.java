@@ -5,6 +5,8 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -30,32 +32,22 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
 
-/**
- * MIRA Accounting — New Container (Enterprise v2.2)
- * 
- * التحديثات:
- * - إضافة زر إغلاق/رجوع في الشريط العلوي.
- * - إخفاء الهيدر الرئيسي لمنع التداخل.
- */
 public class MiraAccountingFragmentNew extends Fragment {
 
     private static final String TAG = "MiraAccountingNew";
     private static final String KEY_SCREEN_ID = "current_screen_id";
     private static final String KEY_HISTORY = "screen_history";
 
-    // ─── Views ───
     private DrawerLayout drawerLayout;
     private NavigationView navView;
     private MaterialToolbar toolbar;
     private FrameLayout contentContainer;
 
-    // ─── State ───
     private String currentScreenId = MiraAccountingScreens.ID_DASHBOARD;
     private final Deque<String> history = new ArrayDeque<>();
     private boolean isNavigating = false;
     private boolean isArabic = true;
 
-    // ─── Dependencies ───
     private PermissionManager permissionManager;
     private SessionManager sessionManager;
 
@@ -64,6 +56,9 @@ public class MiraAccountingFragmentNew extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // ✅ 1. منع الـ Activity من إضافة قائمته (هذا سبب التكرار)
+        setHasOptionsMenu(false); 
 
         if (getContext() != null) {
             try {
@@ -86,10 +81,7 @@ public class MiraAccountingFragmentNew extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
         drawerLayout = v.findViewById(R.id.drawerLayout);
         navView = v.findViewById(R.id.navView);
@@ -118,10 +110,13 @@ public class MiraAccountingFragmentNew extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        // ✅ 2. إخفاء الشريط الأصفر وشريط التنقل السفلي
         if (getActivity() != null) {
+            // إخفاء الـ AppBar (الشريط الأصفر)
             View appBar = getActivity().findViewById(R.id.appBarLayout);
             if (appBar != null) appBar.setVisibility(View.GONE);
             
+            // إخفاء شريط التنقل السفلي
             View bottomNav = getActivity().findViewById(R.id.bottomNavContainer);
             if (bottomNav != null) bottomNav.setVisibility(View.GONE);
         }
@@ -140,10 +135,10 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void setupStandardToolbar() {
-        // 1. تنظيف القائمة
+        // ✅ 3. تنظيف القائمة تماماً لمنع تكرار (تحديث)
         toolbar.getMenu().clear();
         
-        // 2. إعداد أيقونة القائمة
+        // 4. إعداد أيقونة القائمة (Hamburger)
         toolbar.setNavigationIcon(R.drawable.ic_menu); 
         toolbar.setNavigationOnClickListener(v -> {
             if (drawerLayout != null) {
@@ -151,7 +146,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         });
 
-        // 3. جلب اسم الجهة
+        // 5. جلب اسم الجهة
         String orgName = "MIRA TECHNOLOGY";
         try {
             MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
@@ -163,14 +158,14 @@ public class MiraAccountingFragmentNew extends Fragment {
             Log.w(TAG, "Failed to load org name");
         }
 
-        // 4. إعداد العنوان
+        // 6. إعداد العنوان والفرع
         toolbar.setTitle(isArabic ? "لوحة التحكم" : "Dashboard");
         toolbar.setSubtitle(orgName);
 
-        // 5. تحميل القائمة
+        // 7. تحميل القائمة
         toolbar.inflateMenu(R.menu.menu_accounting_toolbar);
         
-        // 6. استقبال ضغطات الأزرار
+        // 8. استقبال ضغطات الأزرار
         toolbar.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
             
@@ -184,7 +179,6 @@ public class MiraAccountingFragmentNew extends Fragment {
                 return true;
             }
             else if (id == R.id.action_exit) {
-                // ✅ الخروج من شاشة المحاسبة
                 exitAccounting();
                 return true;
             }
@@ -193,7 +187,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void exitAccounting() {
-        // محاكاة ضغط زر الرجوع للخروج من شاشة المحاسبة والعودة للداشبورد
         if (backCallback != null) backCallback.setEnabled(false);
         requireActivity().getOnBackPressedDispatcher().onBackPressed();
     }
@@ -214,7 +207,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             }
         }
 
-        navigateTo(startId, /*pushHistory=*/false);
+        navigateTo(startId, false);
     }
 
     @Override
@@ -300,7 +293,7 @@ public class MiraAccountingFragmentNew extends Fragment {
         }
         if (!history.isEmpty()) {
             String prev = history.pop();
-            navigateTo(prev, /*pushHistory=*/false);
+            navigateTo(prev, false);
             return;
         }
         if (MiraAccountingScreens.ID_DASHBOARD.equals(currentScreenId)) {
@@ -308,7 +301,7 @@ public class MiraAccountingFragmentNew extends Fragment {
             requireActivity().getOnBackPressedDispatcher().onBackPressed();
             return;
         }
-        navigateTo(MiraAccountingScreens.ID_DASHBOARD, /*pushHistory=*/false);
+        navigateTo(MiraAccountingScreens.ID_DASHBOARD, false);
     }
 
     private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
