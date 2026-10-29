@@ -16,38 +16,42 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:paddingHorizontal="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="24dp">
 
-            <!-- ═══════ شريط الفترة والفرع ═══════ -->
+            <!-- ═══════ شريط الفترة والفرع (تصميم احترافي) ═══════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="10dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="12dp"
                 app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutline">
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:padding="10dp">
+                    android:padding="12dp">
 
+                    <!-- أيقونة تقويم حقيقية (أو استبدلها بـ ImageView) -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="📅"
+                        android:text="🗓️"
                         android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/tvPeriodFrom"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
+                        android:layout_marginStart="8dp"
                         android:padding="4dp"
                         android:text="—"
-                        android:textSize="12sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorPrimary"
                         android:background="?attr/selectableItemBackground"
@@ -59,8 +63,8 @@
                         android:layout_height="wrap_content"
                         android:paddingHorizontal="4dp"
                         android:text="—"
-                        android:textSize="12sp"
-                        android:alpha="0.5" />
+                        android:textSize="13sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:id="@+id/tvPeriodTo"
@@ -68,7 +72,7 @@
                         android:layout_height="wrap_content"
                         android:padding="4dp"
                         android:text="—"
-                        android:textSize="12sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorPrimary"
                         android:background="?attr/selectableItemBackground"
@@ -85,8 +89,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="الفرع: —"
-                        android:textSize="11sp"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textStyle="bold" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -94,10 +99,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"
-                android:text="📊 المؤشرات المالية"
-                android:textSize="14sp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="12dp"
+                android:text="المؤشرات المالية"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnSurface" />
 
@@ -108,15 +113,29 @@
                 android:columnCount="2" />
 
             <!-- ═══════ التنبيهات ═══════ -->
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
-                android:text="🔔 التنبيهات"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="التنبيهات"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@android:drawable/ic_popup_reminder"
+                    app:tint="?attr/colorPrimary" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/containerAlerts"
@@ -124,27 +143,45 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <TextView
-                android:id="@+id/tvAlertsEmpty"
+            <!-- حالة فارغة احترافية (تأخذ شكل بطاقة) -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="16dp"
-                android:gravity="center"
-                android:text="✅ لا توجد تنبيهات حالياً"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:visibility="gone" />
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                android:visibility="gone"
+                android:id="@+id/tvAlertsEmptyCard">
+                <!-- نستخدم TextView بالداخل للحفاظ على الـ ID المطلوب في الجافا -->
+                <TextView
+                    android:id="@+id/tvAlertsEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:gravity="center"
+                    android:text="✅ لا توجد تنبيهات حالياً، كل شيء يعمل بشكل ممتاز."
+                    android:textSize="13sp"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- ═══════ الوصول السريع ═══════ -->
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
-                android:text="⚡ الوصول السريع"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="الوصول السريع"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
+            </LinearLayout>
 
             <GridLayout
                 android:id="@+id/gridQuick"
@@ -153,15 +190,29 @@
                 android:columnCount="2" />
 
             <!-- ═══════ آخر الأنشطة ═══════ -->
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
-                android:text="🕐 آخر الأنشطة"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="آخر الأنشطة"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@android:drawable/ic_menu_recent_history"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/containerRecent"
@@ -169,21 +220,33 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <TextView
-                android:id="@+id/tvRecentEmpty"
+            <!-- حالة فارغة احترافية (أيقونة باهتة ونص) -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="16dp"
+                android:padding="24dp"
                 android:gravity="center"
-                android:text="لا توجد أنشطة حديثة"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:visibility="gone" />
-
-            <!-- مساحة أسفل الصفحة -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="24dp" />
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:id="@+id/tvRecentEmptyContainer">
+                
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:alpha="0.3"
+                    android:src="@android:drawable/ic_menu_recent_history"
+                    app:tint="?attr/colorOnSurface" />
+                
+                <TextView
+                    android:id="@+id/tvRecentEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="لا توجد أنشطة مسجلة حتى الآن"
+                    android:textSize="13sp"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
