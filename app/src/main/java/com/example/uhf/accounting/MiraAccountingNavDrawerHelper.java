@@ -2,39 +2,18 @@ package com.example.uhf.accounting;
 
 import android.view.Menu;
 import android.view.MenuItem;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.navigation.NavigationView;
-
 import java.util.List;
 
-/**
- * MIRA Accounting — Navigation Drawer Helper
- *
- * يبني عناصر القائمة الجانبية ديناميكياً من {@link MiraAccountingScreens}.
- * المسؤوليات الوحيدة:
- *   1. تحويل الـ registry إلى MenuItems مصنّفة بالأقسام
- *   2. إبقاء معرّفات MenuItem مرتبطة بالـ Screen.id عبر hash مستقر
- *   3. تسليم حدث "شاشة مختارة" للمتلقي (الـ Fragment)
- *
- * لماذا hash بدل استخدام ordinal؟
- *   لأن ordinal يتغير إذا أضفنا/أعدنا ترتيب شاشات، بينما hash(screenId)
- *   يبقى ثابتاً ما دام المعرف النصي ثابتاً. هذا يمنع كسر الـ checked state
- *   بعد أي تعديل في السجل.
- */
 public final class MiraAccountingNavDrawerHelper {
 
     public interface OnScreenSelectedListener {
         void onScreenSelected(@NonNull MiraAccountingScreens.Screen screen);
     }
 
-    /**
-     * كل MenuItem لشاشة يحمل id = BASE + hash(screenId) % RANGE.
-     * النطاق 90,000 يترك مساحة آمنة للأيقونات الأخرى، وقاعدة 100,000
-     * تفصل menu items عن أي id آخر قد يُستخدم في القوائم.
-     */
     private static final int ITEM_ID_BASE = 100_000;
     private static final int ITEM_ID_RANGE = 90_000;
 
@@ -46,52 +25,61 @@ public final class MiraAccountingNavDrawerHelper {
     }
 
     /**
-     * يملأ الـ NavigationView بكل الأقسام والشاشات.
-     *
-     * @param navView  عرض القائمة
-     * @param isArabic لغة العرض الحالية
-     * @param listener يُنفَّذ عند اختيار شاشة
+     * بناء القائمة الجانبية مع فحص الصلاحيات والأيقونات الحقيقية
      */
     public static void build(@NonNull NavigationView navView,
                              boolean isArabic,
+                             @NonNull PermissionManager permissionManager, // ✅ مضاف
                              @NonNull OnScreenSelectedListener listener) {
 
         Menu menu = navView.getMenu();
         menu.clear();
 
         int order = 0;
+        
+        // المرور على الأقسام
         for (MiraAccountingScreens.Section section : MiraAccountingScreens.allSections()) {
-            List<MiraAccountingScreens.Screen> screens =
-                    MiraAccountingScreens.inSection(section);
-
+            List<MiraAccountingScreens.Screen> screens = MiraAccountingScreens.inSection(section);
             if (screens.isEmpty()) continue;
 
-            // ─── عنوان قسم (غير قابل للنقر) ───
-            MenuItem header = menu.add(
-                    Menu.NONE,
-                    Menu.NONE,
-                    order++,
-                    section.icon + "  " + section.title(isArabic)
-            );
+            // إنشاء قسم فرعي قابل للطي (SubMenu)
+            // ملاحظة: يجب أن يدعم الـ XML الخاص بك الـ SubMenu، أو يمكنك تركها كعنوان غير قابل للنقر
+            MenuItem header = menu.add(Menu.NONE, Menu.NONE, order++, section.icon + " " + section.title(isArabic));
             header.setCheckable(false);
             header.setEnabled(false);
 
-            // ─── شاشات القسم ───
+            // المرور على شاشات القسم
             for (MiraAccountingScreens.Screen screen : screens) {
+                
+                // ⚡ فلترة الصلاحيات: هل هذا المستخدم يملك حق الوصول لهذه الشاشة؟
+                if (!hasPermission(permissionManager, screen)) {
+                    continue; // تخطي هذه الشاشة، لا تضفها للقائمة
+                }
+
                 MenuItem item = menu.add(
                         Menu.NONE,
                         itemIdFor(screen.id),
                         order++,
-                        "      " + screen.icon + "  " + screen.title(isArabic)
+                        screen.title(isArabic)
                 );
                 item.setCheckable(true);
+                
+                // ⚡ استخدام الأيقونة الحقيقية إذا كانت موجودة
+                if (screen.iconResId != 0) {
+                    item.setIcon(screen.iconResId);
+                }
+                
+                // ⚡ إضافة شارات الإشعارات (اختياري)
+                // if (screen.id.equals(MiraAccountingScreens.ID_JOURNAL)) {
+                //     item.setActionView(...); // يمكنك إضافة Badge هنا
+                // }
             }
         }
 
-        // ─── استقبال الاختيار ───
+        // استقبال الاختيار
         navView.setNavigationItemSelectedListener(item -> {
             int id = item.getItemId();
-            if (id < ITEM_ID_BASE) return false;   // عنوان قسم
+            if (id < ITEM_ID_BASE) return false; // عنوان قسم
 
             for (MiraAccountingScreens.Screen screen : MiraAccountingScreens.all()) {
                 if (itemIdFor(screen.id) == id) {
@@ -103,9 +91,22 @@ public final class MiraAccountingNavDrawerHelper {
         });
     }
 
-    /** تحديد الشاشة النشطة في القائمة */
-    public static void setChecked(@NonNull NavigationView navView,
-                                  @Nullable String screenId) {
+    /**
+     * فحص ما إذا كان المستخدم يملك صلاحية فتح هذه الشاشة
+     */
+    private static boolean hasPermission(PermissionManager pm, MiraAccountingScreens.Screen screen) {
+        if (pm == null) return true;
+        
+        // المدير والمحاسب المالي يملكان كل شيء
+        if (pm.isSystemAdmin() || pm.isOrgAdmin() || pm.isFinanceManager() || pm.isAccountant()) {
+            return true;
+        }
+        
+        // باقي الأدوار (مثل المدقق) يفحصون الصلاحية الفردية للشاشة
+        return pm.canView(screen.permissionKey);
+    }
+
+    public static void setChecked(@NonNull NavigationView navView, @Nullable String screenId) {
         if (screenId == null) {
             navView.setCheckedItem(androidx.appcompat.R.id.home);
             return;
