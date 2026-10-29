@@ -117,6 +117,13 @@ public class MiraAccountingFragmentNew extends Fragment {
 
         return v;
     }
+    
+    @Override
+    public void onResume() {
+    super.onResume();
+    // ✅ شبكة الأمان: إخفاء واجهة التطبيق الرئيسية في كل مرة تستعيد فيها الشاشة نشاطها
+    hideMainUI();
+}
 
     @Override
     public void onDestroyView() {
