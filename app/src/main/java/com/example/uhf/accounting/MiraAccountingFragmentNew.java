@@ -8,6 +8,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -20,6 +22,7 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraGeneralLedgerFragment;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -33,21 +36,9 @@ import java.util.Locale;
  * MIRA Accounting — New Container
  *
  * الحاوية الجديدة للواجهة المحاسبية. تستخدم DrawerLayout + NavigationView
- * بدلاً من الـ 17 TabLayout المزدحم.
+ * مع تصميم هيدر مخصص (Custom Header) يعرض اسم الجهة وعنوان الشاشة.
  *
- * ── المبادئ ──
- *  1. لا تحذف الشاشات عند التنقل — تخفيها فقط (تحافظ على مدخلات المستخدم)
- *  2. كل التنقل يمر عبر الـ registry (MiraAccountingScreens)
- *  3. Back stack واضح: drawer → history → dashboard → exit
- *  4. الصلاحيات تُفحص عند كل انتقال
- *  5. State كامل يُحفظ ويُستعاد (screenId + history)
- *
- * ── للتوافق الخلفي ──
- *  نوفر نفس الـ API العام لـ MiraAccountingFragment القديم:
- *    navigateToTab(int), navigateToLedgerWithAccount(long), refreshCurrentTab()
- *
- * @version 1.2.0 — Fixed StackOverflowError on back press, fixed empty screen
- *                   on initial load, hardened against missing bools.xml
+ * @version 1.3.0 — Added Custom Header (Org Name + Dynamic Title)
  */
 public class MiraAccountingFragmentNew extends Fragment {
 
@@ -61,6 +52,10 @@ public class MiraAccountingFragmentNew extends Fragment {
     private MaterialToolbar toolbar;
     private FrameLayout contentContainer;
 
+    // ─── Header Custom Views ───
+    private TextView tvOrgNameHeader;
+    private TextView tvScreenTitleHeader;
+
     // ─── State ───
     private String currentScreenId = MiraAccountingScreens.ID_DASHBOARD;
     private final Deque<String> history = new ArrayDeque<>();
@@ -71,8 +66,6 @@ public class MiraAccountingFragmentNew extends Fragment {
     private PermissionManager permissionManager;
     private SessionManager sessionManager;
 
-    // ✅ [إصلاح StackOverflow]: نحتفظ بمرجع للـ callback
-    //    لنتمكن من تعطيله قبل تفويض زر الرجوع للـ activity.
     private OnBackPressedCallback backCallback;
 
     // ═══════════════════════════════════════════════════════════
@@ -92,7 +85,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             isArabic = "ar".equals(Locale.getDefault().getLanguage());
         }
 
-        // ✅ Back handler — نحفظ المرجع في حقل
         backCallback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -120,27 +112,16 @@ public class MiraAccountingFragmentNew extends Fragment {
             return v;
         }
 
-        // Toolbar: hamburger
-        toolbar.setNavigationOnClickListener(view -> {
-            if (drawerLayout != null) {
-                drawerLayout.openDrawer(GravityCompat.START);
-            }
-        });
+        // ═══════════════════════════════════════════════════════════
+        //  ✅ [جديد] إعداد الهيدر المخصص (Custom Header)
+        // ═══════════════════════════════════════════════════════════
+        setupCustomHeader(inflater);
 
-        // Toolbar: refresh
-        toolbar.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.action_refresh) {
-                refreshCurrentTab();
-                return true;
-            }
-            return false;
-        });
-
-        // Build drawer from registry
-        MiraAccountingNavDrawerHelper.build(navView, isArabic, permissionManager, screen -> navigateTo(screen.id, true));
+        // Build drawer from registry (مع تمرير PermissionManager)
+        MiraAccountingNavDrawerHelper.build(navView, isArabic, permissionManager,
+                screen -> navigateTo(screen.id, true));
 
         // Responsive — permanent drawer on tablets
-        // ✅ [حماية]: نقرأ الـ bool بأمان؛ إن لم يكن موجوداً نستخدم false
         boolean permanent = readPermanentDrawerFlag();
         if (permanent) {
             drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_OPEN);
@@ -148,6 +129,53 @@ public class MiraAccountingFragmentNew extends Fragment {
         }
 
         return v;
+    }
+
+    private void setupCustomHeader(LayoutInflater inflater) {
+        // 1. إخفاء العنوان الافتراضي للـ Toolbar
+        toolbar.setTitle("");
+        
+        // 2. حقن ملف التصميم المخصص داخل الـ Toolbar
+        View customHeader = inflater.inflate(R.layout.header_accounting_dashboard, toolbar, false);
+        toolbar.addView(customHeader);
+
+        // 3. ربط العناصر
+        ImageView btnMenu = customHeader.findViewById(R.id.btnMenu);
+        ImageView btnProfile = customHeader.findViewById(R.id.btnProfile);
+        tvOrgNameHeader = customHeader.findViewById(R.id.tvOrgName);
+        tvScreenTitleHeader = customHeader.findViewById(R.id.tvScreenTitle);
+
+        // 4. إعداد زر القائمة (Hamburger)
+        if (btnMenu != null) {
+            btnMenu.setOnClickListener(view -> {
+                if (drawerLayout != null) {
+                    drawerLayout.openDrawer(GravityCompat.START);
+                }
+            });
+        }
+
+        // 5. إعداد زر الحساب/الإشعارات
+        if (btnProfile != null) {
+            btnProfile.setOnClickListener(view -> {
+                Toast.makeText(requireContext(), 
+                        isArabic ? "الملف الشخصي" : "Profile", 
+                        Toast.LENGTH_SHORT).show();
+                // يمكنك هنا فتح شاشة الملف الشخصي أو الإشعارات
+            });
+        }
+
+        // 6. جلب اسم الجهة من MiraOrgProfileManager
+        if (tvOrgNameHeader != null) {
+            try {
+                MiraOrgProfileManager profileMgr = MiraOrgProfileManager.getInstance(requireContext());
+                String orgName = profileMgr.getDisplayName();
+                if (orgName != null && !orgName.isEmpty()) {
+                    tvOrgNameHeader.setText(orgName);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to load org name: " + e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -161,15 +189,13 @@ public class MiraAccountingFragmentNew extends Fragment {
             String[] arr = savedInstanceState.getStringArray(KEY_HISTORY);
             if (arr != null) {
                 history.clear();
-                // push بترتيب معكوس لأن ArrayDeque.push يُضيف في الرأس
                 for (int i = arr.length - 1; i >= 0; i--) {
                     history.push(arr[i]);
                 }
             }
         }
 
-        // ✅ الآن سيعمل: currentScreenId = dashboard, لكن existing = null
-        //    → navigateTo لن يخرج مبكراً وسيضيف الـ fragment فعلياً
+        // ✅ الانتقال للشاشة الأولى (سيقوم بتحديث عنوان الهيدر تلقائياً)
         navigateTo(startId, /*pushHistory=*/false);
     }
 
@@ -187,6 +213,8 @@ public class MiraAccountingFragmentNew extends Fragment {
         navView = null;
         toolbar = null;
         contentContainer = null;
+        tvOrgNameHeader = null;
+        tvScreenTitleHeader = null;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -207,10 +235,6 @@ public class MiraAccountingFragmentNew extends Fragment {
             return;
         }
 
-        // ✅ [إصلاح الشاشة الفارغة]:
-        //    نبحث عن الـ fragment أولاً، ثم نقرر إذا كان هناك حاجة للانتقال.
-        //    سابقاً كان الشرط `screenId == currentScreenId` يُرجع دائماً في أول تحميل
-        //    لأن كلاهما = "dashboard" لكن لا يوجد fragment معروض بعد.
         Fragment existing = getChildFragmentManager()
                 .findFragmentByTag("SCR_" + screenId);
         if (screenId.equals(currentScreenId) && existing != null) {
@@ -229,7 +253,6 @@ public class MiraAccountingFragmentNew extends Fragment {
                     .beginTransaction()
                     .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out);
 
-            // hide كل الشاشات الأخرى دون حذفها
             for (Fragment f : getChildFragmentManager().getFragments()) {
                 if (f != existing && f.isVisible()) {
                     tx.hide(f);
@@ -248,8 +271,14 @@ public class MiraAccountingFragmentNew extends Fragment {
                 tx.commitAllowingStateLoss();
             }
 
-            // Toolbar + check
+            // ✅ [جديد] تحديث عنوان الشاشة في الهيدر المخصص
+            if (tvScreenTitleHeader != null) {
+                tvScreenTitleHeader.setText(target.title(isArabic));
+            }
+            
+            // تحديث الـ Toolbar الافتراضي أيضاً (للاحتياط)
             toolbar.setTitle(target.title(isArabic));
+            
             MiraAccountingNavDrawerHelper.setChecked(navView, screenId);
 
             closeDrawerIfOpen();
@@ -266,72 +295,55 @@ public class MiraAccountingFragmentNew extends Fragment {
     }
 
     private void onBackPressed() {
-        // 1) drawer open → close
         if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START);
             return;
         }
-        // 2) history → pop
         if (!history.isEmpty()) {
             String prev = history.pop();
             navigateTo(prev, /*pushHistory=*/false);
             return;
         }
-        // 3) من dashboard → للـ activity
         if (MiraAccountingScreens.ID_DASHBOARD.equals(currentScreenId)) {
-            // ✅ [إصلاح StackOverflow]:
-            //    نعطّل الـ callback أولاً قبل استدعاء dispatcher.onBackPressed().
-            //    بدون هذا، الـ dispatcher يُعيد استدعاء نفس الـ callback
-            //    → onBackPressed → dispatcher → callback → ...
-            //    حتى ينفجر الـ stack.
             if (backCallback != null) {
                 backCallback.setEnabled(false);
             }
             requireActivity().getOnBackPressedDispatcher().onBackPressed();
             return;
         }
-        // 4) من أي شاشة أخرى → للوحة التحكم
         navigateTo(MiraAccountingScreens.ID_DASHBOARD, /*pushHistory=*/false);
     }
 
     // ═══════════════════════════════════════════════════════════
-//  Permissions
-// ═══════════════════════════════════════════════════════════
-private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
-    if (permissionManager == null) return true;
-    try {
-        // ✅ [تطوير] إضافة المحاسب والمدير المالي صراحةً
-        boolean base = permissionManager.canView(MiraAccountingScreens.BASE_PERMISSION)
-                || permissionManager.isAdmin()
-                || permissionManager.isBranchManager()
-                || permissionManager.isAccountant()      // مضاف
-                || permissionManager.isFinanceManager()  // مضاف
-                || (sessionManager != null
-                    && "AUDITOR".equals(sessionManager.getRoleString()));
-                    
-        if (!base) return false;
-        
-        // المحاسب والمدير المالي يملكان صلاحية الوصول لكل الشاشات المحاسبية
-        if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
-            return true;
+    //  Permissions
+    // ═══════════════════════════════════════════════════════════
+    private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
+        if (permissionManager == null) return true;
+        try {
+            boolean base = permissionManager.canView(MiraAccountingScreens.BASE_PERMISSION)
+                    || permissionManager.isAdmin()
+                    || permissionManager.isBranchManager()
+                    || permissionManager.isAccountant()
+                    || permissionManager.isFinanceManager()
+                    || (sessionManager != null
+                        && "AUDITOR".equals(sessionManager.getRoleString()));
+            if (!base) return false;
+            
+            if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
+                return true;
+            }
+            
+            return permissionManager.isAdmin()
+                    || permissionManager.canView(screen.permissionKey);
+        } catch (Exception e) {
+            Log.e(TAG, "canOpen: " + e.getMessage());
+            return false;
         }
-        
-        return permissionManager.isAdmin()
-                || permissionManager.canView(screen.permissionKey);
-    } catch (Exception e) {
-        Log.e(TAG, "canOpen: " + e.getMessage());
-        return false;
     }
-}
 
     // ═══════════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════════
-
-    /**
-     * قراءة flag الـ permanent drawer بأمان.
-     * إن لم يُعرَّف المورد (bools.xml مفقود) → false بلا crash.
-     */
     private boolean readPermanentDrawerFlag() {
         try {
             return getResources().getBoolean(R.bool.accounting_permanent_drawer);
@@ -342,22 +354,14 @@ private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Public API — backward compatible with old container
+    //  Public API
     // ═══════════════════════════════════════════════════════════
-
-    /** @deprecated استخدم navigateToScreen(String) */
-    @Deprecated
-    public void navigateToTab(int tabIndex) {
-        MiraAccountingScreens.Screen s = MiraAccountingScreens.byLegacyTab(tabIndex);
-        if (s != null) navigateTo(s.id, true);
-    }
 
     public void navigateToScreen(@NonNull String screenId) {
         navigateTo(screenId, true);
     }
 
     public void navigateToLedgerWithAccount(long accountId) {
-        // pre-set على الشاشة القائمة أو المنشأة حديثاً
         Fragment ledger = getChildFragmentManager()
                 .findFragmentByTag("SCR_" + MiraAccountingScreens.ID_GENERAL_LEDGER);
 
@@ -366,7 +370,6 @@ private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
         }
         navigateTo(MiraAccountingScreens.ID_GENERAL_LEDGER, true);
 
-        // بعد الانتقال، اضبط مرة أخرى إن كانت الشاشة جديدة
         Fragment now = getChildFragmentManager()
                 .findFragmentByTag("SCR_" + MiraAccountingScreens.ID_GENERAL_LEDGER);
         if (now instanceof MiraGeneralLedgerFragment && now != ledger) {
@@ -386,15 +389,11 @@ private boolean canOpen(@NonNull MiraAccountingScreens.Screen screen) {
         }
     }
 
-    /** يتيح للـ Fragments الأخرى الاستعلام عن الشاشة الحالية */
     @NonNull
     public String getCurrentScreenId() {
         return currentScreenId;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Optional interface للشاشات القابلة للتحديث
-    // ═══════════════════════════════════════════════════════════
     public interface MiraRefreshable {
         void refresh();
     }
