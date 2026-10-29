@@ -1178,6 +1178,14 @@ try {
     public ApiResponse getUsers() {
         return getWithAuth("/auth/users");
     }
+    
+
+// ✅ [جديد] دالة جلب الصلاحيات من قاعدة البيانات
+public ApiResponse getRoles() {
+    // ملاحظة: إذا كان المسار مختلفاً في الـ backend لديك (مثلاً /roles أو /auth/users/roles)، 
+    // قم بتغييره هنا.
+    return getWithAuth("/auth/roles"); 
+}
 
     public ApiResponse createUser(JSONObject payload) {
         return postWithAuth("/auth/users/create", payload);
