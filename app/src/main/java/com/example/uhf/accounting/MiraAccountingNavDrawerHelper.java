@@ -2,12 +2,22 @@ package com.example.uhf.accounting;
 
 import android.view.Menu;
 import android.view.MenuItem;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
 import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.navigation.NavigationView;
+
 import java.util.List;
 
+/**
+ * MIRA Accounting — Navigation Drawer Helper v2.0
+ * 
+ * التحديثات:
+ * - دعم فلترة الصلاحيات (لا يعرض الشاشات التي لا يملك المستخدم صلاحيتها).
+ * - دعم الأيقونات الحقيقية (Vector Drawables).
+ */
 public final class MiraAccountingNavDrawerHelper {
 
     public interface OnScreenSelectedListener {
@@ -25,61 +35,59 @@ public final class MiraAccountingNavDrawerHelper {
     }
 
     /**
-     * بناء القائمة الجانبية مع فحص الصلاحيات والأيقونات الحقيقية
+     * يملأ الـ NavigationView بكل الأقسام والشاشات المتاحة للمستخدم الحالي.
      */
     public static void build(@NonNull NavigationView navView,
                              boolean isArabic,
-                             @NonNull PermissionManager permissionManager, // ✅ مضاف
+                             @NonNull PermissionManager permissionManager, 
                              @NonNull OnScreenSelectedListener listener) {
 
         Menu menu = navView.getMenu();
         menu.clear();
 
         int order = 0;
-        
-        // المرور على الأقسام
+
         for (MiraAccountingScreens.Section section : MiraAccountingScreens.allSections()) {
             List<MiraAccountingScreens.Screen> screens = MiraAccountingScreens.inSection(section);
             if (screens.isEmpty()) continue;
 
-            // إنشاء قسم فرعي قابل للطي (SubMenu)
-            // ملاحظة: يجب أن يدعم الـ XML الخاص بك الـ SubMenu، أو يمكنك تركها كعنوان غير قابل للنقر
-            MenuItem header = menu.add(Menu.NONE, Menu.NONE, order++, section.icon + " " + section.title(isArabic));
+            // ─── عنوان قسم (غير قابل للنقر) ───
+            MenuItem header = menu.add(
+                    Menu.NONE,
+                    Menu.NONE,
+                    order++,
+                    section.icon + "  " + section.title(isArabic)
+            );
             header.setCheckable(false);
             header.setEnabled(false);
 
-            // المرور على شاشات القسم
+            // ─── شاشات القسم ───
             for (MiraAccountingScreens.Screen screen : screens) {
-                
-                // ⚡ فلترة الصلاحيات: هل هذا المستخدم يملك حق الوصول لهذه الشاشة؟
+
+                // ⚡ فلترة الصلاحيات
                 if (!hasPermission(permissionManager, screen)) {
-                    continue; // تخطي هذه الشاشة، لا تضفها للقائمة
+                    continue;
                 }
 
                 MenuItem item = menu.add(
                         Menu.NONE,
                         itemIdFor(screen.id),
                         order++,
-                        screen.title(isArabic)
+                        "      " + screen.title(isArabic)
                 );
                 item.setCheckable(true);
                 
-                // ⚡ استخدام الأيقونة الحقيقية إذا كانت موجودة
-                if (screen.iconResId != 0) {
-                    item.setIcon(screen.iconResId);
+                // ✅ تم التصحيح: استخدام iconRes بدلاً من iconResId
+                if (screen.iconRes != 0) {
+                    item.setIcon(screen.iconRes);
                 }
-                
-                // ⚡ إضافة شارات الإشعارات (اختياري)
-                // if (screen.id.equals(MiraAccountingScreens.ID_JOURNAL)) {
-                //     item.setActionView(...); // يمكنك إضافة Badge هنا
-                // }
             }
         }
 
-        // استقبال الاختيار
+        // ─── استقبال الاختيار ───
         navView.setNavigationItemSelectedListener(item -> {
             int id = item.getItemId();
-            if (id < ITEM_ID_BASE) return false; // عنوان قسم
+            if (id < ITEM_ID_BASE) return false;
 
             for (MiraAccountingScreens.Screen screen : MiraAccountingScreens.all()) {
                 if (itemIdFor(screen.id) == id) {
@@ -91,22 +99,16 @@ public final class MiraAccountingNavDrawerHelper {
         });
     }
 
-    /**
-     * فحص ما إذا كان المستخدم يملك صلاحية فتح هذه الشاشة
-     */
     private static boolean hasPermission(PermissionManager pm, MiraAccountingScreens.Screen screen) {
         if (pm == null) return true;
-        
-        // المدير والمحاسب المالي يملكان كل شيء
         if (pm.isSystemAdmin() || pm.isOrgAdmin() || pm.isFinanceManager() || pm.isAccountant()) {
             return true;
         }
-        
-        // باقي الأدوار (مثل المدقق) يفحصون الصلاحية الفردية للشاشة
         return pm.canView(screen.permissionKey);
     }
 
-    public static void setChecked(@NonNull NavigationView navView, @Nullable String screenId) {
+    public static void setChecked(@NonNull NavigationView navView,
+                                  @Nullable String screenId) {
         if (screenId == null) {
             navView.setCheckedItem(androidx.appcompat.R.id.home);
             return;
