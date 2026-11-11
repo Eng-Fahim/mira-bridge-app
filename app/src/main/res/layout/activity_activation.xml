@@ -19,7 +19,8 @@
             android:layout_height="100dp"
             android:layout_marginTop="40dp"
             android:src="@drawable/ic_luxury_mira_logo"
-            app:tint="?attr/colorPrimary" />
+            app:tint="?attr/colorPrimary"
+            android:contentDescription="@string/app_name" />
 
         <TextView
             android:id="@+id/tvActivationTitle"
@@ -61,7 +62,10 @@
                     android:layout_marginBottom="20dp"
                     android:textColor="?android:attr/textColorSecondary" />
 
-                <!-- Server URL (اختياري — يظهر فقط عند أول تفعيل) -->
+                <!-- ═══════════════════════════════════════════════════════
+                     Server URL — مخفي (يُكتشف تلقائياً من مركز الترخيص)
+                     القيمة الأولية الآن: Laravel
+                     ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilServerUrl"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -76,10 +80,12 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textUri"
-                        android:text="https://id.ibreg.org/wp-json" />
+                        android:text="https://jewelry.ibreg.org/api" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- License Key -->
+                <!-- ═══════════════════════════════════════════════════════
+                     License Key — الحقل الأساسي
+                     ═══════════════════════════════════════════════════════ -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilLicenseKey"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -98,10 +104,14 @@
                         android:maxLength="25"
                         android:hint="MIRA-XXXX-XXXX-XXXX"
                         android:fontFamily="monospace"
-                        android:letterSpacing="0.05" />
+                        android:letterSpacing="0.05"
+                        android:importantForAutofill="no" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Status (loading) -->
+                <!-- ═══════════════════════════════════════════════════════
+                     Loading — VISIBLE في XML، ويُخفى برمجياً عبر loadingContainer
+                     ✅ يصلح خطأ "المؤشر لا يظهر أبداً"
+                     ═══════════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/loadingContainer"
                     android:layout_width="match_parent"
