@@ -21,23 +21,14 @@ import java.nio.charset.StandardCharsets;
 import javax.net.ssl.HttpsURLConnection;
 
 /**
- * LicenseManager — التواصل مع MIRA License Center (Laravel)
+ * LicenseManager — Laravel License Center
  *
- * v2.0 — نقل كامل من WordPress إلى Laravel
- *
- * Endpoints (كلها على Laravel):
- *   POST {serverUrl}/v1/license/activate
- *   POST {serverUrl}/v1/license/heartbeat
- *   POST {serverUrl}/v1/license/deactivate
- *   GET  {serverUrl}/v1/license/status
+ * v2.1 — إصلاح: device_uuid + بنية device مسطّحة حسب ActivateRequest
  */
 public class LicenseManager {
 
     private static final String TAG = "LicenseManager";
-
-    // ⚡ المسار موحّد — Laravel لا يستخدم /wp-json
     private static final String ENDPOINT_PREFIX = "/v1/license";
-
     private static final int CONNECT_TIMEOUT = 15_000;
     private static final int READ_TIMEOUT    = 15_000;
 
@@ -47,25 +38,16 @@ public class LicenseManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Build URL (Laravel — مع دعم الترحيل من WP)
+    //  Build URL
     // ═══════════════════════════════════════════════════════
     private static String buildUrl(String serverUrl, String endpointPath) {
         if (serverUrl == null) return "";
         String base = serverUrl.trim();
-
-        // إزالة slash نهائي
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-
-        // ⚡ ترحيل: إذا كانت URL قديمة WordPress → نظّفها
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
         base = base.replace("/wp-json", "");
-
-        // ⚡ إذا كانت URL تنتهي بـ /v1 (من lookup قديم) → لا نكررها
         if (base.endsWith("/v1")) {
             return base + "/license" + endpointPath;
         }
-
         return base + ENDPOINT_PREFIX + endpointPath;
     }
 
@@ -82,18 +64,15 @@ public class LicenseManager {
                 String fullUrl = buildUrl(serverUrl, "/activate");
                 Log.d(TAG, "POST " + fullUrl);
 
-                // ═══ بناء device fingerprint ═══
-                JSONObject device = new JSONObject();
-                device.put("device_name", (Build.MANUFACTURER + " " + Build.MODEL).trim());
-                device.put("device_model", Build.MODEL != null ? Build.MODEL : "");
-                device.put("device_os", "Android " + Build.VERSION.RELEASE
-                        + " (API " + Build.VERSION.SDK_INT + ")");
+                // ═══════════════════════════════════════════════════
+                //  ⚡ بناء device بالبنية المسطّحة المتوافقة مع ActivateRequest
+                // ═══════════════════════════════════════════════════
+                String deviceUuid = getOrCreateDeviceUuid(context);
 
-                JSONObject fingerprint = new JSONObject();
                 String androidId = Settings.Secure.getString(
                         context.getContentResolver(),
                         Settings.Secure.ANDROID_ID);
-                fingerprint.put("android_id", androidId != null ? androidId : "");
+                if (androidId == null) androidId = "";
 
                 String serial = "";
                 try {
@@ -103,15 +82,23 @@ public class LicenseManager {
                         serial = Build.SERIAL;
                     }
                 } catch (SecurityException ignored) {}
-                fingerprint.put("serial", serial != null ? serial : "");
-                fingerprint.put("model", Build.MODEL != null ? Build.MODEL : "");
+                if (serial == null) serial = "";
 
-                device.put("fingerprint", fingerprint);
-                device.put("app_version", getAppVersion(context));
+                JSONObject device = new JSONObject();
+                device.put("device_uuid",  deviceUuid);                         // ⚡ مطلوب
+                device.put("device_name",  (Build.MANUFACTURER + " " + Build.MODEL).trim());
+                device.put("device_model", Build.MODEL != null ? Build.MODEL : "");
+                device.put("device_os",    "Android " + Build.VERSION.RELEASE
+                        + " (API " + Build.VERSION.SDK_INT + ")");
+                device.put("android_id",   androidId);                          // ⚡ مسطّح
+                device.put("serial",       serial);                             // ⚡ مسطّح
+                device.put("app_version",  getAppVersion(context));
 
                 JSONObject payload = new JSONObject();
                 payload.put("license_key", licenseKey.toUpperCase().trim());
                 payload.put("device", device);
+
+                Log.d(TAG, "📤 REQUEST: " + payload.toString());
 
                 // ═══ الاتصال ═══
                 URL url = new URL(fullUrl);
@@ -142,7 +129,6 @@ public class LicenseManager {
                     os.write(payload.toString().getBytes(StandardCharsets.UTF_8));
                 }
 
-                // ═══ قراءة الاستجابة ═══
                 int code = conn.getResponseCode();
                 InputStream is = (code >= 200 && code < 300)
                         ? conn.getInputStream()
@@ -158,12 +144,11 @@ public class LicenseManager {
                 }
 
                 String body = sb.toString().trim();
-                Log.d(TAG, "Activate response: HTTP " + code + " | " + body);
+                Log.d(TAG, "📥 RESPONSE: HTTP " + code + " | " + body);
 
                 JSONObject json = body.isEmpty() ? new JSONObject() : new JSONObject(body);
 
                 if (code >= 200 && code < 300 && json.optBoolean("success", true)) {
-                    // ⚡ Laravel يُعيد "token"، القديم كان "activation_token"
                     String token = json.optString("token",
                             json.optString("activation_token", ""));
                     String uuid  = json.optString("device_uuid", "");
@@ -175,7 +160,6 @@ public class LicenseManager {
 
                         JSONObject lic = json.optJSONObject("license");
                         if (lic != null) {
-                            // ⚡ Laravel يُعيد max_gates، القديم max_devices
                             int maxDevices = lic.optInt("max_devices",
                                     lic.optInt("max_gates", 1));
                             sm.saveLicenseInfo(
@@ -200,7 +184,7 @@ public class LicenseManager {
                         Log.d(TAG, "✅ Activation saved successfully");
                     }
 
-                    // ⚡ blob (اختياري — إن أرجعه Laravel)
+                    // blob اختياري
                     JSONObject blobPayload = json.optJSONObject("license_blob");
                     if (blobPayload != null) {
                         JSONObject blob = blobPayload.optJSONObject("blob");
@@ -391,6 +375,27 @@ public class LicenseManager {
     // ═══════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════
+
+    /**
+     * ⚡ UUID ثابت للجهاز — يُنشأ مرة واحدة ويُخزَّن للأبد
+     */
+    private static String getOrCreateDeviceUuid(Context ctx) {
+        final String PREFS = "MIRA_DEVICE_UUID";
+        final String KEY   = "device_uuid";
+
+        android.content.SharedPreferences sp =
+                ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String existing = sp.getString(KEY, null);
+        if (existing != null && !existing.isEmpty()) {
+            return existing;
+        }
+
+        String uuid = java.util.UUID.randomUUID().toString();
+        sp.edit().putString(KEY, uuid).apply();
+        Log.d(TAG, "🔑 Device UUID created: " + uuid);
+        return uuid;
+    }
+
     private static String getAppVersion(Context ctx) {
         try {
             return ctx.getPackageManager()
