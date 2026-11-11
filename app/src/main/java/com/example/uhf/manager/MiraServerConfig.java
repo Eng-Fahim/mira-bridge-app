@@ -7,6 +7,10 @@ import android.util.Log;
 /**
  * MIRA Server Configuration Manager
  * إدارة عنوان السيرفر والنطاق بشكل ديناميكي وآمن
+ *
+ * ✅ مضبوط لـ Laravel API:
+ *    BASE = https://jewelry.ibreg.org/api/
+ *    PING = {BASE}ping  →  https://jewelry.ibreg.org/api/ping
  */
 public class MiraServerConfig {
 
@@ -16,16 +20,19 @@ public class MiraServerConfig {
     private static final String KEY_API_KEY = "api_key";
     private static final String KEY_GATE_ID = "gate_id";
     private static final String KEY_AUTH_TOKEN = "auth_token";
-    
-    // ✅ إضافة العنوان الافتراضي كـ constant
-    //private static final String DEFAULT_BASE_URL = "https://id.ibreg.org/wp-json/";
-    private static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
-    
+
+    // ✅ عنوان Laravel API الافتراضي (ينتهي بـ / دائماً)
+    private static final String DEFAULT_BASE_URL = "https://jewelry.ibreg.org/api/";
+
+    // ✅ مسار فحص الاتصال (يجب أن يطابق Route في routes/api.php)
+    private static final String PING_PATH = "ping";
+
     private static MiraServerConfig instance;
     private final SharedPreferences prefs;
 
     private MiraServerConfig(Context context) {
-        prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs = context.getApplicationContext()
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
     public static synchronized MiraServerConfig getInstance(Context context) {
@@ -35,95 +42,99 @@ public class MiraServerConfig {
         return instance;
     }
 
+    // ==========================================================
+    //  Base URL
+    // ==========================================================
+
     /**
-     * ✅ الحصول على الرابط الأساسي
-     * في حال عدم وجود رابط محفوظ، يتم استخدام الرابط الافتراضي
+     * ✅ إرجاع الرابط الأساسي مع ضمان:
+     *   - قيمة افتراضية عند عدم الحفظ
+     *   - تحويل أي قيمة قديمة تحتوي /wp-json/ إلى /api/
+     *   - نهاية / مضمونة
      */
-    /**
- * ✅ إصلاح: ضمان / نهائي دائماً
- */
-public String getBaseUrl() {
-    String url = prefs.getString(KEY_BASE_URL, "");
-    if (url == null || url.isEmpty()) {
-        url = DEFAULT_BASE_URL;
-        setBaseUrl(DEFAULT_BASE_URL);
-    }
-    // ✅ ضمان / نهائي
-    if (!url.endsWith("/")) {
-        url += "/";
-        setBaseUrl(url);
-    }
-    return url;
-}
-
-
-/**
- * ✅ إصلاح: دعم baseUrl مع أو بدون wp-json
- */
-public boolean testConnection(String baseUrl) {
-    try {
-        Log.d(TAG, "Testing connection to: " + baseUrl);
-        
-        String cleanUrl = baseUrl.trim();
-        if (!cleanUrl.endsWith("/")) cleanUrl += "/";
-        
-        // ✅ لا تكرر wp-json
-        String pingUrl;
-        if (cleanUrl.contains("/wp-json/")) {
-            pingUrl = cleanUrl + "mira-gate/v1/ping";
-        } else {
-            pingUrl = cleanUrl + "wp-json/mira-gate/v1/ping";
+    public String getBaseUrl() {
+        String url = prefs.getString(KEY_BASE_URL, "");
+        if (url == null || url.trim().isEmpty()) {
+            url = DEFAULT_BASE_URL;
+            setBaseUrl(url);
+            return url;
         }
-        
-        Log.d(TAG, "Ping URL: " + pingUrl);
-        
-        java.net.URL url = new java.net.URL(pingUrl);
-        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-        conn.setConnectTimeout(8000);
-        conn.setReadTimeout(8000);
-        conn.setRequestMethod("GET");
-        
-        int responseCode = conn.getResponseCode();
-        Log.d(TAG, "Connection test response: " + responseCode);
-        
-        conn.disconnect();
-        return responseCode >= 200 && responseCode < 400;
-    } catch (Exception e) {
-        Log.e(TAG, "Connection test failed: " + e.getMessage());
-        return false;
+
+        String clean = sanitizeBaseUrl(url);
+        if (!clean.equals(url)) {
+            setBaseUrl(clean); // ترحيل القيم القديمة تلقائياً
+        }
+        return clean;
     }
-}
 
-
-/**
- * ✅ جديد: مسح Token منفرداً (يُستدعى من logout)
- */
-public void clearAuthToken() {
-    prefs.edit().remove(KEY_AUTH_TOKEN).apply();
-    Log.d(TAG, "Auth token cleared from serverConfig");
-}
-
-    /**
-     * ✅ حفظ الرابط الأساسي
-     */
     public void setBaseUrl(String baseUrl) {
-        if (baseUrl == null || baseUrl.isEmpty()) {
+        if (baseUrl == null || baseUrl.trim().isEmpty()) {
             Log.e(TAG, "Cannot save empty base URL!");
             return;
         }
-        
-        // ✅ التأكد من وجود / في نهاية الرابط
-        if (!baseUrl.endsWith("/")) {
-            baseUrl += "/";
-        }
-        
-        Log.d(TAG, "Saving base URL: " + baseUrl);
-        prefs.edit().putString(KEY_BASE_URL, baseUrl).apply();
+        String clean = sanitizeBaseUrl(baseUrl);
+        Log.d(TAG, "Saving base URL: " + clean);
+        prefs.edit().putString(KEY_BASE_URL, clean).apply();
     }
 
     /**
-     * ✅ مفتاح API
+     * ✅ توحيد الصيغة: يحوّل أي wp-json قديم إلى api، ويضمن / نهائي
      */
+    private String sanitizeBaseUrl(String raw) {
+        String clean = (raw == null) ? DEFAULT_BASE_URL : raw.trim();
+
+        // ترحيل: إذا كانت قيمة محفوظة بصيغة WordPress
+        int wpIdx = clean.indexOf("/wp-json/");
+        if (wpIdx > 0) {
+            clean = clean.substring(0, wpIdx) + "/api/";
+        }
+
+        if (clean.isEmpty()) {
+            clean = DEFAULT_BASE_URL;
+        }
+        if (!clean.endsWith("/")) {
+            clean += "/";
+        }
+        return clean;
+    }
+
+    // ==========================================================
+    //  فحص الاتصال (Laravel ping)
+    // ==========================================================
+
+    /**
+     * ✅ يبني: {BASE}ping  (بدون wp-json)
+     * مثال: https://jewelry.ibreg.org/api/ping
+     */
+    public boolean testConnection(String baseUrl) {
+        try {
+            String cleanUrl = sanitizeBaseUrl(baseUrl);
+            String pingUrl = cleanUrl + PING_PATH;
+
+            Log.d(TAG, "Testing connection to: " + pingUrl);
+
+            java.net.URL url = new java.net.URL(pingUrl);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json");
+
+            int responseCode = conn.getResponseCode();
+            Log.d(TAG, "Connection test response: " + responseCode);
+
+            conn.disconnect();
+            return responseCode >= 200 && responseCode < 400;
+        } catch (Exception e) {
+            Log.e(TAG, "Connection test failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ==========================================================
+    //  API Key / Gate ID / Auth Token
+    // ==========================================================
+
     public String getApiKey() {
         return prefs.getString(KEY_API_KEY, "");
     }
@@ -133,9 +144,6 @@ public void clearAuthToken() {
         prefs.edit().putString(KEY_API_KEY, apiKey != null ? apiKey : "").apply();
     }
 
-    /**
-     * ✅ معرف البوابة
-     */
     public String getGateId() {
         return prefs.getString(KEY_GATE_ID, "");
     }
@@ -145,75 +153,62 @@ public void clearAuthToken() {
         prefs.edit().putString(KEY_GATE_ID, gateId != null ? gateId : "").apply();
     }
 
-    /**
-     * ✅ حفظ بيانات الجلسة بعد تسجيل الدخول
-     */
-    public void saveSession(String apiKey, String gateId, String authToken) {
-        Log.d(TAG, "Saving session - API Key: " + (apiKey != null && !apiKey.isEmpty() ? "SET" : "EMPTY") + 
-                   ", Gate ID: " + (gateId != null && !gateId.isEmpty() ? "SET" : "EMPTY") + 
-                   ", Auth Token: " + (authToken != null && !authToken.isEmpty() ? "SET" : "EMPTY"));
-        
-        prefs.edit()
-            .putString(KEY_API_KEY, apiKey != null ? apiKey : "")
-            .putString(KEY_GATE_ID, gateId != null ? gateId : "")
-            .putString(KEY_AUTH_TOKEN, authToken != null ? authToken : "")
-            .apply();
-    }
-
-    /**
-     * ✅ الحصول على التوكن المحفوظ
-     */
     public String getAuthToken() {
         return prefs.getString(KEY_AUTH_TOKEN, "");
     }
 
-    /**
-     * ✅ مسح الجلسة عند تسجيل الخروج
-     */
+    // ==========================================================
+    //  Session
+    // ==========================================================
+
+    public void saveSession(String apiKey, String gateId, String authToken) {
+        Log.d(TAG, "Saving session - API Key: " + (apiKey != null && !apiKey.isEmpty() ? "SET" : "EMPTY")
+                + ", Gate ID: " + (gateId != null && !gateId.isEmpty() ? "SET" : "EMPTY")
+                + ", Auth Token: " + (authToken != null && !authToken.isEmpty() ? "SET" : "EMPTY"));
+
+        prefs.edit()
+                .putString(KEY_API_KEY, apiKey != null ? apiKey : "")
+                .putString(KEY_GATE_ID, gateId != null ? gateId : "")
+                .putString(KEY_AUTH_TOKEN, authToken != null ? authToken : "")
+                .apply();
+    }
+
+    public void clearAuthToken() {
+        prefs.edit().remove(KEY_AUTH_TOKEN).apply();
+        Log.d(TAG, "Auth token cleared from serverConfig");
+    }
+
     public void clearSession() {
         Log.d(TAG, "Clearing session");
         prefs.edit()
-            .remove(KEY_API_KEY)
-            .remove(KEY_GATE_ID)
-            .remove(KEY_AUTH_TOKEN)
-            .apply();
+                .remove(KEY_API_KEY)
+                .remove(KEY_GATE_ID)
+                .remove(KEY_AUTH_TOKEN)
+                .apply();
     }
 
-    /**
-     * ✅ مسح كل البيانات (عند تسجيل الخروج الكامل)
-     */
     public void clearAllData() {
         Log.d(TAG, "Clearing all data");
-        prefs.edit()
-            .clear()
-            .apply();
+        prefs.edit().clear().apply();
     }
 
-    /**
-     * ✅ التحقق من وجود جلسة نشطة
-     */
     public boolean hasSession() {
         boolean hasKey = !getApiKey().isEmpty();
         boolean hasToken = !getAuthToken().isEmpty();
         boolean hasSession = hasKey && hasToken;
-        
         Log.d(TAG, "Has session: " + hasSession + " (Key: " + hasKey + ", Token: " + hasToken + ")");
         return hasSession;
     }
 
-    /**
-     * ✅ التحقق من وجود عنوان خادم محفوظ
-     */
     public boolean hasSavedBaseUrl() {
         String url = prefs.getString(KEY_BASE_URL, "");
         return url != null && !url.isEmpty();
     }
 
-   
+    // ==========================================================
+    //  Reset
+    // ==========================================================
 
-    /**
-     * ✅ إعادة تعيين الإعدادات إلى الافتراضي
-     */
     public void resetToDefault() {
         Log.d(TAG, "Resetting to default settings");
         setBaseUrl(DEFAULT_BASE_URL);
