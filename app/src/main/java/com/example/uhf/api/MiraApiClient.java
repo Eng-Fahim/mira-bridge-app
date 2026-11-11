@@ -52,6 +52,7 @@ public class MiraApiClient {
     private static final String TAG = "MiraApiClient";
 
     // ==================== الإعدادات العامة ====================
+    // ✅ مصدر الحقيقة الوحيد هو MiraServerConfig. هذه القيمة للطوارئ فقط.
     public static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
     public static final String DEFAULT_BASE_URL = DEFAULT_SERVER_URL;
 
@@ -67,7 +68,9 @@ public class MiraApiClient {
 
     private static final long TOKEN_CACHE_MS = 30_000;
 
-    private final AccountingApiService accountingService;
+    // ✅ غير final حتى يُعاد بناؤها عند تغيير السيرفر
+    private volatile AccountingApiService accountingService;
+    private okhttp3.OkHttpClient accountingHttpClient;
     private final Gson gson;
 
     private final Context context;
@@ -131,7 +134,7 @@ public class MiraApiClient {
                 .serializeNulls()
                 .create();
 
-        // 1. استخراج الـ Base URL أولاً لتوفيره للخدمات
+        // 1. استخراج Base URL
         String savedBaseUrl = sessionManager.getServerUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
             savedBaseUrl = serverConfig.getBaseUrl();
@@ -143,8 +146,18 @@ public class MiraApiClient {
         }
         this.baseUrl = normalizeBaseUrl(savedBaseUrl);
 
-        // 2. إعداد عميل OkHttp لـ Retrofit
-        okhttp3.OkHttpClient accountingOkHttp = new okhttp3.OkHttpClient.Builder()
+        // 2. بناء OkHttp مرة واحدة (يُعاد استخدامه عند إعادة بناء Retrofit)
+        this.accountingHttpClient = buildAccountingHttpClient();
+
+        // 3. بناء Retrofit
+        this.accountingService = buildAccountingService(this.baseUrl);
+
+        refreshCredentials();
+    }
+
+    // ✅ مستخرج من الـ constructor ليسهل إعادة البناء
+    private okhttp3.OkHttpClient buildAccountingHttpClient() {
+        return new okhttp3.OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
@@ -192,16 +205,16 @@ public class MiraApiClient {
                     return chain.proceed(builder.build());
                 })
                 .build();
+    }
 
-        // 3. بناء خدمة Retrofit باستخدام this.baseUrl المعرف مسبقاً
-        this.accountingService = new retrofit2.Retrofit.Builder()
-                .baseUrl(this.baseUrl + ACCOUNTING_PREFIX + "/")
-                .client(accountingOkHttp)
+    // ✅ مستخرج ليسهل إعادة البناء عند تغيير baseUrl
+    private AccountingApiService buildAccountingService(String base) {
+        return new retrofit2.Retrofit.Builder()
+                .baseUrl(normalizeBaseUrl(base) + ACCOUNTING_PREFIX + "/")
+                .client(accountingHttpClient)
                 .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
                 .build()
                 .create(AccountingApiService.class);
-
-        refreshCredentials();
     }
 
     public void shutdown() {
@@ -223,9 +236,14 @@ public class MiraApiClient {
         }
     }
 
+    // ✅ يُعيد بناء accountingService أيضاً
     private void refreshCredentials() {
         synchronized (credentialsLock) {
             String cleanBaseUrl = normalizeBaseUrl(baseUrl);
+            if (cleanBaseUrl.isEmpty()) {
+                cleanBaseUrl = normalizeBaseUrl(serverConfig.getBaseUrl());
+            }
+            this.baseUrl = cleanBaseUrl;
             this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
 
             String key = sessionManager.getApiKey();
@@ -247,6 +265,15 @@ public class MiraApiClient {
             } else {
                 this.cachedToken = null;
                 this.cachedTokenTimestamp = 0;
+            }
+
+            // ✅ إعادة بناء Retrofit لتعكس baseUrl الجديد
+            if (!cleanBaseUrl.isEmpty()) {
+                try {
+                    this.accountingService = buildAccountingService(cleanBaseUrl);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to rebuild accountingService: " + e.getMessage());
+                }
             }
 
             Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
@@ -373,10 +400,25 @@ public class MiraApiClient {
         return key;
     }
 
+    // ✅ إضافة fallback من sessionManager و serverConfig
     private String getEffectiveGateId() {
         String gate = gateId;
         if (gate == null || gate.isEmpty()) {
-            Log.e(TAG, "⛔ Gate ID is empty! User must login first.");
+            try {
+                gate = sessionManager.getGateId();
+                if (gate != null && !gate.isEmpty()) {
+                    this.gateId = gate;
+                    return gate;
+                }
+            } catch (Exception ignored) {}
+            try {
+                gate = serverConfig.getGateId();
+                if (gate != null && !gate.isEmpty()) {
+                    this.gateId = gate;
+                    return gate;
+                }
+            } catch (Exception ignored) {}
+            Log.w(TAG, "⛔ Gate ID is empty! User must login first.");
             return "";
         }
         return gate;
@@ -484,12 +526,12 @@ public class MiraApiClient {
 
             if (!"https".equalsIgnoreCase(url.getProtocol())) {
                 String host = url.getHost();
-                boolean isLocal = "localhost".equals(host) 
-                               || "127.0.0.1".equals(host) 
+                boolean isLocal = "localhost".equals(host)
+                               || "127.0.0.1".equals(host)
                                || "10.0.2.2".equals(host);
-                
+
                 if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-                    Log.e(TAG, "🚨 SECURITY: Refused non-HTTPS URL: " 
+                    Log.e(TAG, "🚨 SECURITY: Refused non-HTTPS URL: "
                         + url.getProtocol() + "://" + host);
                     return networkError("يُشترط اتصال HTTPS آمن");
                 }
@@ -671,7 +713,7 @@ public class MiraApiClient {
         HttpURLConnection conn = null;
         try {
             String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-            
+
             String fullUrl = normalizeBaseUrl(baseUrl) + ACCOUNTING_PREFIX + "/" + cleanEndpoint;
             URL url = new URL(fullUrl);
 
@@ -855,7 +897,7 @@ public class MiraApiClient {
             payload.put("token", token);
             payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
-        return postWithAuth("/auth/validate-token", payload); 
+        return postWithAuth("/auth/validate-token", payload);
     }
 
     public ApiResponse logout(String token) {
@@ -865,7 +907,7 @@ public class MiraApiClient {
             payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
 
-        ApiResponse response = postWithAuth("/auth/logout", payload); 
+        ApiResponse response = postWithAuth("/auth/logout", payload);
 
         invalidateTokenCache();
 
@@ -1176,7 +1218,7 @@ public class MiraApiClient {
     }
 
     public ApiResponse getRoles() {
-        return getWithAuth("/auth/roles"); 
+        return getWithAuth("/auth/roles");
     }
 
     public ApiResponse createUser(JSONObject payload) {
@@ -1281,18 +1323,22 @@ public class MiraApiClient {
     }
 
     // ==================== Ping ====================
+    // ✅ يحاول v1/ping أولاً ثم ping كبديل، وبدون auth
     public boolean pingApi() {
+        if (apiUrl != null && !apiUrl.isEmpty() && tryPing(apiUrl + "ping")) {
+            return true;
+        }
+        String base = normalizeBaseUrl(baseUrl);
+        if (!base.isEmpty() && tryPing(base + "ping")) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean tryPing(String urlString) {
         HttpURLConnection conn = null;
         try {
-            String cleanUrl = this.apiUrl;
-            if (cleanUrl == null || cleanUrl.isEmpty()) {
-                return false;
-            }
-            if (cleanUrl.endsWith("/")) {
-                cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
-            }
-
-            URL url = new URL(cleanUrl + "/ping");
+            URL url = new URL(urlString);
 
             if (!"https".equalsIgnoreCase(url.getProtocol())) {
                 String host = url.getHost();
@@ -1312,13 +1358,16 @@ public class MiraApiClient {
             }
 
             conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, true);
+            // ✅ ping عام - لا يحتاج auth
+            applyStandardHeaders(conn, false);
             conn.setConnectTimeout(PING_CONNECT_TIMEOUT);
             conn.setReadTimeout(PING_READ_TIMEOUT);
 
             int responseCode = conn.getResponseCode();
+            Log.d(TAG, "ping " + urlString + " → " + responseCode);
             return responseCode >= 200 && responseCode < 400;
         } catch (Exception e) {
+            Log.d(TAG, "ping " + urlString + " failed: " + e.getClass().getSimpleName());
             return false;
         } finally {
             if (conn != null) conn.disconnect();
@@ -1339,7 +1388,7 @@ public class MiraApiClient {
     public ApiResponse getDashboardFull() {
         return getDashboardFull(0);
     }
-    
+
     public ApiResponse getDashboardGoldPrices() {
         return getWithAuth("/dashboard/gold-prices");
     }
@@ -1347,18 +1396,18 @@ public class MiraApiClient {
     public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
-            
+
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-            
+
             String localUuid = payload.optString("local_uuid", "");
             if (!localUuid.isEmpty()) {
                 Log.d(TAG, "✅ Checkout with local_uuid: " + localUuid);
             } else {
                 Log.w(TAG, "⚠️ Checkout WITHOUT local_uuid — offline retry غير محمي!");
             }
-            
+
         } catch (Exception e) {
             Log.e(TAG, "checkout payload prep error: " + e.getMessage());
         }
@@ -1369,16 +1418,16 @@ public class MiraApiClient {
     public ApiResponse checkout(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
-            
+
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-            
+
             String localUuid = payload.optString("local_uuid", "");
             if (localUuid.isEmpty()) {
                 Log.w(TAG, "⚠️ Checkout without local_uuid");
             }
-            
+
         } catch (Exception e) {
             Log.e(TAG, "checkout payload prep error: " + e.getMessage());
         }
@@ -1397,13 +1446,13 @@ public class MiraApiClient {
     public ApiResponse processRefund(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
-            
+
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-            
+
             return postWithAuth("/pos/refund", payload);
-            
+
         } catch (Exception e) {
             Log.e(TAG, "processRefund error: " + e.getMessage());
             ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
@@ -1492,7 +1541,7 @@ public class MiraApiClient {
                 + "&limit=" + pageSize + "&per_page=" + pageSize
                 + "&payment_method=" + paymentMethod);
     }
-    
+
     public ApiResponse getPaymentMethods() {
         return getWithAuth("/pos/payment-methods");
     }
@@ -2114,7 +2163,7 @@ public class MiraApiClient {
         return getReportData(reportType, fromDate, toDate, branchId, null, null, null);
     }
 
-    public ApiResponse getReportData(String reportType, String fromDate, String toDate, 
+    public ApiResponse getReportData(String reportType, String fromDate, String toDate,
                                      int branchId, String search, String filter1, String filter2) {
         try {
             String cleanType = reportType != null
@@ -2123,7 +2172,7 @@ public class MiraApiClient {
 
             StringBuilder endpoint = new StringBuilder("/reports-app?type=")
                     .append(URLEncoder.encode(cleanType, "UTF-8"));
-            
+
             if (fromDate != null && !fromDate.isEmpty()) {
                 endpoint.append("&from=").append(URLEncoder.encode(fromDate, "UTF-8"));
             }
@@ -2131,7 +2180,7 @@ public class MiraApiClient {
                 endpoint.append("&to=").append(URLEncoder.encode(toDate, "UTF-8"));
             }
             if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
-            
+
             if (search != null && !search.trim().isEmpty()) {
                 endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
             }
@@ -2462,7 +2511,7 @@ public class MiraApiClient {
     }
 
     public ApiResponse getScrapProfitReport(int branchId, String fromDate, String toDate) {
-        return getWithAuth("/scrap/profit-report?branch_id=" + branchId 
+        return getWithAuth("/scrap/profit-report?branch_id=" + branchId
             + "&from=" + fromDate + "&to=" + toDate);
     }
 
@@ -2486,27 +2535,27 @@ public class MiraApiClient {
         }
 
         if (!isNetworkAvailable()) {
-            return isArabic() 
-                ? "لا يوجد اتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مرة أخرى." 
+            return isArabic()
+                ? "لا يوجد اتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مرة أخرى."
                 : "No internet connection. Please check your network and try again.";
         }
 
         if (throwable instanceof java.net.UnknownHostException) {
-            return isArabic() 
-                ? "تعذر الوصول إلى الخادم. يرجى التأكد من اتصالك بالإنترنت." 
+            return isArabic()
+                ? "تعذر الوصول إلى الخادم. يرجى التأكد من اتصالك بالإنترنت."
                 : "Unable to reach the server. Please check your connection.";
         } else if (throwable instanceof java.net.SocketTimeoutException) {
-            return isArabic() 
-                ? "انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى." 
+            return isArabic()
+                ? "انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى."
                 : "Connection timed out. Please try again.";
         } else if (throwable instanceof java.net.ConnectException) {
-            return isArabic() 
-                ? "فشل الاتصال بالخادم. يرجى المحاولة لاحقاً." 
+            return isArabic()
+                ? "فشل الاتصال بالخادم. يرجى المحاولة لاحقاً."
                 : "Failed to connect to the server. Please try again later.";
         }
 
-        return isArabic() 
-            ? "حدث خطأ في الاتصال. يرجى المحاولة لاحقاً." 
+        return isArabic()
+            ? "حدث خطأ في الاتصال. يرجى المحاولة لاحقاً."
             : "A network error occurred. Please try again later.";
     }
 
@@ -2591,9 +2640,9 @@ public class MiraApiClient {
     }
 
     public ApiResponse getDashboardCharts(int branchId) {
-        String endpoint = "/dashboard/charts"; 
+        String endpoint = "/dashboard/charts";
         if (branchId > 0) endpoint += "?branch_id=" + branchId;
-        return getWithAuth(endpoint); 
+        return getWithAuth(endpoint);
     }
 
     public ApiResponse processGoldConversion(JSONObject payload) {
@@ -2650,7 +2699,7 @@ public class MiraApiClient {
     public ApiResponse getCheques(String type, String status) {
         String url = "/cheques";
         boolean hasParam = false;
-        
+
         if (type != null && !type.isEmpty()) {
             url += "?type=" + type;
             hasParam = true;
@@ -2694,4 +2743,4 @@ public class MiraApiClient {
     public ApiResponse runDepreciation(JSONObject payload) {
         return postAccounting("/fixed-assets/depreciate", payload);
     }
-}
+    }
