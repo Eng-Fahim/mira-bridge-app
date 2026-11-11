@@ -7,12 +7,14 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
 import com.example.uhf.license.LicenseManager;
 import com.example.uhf.license.MiraBlobFetcher;
@@ -25,29 +27,53 @@ import org.json.JSONObject;
 
 import java.util.regex.Pattern;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *  ActivationActivity — شاشة تفعيل الترخيص
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *  التدفق:
+ *    1. المستخدم يدخل رقم الترخيص (MIRA-XXXX-XXXX-XXXX)
+ *    2. lookupServerUrl() على مركز Laravel: POST {central}/license/lookup
+ *    3. إذا نجح، LicenseManager.activate() على {server}/api/v1/license/activate
+ *    4. حفظ server_url + token، ثم الانتقال إلى LoginActivity
+ *
+ *  التغييرات في هذه النسخة:
+ *    ✅ DEFAULT_SERVER_URL = BuildConfig.MIRA_LICENSE_BASE_URL (لا hardcoded)
+ *    ✅ showLoading() يتحكم في loadingContainer (كان مخفياً دائماً)
+ *    ✅ null-safety في كل مكان (لا NPE إذا حُذف أي view من XML)
+ *    ✅ تحقق مبكر من وجود الحقول الحرجة
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 public class ActivationActivity extends AppCompatActivity {
 
     private static final String TAG = "ActivationActivity";
+
     private static final Pattern LICENSE_KEY_PATTERN =
             Pattern.compile("^MIRA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$");
 
-    // ⚠️ يُستبدل على السيرفر — نفس قيمة BuildConfig/المركز
-    private static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
+    /** ⚡ مركز الترخيص — الآن على Laravel (BuildConfig) */
+    private static final String DEFAULT_SERVER_URL = BuildConfig.MIRA_LICENSE_BASE_URL;
 
-    // ═══ Views (قد تكون null — كل استخدام محمي) ═══
-    private TextInputLayout  tilServerUrl, tilLicenseKey;
-    private TextInputEditText etServerUrl, etLicenseKey;
-    private MaterialButton   btnActivate, btnRetry;
-    private ProgressBar      progressBar;
-    private TextView         tvError, tvStatus, tvActivationTitle, tvActivationSubtitle;
+    // ═══ Views (كلها قد تكون null — كل استخدام محمي) ═══
+    private TextInputLayout    tilServerUrl, tilLicenseKey;
+    private TextInputEditText  etServerUrl, etLicenseKey;
+    private LinearLayout       loadingContainer;
+    private MaterialButton     btnActivate, btnRetry;
+    private ProgressBar        progressBar;
+    private TextView           tvError, tvStatus, tvActivationTitle, tvActivationSubtitle;
 
     private SessionManager sessionManager;
-    private boolean isArabic = true;
+    private boolean        isArabic = true;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // حماية الشاشة (screenshot protection)
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE
@@ -58,11 +84,23 @@ public class ActivationActivity extends AppCompatActivity {
         sessionManager = new SessionManager(getApplicationContext());
         isArabic = "ar".equals(getResources().getConfiguration().getLocales().get(0).getLanguage());
 
-        // ═══ ربط Views (كلها قد تكون null) ═══
+        bindViews();
+        loadSavedServerUrl();
+        setupListeners();
+        updateButtonState();
+        verifyCriticalViews();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Binding
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private void bindViews() {
         tilServerUrl         = findViewById(R.id.tilServerUrl);
         tilLicenseKey        = findViewById(R.id.tilLicenseKey);
         etServerUrl          = findViewById(R.id.etServerUrl);
         etLicenseKey         = findViewById(R.id.etLicenseKey);
+        loadingContainer     = findViewById(R.id.loadingContainer);
         btnActivate          = findViewById(R.id.btnActivate);
         btnRetry             = findViewById(R.id.btnRetry);
         progressBar          = findViewById(R.id.progressBar);
@@ -70,31 +108,44 @@ public class ActivationActivity extends AppCompatActivity {
         tvStatus             = findViewById(R.id.tvStatus);
         tvActivationTitle    = findViewById(R.id.tvActivationTitle);
         tvActivationSubtitle = findViewById(R.id.tvActivationSubtitle);
+    }
 
-        // ═══ قيم الحقول الاختيارية ═══
+    private void loadSavedServerUrl() {
         String savedUrl = sessionManager.getServerUrl();
         if (savedUrl == null || savedUrl.isEmpty()) {
             savedUrl = DEFAULT_SERVER_URL;
             sessionManager.setServerUrl(savedUrl);
         }
 
-        // ✅ null-safe
         if (etServerUrl != null) {
             etServerUrl.setText(savedUrl);
             etServerUrl.setHint(isArabic
                     ? "سيُكتشف تلقائياً من الترخيص"
                     : "Auto-detected from license");
         }
+        // حقل السيرفر مخفي — يُكتشف تلقائياً من مركز الترخيص
         if (tilServerUrl != null) {
             tilServerUrl.setVisibility(View.GONE);
         }
 
-        // ✅ تأكيد أن حقل الترخيص ظاهر (حتى لو أُخفي سهواً في XML)
+        // ⚡ تأكيد ظهور حقل رقم الترخيص (حتى لو أُخفي سهواً في XML)
         if (tilLicenseKey != null) {
             tilLicenseKey.setVisibility(View.VISIBLE);
         }
         if (etLicenseKey != null) {
             etLicenseKey.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void setupListeners() {
+        if (btnActivate != null) {
+            btnActivate.setOnClickListener(v -> attemptActivation());
+        }
+        if (btnRetry != null) {
+            btnRetry.setOnClickListener(v -> attemptActivation());
+        }
+
+        if (etLicenseKey != null) {
             etLicenseKey.addTextChangedListener(new SimpleTextWatcher() {
                 @Override
                 public void afterTextChanged(Editable s) {
@@ -104,29 +155,28 @@ public class ActivationActivity extends AppCompatActivity {
                 }
             });
         }
+    }
 
-        // ✅ null-safe
-        if (btnActivate != null) {
-            btnActivate.setOnClickListener(v -> attemptActivation());
-        }
-        if (btnRetry != null) {
-            btnRetry.setOnClickListener(v -> attemptActivation());
-        }
-
-        updateButtonState();
-
-        // ⚠️ تحقق مبكر: إذا كان أي عنصر حرج مفقود، اطبع خطأً واضحاً بدل الانفجار لاحقاً
+    private void verifyCriticalViews() {
         if (etLicenseKey == null) {
-            Log.e(TAG, "❌ Critical: R.id.etLicenseKey missing from activity_activation.xml");
+            Log.e(TAG, "❌ R.id.etLicenseKey missing from activity_activation.xml");
         }
         if (btnActivate == null) {
-            Log.e(TAG, "❌ Critical: R.id.btnActivate missing from activity_activation.xml");
+            Log.e(TAG, "❌ R.id.btnActivate missing from activity_activation.xml");
+        }
+        if (loadingContainer == null) {
+            Log.w(TAG, "⚠️ R.id.loadingContainer missing — مؤشر التحميل لن يظهر");
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Activation flow
+    // ═══════════════════════════════════════════════════════════════════════════
 
     private void attemptActivation() {
         String licenseKey = getText(etLicenseKey).toUpperCase();
 
+        // ─── Validation ───
         if (licenseKey.isEmpty()) {
             if (tilLicenseKey != null) {
                 tilLicenseKey.setError(isArabic ? "أدخل رقم الترخيص" : "Enter license key");
@@ -137,14 +187,13 @@ public class ActivationActivity extends AppCompatActivity {
         }
 
         if (!LICENSE_KEY_PATTERN.matcher(licenseKey).matches()) {
+            String msg = isArabic
+                    ? "الصيغة: MIRA-XXXX-XXXX-XXXX"
+                    : "Format: MIRA-XXXX-XXXX-XXXX";
             if (tilLicenseKey != null) {
-                tilLicenseKey.setError(isArabic
-                        ? "الصيغة: MIRA-XXXX-XXXX-XXXX"
-                        : "Format: MIRA-XXXX-XXXX-XXXX");
+                tilLicenseKey.setError(msg);
             } else {
-                showError(isArabic
-                        ? "الصيغة: MIRA-XXXX-XXXX-XXXX"
-                        : "Format: MIRA-XXXX-XXXX-XXXX");
+                showError(msg);
             }
             return;
         }
@@ -153,34 +202,38 @@ public class ActivationActivity extends AppCompatActivity {
         hideError();
 
         if (tvStatus != null) {
-            tvStatus.setVisibility(View.VISIBLE);
-            tvStatus.setText(isArabic
-                    ? "جارٍ التحقق من الترخيص..."
-                    : "Verifying license...");
+            tvStatus.setText(isArabic ? "جارٍ التحقق من الترخيص..." : "Verifying license...");
         }
 
+        // ─── الخطوة 1: Lookup على مركز Laravel ───
+        final String key = licenseKey;
         new Thread(() -> {
             String centralUrl = getCentralUrl();
-            Log.d(TAG, "🔍 Lookup: central=" + centralUrl + ", key=" + licenseKey);
+            Log.d(TAG, "🔍 Lookup: central=" + centralUrl + ", key=" + key);
 
             MiraBlobFetcher.LookupResult lookup = MiraBlobFetcher.lookupServerUrl(
-                    getApplicationContext(), centralUrl, licenseKey);
+                    getApplicationContext(),
+                    centralUrl,
+                    key
+            );
 
-            runOnUiThread(() -> handleLookupResult(lookup, licenseKey));
-
+            runOnUiThread(() -> handleLookupResult(lookup, key));
         }, "Activation-Lookup").start();
     }
 
     private void handleLookupResult(MiraBlobFetcher.LookupResult lookup, String licenseKey) {
+        // ═══ فشل الـ lookup ═══
         if (!lookup.success) {
             showLoading(false);
-            String err = lookup.error != null ? lookup.error
+            String err = lookup.error != null
+                    ? lookup.error
                     : (isArabic ? "فشل التحقق من الترخيص" : "License lookup failed");
             showError(err);
             Log.e(TAG, "❌ Lookup failed: " + err);
             return;
         }
 
+        // ═══ الخادم غير جاهز ═══
         if (!lookup.serverReady) {
             showLoading(false);
             String msg = isArabic
@@ -199,12 +252,12 @@ public class ActivationActivity extends AppCompatActivity {
             return;
         }
 
+        // ═══ نجاح الـ lookup ═══
         Log.d(TAG, "✅ Lookup OK: server=" + lookup.serverUrl
                 + ", customer=" + lookup.customerName);
 
         sessionManager.setServerUrl(lookup.serverUrl);
 
-        // ✅ null-safe
         if (etServerUrl != null) {
             etServerUrl.setText(lookup.serverUrl);
             etServerUrl.setEnabled(false);
@@ -219,6 +272,7 @@ public class ActivationActivity extends AppCompatActivity {
                     : "Identified: " + customerInfo + "\nActivating...");
         }
 
+        // ─── الخطوة 2: Activate على السيرفر المكتشف ───
         LicenseManager.activate(
                 getApplicationContext(),
                 lookup.serverUrl,
@@ -239,6 +293,7 @@ public class ActivationActivity extends AppCompatActivity {
                             showLoading(false);
                             showError(message);
                             Log.e(TAG, "❌ Activation failed: " + code + " | " + message);
+
                             if (tilLicenseKey != null) {
                                 tilLicenseKey.setError(isArabic
                                         ? "فشل التفعيل — حاول مرة أخرى"
@@ -250,13 +305,14 @@ public class ActivationActivity extends AppCompatActivity {
         );
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Helpers — Center URL & Success
+    // ═══════════════════════════════════════════════════════════════════════════
+
     private String getCentralUrl() {
-        try {
-            java.lang.reflect.Field f = com.example.uhf.BuildConfig.class
-                    .getField("MIRA_LICENSE_BASE_URL");
-            String v = (String) f.get(null);
-            if (v != null && !v.isEmpty()) return v;
-        } catch (Exception ignored) {}
+        // BuildConfig هو المصدر الوحيد — لا fallback لـ WP
+        String v = BuildConfig.MIRA_LICENSE_BASE_URL;
+        if (v != null && !v.isEmpty()) return v;
         return DEFAULT_SERVER_URL;
     }
 
@@ -297,20 +353,43 @@ public class ActivationActivity extends AppCompatActivity {
         finish();
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  UI Helpers (كلها null-safe)
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  UI helpers (كلها null-safe)
+    // ═══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * ⚡ تحكم كامل في حالة التحميل — بما فيها loadingContainer
+     *    (كانت المشكلة: الحاوية GONE دائماً، فيظهر الزر مخفياً بدون مؤشر)
+     */
     private void showLoading(boolean loading) {
-        if (progressBar != null) progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
+        // الحاوية الرئيسية
+        if (loadingContainer != null) {
+            loadingContainer.setVisibility(loading ? View.VISIBLE : View.GONE);
+        }
+
+        // زر التفعيل
         if (btnActivate != null) {
             btnActivate.setEnabled(!loading);
             btnActivate.setVisibility(loading ? View.GONE : View.VISIBLE);
         }
-        if (btnRetry != null) btnRetry.setVisibility(View.GONE);
-        if (etLicenseKey != null) etLicenseKey.setEnabled(!loading);
-        if (etServerUrl != null)  etServerUrl.setEnabled(!loading);
-        if (tvStatus != null)     tvStatus.setVisibility(loading ? View.VISIBLE : View.GONE);
+
+        // زر الإعادة — يبقى مخفياً أثناء التحميل
+        if (btnRetry != null) {
+            btnRetry.setVisibility(View.GONE);
+        }
+
+        // حقل الترخيص
+        if (etLicenseKey != null) {
+            etLicenseKey.setEnabled(!loading);
+        }
+
+        // حقل السيرفر (المخفي عادةً)
+        if (etServerUrl != null) {
+            etServerUrl.setEnabled(!loading);
+        }
+
+        // progressBar و tvStatus أبناء الحاوية — لا حاجة للتحكم المنفصل
+        // (نتركهما كما في XML، فهما يظهران/يختفيان مع الحاوية)
     }
 
     private void showError(String message) {
@@ -318,7 +397,7 @@ public class ActivationActivity extends AppCompatActivity {
             tvError.setText(message);
             tvError.setVisibility(View.VISIBLE);
         }
-        if (btnRetry != null) btnRetry.setVisibility(View.VISIBLE);
+        if (btnRetry != null)    btnRetry.setVisibility(View.VISIBLE);
         if (btnActivate != null) btnActivate.setVisibility(View.GONE);
     }
 
@@ -335,6 +414,10 @@ public class ActivationActivity extends AppCompatActivity {
     private String getText(TextInputEditText et) {
         return (et != null && et.getText() != null) ? et.getText().toString().trim() : "";
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  TextWatcher مساعد
+    // ═══════════════════════════════════════════════════════════════════════════
 
     private static abstract class SimpleTextWatcher implements TextWatcher {
         @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
