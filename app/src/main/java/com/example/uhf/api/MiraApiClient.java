@@ -52,10 +52,14 @@ public class MiraApiClient {
     private static final String TAG = "MiraApiClient";
 
     // ==================== الإعدادات العامة ====================
-    private static final String API_PREFIX = "mira-gate/v1";
+    //private static final String API_PREFIX = "mira-gate/v1";
+    private static final String API_PREFIX = "v1";
+    
     private static final String ACCOUNTING_PREFIX = "mira/v2"; // ✅ مسار المحاسبة الصحيح
     
-    private static final String DEFAULT_BASE_URL = "https://id.ibreg.org/wp-json";
+    private static final String //DEFAULT_BASE_URL = "https://id.ibreg.org/wp-json";
+    DEFAULT_BASE_URL = "https://jewelry.ibreg.org/api";
+
 
     private static final int DEFAULT_CONNECT_TIMEOUT = 10_000;
     private static final int DEFAULT_READ_TIMEOUT    = 10_000;
