@@ -111,31 +111,36 @@ public class ActivationActivity extends AppCompatActivity {
     }
 
     private void loadSavedServerUrl() {
-        String savedUrl = sessionManager.getServerUrl();
-        if (savedUrl == null || savedUrl.isEmpty()) {
-            savedUrl = DEFAULT_SERVER_URL;
-            sessionManager.setServerUrl(savedUrl);
-        }
+    String savedUrl = sessionManager.getServerUrl();
 
-        if (etServerUrl != null) {
+    // ⚡ لا تحفظ شيئاً حتى يُفعَّل الترخيص فعلياً.
+    //    serverUrl الحقيقي يأتي من lookup.serverUrl (= .../api) بعد التفعيل.
+    boolean hasValidSavedUrl = savedUrl != null
+            && !savedUrl.isEmpty()
+            && !savedUrl.contains("id.ibreg.org")
+            && !savedUrl.contains("wp-json")
+            && !savedUrl.endsWith("/api/v1")
+            && !savedUrl.endsWith("/api/v1/");
+
+    if (etServerUrl != null) {
+        if (hasValidSavedUrl) {
             etServerUrl.setText(savedUrl);
+        } else {
+            // لا نضع قيمة الآن — سنضعها بعد lookup
+            etServerUrl.setText("");
             etServerUrl.setHint(isArabic
                     ? "سيُكتشف تلقائياً من الترخيص"
                     : "Auto-detected from license");
         }
-        // حقل السيرفر مخفي — يُكتشف تلقائياً من مركز الترخيص
-        if (tilServerUrl != null) {
-            tilServerUrl.setVisibility(View.GONE);
-        }
-
-        // ⚡ تأكيد ظهور حقل رقم الترخيص (حتى لو أُخفي سهواً في XML)
-        if (tilLicenseKey != null) {
-            tilLicenseKey.setVisibility(View.VISIBLE);
-        }
-        if (etLicenseKey != null) {
-            etLicenseKey.setVisibility(View.VISIBLE);
-        }
     }
+    if (tilServerUrl != null) {
+        tilServerUrl.setVisibility(View.GONE);
+    }
+
+    // تأكيد ظهور حقل الترخيص
+    if (tilLicenseKey != null) tilLicenseKey.setVisibility(View.VISIBLE);
+    if (etLicenseKey != null)  etLicenseKey.setVisibility(View.VISIBLE);
+}
 
     private void setupListeners() {
         if (btnActivate != null) {
