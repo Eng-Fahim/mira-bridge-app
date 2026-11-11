@@ -72,7 +72,10 @@ public class SecureSessionManager {
     private static final String KEY_SESSION_LOCKED                  = "session_locked";
 
     // القيم الافتراضية
-    private static final String DEFAULT_SERVER_URL  = "https://id.ibreg.org/wp-json";
+    // قبل
+    //private static final String DEFAULT_SERVER_URL = "https://id.ibreg.org/wp-json";
+    // بعد
+    private static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
     private static final long TOKEN_EXPIRY_BUFFER   = 60_000L;
     private static final long REFRESH_THRESHOLD     = 300_000L;
     private static final long CACHE_VALIDITY_MS     = 5_000L;
