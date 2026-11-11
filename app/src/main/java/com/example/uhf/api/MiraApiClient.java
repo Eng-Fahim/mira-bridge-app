@@ -183,9 +183,9 @@ public class MiraApiClient {
                     return chain.proceed(builder.build());
                 })
                 .build();
-
         this.accountingService = new retrofit2.Retrofit.Builder()
-                .baseUrl(DEFAULT_BASE_URL + "/" + ACCOUNTING_PREFIX + "/")
+        .baseUrl(normalizeBaseUrl(savedBaseUrl) + ACCOUNTING_PREFIX + "/")
+
                 .client(accountingOkHttp)
                 .addConverterFactory(
                         retrofit2.converter.gson.GsonConverterFactory.create())
