@@ -70,7 +70,9 @@ import javax.crypto.spec.PBEKeySpec;
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
-    private static final String DEFAULT_SERVER_URL = "https://id.ibreg.org/wp-json";
+    private static final String //DEFAULT_SERVER_URL = "https://id.ibreg.org/wp-json";
+    DEFAULT_BASE_URL = "https://jewelry.ibreg.org/api";
+
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000;
     private static final int PBKDF2_ITERATIONS = 10000;
