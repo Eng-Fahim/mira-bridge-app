@@ -154,7 +154,19 @@ protected void onCreate(Bundle savedInstanceState) {
 //  ⚡ فحص الترخيص — ASYNC (لا يحجب Main Thread)
 // ═══════════════════════════════════════════════════════
 private void checkLicenseIntegrityAsync() {
-    // [1] حاول الفحص المحلي أولاً (سريع، بدون شبكة)
+    // ═══════════════════════════════════════════════════════════
+    //  ⚡ 1. فحص مسبق: هل يوجد activationToken؟
+    //     إذا لا → لا معنى لفحص blob، وجّه للتفعيل
+    // ═══════════════════════════════════════════════════════════
+    if (!sessionManager.hasActivationToken()) {
+        Log.d(TAG, "No activation token → skip blob check");
+        continueOnCreateAfterLicenseCheck();  // سيعيد التوجيه لـ ActivationActivity
+        return;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ⚡ 2. يوجد token → جرّب blob محلي (اختياري)
+    // ═══════════════════════════════════════════════════════════
     MiraBlobStorage.BlobData storedBlob = MiraBlobStorage.load(this);
 
     if (storedBlob != null) {
@@ -167,72 +179,53 @@ private void checkLicenseIntegrityAsync() {
                     MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob);
 
             if (fullResult.valid) {
-                Log.d(TAG, "✅ License valid locally (v" + storedBlob.version + ")");
+                Log.d(TAG, "✅ License blob valid (v" + storedBlob.version + ")");
                 continueOnCreateAfterLicenseCheck();
                 return;
             } else {
-                Log.w(TAG, "⏰ License expired: " + fullResult.message);
-                showBlockingDialog(
-                        isArabic ? "⏰ انتهى الترخيص" : "⏰ License Expired",
-                        fullResult.message
-                );
-                return;
+                // blob موجود لكن منتهي — جرب تحديثه
+                Log.w(TAG, "⚠️ Stored blob expired: " + fullResult.message
+                        + " — will try refresh");
+                // لا نُظهر dialog هنا — نجرب التحديث أولاً
             }
         } else {
-            Log.e(TAG, "🚨 License tampered: " + result.message);
-            showBlockingDialog(
-                    isArabic ? "⚠️ ترخيص مُعدَّل" : "⚠️ License Tampered",
-                    result.message
-            );
-            return;
+            Log.w(TAG, "⚠️ Stored blob tampered: " + result.message
+                    + " — will try refresh");
+            // لا نُظهر dialog — نجرب التحديث
         }
     }
 
-    // [2] لا يوجد blob محلي → جلب من الخادم (في الخلفية)
-    Log.d(TAG, "📥 No valid local blob — fetching async from server...");
-    showLicenseLoading(true);
+    // ═══════════════════════════════════════════════════════════
+    //  ⚡ 3. جلب blob من السيرفر (اختياري)
+    //     إذا فشل → المتابعة تعمل (token موجود)
+    // ═══════════════════════════════════════════════════════════
+    Log.d(TAG, "📥 Fetching blob from server (optional)");
 
     executeSafeBg(() -> {
-        final boolean ok;
+        boolean fetched = false;
         try {
-            ok = MiraBlobFetcher.fetchVerifyAndStore(LoginActivity.this);
+            fetched = MiraBlobFetcher.fetchVerifyAndStore(LoginActivity.this);
         } catch (Exception e) {
-            Log.e(TAG, "fetch error", e);
-            mainHandler.post(() -> {
-                showLicenseLoading(false);
-                showBlockingDialog(
-                        isArabic ? "❌ لا يوجد ترخيص صالح" : "❌ No Valid License",
-                        isArabic
-                                ? "لم نتمكن من جلب الترخيص.\n\nتحقق من اتصالك بالإنترنت."
-                                : "Could not fetch license.\n\nCheck your internet connection."
-                );
-            });
-            return;
+            Log.w(TAG, "blob fetch exception: " + e.getMessage());
         }
 
+        final boolean finalFetched = fetched;
         mainHandler.post(() -> {
-            showLicenseLoading(false);
+            if (!isActivityAlive()) return;
 
-            if (ok) {
-                Log.d(TAG, "✅ License fetched from server");
-                continueOnCreateAfterLicenseCheck();
+            if (finalFetched) {
+                Log.d(TAG, "✅ Blob fetched from server");
             } else {
-                Log.e(TAG, "❌ License fetch failed");
-                showBlockingDialog(
-                        isArabic ? "❌ لا يوجد ترخيص صالح" : "❌ No Valid License",
-                        isArabic
-                                ? "لم نتمكن من التحقق من ترخيصك.\n\n"
-                                + "تحقق من اتصالك بالإنترنت، ثم أعد المحاولة.\n"
-                                + "إذا استمرت المشكلة، تواصل مع ميرا تكنولوجي."
-                                : "Could not verify your license.\n\n"
-                                + "Check your internet connection and try again.\n"
-                                + "If the issue persists, contact MIRA Technology."
-                );
+                // ⚡ لا نُظهر dialog — التطبيق يعمل بالتوكن حتى بدون blob
+                Log.w(TAG, "⚠️ Blob fetch failed — but activation token exists, "
+                        + "proceeding without blob");
             }
+
+            // في الحالتين → تابع
+            continueOnCreateAfterLicenseCheck();
         });
     });
 }
-
 // ═══════════════════════════════════════════════════════
 //  ⚡ يستأنف onCreate بعد نجاح فحص الترخيص
 // ═══════════════════════════════════════════════════════
