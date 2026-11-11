@@ -21,20 +21,22 @@ import java.nio.charset.StandardCharsets;
 import javax.net.ssl.HttpsURLConnection;
 
 /**
- * LicenseManager — التواصل مع MIRA License Center
+ * LicenseManager — التواصل مع MIRA License Center (Laravel)
  *
- * v1.1 — إصلاح بناء الرابط + إرسال blob_version في heartbeat
+ * v2.0 — نقل كامل من WordPress إلى Laravel
  *
- * Endpoints:
- *   POST {serverUrl}/wp-json/mira-license/v1/activate
- *   POST {serverUrl}/wp-json/mira-license/v1/heartbeat
- *   POST {serverUrl}/wp-json/mira-license/v1/deactivate
- *   GET  {serverUrl}/wp-json/mira-license/v1/status
+ * Endpoints (كلها على Laravel):
+ *   POST {serverUrl}/v1/license/activate
+ *   POST {serverUrl}/v1/license/heartbeat
+ *   POST {serverUrl}/v1/license/deactivate
+ *   GET  {serverUrl}/v1/license/status
  */
 public class LicenseManager {
 
     private static final String TAG = "LicenseManager";
-    private static final String ENDPOINT_PREFIX = "mira-license/v1";
+
+    // ⚡ المسار موحّد — Laravel لا يستخدم /wp-json
+    private static final String ENDPOINT_PREFIX = "/v1/license";
 
     private static final int CONNECT_TIMEOUT = 15_000;
     private static final int READ_TIMEOUT    = 15_000;
@@ -45,7 +47,7 @@ public class LicenseManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Build URL (يتعامل مع /wp-json المكرر)
+    //  Build URL (Laravel — مع دعم الترحيل من WP)
     // ═══════════════════════════════════════════════════════
     private static String buildUrl(String serverUrl, String endpointPath) {
         if (serverUrl == null) return "";
@@ -56,19 +58,20 @@ public class LicenseManager {
             base = base.substring(0, base.length() - 1);
         }
 
-        // إذا كان يحتوي /wp-json بالفعل
-        if (base.endsWith("/wp-json")) {
-            return base + "/" + ENDPOINT_PREFIX + endpointPath;
+        // ⚡ ترحيل: إذا كانت URL قديمة WordPress → نظّفها
+        base = base.replace("/wp-json", "");
+
+        // ⚡ إذا كانت URL تنتهي بـ /v1 (من lookup قديم) → لا نكررها
+        if (base.endsWith("/v1")) {
+            return base + "/license" + endpointPath;
         }
 
-        // إذا لم يكن، نضيفه
-        return base + "/wp-json/" + ENDPOINT_PREFIX + endpointPath;
+        return base + ENDPOINT_PREFIX + endpointPath;
     }
 
     // ═══════════════════════════════════════════════════════
     //  Activate
     // ═══════════════════════════════════════════════════════
-
     public static void activate(final Context context,
                                 final String serverUrl,
                                 final String licenseKey,
@@ -76,9 +79,10 @@ public class LicenseManager {
         new Thread(() -> {
             HttpURLConnection conn = null;
             try {
-                // ═══ 1. بناء الطلب ═══
                 String fullUrl = buildUrl(serverUrl, "/activate");
+                Log.d(TAG, "POST " + fullUrl);
 
+                // ═══ بناء device fingerprint ═══
                 JSONObject device = new JSONObject();
                 device.put("device_name", (Build.MANUFACTURER + " " + Build.MODEL).trim());
                 device.put("device_model", Build.MODEL != null ? Build.MODEL : "");
@@ -109,7 +113,7 @@ public class LicenseManager {
                 payload.put("license_key", licenseKey.toUpperCase().trim());
                 payload.put("device", device);
 
-                // ═══ 2. الاتصال ═══
+                // ═══ الاتصال ═══
                 URL url = new URL(fullUrl);
                 if (!"https".equalsIgnoreCase(url.getProtocol())) {
                     callback.onError("insecure_url",
@@ -138,7 +142,7 @@ public class LicenseManager {
                     os.write(payload.toString().getBytes(StandardCharsets.UTF_8));
                 }
 
-                // ═══ 3. قراءة الاستجابة ═══
+                // ═══ قراءة الاستجابة ═══
                 int code = conn.getResponseCode();
                 InputStream is = (code >= 200 && code < 300)
                         ? conn.getInputStream()
@@ -158,23 +162,27 @@ public class LicenseManager {
 
                 JSONObject json = body.isEmpty() ? new JSONObject() : new JSONObject(body);
 
-                if (code >= 200 && code < 300) {
-                    String token = json.optString("activation_token", "");
+                if (code >= 200 && code < 300 && json.optBoolean("success", true)) {
+                    // ⚡ Laravel يُعيد "token"، القديم كان "activation_token"
+                    String token = json.optString("token",
+                            json.optString("activation_token", ""));
                     String uuid  = json.optString("device_uuid", "");
 
                     if (!token.isEmpty()) {
-                        // حفظ في SessionManager
                         SessionManager sm = new SessionManager(context);
                         sm.saveActivationToken(token);
                         if (!uuid.isEmpty()) sm.saveDeviceUuid(uuid);
 
                         JSONObject lic = json.optJSONObject("license");
                         if (lic != null) {
+                            // ⚡ Laravel يُعيد max_gates، القديم max_devices
+                            int maxDevices = lic.optInt("max_devices",
+                                    lic.optInt("max_gates", 1));
                             sm.saveLicenseInfo(
                                     lic.optString("type", "custom"),
                                     lic.optString("valid_from", ""),
                                     lic.optString("valid_until", ""),
-                                    lic.optInt("max_devices", 1),
+                                    maxDevices,
                                     lic.optInt("max_users", 5)
                             );
                         }
@@ -189,11 +197,10 @@ public class LicenseManager {
                         }
 
                         sm.saveLastHeartbeat(System.currentTimeMillis());
-
                         Log.d(TAG, "✅ Activation saved successfully");
                     }
 
-                    // ⚡ v1.1 — إذا رجع license_blob، نخزّنه فوراً
+                    // ⚡ blob (اختياري — إن أرجعه Laravel)
                     JSONObject blobPayload = json.optJSONObject("license_blob");
                     if (blobPayload != null) {
                         JSONObject blob = blobPayload.optJSONObject("blob");
@@ -203,21 +210,21 @@ public class LicenseManager {
 
                             if (values != null) {
                                 MiraBlobStorage.BlobData blobData =
-        new MiraBlobStorage.BlobData(
-                blob.toString(),
-                blobPayload.optString("signature", ""),
-                blobPayload.optString("public_key", ""),
-                blobPayload.optString("fingerprint", ""),
-                blobPayload.optInt("version", values.version),
-                blobPayload.optString("key_id", ""),
-                blobPayload.optInt("license_id", values.licenseId),
-                values.maxUsers,
-                values.maxDevices,
-                values.validUntil,
-                System.currentTimeMillis(),
-                json.optInt("active_users", -1),      // ← جديد
-                json.optInt("active_devices", -1)     // ← جديد
-        );
+                                        new MiraBlobStorage.BlobData(
+                                                blob.toString(),
+                                                blobPayload.optString("signature", ""),
+                                                blobPayload.optString("public_key", ""),
+                                                blobPayload.optString("fingerprint", ""),
+                                                blobPayload.optInt("version", values.version),
+                                                blobPayload.optString("key_id", ""),
+                                                blobPayload.optInt("license_id", values.licenseId),
+                                                values.maxUsers,
+                                                values.maxDevices,
+                                                values.validUntil,
+                                                System.currentTimeMillis(),
+                                                json.optInt("active_users", -1),
+                                                json.optInt("active_devices", -1)
+                                        );
                                 MiraBlobVerifier.VerifyResult blobVerify =
                                         MiraBlobVerifier.verify(
                                                 blobData.blobJson,
@@ -240,7 +247,8 @@ public class LicenseManager {
                     callback.onSuccess(json);
                 } else {
                     String errCode = json.optString("code", "http_" + code);
-                    String errMsg  = json.optString("message", "خطأ غير معروف");
+                    String errMsg  = json.optString("error",
+                            json.optString("message", "خطأ غير معروف"));
                     callback.onError(errCode, errMsg, code);
                 }
 
@@ -262,7 +270,6 @@ public class LicenseManager {
     // ═══════════════════════════════════════════════════════
     //  Heartbeat
     // ═══════════════════════════════════════════════════════
-
     public static void heartbeat(final Context context,
                                  final Callback callback) {
         new Thread(() -> {
@@ -278,26 +285,20 @@ public class LicenseManager {
                 }
 
                 String fullUrl = buildUrl(serverUrl, "/heartbeat");
+                Log.d(TAG, "POST " + fullUrl);
 
                 JSONObject payload = new JSONObject();
                 payload.put("app_version", getAppVersion(context));
 
-                // ═══════════════════════════════════════════════════════
-                //  ⚡ v1.1 — إرسال blob_version + user_count للمركز
-                //  يُستخدم في تقارير السلامة لكشف التلاعب
-                // ═══════════════════════════════════════════════════════
                 try {
                     MiraBlobStorage.BlobData blob = MiraBlobStorage.load(context);
                     if (blob != null) {
                         payload.put("blob_version", blob.version);
                         payload.put("license_id", blob.licenseId);
-                        Log.d(TAG, "Heartbeat with blob_version=" + blob.version);
                     } else {
                         payload.put("blob_version", 0);
-                        Log.w(TAG, "Heartbeat without local blob");
                     }
                 } catch (Exception e) {
-                    Log.w(TAG, "Could not add blob_version: " + e.getMessage());
                     payload.put("blob_version", 0);
                 }
 
@@ -345,21 +346,17 @@ public class LicenseManager {
                     String action = json.optString("action", "continue");
 
                     if ("revoke_access".equals(action)) {
-                        // الترخيص أُلغي/عُلّق → مسح محلي
                         sm.clearLicense();
                         MiraBlobStorage.clear(context);
-                        callback.onError(
-                                "revoked",
-                                json.optString("reason", "الترخيص موقوف. تواصل مع ميرا"),
-                                code
-                        );
+                        callback.onError("revoked",
+                                json.optString("reason",
+                                        "الترخيص موقوف. تواصل مع ميرا"),
+                                code);
                         return;
                     }
 
-                    // تحديث آخر heartbeat
                     sm.saveLastHeartbeat(System.currentTimeMillis());
 
-                    // تحديث الإعدادات لو تغيرت
                     JSONObject settings = json.optJSONObject("settings");
                     if (settings != null) {
                         sm.saveOfflineSettings(
@@ -369,29 +366,17 @@ public class LicenseManager {
                         );
                     }
 
-                    // ⚡ قراءة تقرير السلامة من المركز (إن وُجد)
-                    JSONObject integrity = json.optJSONObject("integrity");
-                    if (integrity != null) {
-                        int reportedCount = integrity.optInt("user_count", -1);
-                        int maxUsers = integrity.optInt("max_users", -1);
-                        if (reportedCount >= 0 && maxUsers > 0) {
-                            Log.d(TAG, "Server integrity: users=" + reportedCount
-                                    + "/" + maxUsers);
-                        }
-                    }
-
                     callback.onSuccess(json);
                 } else {
                     String errCode = json.optString("code", "http_" + code);
-                    String errMsg  = json.optString("message", "فشل التحقق من الترخيص");
+                    String errMsg  = json.optString("error",
+                            json.optString("message", "فشل التحقق من الترخيص"));
                     callback.onError(errCode, errMsg, code);
                 }
 
             } catch (java.net.UnknownHostException e) {
-                Log.w(TAG, "Heartbeat: DNS failed");
                 callback.onError("network", "تعذر الوصول للخادم", 0);
             } catch (java.net.SocketTimeoutException e) {
-                Log.w(TAG, "Heartbeat: timeout");
                 callback.onError("timeout", "انتهت مهلة الاتصال", 0);
             } catch (Exception e) {
                 Log.w(TAG, "Heartbeat failed: " + e.getMessage());
@@ -406,7 +391,6 @@ public class LicenseManager {
     // ═══════════════════════════════════════════════════════
     //  Helpers
     // ═══════════════════════════════════════════════════════
-
     private static String getAppVersion(Context ctx) {
         try {
             return ctx.getPackageManager()
