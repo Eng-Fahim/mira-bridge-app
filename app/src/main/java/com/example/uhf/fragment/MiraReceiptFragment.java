@@ -800,10 +800,19 @@ public class MiraReceiptFragment extends DialogFragment {
 
         try {
             JSONObject root = new JSONObject(receiptJsonStr);
-            JSONObject t = root.optJSONObject("transaction");
+            // ✅ تحقق من sales wrapper أولاً (Backend الجديد)
+            JSONObject t = root.optJSONObject("sale");
+            if (t == null) t = root.optJSONObject("transaction");
             if (t == null) t = root.optJSONObject("data");
             if (t == null) t = root.optJSONObject("receipt");
             if (t == null) t = root;
+            // ✅ إذا كان sale بداخل data
+            if (t != null && t.optJSONObject("sale") != null) {
+            JSONObject innerSale = t.optJSONObject("sale");
+            if (innerSale.optString("sale_number", "").isEmpty() == false) {
+                t = innerSale;
+            }
+            }
 
             JSONObject customerObj = t.optJSONObject("customer");
             JSONObject paymentObj = t.optJSONObject("payment");
@@ -889,7 +898,11 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("</div>");
 
             // ═══ Title Bar ═══
-            String titleText = isFullyRefunded ? (isArabic ? "🔄 سند مرتجع مبيعات كلي" : "FULL RETURN INVOICE") :
+            String titleText = isFullyRefunded
+    ? (isArabic ? "🔄 سند مرتجع مبيعات كلي" : "FULL RETURN INVOICE")
+    : isPartiallyRefunded
+    ? (isArabic ? "⚠️ سند مرتجع مبيعات جزئي" : "PARTIAL RETURN INVOICE")
+    : (isArabic ? "🧾 فاتورة بيع مجوهرات" : "JEWELRY SALES INVOICE");
                                isPartiallyRefunded ? (isArabic ? "⚠️ سند مرتجع مبيعات جزئي" : "PARTIAL RETURN INVOICE") :
                                (isArabic ? "🧾 سند بيع مجوهرات" : "JEWELRY INVOICE");
 
