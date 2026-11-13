@@ -2330,6 +2330,7 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
             JSONObject obj = new JSONObject();
             obj.put("weight_grams", src.optDouble("weight_grams", 0));
             obj.put("karat", src.optString("karat", "21K"));
+            obj.put("value_yer", src.optDouble("value_yer", 0));   // ✅ سطر جديد
             obj.put("description", src.optString("description", "ذهب كسر"));
             tradeInsArr.put(obj);
         } catch (Exception ignored) {}
@@ -2479,6 +2480,35 @@ private void handleRefundSuccessV2(JSONObject result) {
         String method = result.optString("method", "cash");
         boolean isFull = result.optBoolean("is_full", false);
 
+        // ✅ إبطال الكاش للقطع المرتجعة
+        JSONArray items = result.optJSONArray("items");
+        if (items != null && items.length() > 0) {
+            Context appCtx = getSafeAppContext();
+            if (appCtx != null) {
+                MiraLocalItemCache cache = MiraLocalItemCache.getInstance(appCtx);
+                if (cache != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        try {
+                            JSONObject it = items.getJSONObject(i);
+                            String epc = it.optString("epc", "");
+                            String serial = it.optString("serial", "");
+                            
+                            if (!epc.isEmpty()) {
+                                cache.markItemAsAvailable(epc);
+                                Log.d(TAG, "✅ Cache invalidated: " + epc);
+                            }
+                            if (!serial.isEmpty() && !serial.equals(epc)) {
+                                cache.markItemAsAvailable(serial);
+                                Log.d(TAG, "✅ Cache invalidated: " + serial);
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "cache invalidate error for item", e);
+                        }
+                    }
+                }
+            }
+        }
+
         String methodLabel = "credit".equals(method)
             ? (isArabic ? "رصيد دائن" : "Store Credit")
             : (isArabic ? "نقدي" : "Cash");
@@ -2499,7 +2529,6 @@ private void handleRefundSuccessV2(JSONObject result) {
             isArabic ? "تم الإرجاع" : "Refund Success",
             msg, true, isArabic);
 
-        // إشعار تحديث البيانات
         PosUIManager.notifyDataChanged(requireContext(), "refund", getActiveBranchId());
 
     } catch (Exception e) {
