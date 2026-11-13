@@ -45,13 +45,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set; 
+import java.util.LinkedHashSet;
 
 public class POSCheckoutDialog extends DialogFragment {
 
     private static final String TAG = "POSCheckoutDialog";
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
     private static final String ARG_ITEM_COUNT = "item_count";
-    private static final String[] CURRENCIES = {"YER", "SAR", "USD"};
+    private final List<String> CURRENCIES = new ArrayList<>(Arrays.asList("YER", "SAR", "USD"));
 
     public interface OnCheckoutListener { void onCheckout(POSCheckoutData data); }
     public interface OnDialogDismissListener { void onDialogDismissed(); }
@@ -156,6 +158,7 @@ public class POSCheckoutDialog extends DialogFragment {
         bindViews(view);
         applyLanguage();
         loadPaymentMethods();
+        loadCurrencies();
     }
 
     private void bindViews(View view) {
@@ -203,41 +206,116 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private void loadPaymentMethods() {
-        new Thread(() -> {
-            List<PaymentMethodDto> loaded = null;
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.getPaymentMethods();
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray arr = response.data.optJSONArray("data");
-                    if (arr == null) arr = response.data.optJSONArray("methods");
-                    if (arr != null && arr.length() > 0) {
-                        Gson gson = new Gson();
-                        loaded = new ArrayList<>();
-                        for (int i = 0; i < arr.length(); i++) {
+    new Thread(() -> {
+        List<PaymentMethodDto> loaded = null;
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse response = client.getPaymentMethods();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray arr = null;
+                // جرب كل تنسيقات الاستجابة الممكنة
+                arr = response.data.optJSONArray("data");
+                if (arr == null) arr = response.data.optJSONArray("methods");
+                if (arr == null) arr = response.data.optJSONArray("payment_methods");
+                if (arr == null) arr = response.data.optJSONArray("items");
+
+                if (arr != null && arr.length() > 0) {
+                    Gson gson = new Gson();
+                    loaded = new ArrayList<>();
+                    for (int i = 0; i < arr.length(); i++) {
+                        try {
                             PaymentMethodDto m = gson.fromJson(arr.getJSONObject(i).toString(), PaymentMethodDto.class);
-                            if (m != null && m.code != null) loaded.add(m);
+                            if (m != null && m.code != null && !m.code.isEmpty()) {
+                                loaded.add(m);
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "skip malformed method", e);
                         }
                     }
+                    Log.i(TAG, "✅ Loaded " + loaded.size() + " payment methods from server");
+                } else {
+                    Log.w(TAG, "⚠️ Empty payment methods response");
                 }
-            } catch (Exception e) { Log.e(TAG, "loadPaymentMethods", e); }
+            } else {
+                Log.w(TAG, "⚠️ getPaymentMethods failed: " + (response != null ? response.error : "null"));
+            }
+        } catch (Exception e) { Log.e(TAG, "loadPaymentMethods error", e); }
 
-            final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty()) ? loaded : getFallbackMethods();
-            mainHandler.post(() -> {
-                paymentMethods.clear();
-                paymentMethods.addAll(finalList);
-                setupUI();
-            });
-        }).start();
-    }
+        final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty()) ? loaded : getFallbackMethods();
+        mainHandler.post(() -> {
+            paymentMethods.clear();
+            paymentMethods.addAll(finalList);
+            setupUI();
+        });
+    }).start();
+}
+
+private void loadCurrencies() {
+    new Thread(() -> {
+        Set<String> currencies = new LinkedHashSet<>();
+        currencies.add("YER"); // دائماً موجودة
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse response = client.getExchangeRates();
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray arr = response.data.optJSONArray("data");
+                if (arr == null) arr = response.data.optJSONArray("rates");
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject r = arr.getJSONObject(i);
+                        String from = r.optString("from_currency", "").toUpperCase();
+                        if (!from.isEmpty()) currencies.add(from);
+                    }
+                }
+            }
+        } catch (Exception e) { Log.e(TAG, "loadCurrencies error", e); }
+
+        // ضمان وجود USD و SAR في الحد الأدنى
+        if (currencies.size() < 2) {
+            currencies.add("USD");
+            currencies.add("SAR");
+        }
+
+        final List<String> finalList = new ArrayList<>(currencies);
+        mainHandler.post(() -> {
+            CURRENCIES.clear();
+            CURRENCIES.addAll(finalList);
+            // تحديث كل السطور الموجودة
+            for (View row : paymentRows) {
+                AutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
+                if (actCurr != null) {
+                    actCurr.setAdapter(new ArrayAdapter<>(requireContext(),
+                        android.R.layout.simple_dropdown_item_1line, CURRENCIES));
+                }
+            }
+            Log.i(TAG, "✅ Loaded currencies: " + CURRENCIES);
+        });
+    }).start();
+}
 
     private List<PaymentMethodDto> getFallbackMethods() {
-        List<PaymentMethodDto> list = new ArrayList<>();
-        PaymentMethodDto cash = new PaymentMethodDto();
-        cash.code = "CASH"; cash.nameAr = "نقداً"; cash.nameEn = "Cash"; cash.icon = "💵";
-        list.add(cash);
-        return list;
+    List<PaymentMethodDto> list = new ArrayList<>();
+    String[][] fallback = {
+        {"CASH",       "نقداً",       "Cash",           "💵", "1101", "الصندوق الرئيسي",  "Main Cash Box"},
+        {"POS_MADA",   "شبكة مدى",    "POS Mada",       "💳", "112521", "شبكة مدى",       "Mada Network"},
+        {"VISA_MASTER","فيزا/ماستر",  "Visa/Master",    "💳", "112521", "فيزا/ماستر",     "Visa/Mastercard"},
+        {"BANK_TRANSFER","تحويل بنكي","Bank Transfer",  "🏦", "1102", "البنك",          "Bank"},
+        {"E_WALLET",   "محفظة إلكترونية","E-Wallet",   "📱", "1103", "محفظة",          "Wallet"},
+    };
+    for (String[] f : fallback) {
+        PaymentMethodDto m = new PaymentMethodDto();
+        m.code = f[0];
+        m.nameAr = f[1];
+        m.nameEn = f[2];
+        m.icon = f[3];
+        m.accountCode = f[4];
+        m.accountNameAr = f[5];
+        m.accountName = f[6];
+        list.add(m);
     }
+    return list;
+}
 
     private void setupUI() {
         updateFinalAmount();
@@ -269,8 +347,14 @@ public class POSCheckoutDialog extends DialogFragment {
         // Setup Methods
         String[] methodNames = new String[paymentMethods.size()];
         for (int i = 0; i < paymentMethods.size(); i++) {
-            methodNames[i] = paymentMethods.get(i).getDisplayName(isArabic);
-        }
+            PaymentMethodDto m = paymentMethods.get(i);
+            String display = m.getDisplayName(isArabic);
+            String account = m.getAccountDisplay(isArabic);
+            if (account != null && !account.isEmpty()) {
+            display = display + " (" + account + ")";
+            }
+            methodNames[i] = display;
+            }
         actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, methodNames));
         actMethod.setText(methodNames[0], false);
@@ -483,22 +567,23 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private String resolveMethodCode(@Nullable MaterialAutoCompleteTextView actMethod) {
-        if (actMethod == null) return "CASH";
-        if (paymentMethods.isEmpty()) return "CASH";
+    if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
 
-        String selectedText = actMethod.getText() != null
-                ? actMethod.getText().toString().trim() : "";
-        if (selectedText.isEmpty()) return paymentMethods.get(0).code;
+    String selectedText = actMethod.getText() != null
+            ? actMethod.getText().toString().trim() : "";
+    if (selectedText.isEmpty()) return paymentMethods.get(0).code;
 
-        for (PaymentMethodDto m : paymentMethods) {
-            if (m == null) continue;
-            String display = m.getDisplayName(isArabic);
-            if (display != null && display.equals(selectedText)) {
-                return m.code != null ? m.code : "CASH";
-            }
+    for (PaymentMethodDto m : paymentMethods) {
+        if (m == null) continue;
+        String display = m.getDisplayName(isArabic);
+        String account = m.getAccountDisplay(isArabic);
+        String full = (account != null && !account.isEmpty()) ? display + " (" + account + ")" : display;
+        if (full.equals(selectedText)) {
+            return m.code != null ? m.code : "CASH";
         }
-        return paymentMethods.get(0).code;
     }
+    return paymentMethods.get(0).code;
+}
 
     private void dispatchCheckout(POSCheckoutData data) {
         dismissAllowingStateLoss();
