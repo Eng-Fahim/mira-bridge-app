@@ -17,7 +17,7 @@
             android:orientation="vertical"
             android:padding="@dimen/space_4">
 
-            <!-- Header -->
+            <!-- ═══════════ Header ═══════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -44,7 +44,7 @@
                     app:iconTint="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
 
-            <!-- Total Card -->
+            <!-- ═══════════ Total Card ═══════════ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -77,7 +77,7 @@
                         android:textStyle="bold"
                         android:textColor="?attr/colorOnSurface"
                         android:textDirection="ltr" />
-                        
+
                     <TextView
                         android:id="@+id/tvItemCount"
                         android:layout_width="wrap_content"
@@ -86,15 +86,15 @@
                         android:textSize="12sp"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:layout_marginTop="4dp" />
-                        
-                    <!-- Hidden fields for compatibility -->
+
+                    <!-- Hidden fields for backward compatibility -->
                     <TextView android:id="@+id/tvSubtotal" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
                     <TextView android:id="@+id/tvDiscountAmount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
                     <TextView android:id="@+id/tvAccountNumber" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Payments Header -->
+            <!-- ═══════════ Payments Header ═══════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -130,14 +130,14 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <!-- Dynamic Payment Container -->
+            <!-- ═══════════ Dynamic Payment Container ═══════════ -->
             <LinearLayout
                 android:id="@+id/llPaymentsContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <!-- Trade-In Summary -->
+            <!-- ═══════════ Trade-In Summary ═══════════ -->
             <LinearLayout
                 android:id="@+id/llTradeInSummary"
                 android:layout_width="match_parent"
@@ -169,7 +169,7 @@
                     android:textDirection="ltr" />
             </LinearLayout>
 
-            <!-- Status Banner (Shortage/Excess) -->
+            <!-- ═══════════ Status Banner ═══════════ -->
             <LinearLayout
                 android:id="@+id/llStatusBanner"
                 android:layout_width="match_parent"
@@ -189,10 +189,11 @@
                     android:layout_marginEnd="8dp" />
 
                 <TextView
+                    android:id="@+id/tvStatusLabel"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="مبلغ ناقص"
+                    android:text="المتبقي"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:textColor="#B91C1C" />
@@ -208,7 +209,7 @@
                     android:textDirection="ltr" />
             </LinearLayout>
 
-            <!-- Customer Info -->
+            <!-- ═══════════ Customer Info ═══════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -247,27 +248,60 @@
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- Hidden fields for compatibility -->
+            <!-- ═══════════ Inline Error (NEW) ═══════════ -->
+            <LinearLayout
+                android:id="@+id/llInlineError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#FEE2E2"
+                android:padding="10dp"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="❌"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/tvInlineError"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text=""
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#991B1B" />
+            </LinearLayout>
+
+            <!-- ═══════════ Hidden fields for backward compatibility ═══════════ -->
             <EditText android:id="@+id/etSimpleAmount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
             <EditText android:id="@+id/etDiscount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
             <EditText android:id="@+id/etCustomerEmail" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
             <EditText android:id="@+id/etCustomerAddress" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
             <EditText android:id="@+id/etCustomerNotes" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-            <LinearLayout android:id="@+id/llDiscountToggle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-            <LinearLayout android:id="@+id/llDiscountFields" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-            <TextView android:id="@+id/tvDiscountArrow" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-            <LinearLayout android:id="@+id/llCustomerToggle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-            <LinearLayout android:id="@+id/llCustomerFields" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-            <TextView android:id="@+id/tvCustomerArrow" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <LinearLayout android:id="@+id/llDiscountToggle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <LinearLayout android:id="@+id/llDiscountFields" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <TextView android:id="@+id/tvDiscountArrow" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <LinearLayout android:id="@+id/llCustomerToggle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <LinearLayout android:id="@+id/llCustomerFields" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <TextView android:id="@+id/tvCustomerArrow" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
             <com.google.android.material.card.MaterialCardView android:id="@+id/btnTabCash" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
             <com.google.android.material.card.MaterialCardView android:id="@+id/btnTabGold" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-            <com.google.android.material.textfield.TextInputLayout android:id="@+id/tilPaymentMethod" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"><com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/spPaymentMethod" android:layout_width="match_parent" android:layout_height="wrap_content" /></com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:id="@+id/tilPaymentMethod" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone">
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/spPaymentMethod" android:layout_width="match_parent" android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Action Buttons -->
+            <!-- ═══════════ Action Buttons ═══════════ -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCancelCheckout"
