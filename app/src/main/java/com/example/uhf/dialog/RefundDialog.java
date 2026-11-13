@@ -56,17 +56,26 @@ public class RefundDialog extends Dialog {
     }
 
     private static class ItemRow {
-        int itemId;
-        String title;
-        String karat;
-        double weight;
-        double price;
-        boolean isRefunded;
-        String condition = "in_stock";
-        CheckBox checkbox;
-        Spinner conditionSpinner;
-        View rowView;
-    }
+    int itemId;
+    String title;
+    String karat;
+    double weight;
+    double price;
+    boolean isRefunded;
+    String condition = "in_stock";
+
+    // ✅ معرّفات الكاش — تُستخدم لإبطال MiraLocalItemCache
+    String epc = "";
+    String serialNo = "";
+    String gtin = "";
+    String tid = "";
+    String rfidEpc = "";
+    String itemCode = "";
+
+    CheckBox checkbox;
+    Spinner conditionSpinner;
+    View rowView;
+}
 
     private final RefundCallback callback;
     private final boolean isArabic;
@@ -97,6 +106,17 @@ public class RefundDialog extends Dialog {
         this.callback = callback;
         this.isArabic = context.getResources().getConfiguration().locale.getLanguage().equals("ar");
     }
+    
+    private static String firstNonEmpty(JSONObject obj, String... keys) {
+    if (obj == null || keys == null) return "";
+    for (String key : keys) {
+        try {
+            String v = obj.optString(key, "");
+            if (v != null && !v.isEmpty() && !"null".equals(v)) return v;
+        } catch (Exception ignored) {}
+    }
+    return "";
+}
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -327,11 +347,19 @@ private void addItemRow(JSONObject it) {
 
         ItemRow ir = new ItemRow();
         ir.itemId = it.optInt("item_id", 0);
-        ir.title = it.optString("item_title", "قطعة");
-        ir.karat = it.optString("gold_karat", "21K");
-        ir.weight = it.optDouble("net_weight_grams", 0);
-        ir.price = it.optDouble("line_total_local", 0);
-        ir.isRefunded = it.optBoolean("is_refunded", false);
+ir.title = it.optString("item_title", "قطعة");
+ir.karat = it.optString("gold_karat", "21K");
+ir.weight = it.optDouble("net_weight_grams", 0);
+ir.price = it.optDouble("line_total_local", 0);
+ir.isRefunded = it.optBoolean("is_refunded", false);
+
+// ✅ استخراج كل المعرّفات الممكنة لإبطال الكاش
+ir.epc      = firstNonEmpty(it, "epc", "rfid_epc", "epc_final");
+ir.serialNo = firstNonEmpty(it, "serial", "serial_number", "serialNo", "sn");
+ir.gtin     = firstNonEmpty(it, "gtin", "gtin13", "barcode", "code");
+ir.tid      = firstNonEmpty(it, "tid", "tag_tid", "rfid_tid");
+ir.rfidEpc  = firstNonEmpty(it, "rfid_epc", "epc_final");
+ir.itemCode = firstNonEmpty(it, "item_code");
         ir.rowView = row;
 
         TextView tvTitle = row.findViewById(R.id.tvRefundRowTitle);
@@ -494,11 +522,15 @@ private void setMethod(String method) {
 
                     handler.post(() -> {
                         if (resp != null && resp.isSuccess) {
-                            JSONObject result = resp.data != null ? resp.data : new JSONObject();
-                            if (result.has("data")) result = result.optJSONObject("data");
-                            if (callback != null) callback.onRefundSuccess(result);
-                            dismiss();
-                        } else {
+    JSONObject result = resp.data != null ? resp.data : new JSONObject();
+    if (result.has("data")) result = result.optJSONObject("data");
+
+    // ✅ إبطال الكاش المحلي للقطع المرتجعة — قبل استدعاء callback
+    invalidateCacheForRefundedItems();
+
+    if (callback != null) callback.onRefundSuccess(result);
+    dismiss();
+} else {
                             String err = (resp != null && resp.error != null) ? resp.error
                                 : (isArabic ? "فشل الإرجاع" : "Refund failed");
                             toast("❌ " + err);
@@ -542,10 +574,74 @@ private void setMethod(String method) {
         dismiss();
     }
 
+
     // ═══════════════════════════════════════════════════════════════════
     //  Public API
     // ═══════════════════════════════════════════════════════════════════
+/**
+ * ✅ إبطال MiraLocalItemCache لجميع القطع المرتجعة
+ * تستخدم كل المعرّفات الممكنة (epc, serial, gtin, tid, rfid_epc, item_code)
+ */
+private void invalidateCacheForRefundedItems() {
+    try {
+        Context appCtx = getContext() != null
+                ? getContext().getApplicationContext() : null;
+        if (appCtx == null) {
+            Log.w(TAG, "invalidateCacheForRefundedItems: no context");
+            return;
+        }
 
+        com.example.uhf.manager.MiraLocalItemCache cache =
+                com.example.uhf.manager.MiraLocalItemCache.getInstance(appCtx);
+        if (cache == null) {
+            Log.w(TAG, "invalidateCacheForRefundedItems: cache is null");
+            return;
+        }
+
+        int invalidated = 0;
+        int itemsProcessed = 0;
+
+        for (ItemRow ir : itemRows) {
+            if (ir.isRefunded) continue;
+            if (ir.checkbox == null || !ir.checkbox.isChecked()) continue;
+
+            itemsProcessed++;
+
+            if (!ir.epc.isEmpty()) {
+                cache.markItemAsAvailable(ir.epc);
+                invalidated++;
+            }
+            if (!ir.serialNo.isEmpty() && !ir.serialNo.equals(ir.epc)) {
+                cache.markItemAsAvailable(ir.serialNo);
+                invalidated++;
+            }
+            if (!ir.gtin.isEmpty()) {
+                cache.markItemAsAvailable(ir.gtin);
+                invalidated++;
+            }
+            if (!ir.tid.isEmpty()) {
+                cache.markItemAsAvailable(ir.tid);
+                invalidated++;
+            }
+            if (!ir.rfidEpc.isEmpty() && !ir.rfidEpc.equals(ir.epc)) {
+                cache.markItemAsAvailable(ir.rfidEpc);
+                invalidated++;
+            }
+            if (!ir.itemCode.isEmpty()) {
+                cache.markItemAsAvailable(ir.itemCode);
+                invalidated++;
+            }
+        }
+
+        Log.i(TAG, "✅ Cache invalidated: " + invalidated
+                + " identifiers for " + itemsProcessed + " refunded item(s)");
+
+    } catch (Exception e) {
+        Log.e(TAG, "invalidateCacheForRefundedItems error", e);
+    }
+}
+    
+    
     public void setQueryFromScan(String code) {
         if (etQuery == null || code == null) return;
         suppressWatcher = true;
