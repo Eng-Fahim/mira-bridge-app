@@ -569,11 +569,43 @@ public class POSCheckoutDialog extends DialogFragment {
                 }
 
                 double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
-                if (Math.abs(totalPaidInYer - requiredTotalInYer) > 1) {
-                    Toast.makeText(requireContext(), isArabic ? "⚠️ إجمالي المدفوعات لا يطابق الفاتورة" : "⚠️ Payment total mismatch", Toast.LENGTH_SHORT).show();
-                    return;
-                }
+double diff = totalPaidInYer - requiredTotalInYer;
 
+// ❌ نقص → ممنوع
+if (diff < -1.0) {
+    Toast.makeText(requireContext(),
+        isArabic ? "⚠️ المبلغ ناقص " + String.format(Locale.US, "%,.0f", Math.abs(diff)) + " YER"
+                 : "⚠️ Short by " + String.format(Locale.US, "%,.0f", Math.abs(diff)),
+        Toast.LENGTH_SHORT).show();
+    return;
+}
+
+// ✅ زيادة → مسموحة (ستُصبح رصيداً دائناً)
+if (diff > 1.0) {
+    String phone = (etCustomerPhone != null) ? etCustomerPhone.getText().toString().trim() : "";
+    if (phone.isEmpty()) {
+        Toast.makeText(requireContext(),
+            isArabic ? "⚠️ الدفع الزائد يتطلب رقم هاتف العميل (لحفظ الرصيد الدائن)"
+                     : "⚠️ Overpayment requires customer phone (to save credit)",
+            Toast.LENGTH_LONG).show();
+        return;
+    }
+
+    // تأكيد صريح
+    new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        .setTitle(isArabic ? "💰 سيُضاف رصيد دائن" : "💰 Store Credit")
+        .setMessage(isArabic
+            ? "المبلغ المدفوع أكثر من الفاتورة بـ " + String.format(Locale.US, "%,.2f", diff) + " YER\n\nسيُحفظ هذا المبلغ كرصيد دائن للعميل (صالح 12 شهراً)."
+            : "Overpaid by " + String.format(Locale.US, "%,.2f", diff) + " YER\n\nThis will be saved as store credit (valid 12 months).")
+        .setPositiveButton(isArabic ? "متابعة" : "Continue", (d, w) -> {
+            proceedCheckout(data, paymentsArray, isArabic);
+        })
+        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+        .show();
+    return;
+}
+// ✅ متطابق
+proceedCheckout(data, paymentsArray, isArabic);
                 POSCheckoutData data = new POSCheckoutData();
                 if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
                 if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
@@ -598,7 +630,28 @@ public class POSCheckoutDialog extends DialogFragment {
             });
         }
     }
+private void proceedCheckout(POSCheckoutData data, JSONArray paymentsArray, boolean isArabic) {
+    if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
+    if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
+    if (etCustomerEmail != null) data.customerEmail = etCustomerEmail.getText().toString().trim();
+    if (etCustomerAddress != null) data.customerAddress = etCustomerAddress.getText().toString().trim();
+    if (etCustomerNotes != null) data.customerNotes = etCustomerNotes.getText().toString().trim();
 
+    data.paymentMethod = getCurrentPaymentMethod();
+    data.accountCode = getCurrentAccountCode();
+    data.currency = "MIX";
+
+    String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
+    try { data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr); } catch (Exception e) { data.discount = 0; }
+
+    data.originalTotal = totalAmount;
+    data.discountAmount = totalAmount * (data.discount / 100.0);
+    data.finalAmount = totalAmount - data.discountAmount;
+    data.payments = paymentsArray;
+
+    dismissAllowingStateLoss();
+    if (listener != null) listener.onCheckout(data);
+}
     private void updateFinalAmount() {
         if (priceManager == null) return;
         double discountPercent = 0.0;
