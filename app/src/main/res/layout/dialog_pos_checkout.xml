@@ -326,14 +326,60 @@
                 android:layout_marginBottom="@dimen/space_3"
                 android:background="?attr/colorOutlineVariant" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/space_2"
-                android:text="💵 تفاصيل الدفع"
-                android:textAppearance="@style/TextAppearance.App.Title.Small"
-                android:textColor="@color/text_gold_accent" />
+            <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="@dimen/space_2">
 
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="💵 تفاصيل الدفع"
+        android:textAppearance="@style/TextAppearance.App.Title.Small"
+        android:textColor="@color/text_gold_accent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnTradeIn"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🥇 دفع بالذهب"
+        android:textColor="@color/text_gold_accent" />
+</LinearLayout>
+
+<LinearLayout
+    android:id="@+id/llTradeInSummary"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="#FEF3C7"
+    android:padding="8dp"
+    android:layout_marginBottom="8dp"
+    android:visibility="gone">
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="🥇 ذهب مُستلم:"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="#92400E" />
+
+    <TextView
+        android:id="@+id/tvTradeInTotal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 YER"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="#92400E"
+        android:textDirection="ltr" />
+</LinearLayout>
             <!-- حاوية سطور الدفع (يتم تعبئتها برمجياً) -->
             <LinearLayout
                 android:id="@+id/llPaymentsContainer"
