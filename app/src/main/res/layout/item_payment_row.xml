@@ -4,113 +4,138 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="?attr/colorSurfaceVariant"
-    android:padding="8dp"
-    android:layout_marginBottom="8dp">
+    android:padding="10dp"
+    android:layout_marginBottom="8dp"
+    android:background="?attr/colorSurfaceVariant">
 
-    <!-- السطر الأول: طريقة الدفع -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="4dp">
-
-        <TextView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:text="1"
-            android:gravity="center"
-            android:background="@drawable/circle_bg_primary"
-            android:textColor="@android:color/white"
-            android:textSize="12sp"
-            android:layout_marginEnd="8dp" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                android:id="@+id/actMethod"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="none"
-                android:textSize="14sp" />
-        </com.google.android.material.textfield.TextInputLayout>
-    </LinearLayout>
-
-    <!-- السطر الثاني: العملة، المبلغ، المتبقي، حذف -->
+    <!-- ═══════════════════════════════════════════════════
+         السطر الأول: رقم + طريقة الدفع + العملة + حذف
+         ═══════════════════════════════════════════════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- العملة -->
+        <!-- ✅ رقم السطر (يستخدمه POSCheckoutDialog) -->
+        <TextView
+            android:id="@+id/tvRowNumber"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:background="@drawable/circle_bg_primary"
+            android:gravity="center"
+            android:text="1"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <!-- ✅ طريقة الدفع (النسخة الجديدة MaterialAutoComplete) -->
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-            android:layout_width="90dp"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp">
+            android:layout_weight="2"
+            android:layout_marginStart="8dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
+
+            <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                android:id="@+id/actMethod"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="طريقة الدفع" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ✅ العملة -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
 
             <AutoCompleteTextView
                 android:id="@+id/actCurrency"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="none"
-                android:textSize="12sp" />
+                android:hint="العملة"
+                android:inputType="text" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- المبلغ -->
+        <!-- ✅ حذف السطر -->
+        <ImageButton
+            android:id="@+id/btnRemove"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="حذف" />
+    </LinearLayout>
+
+    <!-- ═══════════════════════════════════════════════════
+         السطر الثاني: المبلغ + زر المتبقي
+         ═══════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:hint="المبلغ">
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etAmount"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:hint="المبلغ"
                 android:inputType="numberDecimal"
-                android:textDirection="ltr"
-                android:textSize="14sp" />
+                android:textDirection="ltr" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- زر المتبقي -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRemaining"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
+            android:layout_marginStart="6dp"
             android:text="المتبقي"
             android:textSize="11sp"
             android:minWidth="0dp"
-            android:paddingHorizontal="8dp"
-            android:layout_marginEnd="4dp" />
-
-        <!-- زر الحذف -->
-        <ImageButton
-            android:id="@+id/btnRemove"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_delete"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="?attr/colorError" />
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp" />
     </LinearLayout>
 
-    <!-- معادل الـ YER (يظهر عند اختيار عملة أجنبية) -->
+    <!-- ✅ المعادل بـ YER -->
     <TextView
         android:id="@+id/tvBaseEquivalent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="10sp"
+        android:textSize="11sp"
         android:textColor="?attr/colorPrimary"
-        android:layout_marginTop="4dp"
-        android:gravity="end"
-        android:visibility="gone" />
+        android:textDirection="ltr"
+        android:visibility="gone"
+        android:layout_marginTop="4dp" />
+
+    <!-- ═══════════════════════════════════════════════════
+         ⚠️ عناصر مخفية للتوافق الخلفي
+         (MiraScrapGoldBuyFragment و أي كود قديم يستخدمها)
+         ═══════════════════════════════════════════════════ -->
+
+    <Spinner
+        android:id="@+id/spMethod"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+
+    <Spinner
+        android:id="@+id/spCurrency"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 </LinearLayout>
