@@ -243,6 +243,13 @@ public class POSCheckoutDialog extends DialogFragment {
         } catch (Exception e) { Log.e(TAG, "loadPaymentMethods error", e); }
 
         final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty()) ? loaded : getFallbackMethods();
+        
+        // ✅ استبعاد طرق خاصة (لها مسار منفصل)
+        if (loaded != null && !loaded.isEmpty()) {
+            final int before = loaded.size();
+            loaded.removeIf(m -> m.code != null && (m.code.equalsIgnoreCase("TRADE_IN") || m.code.equalsIgnoreCase("CUSTOMER_CREDIT")));
+            Log.i(TAG, "Filtered: " + before + " → " + loaded.size() + " methods");
+            }
         mainHandler.post(() -> {
             paymentMethods.clear();
             paymentMethods.addAll(finalList);
