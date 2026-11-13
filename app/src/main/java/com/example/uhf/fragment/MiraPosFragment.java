@@ -2321,6 +2321,23 @@ private JSONObject buildCheckoutPayload(MiraApiClient client,
         }
         itemsArr.put(obj);
     }
+    // ✅ Trade-in (ذهب كسر)
+    if (data.tradeIns != null && data.tradeIns.length() > 0) {
+    JSONArray tradeInsArr = new JSONArray();
+    for (int i = 0; i < data.tradeIns.length(); i++) {
+        try {
+            JSONObject src = data.tradeIns.getJSONObject(i);
+            JSONObject obj = new JSONObject();
+            obj.put("weight_grams", src.optDouble("weight_grams", 0));
+            obj.put("karat", src.optString("karat", "21K"));
+            obj.put("description", src.optString("description", "ذهب كسر"));
+            tradeInsArr.put(obj);
+        } catch (Exception ignored) {}
+    }
+    payload.put("trade_ins", tradeInsArr);
+    Log.d(TAG, "✅ Trade-ins added: " + tradeInsArr.length() + " item(s)");
+}
+    
     payload.put("items", itemsArr);
     payload.put("item_count", cartManager.size());
 
