@@ -2475,39 +2475,41 @@ private void handleRefundSuccessV2(JSONObject result) {
     try {
         if (result == null) return;
 
+        // ✅ [Defense-in-depth] إبطال إضافي للكاش من استجابة السيرفر (إن وُجدت)
+        //    الإبطال الأساسي يحدث داخل RefundDialog قبل هذا الاستدعاء
+        invalidateCacheFromRefundResponse(result);
+
+        // ✅ [FIX] GateSaleBridge كان ناقصاً في V2 flow
+        //    V1 flow يستدعيه، لكن V2 كان يتجاهله
+        try {
+            Context appCtx = getSafeAppContext();
+            if (appCtx != null) {
+                JSONArray items = result.optJSONArray("items");
+                if (items != null && items.length() > 0) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject it = items.optJSONObject(i);
+                        if (it == null) continue;
+                        String epc = it.optString("epc", "");
+                        String serial = it.optString("serial", "");
+                        if (epc.isEmpty() && serial.isEmpty()) continue;
+
+                        GateSaleBridge.onRefundCompleted(
+                                appCtx, epc, serial,
+                                it.optLong("sale_id", 0L),
+                                getActiveBranchId(),
+                                sessionManager != null ? sessionManager.getUserId() : 0,
+                                "customer_request");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "GateSaleBridge onRefundCompleted error", e);
+        }
+
         String refundNumber = result.optString("refund_number", "");
         double amountLocal = result.optDouble("amount_local", 0);
         String method = result.optString("method", "cash");
         boolean isFull = result.optBoolean("is_full", false);
-
-        // ✅ إبطال الكاش للقطع المرتجعة
-        JSONArray items = result.optJSONArray("items");
-        if (items != null && items.length() > 0) {
-            Context appCtx = getSafeAppContext();
-            if (appCtx != null) {
-                MiraLocalItemCache cache = MiraLocalItemCache.getInstance(appCtx);
-                if (cache != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        try {
-                            JSONObject it = items.getJSONObject(i);
-                            String epc = it.optString("epc", "");
-                            String serial = it.optString("serial", "");
-                            
-                            if (!epc.isEmpty()) {
-                                cache.markItemAsAvailable(epc);
-                                Log.d(TAG, "✅ Cache invalidated: " + epc);
-                            }
-                            if (!serial.isEmpty() && !serial.equals(epc)) {
-                                cache.markItemAsAvailable(serial);
-                                Log.d(TAG, "✅ Cache invalidated: " + serial);
-                            }
-                        } catch (Exception e) {
-                            Log.w(TAG, "cache invalidate error for item", e);
-                        }
-                    }
-                }
-            }
-        }
 
         String methodLabel = "credit".equals(method)
             ? (isArabic ? "رصيد دائن" : "Store Credit")
@@ -2533,6 +2535,56 @@ private void handleRefundSuccessV2(JSONObject result) {
 
     } catch (Exception e) {
         Log.e(TAG, "handleRefundSuccessV2 error", e);
+    }
+}
+
+/**
+ * ✅ إبطال دفاعي إضافي — لو استجابة السيرفر تحتوي items
+ * (احتياطي: الإبطال الأساسي يحدث داخل RefundDialog)
+ */
+private void invalidateCacheFromRefundResponse(JSONObject result) {
+    try {
+        JSONArray items = result.optJSONArray("items");
+        if (items == null || items.length() == 0) {
+            Log.d(TAG, "invalidateCacheFromRefundResponse: no items in response (OK — RefundDialog already handled it)");
+            return;
+        }
+
+        Context appCtx = getSafeAppContext();
+        if (appCtx == null) return;
+
+        MiraLocalItemCache cache = MiraLocalItemCache.getInstance(appCtx);
+        if (cache == null) return;
+
+        String[] identifierKeys = {
+            "epc", "rfid_epc", "epc_final",
+            "serial", "serial_number", "serialNo", "sn",
+            "gtin", "gtin13", "barcode", "code",
+            "tid", "tag_tid", "rfid_tid",
+            "item_code"
+        };
+
+        int total = 0;
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject it = items.optJSONObject(i);
+            if (it == null) continue;
+
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            for (String key : identifierKeys) {
+                String v = it.optString(key, "");
+                if (v != null && !v.isEmpty() && !"null".equals(v)) {
+                    ids.add(v);
+                }
+            }
+
+            for (String id : ids) {
+                cache.markItemAsAvailable(id);
+                total++;
+            }
+        }
+        Log.i(TAG, "✅ Defense invalidated " + total + " identifiers from response");
+    } catch (Exception e) {
+        Log.e(TAG, "invalidateCacheFromRefundResponse error", e);
     }
 }
 
