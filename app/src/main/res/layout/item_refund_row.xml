@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:layout_marginBottom="6dp"
+    android:background="?attr/colorSurfaceVariant">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <CheckBox
+            android:id="@+id/cbRefundItem"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:buttonTint="?attr/colorPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="6dp">
+
+            <TextView
+                android:id="@+id/tvRefundRowTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="اسم القطعة"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/tvRefundRowMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="21K · 10.000g"
+                android:textSize="11sp"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvRefundRowPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 YER"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorPrimary"
+            android:textDirection="ltr" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvRefundRowBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="مرتجعة مسبقاً"
+        android:textSize="10sp"
+        android:textColor="#B45309"
+        android:textStyle="bold"
+        android:background="#FEF3C7"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:layout_marginTop="4dp"
+        android:visibility="gone" />
+
+    <Spinner
+        android:id="@+id/spRefundCondition"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="6dp"
+        android:background="?attr/selectableItemBackground"
+        android:visibility="gone" />
+</LinearLayout>
