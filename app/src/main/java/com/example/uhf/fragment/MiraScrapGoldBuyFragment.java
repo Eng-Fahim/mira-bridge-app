@@ -7,12 +7,10 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,14 +25,13 @@ import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
 
 public class MiraScrapGoldBuyFragment extends Fragment {
@@ -47,12 +44,11 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
     private String[] karats = {"24", "22", "21", "18", "14"};
     private final String[] CURRENCIES = {"YER", "SAR", "USD"};
-    
+
     private final List<View> paymentRows = new ArrayList<>();
     private double totalGoldValue = 0;
     private MiraPriceManager priceManager;
 
-    // ✅ قائمة ديناميكية لطرق الدفع من السيرفر
     private List<JSONObject> availableMethods = new ArrayList<>();
     private boolean isMethodsLoaded = false;
 
@@ -66,8 +62,7 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         initViews(view);
         setupKaratDropdown();
         setupCalculations();
-        
-        // ✅ جلب طرق الدفع من السيرفر أولاً
+
         loadPaymentMethods();
 
         btnSavePurchase.setOnClickListener(v -> savePurchase());
@@ -90,17 +85,16 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
     }
 
-    // ✅ دالة جلب طرق الدفع من السيرفر
     private void loadPaymentMethods() {
         new Thread(() -> {
             try {
                 MiraApiClient api = MiraApiClient.getInstance(requireContext());
                 MiraApiClient.ApiResponse response = api.getPaymentMethods();
-                
+
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray arr = response.data.optJSONArray("data");
                     if (arr == null) arr = response.data.optJSONArray("methods");
-                    
+
                     if (arr != null) {
                         for (int i = 0; i < arr.length(); i++) {
                             availableMethods.add(arr.getJSONObject(i));
@@ -109,43 +103,45 @@ public class MiraScrapGoldBuyFragment extends Fragment {
                 }
             } catch (Exception ignored) {}
 
-            // إذا فشل الجلب، نضع قيم افتراضية
             if (availableMethods.isEmpty()) {
                 try {
-                    JSONObject cash = new JSONObject(); cash.put("code", "CASH"); cash.put("name_ar", "نقداً"); cash.put("icon", "💵");
-                    JSONObject bank = new JSONObject(); bank.put("code", "BANK_TRANSFER"); bank.put("name_ar", "تحويل بنكي"); bank.put("icon", "🏦");
+                    JSONObject cash = new JSONObject();
+                    cash.put("code", "CASH"); cash.put("name_ar", "نقداً"); cash.put("icon", "💵");
+                    JSONObject bank = new JSONObject();
+                    bank.put("code", "BANK_TRANSFER"); bank.put("name_ar", "تحويل بنكي"); bank.put("icon", "🏦");
                     availableMethods.add(cash);
                     availableMethods.add(bank);
                 } catch (Exception ignored) {}
             }
-            
+
             isMethodsLoaded = true;
-            
+
             if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    // إضافة سطر الدفع الأول بعد تحميل البيانات
-                    addPaymentRow("YER", 0.0);
-                });
+                getActivity().runOnUiThread(() -> addPaymentRow("YER", 0.0));
             }
         }).start();
     }
 
-    // ✅ دالة لتعبئة Spinner طرق الدفع
-    private void setupMethodSpinner(Spinner spMethod) {
-        if (spMethod == null) return;
+    // ✅ يستخدم MaterialAutoCompleteTextView بدل Spinner
+    private void setupMethodDropdown(MaterialAutoCompleteTextView actMethod) {
+        if (actMethod == null) return;
         List<String> methodNames = new ArrayList<>();
         for (JSONObject obj : availableMethods) {
             String icon = obj.optString("icon", "💳");
             String name = obj.optString("name_ar", obj.optString("code", "نقداً"));
-            methodNames.add(icon + " " + name); // مثال: "🏦 بنك التضامن"
+            methodNames.add(icon + " " + name);
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, methodNames);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spMethod.setAdapter(adapter);
+        String[] arr = methodNames.toArray(new String[0]);
+        actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_dropdown_item_1line, arr));
+        if (arr.length > 0) {
+            actMethod.setText(arr[0], false);
+        }
     }
 
     private void setupKaratDropdown() {
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, karats);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_dropdown_item_1line, karats);
         ddKarat.setAdapter(adapter);
         ddKarat.setText("21", false);
         ddKarat.setOnItemClickListener((parent, view, position, id) -> calculateTotal());
@@ -185,49 +181,51 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
     private double getRateToYER(String currency) {
         if ("YER".equalsIgnoreCase(currency)) return 1.0;
-        
+
         if (priceManager != null) {
             double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
             double currencyRate = priceManager.getExchangeRate(currency);
-            
+
             if (currencyRate > 10) return currencyRate;
-            
+
             if (yerRate > 0 && currencyRate > 0) {
-                return yerRate / currencyRate; 
+                return yerRate / currencyRate;
             }
         }
-        
+
         if ("SAR".equalsIgnoreCase(currency)) return 141.33;
         if ("USD".equalsIgnoreCase(currency)) return 530.0;
         return 1.0;
     }
 
+    // ✅ يستخدم actCurrency + actMethod
     private void addPaymentRow(String defaultCurrency, double amount) {
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
-        Spinner spCurrency = row.findViewById(R.id.spCurrency);
-        Spinner spMethod = row.findViewById(R.id.spMethod); 
+        AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
+        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
         TextInputEditText etAmount = row.findViewById(R.id.etAmount);
         TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
         // إعداد عملة الدفع
-        ArrayAdapter<String> currencyAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, CURRENCIES);
-        currencyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spCurrency.setAdapter(currencyAdapter);
-        int index = Arrays.asList(CURRENCIES).indexOf(defaultCurrency);
-        spCurrency.setSelection(index >= 0 ? index : 0);
+        if (actCurrency != null) {
+            actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
+                    android.R.layout.simple_dropdown_item_1line, CURRENCIES));
+            actCurrency.setText(defaultCurrency, false);
+        }
 
-        // ✅ إعداد طريقة الدفع (من القائمة الديناميكية)
-        setupMethodSpinner(spMethod);
+        // إعداد طريقة الدفع
+        setupMethodDropdown(actMethod);
 
         Runnable updateEquivalent = () -> {
             try {
-                int pos = spCurrency.getSelectedItemPosition();
-                if (pos >= 0) {
-                    String curr = CURRENCIES[pos];
-                    double rate = getRateToYER(curr);
-                    double amt = getDoubleFromEditText(etAmount);
-                    double base = amt * rate;
+                String curr = actCurrency != null
+                        ? actCurrency.getText().toString().trim().toUpperCase() : "YER";
+                if (curr.isEmpty()) curr = "YER";
+                double rate = getRateToYER(curr);
+                double amt = getDoubleFromEditText(etAmount);
+                double base = amt * rate;
+                if (tvEquivalent != null) {
                     tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
                 }
             } catch (Exception ignored) {}
@@ -235,30 +233,32 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
         etAmount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
-                updateEquivalent.run(); 
-                updateRemainingBalance(); 
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateEquivalent.run();
+                updateRemainingBalance();
             }
             @Override public void afterTextChanged(Editable s) {}
         });
-        
-        spCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { 
-                updateEquivalent.run(); 
-                updateRemainingBalance(); 
-            }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
-        });
 
-        btnRemove.setOnClickListener(v -> {
-            if (llPaymentsContainer.getChildCount() > 1) {
-                llPaymentsContainer.removeView(row);
-                paymentRows.remove(row);
+        if (actCurrency != null) {
+            actCurrency.setOnItemClickListener((parent, v, position, id) -> {
+                updateEquivalent.run();
                 updateRemainingBalance();
-            } else {
-                Toast.makeText(requireContext(), "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
-            }
-        });
+            });
+        }
+
+        if (btnRemove != null) {
+            btnRemove.setOnClickListener(v -> {
+                if (llPaymentsContainer.getChildCount() > 1) {
+                    llPaymentsContainer.removeView(row);
+                    paymentRows.remove(row);
+                    updateRemainingBalance();
+                } else {
+                    Toast.makeText(requireContext(),
+                            "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
 
         paymentRows.add(row);
         llPaymentsContainer.addView(row);
@@ -266,22 +266,22 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         updateEquivalent.run();
     }
 
+    // ✅ يقرأ من actCurrency
     private void updateRemainingBalance() {
         double totalPaidBase = 0;
         for (View row : paymentRows) {
-            Spinner sp = row.findViewById(R.id.spCurrency);
+            AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
             TextInputEditText et = row.findViewById(R.id.etAmount);
-            int pos = sp.getSelectedItemPosition();
-            if (pos >= 0) {
-                String curr = CURRENCIES[pos];
-                double rate = getRateToYER(curr);
-                double amount = getDoubleFromEditText(et);
-                totalPaidBase += (amount * rate);
-            }
+            String curr = actCurrency != null
+                    ? actCurrency.getText().toString().trim().toUpperCase() : "YER";
+            if (curr.isEmpty()) curr = "YER";
+            double rate = getRateToYER(curr);
+            double amount = getDoubleFromEditText(et);
+            totalPaidBase += (amount * rate);
         }
-        
+
         double remaining = totalGoldValue - totalPaidBase;
-        
+
         if (Math.abs(remaining) < 1) {
             tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
             tvRemaining.setTextColor(Color.parseColor("#16A34A"));
@@ -294,6 +294,7 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         }
     }
 
+    // ✅ يستخدم actCurrency/actMethod
     private void setFormEnabled(boolean enabled) {
         etCustomerName.setEnabled(enabled);
         etCustomerPhone.setEnabled(enabled);
@@ -303,13 +304,46 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         ddKarat.setEnabled(enabled);
         btnAddPayment.setEnabled(enabled);
         for (View row : paymentRows) {
-            row.findViewById(R.id.spCurrency).setEnabled(enabled);
-            row.findViewById(R.id.spMethod).setEnabled(enabled);
-            row.findViewById(R.id.etAmount).setEnabled(enabled);
-            row.findViewById(R.id.btnRemove).setEnabled(enabled);
+            View curr = row.findViewById(R.id.actCurrency);
+            View method = row.findViewById(R.id.actMethod);
+            View amount = row.findViewById(R.id.etAmount);
+            View remove = row.findViewById(R.id.btnRemove);
+            if (curr != null) curr.setEnabled(enabled);
+            if (method != null) method.setEnabled(enabled);
+            if (amount != null) amount.setEnabled(enabled);
+            if (remove != null) remove.setEnabled(enabled);
         }
     }
 
+    // ✅ helper: رمز العملة المختارة
+    private String getSelectedCurrency(View row) {
+        AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
+        if (actCurrency == null) return "YER";
+        String text = actCurrency.getText() != null
+                ? actCurrency.getText().toString().trim().toUpperCase() : "";
+        return text.isEmpty() ? "YER" : text;
+    }
+
+    // ✅ helper: كود طريقة الدفع المختارة
+    private String getSelectedMethodCode(View row) {
+        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+        if (actMethod == null) return "CASH";
+        String selected = actMethod.getText() != null
+                ? actMethod.getText().toString().trim() : "";
+        if (selected.isEmpty()) return "CASH";
+
+        for (JSONObject obj : availableMethods) {
+            String icon = obj.optString("icon", "💳");
+            String name = obj.optString("name_ar", obj.optString("code", "نقداً"));
+            String display = icon + " " + name;
+            if (display.equals(selected)) {
+                return obj.optString("code", "CASH");
+            }
+        }
+        return "CASH";
+    }
+
+    // ✅ يستخدم actCurrency/actMethod
     private void savePurchase() {
         double weight = getDoubleFromEditText(etWeight);
         double marketPrice = getDoubleFromEditText(etMarketPrice);
@@ -320,50 +354,42 @@ public class MiraScrapGoldBuyFragment extends Fragment {
 
         JSONArray paymentsArray = new JSONArray();
         double totalPaidBase = 0;
-        
+
         for (View row : paymentRows) {
-            Spinner sp = row.findViewById(R.id.spCurrency);
-            Spinner spMethod = row.findViewById(R.id.spMethod); 
             TextInputEditText et = row.findViewById(R.id.etAmount);
-            
-            int pos = sp.getSelectedItemPosition();
-            int posMethod = spMethod.getSelectedItemPosition();
             double amount = getDoubleFromEditText(et);
-            
-            if (amount > 0 && pos >= 0) {
+
+            if (amount > 0) {
                 try {
-                    String curr = CURRENCIES[pos];
+                    String curr = getSelectedCurrency(row);
                     double rate = getRateToYER(curr);
                     double base = amount * rate;
                     totalPaidBase += base;
-                    
+
                     JSONObject pObj = new JSONObject();
                     pObj.put("currency", curr);
                     pObj.put("amount", amount);
                     pObj.put("exchange_rate", rate);
                     pObj.put("base_amount", base);
-                    
-                    // ✅ إرسال كود طريقة الدفع الحقيقي (مثلاً WALLET_JAIB)
-                    if (posMethod >= 0 && posMethod < availableMethods.size()) {
-                        pObj.put("method", availableMethods.get(posMethod).optString("code", "CASH"));
-                    } else {
-                        pObj.put("method", "CASH");
-                    }
-                    
+                    pObj.put("method", getSelectedMethodCode(row));
+
                     paymentsArray.put(pObj);
                 } catch (Exception e) { e.printStackTrace(); }
             }
         }
 
         if (Math.abs(totalPaidBase - totalGoldValue) > 1) {
-            Toast.makeText(requireContext(), "⚠️ إجمالي المدفوعات لا يطابق قيمة الذهب", Toast.LENGTH_LONG).show();
+            Toast.makeText(requireContext(),
+                    "⚠️ إجمالي المدفوعات لا يطابق قيمة الذهب", Toast.LENGTH_LONG).show();
             return;
         }
 
         JSONObject payload = new JSONObject();
         try {
-            payload.put("customer_name", etCustomerName.getText() != null ? etCustomerName.getText().toString().trim() : "");
-            payload.put("customer_phone", etCustomerPhone.getText() != null ? etCustomerPhone.getText().toString().trim() : "");
+            payload.put("customer_name", etCustomerName.getText() != null
+                    ? etCustomerName.getText().toString().trim() : "");
+            payload.put("customer_phone", etCustomerPhone.getText() != null
+                    ? etCustomerPhone.getText().toString().trim() : "");
             payload.put("gross_weight_grams", weight);
             payload.put("gold_karat", ddKarat.getText().toString() + "K");
             payload.put("market_price_per_gram", marketPrice);
@@ -407,7 +433,8 @@ public class MiraScrapGoldBuyFragment extends Fragment {
     private void showSuccessDialog(int purchaseId, String purchaseNumber) {
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle("✅ تم الحفظ بنجاح")
-            .setMessage("تم تسجيل عملية شراء الكسر بنجاح.\n\nرقم العملية: " + purchaseNumber + "\n\nهل تريد طباعة الإيصال للعميل الآن؟")
+            .setMessage("تم تسجيل عملية شراء الكسر بنجاح.\n\nرقم العملية: " + purchaseNumber
+                    + "\n\nهل تريد طباعة الإيصال للعميل الآن؟")
             .setPositiveButton("🖨️ عرض وطباعة الإيصال", (dialog, which) -> {
                 if (purchaseId > 0) {
                     MiraScrapReceiptFragment receipt = MiraScrapReceiptFragment.newInstance(purchaseId, null);
@@ -415,9 +442,7 @@ public class MiraScrapGoldBuyFragment extends Fragment {
                 }
                 clearFields();
             })
-            .setNegativeButton("إغلاق", (dialog, which) -> {
-                clearFields();
-            })
+            .setNegativeButton("إغلاق", (dialog, which) -> clearFields())
             .setCancelable(false)
             .show();
     }
@@ -436,7 +461,7 @@ public class MiraScrapGoldBuyFragment extends Fragment {
         etCustomerName.setText("");
         etCustomerPhone.setText("");
         tvTotalAmount.setText("0.00 YER");
-        
+
         llPaymentsContainer.removeAllViews();
         paymentRows.clear();
         addPaymentRow("YER", 0.0);
