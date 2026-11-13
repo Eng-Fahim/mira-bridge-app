@@ -2432,7 +2432,16 @@ public ApiResponse findSaleForRefund(String query) {
         return r;
     }
 }
-
+public ApiResponse findSaleForRefundByItem(String code) {
+    try {
+        String encoded = java.net.URLEncoder.encode(code, "UTF-8");
+        return getWithAuth("/refunds/find-by-item?code=" + encoded);
+    } catch (Exception e) {
+        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        r.isNetworkError = true;
+        return r;
+    }
+}
 public ApiResponse processRefundV2(JSONObject payload) {
     try {
         if (payload == null) payload = new JSONObject();
