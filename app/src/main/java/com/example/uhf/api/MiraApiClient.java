@@ -2418,6 +2418,34 @@ public ApiResponse calculateScrap(double weightGrams, String karat) {
         return r;
     }
 }
+
+// ==================== Refunds V2 (Sale-Centric) ====================
+public ApiResponse findSaleForRefund(String query) {
+    try {
+        String encoded = java.net.URLEncoder.encode(query, "UTF-8");
+        return getWithAuth("/refunds/find-sale?q=" + encoded);
+    } catch (Exception e) {
+        Log.e(TAG, "findSaleForRefund error: " + e.getMessage());
+        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        r.isNetworkError = true;
+        return r;
+    }
+}
+
+public ApiResponse processRefundV2(JSONObject payload) {
+    try {
+        if (payload == null) payload = new JSONObject();
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        return postWithAuth("/refunds", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "processRefundV2 error: " + e.getMessage());
+        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        r.isNetworkError = true;
+        return r;
+    }
+}
     public static class ApiResponse {
         public final int code;
         public final JSONObject data;
