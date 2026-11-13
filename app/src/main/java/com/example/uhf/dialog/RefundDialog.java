@@ -179,45 +179,52 @@ public class RefundDialog extends Dialog {
     }
 
     private void performSearch() {
-        if (etQuery == null) return;
-        String query = etQuery.getText().toString().trim();
-        if (query.isEmpty()) return;
+    if (etQuery == null) return;
+    String query = etQuery.getText().toString().trim();
+    if (query.isEmpty()) return;
 
-        final int mySeq = ++searchSeq;
-        showState("loading");
+    final int mySeq = ++searchSeq;
+    showState("loading");
 
-        new Thread(() -> {
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(getContext().getApplicationContext());
-                MiraApiClient.ApiResponse resp = client.findSaleForRefund(query);
+    // ✅ إذا بدأ بـ INV- → بحث برقم الفاتورة
+    //    غير ذلك → بحث بكود القطعة (EPC/Serial/GTIN)
+    final boolean isSaleNumber = query.toUpperCase().startsWith("INV-")
+            || query.toUpperCase().startsWith("REF-");
 
-                handler.post(() -> {
-                    if (mySeq != searchSeq) return;
-                    if (resp != null && resp.isSuccess && resp.data != null) {
-                        JSONObject sale = resp.data.optJSONObject("sale");
-                        if (sale != null) {
-                            renderSale(sale);
-                        } else {
-                            showState("empty");
-                            toast(isArabic ? "❌ لا توجد فاتورة" : "❌ Not found");
-                        }
+    new Thread(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(getContext().getApplicationContext());
+            MiraApiClient.ApiResponse resp = isSaleNumber
+                    ? client.findSaleForRefund(query)
+                    : client.findSaleForRefundByItem(query);
+
+            handler.post(() -> {
+                if (mySeq != searchSeq) return;
+                if (resp != null && resp.isSuccess && resp.data != null) {
+                    JSONObject sale = resp.data.optJSONObject("sale");
+                    if (sale != null) {
+                        renderSale(sale);
                     } else {
-                        String msg = (resp != null && resp.error != null) ? resp.error
-                                : (isArabic ? "لا توجد فاتورة بهذا الرقم" : "Sale not found");
                         showState("empty");
-                        toast("❌ " + msg);
+                        toast(isArabic ? "❌ لا توجد فاتورة" : "❌ Not found");
                     }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "performSearch error", e);
-                handler.post(() -> {
-                    if (mySeq != searchSeq) return;
+                } else {
+                    String msg = (resp != null && resp.error != null) ? resp.error
+                            : (isArabic ? "لا توجد فاتورة" : "Not found");
                     showState("empty");
-                    toast("⚠️ " + e.getMessage());
-                });
-            }
-        }).start();
-    }
+                    toast("❌ " + msg);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "performSearch error", e);
+            handler.post(() -> {
+                if (mySeq != searchSeq) return;
+                showState("empty");
+                toast("⚠️ " + e.getMessage());
+            });
+        }
+    }).start();
+}
 
     private void renderSale(JSONObject sale) {
         try {
@@ -341,7 +348,15 @@ private void addItemRow(JSONObject it) {
         tvTitle.setText(ir.title);
         tvMeta.setText(String.format(Locale.US, "%s · %.3fg", ir.karat, ir.weight));
         tvPrice.setText(String.format(Locale.US, "%,.0f YER", ir.price));
-
+        
+        boolean isScanned = it.optBoolean("is_scanned", false);
+        if (isScanned && !ir.isRefunded) {
+        // تمييز بصري
+        row.setBackgroundColor(Color.parseColor("#DBEAFE"));  // أزرق فاتح
+        cb.setChecked(true);
+        // شارة صغيرة
+        tvTitle.setText(ir.title + "  📷");
+        }
         if (ir.isRefunded) {
             cb.setEnabled(false);
             cb.setChecked(false);
