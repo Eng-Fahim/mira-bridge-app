@@ -341,89 +341,104 @@ private void loadCurrencies() {
     }
 
     private void addPaymentRow(String defaultCurrency, double amount) {
-        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
+    View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
 
-        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-        com.google.android.material.textfield.MaterialAutoCompleteTextView actCurrency =
-        row.findViewById(R.id.actCurrency);
-        TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
-        if (tvRowNumber != null) {
+    MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+    MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
+    TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
+    EditText etAmount = row.findViewById(R.id.etAmount);
+    TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
+    MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
+    ImageButton btnRemove = row.findViewById(R.id.btnRemove);
+
+    if (tvRowNumber != null) {
         tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
-        }
-        EditText etAmount = row.findViewById(R.id.etAmount);
-        TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-        MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
-        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
-
-        // Setup Methods
-        String[] methodNames = new String[paymentMethods.size()];
-        for (int i = 0; i < paymentMethods.size(); i++) {
-            PaymentMethodDto m = paymentMethods.get(i);
-            String display = m.getDisplayName(isArabic);
-            String account = m.getAccountDisplay(isArabic);
-            if (account != null && !account.isEmpty()) {
-            display = display + " (" + account + ")";
-            }
-            methodNames[i] = display;
-            }
-        actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, methodNames));
-        actMethod.setText(methodNames[0], false);
-
-        // Setup Currencies
-        actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, CURRENCIES));
-        actCurrency.setText(defaultCurrency, false);
-
-        // Listeners
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-                double amt = parseDouble(s.toString());
-                double rate = getRateToYER(actCurrency.getText().toString());
-                double base = amt * rate;
-                if (rate != 1.0) {
-                    tvBaseEquivalent.setVisibility(View.VISIBLE);
-                    tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
-                } else {
-                    tvBaseEquivalent.setVisibility(View.GONE);
-                }
-                updateStatus();
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        };
-        etAmount.addTextChangedListener(watcher);
-        actCurrency.setOnItemClickListener((p, v, pos, id) ->
-                watcher.onTextChanged(etAmount.getText(), 0, 0, 0));
-
-        btnRemaining.setOnClickListener(v -> {
-            double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
-            double currentRowAmount = parseDouble(etAmount.getText().toString())
-                    * getRateToYER(actCurrency.getText().toString());
-            double currentPaid = getTotalPaidYER() - currentRowAmount;
-            double rem = requiredTotal - currentPaid - tradeInTotal;
-            if (rem > 0.01) {
-                double rate = getRateToYER(actCurrency.getText().toString());
-                etAmount.setText(String.format(Locale.US, "%.2f", rem / rate));
-            }
-        });
-
-        btnRemove.setOnClickListener(v -> {
-            if (paymentRows.size() > 1) {
-                llPaymentsContainer.removeView(row);
-                paymentRows.remove(row);
-                renumberRows();  // ✅ إعادة ترقيم بعد الحذف
-                updateStatus();
-            } else {
-                Toast.makeText(requireContext(), "يجب إبقاء سطر واحد", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        if (amount > 0) etAmount.setText(String.format(Locale.US, "%.2f", amount));
-        paymentRows.add(row);
-        llPaymentsContainer.addView(row);
-        updateStatus();
     }
+
+    // ✅ بناء قائمة الأسماء + الخريطة
+    final java.util.Map<String, String> displayToCode = new java.util.LinkedHashMap<>();
+    String[] methodNames = new String[paymentMethods.size()];
+    for (int i = 0; i < paymentMethods.size(); i++) {
+        PaymentMethodDto m = paymentMethods.get(i);
+        String display = m.getDisplayName(isArabic);
+        String account = m.getAccountDisplay(isArabic);
+        String fullName = (account != null && !account.isEmpty())
+                ? display + " (" + account + ")"
+                : display;
+        methodNames[i] = fullName;
+        displayToCode.put(fullName, m.code != null ? m.code : "CASH");
+    }
+
+    actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
+            android.R.layout.simple_dropdown_item_1line, methodNames));
+
+    if (methodNames.length > 0) {
+        actMethod.setText(methodNames[0], false);
+        // ✅ احفظ الكود في Tag
+        actMethod.setTag(displayToCode.get(methodNames[0]));
+    }
+
+    // ✅ عند التغيير: حدّث Tag
+    actMethod.setOnItemClickListener((parent, view, position, id) -> {
+        String selected = (String) parent.getItemAtPosition(position);
+        actMethod.setTag(displayToCode.get(selected));
+        Log.d(TAG, "Method selected: " + selected + " → code=" + actMethod.getTag());
+    });
+
+    // Currency
+    actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
+            android.R.layout.simple_dropdown_item_1line, CURRENCIES));
+    actCurrency.setText(defaultCurrency, false);
+
+    // Listeners للأوزان والمبلغ
+    TextWatcher watcher = new TextWatcher() {
+        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+        @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+            double amt = parseDouble(s.toString());
+            double rate = getRateToYER(actCurrency.getText().toString());
+            double base = amt * rate;
+            if (rate != 1.0) {
+                tvBaseEquivalent.setVisibility(View.VISIBLE);
+                tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
+            } else {
+                tvBaseEquivalent.setVisibility(View.GONE);
+            }
+            updateStatus();
+        }
+        @Override public void afterTextChanged(Editable s) {}
+    };
+    etAmount.addTextChangedListener(watcher);
+    actCurrency.setOnItemClickListener((p, v, pos, id) ->
+            watcher.onTextChanged(etAmount.getText(), 0, 0, 0));
+
+    btnRemaining.setOnClickListener(v -> {
+        double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
+        double currentRowAmount = parseDouble(etAmount.getText().toString())
+                * getRateToYER(actCurrency.getText().toString());
+        double currentPaid = getTotalPaidYER() - currentRowAmount;
+        double rem = requiredTotal - currentPaid - tradeInTotal;
+        if (rem > 0.01) {
+            double rate = getRateToYER(actCurrency.getText().toString());
+            etAmount.setText(String.format(Locale.US, "%.2f", rem / rate));
+        }
+    });
+
+    btnRemove.setOnClickListener(v -> {
+        if (paymentRows.size() > 1) {
+            llPaymentsContainer.removeView(row);
+            paymentRows.remove(row);
+            renumberRows();
+            updateStatus();
+        } else {
+            Toast.makeText(requireContext(), "يجب إبقاء سطر واحد", Toast.LENGTH_SHORT).show();
+        }
+    });
+
+    if (amount > 0) etAmount.setText(String.format(Locale.US, "%.2f", amount));
+    paymentRows.add(row);
+    llPaymentsContainer.addView(row);
+    updateStatus();
+}
 
     // ✅ [IMPROVEMENT-1] إعادة ترقيم الأسطر بعد حذف سطر
     private void renumberRows() {
@@ -540,63 +555,61 @@ private void loadCurrencies() {
     }
 
     private POSCheckoutData buildData() {
-        POSCheckoutData data = new POSCheckoutData();
-        data.customerName = etCustomerName != null
-                ? etCustomerName.getText().toString().trim() : "";
-        data.customerPhone = etCustomerPhone != null
-                ? etCustomerPhone.getText().toString().trim() : "";
-        data.originalTotal = totalAmount;
-        data.finalAmount = totalAmount;
-        data.tradeIns = tradeInLines;
-        data.tradeInTotal = tradeInTotal;
+    POSCheckoutData data = new POSCheckoutData();
+    data.customerName = etCustomerName != null ? etCustomerName.getText().toString().trim() : "";
+    data.customerPhone = etCustomerPhone != null ? etCustomerPhone.getText().toString().trim() : "";
+    data.originalTotal = totalAmount;
+    data.finalAmount = totalAmount;
+    data.tradeIns = tradeInLines;
+    data.tradeInTotal = tradeInTotal;
 
-        JSONArray paymentsArray = new JSONArray();
-        for (View row : paymentRows) {
-    EditText et = row.findViewById(R.id.etAmount);
-    com.google.android.material.textfield.MaterialAutoCompleteTextView actCurr = 
-        row.findViewById(R.id.actCurrency);
-    MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-    
-    // ✅ نضيف actMethod للتحقق
-    if (et == null || actCurr == null || actMethod == null) continue;
-    
-    double amt = parseDouble(et.getText().toString());
-    if (amt <= 0) continue;
-    
-            String curr = actCurr.getText().toString();
-            String methodCode = resolveMethodCode(actMethod);
+    JSONArray paymentsArray = new JSONArray();
+    for (View row : paymentRows) {
+        EditText et = row.findViewById(R.id.etAmount);
+        MaterialAutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
+        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+        if (et == null || actCurr == null || actMethod == null) continue;
 
-            try {
-                JSONObject pObj = new JSONObject();
-                pObj.put("currency", curr);
-                pObj.put("amount", amt);
-                pObj.put("exchange_rate", getRateToYER(curr));
-                pObj.put("base_amount", amt * getRateToYER(curr));
-                pObj.put("method", methodCode);
-                paymentsArray.put(pObj);
-            } catch (Exception ignored) {}
-        }
-        data.payments = paymentsArray;
-        return data;
+        double amt = parseDouble(et.getText().toString());
+        if (amt <= 0) continue;
+
+        String curr = actCurr.getText().toString();
+        // ✅ اقرأ الكود من Tag (موثوق 100%)
+        String methodCode = actMethod.getTag() != null
+                ? String.valueOf(actMethod.getTag())
+                : resolveMethodCodeFallback(actMethod);
+
+        Log.d(TAG, "Payment row: currency=" + curr + " amount=" + amt + " method=" + methodCode);
+
+        try {
+            JSONObject pObj = new JSONObject();
+            pObj.put("currency", curr);
+            pObj.put("amount", amt);
+            pObj.put("exchange_rate", getRateToYER(curr));
+            pObj.put("base_amount", amt * getRateToYER(curr));
+            pObj.put("method", methodCode);
+            paymentsArray.put(pObj);
+        } catch (Exception ignored) {}
     }
+    data.payments = paymentsArray;
+    return data;
+}
 
-    private String resolveMethodCode(@Nullable MaterialAutoCompleteTextView actMethod) {
+// fallback فقط إذا Tag مفقود (يحدث نادراً)
+private String resolveMethodCodeFallback(MaterialAutoCompleteTextView actMethod) {
     if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
-
     String selectedText = actMethod.getText() != null
             ? actMethod.getText().toString().trim() : "";
-    if (selectedText.isEmpty()) return paymentMethods.get(0).code;
-
     for (PaymentMethodDto m : paymentMethods) {
         if (m == null) continue;
         String display = m.getDisplayName(isArabic);
         String account = m.getAccountDisplay(isArabic);
         String full = (account != null && !account.isEmpty()) ? display + " (" + account + ")" : display;
-        if (full.equals(selectedText)) {
-            return m.code != null ? m.code : "CASH";
+        if (full.equals(selectedText) && m.code != null) {
+            return m.code;
         }
     }
-    return paymentMethods.get(0).code;
+    return "CASH";
 }
 
     private void dispatchCheckout(POSCheckoutData data) {
