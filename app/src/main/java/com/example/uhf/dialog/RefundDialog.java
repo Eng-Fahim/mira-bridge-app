@@ -281,103 +281,124 @@ public class RefundDialog extends Dialog {
         }
     }
 
-    private void renderPayments(JSONObject sale) {
-        try {
-            JSONArray pay = sale.optJSONArray("payments_summary");
-            if (pay == null || pay.length() == 0) {
-                tvPaymentsList.setText("—");
-                return;
-            }
-
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < pay.length(); i++) {
-                JSONObject p = pay.getJSONObject(i);
-                String name = p.optString("method_name_ar",
-                              p.optString("method", "CASH"));
-                double yer = p.optDouble("amount_in_yer", 0);
-                sb.append("• ").append(name).append(": ")
-                  .append(String.format(Locale.US, "%,.0f", yer))
-                  .append(" YER\n");
-            }
-            tvPaymentsList.setText(sb.toString().trim());
-
-            // ✅ [FIX] TextView.append() تُرجع void — لا يمكن ربطها
-            if (creditCreated > 0.01) {
-                tvPaymentsList.append("\n💰 أنشأت رصيداً: ");
-                tvPaymentsList.append(String.format(Locale.US, "%,.0f", creditCreated));
-                tvPaymentsList.append(" YER");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "renderPayments error", e);
+    // 1. دالة عرض تفاصيل السداد
+private void renderPayments(JSONObject sale) {
+    try {
+        JSONArray pay = sale.optJSONArray("payments_summary");
+        if (pay == null || pay.length() == 0) {
+            tvPaymentsList.setText("—");
+            return;
         }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < pay.length(); i++) {
+            JSONObject p = pay.getJSONObject(i);
+            String name = p.optString("method_name_ar", p.optString("method", "CASH"));
+            double yer = p.optDouble("amount_in_yer", 0);
+            sb.append("• ").append(name).append(": ")
+              .append(String.format(Locale.US, "%,.0f", yer))
+              .append(" YER\n");
+        }
+        tvPaymentsList.setText(sb.toString().trim());
+
+        if (creditCreated > 0.01) {
+            tvPaymentsList.append("\n💰 أنشأت رصيداً: ")
+                .append(String.format(Locale.US, "%,.0f", creditCreated))
+                .append(" YER");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "renderPayments error", e);
     }
+}
 
-    private void addItemRow(JSONObject it) {
-        try {
-            View row = getLayoutInflater().inflate(R.layout.item_refund_row, llItemsContainer, false);
+// 2. دالة إضافة سطر القطعة
+private void addItemRow(JSONObject it) {
+    try {
+        View row = getLayoutInflater().inflate(R.layout.item_refund_row, llItemsContainer, false);
 
-            ItemRow ir = new ItemRow();
-            ir.itemId = it.optInt("item_id", 0);
-            ir.title = it.optString("item_title", "قطعة");
-            ir.karat = it.optString("gold_karat", "21K");
-            ir.weight = it.optDouble("net_weight_grams", 0);
-            ir.price = it.optDouble("line_total_local", 0);
-            ir.isRefunded = it.optBoolean("is_refunded", false);
-            ir.rowView = row;
+        ItemRow ir = new ItemRow();
+        ir.itemId = it.optInt("item_id", 0);
+        ir.title = it.optString("item_title", "قطعة");
+        ir.karat = it.optString("gold_karat", "21K");
+        ir.weight = it.optDouble("net_weight_grams", 0);
+        ir.price = it.optDouble("line_total_local", 0);
+        ir.isRefunded = it.optBoolean("is_refunded", false);
+        ir.rowView = row;
 
-            TextView tvTitle = row.findViewById(R.id.tvRefundRowTitle);
-            TextView tvMeta = row.findViewById(R.id.tvRefundRowMeta);
-            TextView tvPrice = row.findViewById(R.id.tvRefundRowPrice);
-            TextView tvBadge = row.findViewById(R.id.tvRefundRowBadge);
-            CheckBox cb = row.findViewById(R.id.cbRefundItem);
-            Spinner spCond = row.findViewById(R.id.spRefundCondition);
+        TextView tvTitle = row.findViewById(R.id.tvRefundRowTitle);
+        TextView tvMeta = row.findViewById(R.id.tvRefundRowMeta);
+        TextView tvPrice = row.findViewById(R.id.tvRefundRowPrice);
+        TextView tvBadge = row.findViewById(R.id.tvRefundRowBadge);
+        CheckBox cb = row.findViewById(R.id.cbRefundItem);
+        TextInputLayout tilCond = row.findViewById(R.id.tilRefundCondition);
+        com.google.android.material.textfield.MaterialAutoCompleteTextView actCond = row.findViewById(R.id.actRefundCondition);
 
-            ir.checkbox = cb;
-            ir.conditionSpinner = spCond;
+        ir.checkbox = cb;
+        ir.conditionSpinner = null; // Not using Spinner anymore
 
-            tvTitle.setText(ir.title);
-            tvMeta.setText(String.format(Locale.US, "%s · %.3fg", ir.karat, ir.weight));
-            tvPrice.setText(String.format(Locale.US, "%,.0f YER", ir.price));
+        tvTitle.setText(ir.title);
+        tvMeta.setText(String.format(Locale.US, "%s · %.3fg", ir.karat, ir.weight));
+        tvPrice.setText(String.format(Locale.US, "%,.0f YER", ir.price));
 
-            if (ir.isRefunded) {
-                cb.setEnabled(false);
-                cb.setChecked(false);
-                cb.setAlpha(0.4f);
-                tvBadge.setVisibility(View.VISIBLE);
-                tvTitle.setPaintFlags(tvTitle.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
-                tvPrice.setPaintFlags(tvPrice.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
-                tvPrice.setTextColor(Color.parseColor("#9CA3AF"));
-                spCond.setVisibility(View.GONE);
-            } else {
-                cb.setChecked(true);
-                cb.setOnCheckedChangeListener((b, checked) -> {
-                    spCond.setVisibility(checked ? View.VISIBLE : View.GONE);
-                    updateTotal();
-                });
+        if (ir.isRefunded) {
+            cb.setEnabled(false);
+            cb.setChecked(false);
+            cb.setAlpha(0.4f);
+            tvBadge.setVisibility(View.VISIBLE);
+            tvTitle.setPaintFlags(tvTitle.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+            tvPrice.setPaintFlags(tvPrice.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+            tvPrice.setTextColor(Color.parseColor("#9CA3AF"));
+            tilCond.setVisibility(View.GONE);
+        } else {
+            cb.setChecked(true);
+            cb.setOnCheckedChangeListener((b, checked) -> {
+                tilCond.setVisibility(checked ? View.VISIBLE : View.GONE);
+                updateTotal();
+            });
 
-                ArrayAdapter<String> adp = new ArrayAdapter<>(getContext(),
-                    android.R.layout.simple_spinner_dropdown_item,
-                    new String[]{
-                        isArabic ? "حالة ممتازة (مخزون)" : "Excellent (in stock)",
-                        isArabic ? "كسر (تالف)" : "Scrapped",
-                        isArabic ? "تالف (فحص)" : "Damaged"
-                    });
-                spCond.setAdapter(adp);
-                spCond.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                    @Override public void onItemSelected(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                        ir.condition = pos == 1 ? "scrapped" : pos == 2 ? "damaged" : "in_stock";
-                    }
-                    @Override public void onNothingSelected(android.widget.AdapterView<?> p) {}
-                });
-                spCond.setVisibility(View.VISIBLE);
-            }
-
-            itemRows.add(ir);
-            llItemsContainer.addView(row);
-
-        } catch (Exception e) {
-            Log.e(TAG, "addItemRow error", e);
+            String[] conditions = {
+                isArabic ? "حالة ممتازة (مخزون)" : "Excellent (in stock)",
+                isArabic ? "كسر (تالف)" : "Scrapped",
+                isArabic ? "تالف (فحص)" : "Damaged"
+            };
+            ArrayAdapter<String> adp = new ArrayAdapter<>(getContext(), android.R.layout.simple_dropdown_item_1line, conditions);
+            actCond.setAdapter(adp);
+            actCond.setText(conditions[0], false);
+            ir.condition = "in_stock"; // default
+            
+            actCond.setOnItemClickListener((p, v, pos, id) -> {
+                ir.condition = pos == 1 ? "scrapped" : pos == 2 ? "damaged" : "in_stock";
+            });
+            tilCond.setVisibility(View.VISIBLE);
         }
+
+        itemRows.add(ir);
+        llItemsContainer.addView(row);
+
+    } catch (Exception e) {
+        Log.e(TAG, "addItemRow error", e);
+    }
+}
+
+// 3. تحديث ألوان أزرار الإرجاع (Dark Mode Support)
+private void setMethod(String method) {
+        selectedMethod = method;
+        try {
+            if ("cash".equals(method)) {
+                cardCash.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#3B82F6")));
+                cardCash.setCardBackgroundColor(Color.parseColor("#EFF6FF"));
+                cardCredit.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#D1D5DB")));
+                cardCredit.setCardBackgroundColor(Color.parseColor("#F9FAFB"));
+            } else {
+                cardCredit.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#16A34A")));
+                cardCredit.setCardBackgroundColor(Color.parseColor("#F0FDF4"));
+                cardCash.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#D1D5DB")));
+                cardCash.setCardBackgroundColor(Color.parseColor("#F9FAFB"));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "setMethod color error: " + e.getMessage());
+        }
+        updateWarning();
     }
 
     private void updateTotal() {
@@ -411,26 +432,6 @@ public class RefundDialog extends Dialog {
         } else {
             tvWarning.setVisibility(View.GONE);
         }
-    }
-
-    private void setMethod(String method) {
-        selectedMethod = method;
-        try {
-            if ("cash".equals(method)) {
-                cardCash.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#3B82F6")));
-                cardCash.setCardBackgroundColor(Color.parseColor("#EFF6FF"));
-                cardCredit.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#D1D5DB")));
-                cardCredit.setCardBackgroundColor(Color.parseColor("#F9FAFB"));
-            } else {
-                cardCredit.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#16A34A")));
-                cardCredit.setCardBackgroundColor(Color.parseColor("#F0FDF4"));
-                cardCash.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#D1D5DB")));
-                cardCash.setCardBackgroundColor(Color.parseColor("#F9FAFB"));
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "setMethod color error: " + e.getMessage());
-        }
-        updateWarning();
     }
 
     private void submitRefund() {
