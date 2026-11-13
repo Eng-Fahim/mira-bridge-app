@@ -257,22 +257,57 @@ public class MiraReceiptFragment extends DialogFragment {
     }
 
     private String getPaymentMethodArabic(String method) {
-        if (method == null) return "نقداً";
-        switch (method.toLowerCase()) {
-            case "cash": return "نقداً 💵";
-            case "card": return "بطاقة 💳";
-            case "bank_transfer":
-            case "transfer": return "تحويل بنكي 🏦";
-            case "e_wallet": return "محفظة إلكترونية 📱";
-            case "check":
-            case "cheque": return "شيك 📝";
-            case "credit": return "آجل ⏳";
-            case "split":
-            case "mix":
-            case "mixed": return "متعدد 💰";
-            default: return method;
-        }
+    if (method == null || method.isEmpty()) return "نقداً 💵";
+    
+    String m = method.toUpperCase(Locale.US).trim();
+    
+    // ✅ ترجمة كل الطرق الموجودة في DB
+    switch (m) {
+        case "CASH":             return "نقداً 💵";
+        case "POS_MADA":         return "شبكة مدى 💳";
+        case "VISA_MASTER":      return "فيزا / ماستر 💳";
+        case "BANK_TADHAMON":    return "بنك التضامن 🏦";
+        case "BANK_KURAIMI":     return "بنك الكريمي 🏦";
+        case "BANK_AHLI":        return "البنك الأهلي 🏦";
+        case "BANK_YKB":         return "بنك اليمن والكويت 🏦";
+        case "BANK_SABA":        return "بنك سبأ 🏦";
+        case "BANK_CAC":         return "كاك بنك 🏦";
+        case "WALLET_HAZMI":     return "شبكة الحزمي 📱";
+        case "WALLET_JAIB":      return "حوالت جيب 📱";
+        case "WALLET_DADIA":     return "شبكة دادية 📱";
+        case "WALLET_IMTIAZ":    return "شبكة الامتياز 📱";
+        case "WALLET_NAJM":      return "شبكة النجم 📱";
+        case "WALLET_HAST":      return "شبكة الحوشي 📱";
+        case "WALLET_HOUTAR":    return "شبكة الهتار 📱";
+        case "WALLET_MOTAMAYEZ": return "شبكة المميز 📱";
+        case "WALLET_AKWA":      return "شبكة الأكوع 📱";
+        case "WALLET_YEMEN_NET": return "الشبكة اليمنية 📱";
+        case "WALLET_SAIFI":     return "الصيفي كاش 📱";
+        case "WALLET_EXPRESS":   return "يمن اكسبريس 📱";
+        case "WALLET_MONEY":     return "مال موني 📱";
+        case "WALLET_AMRI":      return "العامري كاش 📱";
+        case "WALLET_BARQ":      return "شبكة البرق 📱";
+        case "WALLET_SAREE":     return "السريع للحوالات 📱";
+        case "WALLET_MUHEET":    return "شبكة المحيط 📱";
+        case "WALLET_NASSER":    return "شبكة الناصر 📱";
+        case "WALLET_YEAH":      return "ياه موني 📱";
+        case "WALLET_ONE_CASH":  return "ون كاش 📱";
+        case "CREDIT":           return "آجل (ذمم) ⏳";
+        case "CUSTOMER_CREDIT":  return "رصيد دائن 💳";
+        case "TRADE_IN":         return "دفع بالذهب 🥇";
+        case "SPLIT":
+        case "MIX":
+        case "MIXED":            return "متعدد 💰";
+        case "BANK_TRANSFER":    return "تحويل بنكي 🏦";
+        case "E_WALLET":         return "محفظة إلكترونية 📱";
     }
+    
+    // Generic prefixes
+    if (m.startsWith("BANK_")) return "🏦 " + method.replace("BANK_", "بنك ");
+    if (m.startsWith("WALLET_")) return "📱 " + method.replace("WALLET_", "");
+    
+    return method;
+}
 
     // ═══════════════════════════════════════════════════════
     // Print / Share / Save
@@ -550,13 +585,18 @@ public class MiraReceiptFragment extends DialogFragment {
                 JSONObject ti = tradeIns.optJSONObject(i);
                 if (ti == null) continue;
 
-                double weight = safeDouble(ti, "weight_grams",
-                                safeDouble(ti, "weight", 0));
-                double value = safeDouble(ti, "value_yer",
-                              safeDouble(ti, "value", 0));
-                String karat = safeString(ti, "karat", "21K");
-                String desc = safeString(ti, "description",
-                        isArabic ? "ذهب كسر" : "Scrap Gold");
+                // ✅ قراءة الحقول الفعلية من Backend
+double weight = safeDouble(ti, "gross_weight_grams",
+                safeDouble(ti, "weight_grams",
+                safeDouble(ti, "weight", 0)));
+double value = safeDouble(ti, "total_amount",
+              safeDouble(ti, "value_yer",
+              safeDouble(ti, "value", 0)));
+String karat = safeString(ti, "gold_karat",
+               safeString(ti, "karat", "21K"));
+String desc = safeString(ti, "description",
+              safeString(ti, "purchase_number",
+              isArabic ? "ذهب كسر" : "Scrap Gold"));
 
                 totalWeight += weight;
                 if (value <= 0) allValuesPresent = false;
@@ -637,15 +677,16 @@ public class MiraReceiptFragment extends DialogFragment {
             }
 
             double tradeInValue = 0;
-            if (tradeIns != null) {
-                for (int i = 0; i < tradeIns.length(); i++) {
-                    JSONObject ti = tradeIns.optJSONObject(i);
-                    if (ti != null) {
-                        tradeInValue += safeDouble(ti, "value_yer",
-                                        safeDouble(ti, "value", 0));
-                    }
-                }
-            }
+if (tradeIns != null) {
+    for (int i = 0; i < tradeIns.length(); i++) {
+        JSONObject ti = tradeIns.optJSONObject(i);
+        if (ti != null) {
+            tradeInValue += safeDouble(ti, "total_amount",
+                            safeDouble(ti, "value_yer",
+                            safeDouble(ti, "value", 0)));
+        }
+    }
+}
 
             // fallback: إذا لم توجد قيم فردية للذهب، استخدم trade_in_total
             if (tradeInValue <= 0) {
@@ -925,17 +966,53 @@ public class MiraReceiptFragment extends DialogFragment {
         }
 
         // ═══ Info Grid ═══
-        h.append("<div class='info-grid'><table>")
-         .append("<tr>")
-         .append("<td class='label'>").append(isArabic ? "اسم العميل:" : "Customer:").append("</td><td class='value'>").append(escapeHtml(customer)).append("</td>")
-         .append("<td class='label'>").append(isArabic ? "التاريخ والوقت:" : "Date:").append("</td><td class='value'>").append(escapeHtml(dateStr)).append("</td>")
-         .append("</tr><tr>")
-         .append("<td class='label'>").append(isArabic ? "هاتف العميل:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : escapeHtml(customerPhone)).append("</td>")
-         .append("<td class='label'>").append(isArabic ? "مُحرر السند:" : "Seller:").append("</td><td class='value'>").append(escapeHtml(sellerName)).append("</td>")
-         .append("</tr><tr>")
-         .append("<td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value'>").append(escapeHtml(paymentMethodDisplay)).append("</td>")
-         .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'>").append(escapeHtml(branchName)).append("</td>")
-         .append("</tr></table></div>");
+        // ✅ قراءة بيانات إضافية للعميل
+String customerEmail = safeString(t, "customer_email",
+                       customerObj != null ? safeString(customerObj, "email", "") : "");
+String customerAddress = safeString(t, "customer_address",
+                         customerObj != null ? safeString(customerObj, "address", "") : "");
+String customerNotes = safeString(t, "customer_notes",
+                       customerObj != null ? safeString(customerObj, "notes", "") : "");
+String customerId = safeString(t, "customer_id", "");
+
+h.append("<div class='info-grid'><table>")
+ .append("<tr>")
+ .append("<td class='label'>").append(isArabic ? "اسم العميل:" : "Customer:").append("</td><td class='value'>").append(escapeHtml(customer))
+ .append(!customerId.isEmpty() && !"0".equals(customerId) && !"null".equals(customerId)
+         ? " <span style='font-size:9px; color:#2b6cb0;'>(" + (isArabic ? "ID: " : "ID: ") + customerId + ")</span>"
+         : "")
+ .append("</td>")
+ .append("<td class='label'>").append(isArabic ? "التاريخ والوقت:" : "Date:").append("</td><td class='value'>").append(escapeHtml(dateStr)).append("</td>")
+ .append("</tr><tr>")
+ .append("<td class='label'>").append(isArabic ? "هاتف العميل:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : escapeHtml(customerPhone)).append("</td>")
+ .append("<td class='label'>").append(isArabic ? "مُحرر السند:" : "Seller:").append("</td><td class='value'>").append(escapeHtml(sellerName)).append("</td>")
+ .append("</tr>");
+
+if (!customerEmail.isEmpty() || !customerAddress.isEmpty()) {
+    h.append("<tr>");
+    if (!customerEmail.isEmpty()) {
+        h.append("<td class='label'>").append(isArabic ? "البريد الإلكتروني:" : "Email:").append("</td><td class='value'>").append(escapeHtml(customerEmail)).append("</td>");
+    } else {
+        h.append("<td colspan='2'></td>");
+    }
+    if (!customerAddress.isEmpty()) {
+        h.append("<td class='label'>").append(isArabic ? "العنوان:" : "Address:").append("</td><td class='value'>").append(escapeHtml(customerAddress)).append("</td>");
+    } else {
+        h.append("<td colspan='2'></td>");
+    }
+    h.append("</tr>");
+}
+
+h.append("<tr>")
+ .append("<td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value'>").append(escapeHtml(paymentMethodDisplay)).append("</td>")
+ .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'>").append(escapeHtml(branchName)).append("</td>")
+ .append("</tr>");
+
+if (!customerNotes.isEmpty()) {
+    h.append("<tr><td class='label'>").append(isArabic ? "ملاحظات:" : "Notes:").append("</td><td class='value' colspan='3'>").append(escapeHtml(customerNotes)).append("</td></tr>");
+}
+
+h.append("</table></div>");
 
         // ═══ Items ═══
         JSONArray items = t.optJSONArray("items");
@@ -962,10 +1039,13 @@ public class MiraReceiptFragment extends DialogFragment {
                 boolean isItemRefunded = safeBoolean(it, "is_returned",
                                         safeBoolean(it, "is_refunded", false)) || isFullyRefunded;
 
-                double weight = safeDouble(it, "weight",
-                                safeDouble(it, "gross_weight",
-                                safeDouble(it, "gross_weight_grams", 0)));
-                if (!isItemRefunded) totalWeightSum += weight;
+                // ✅ قراءة net_weight أولاً (المُرسَل من Backend في items_json)
+double weight = safeDouble(it, "net_weight",
+                safeDouble(it, "weight",
+                safeDouble(it, "gross_weight",
+                safeDouble(it, "gross_weight_grams",
+                safeDouble(it, "net_weight_grams", 0)))));
+if (!isItemRefunded) totalWeightSum += weight;
 
                 double laborFee = safeDouble(it, "making_fee",
                                    safeDouble(it, "labor_price", 0));
