@@ -528,6 +528,43 @@ private void setMethod(String method) {
     // ✅ إبطال الكاش المحلي للقطع المرتجعة — قبل استدعاء callback
     invalidateCacheForRefundedItems();
 
+    // ✅ [FIX] حقن items في النتيجة إن لم تكن موجودة
+    //    ضروري لـ MiraPosFragment.GateSaleBridge (OfflineGateCache)
+    try {
+        JSONArray existingItems = result.optJSONArray("items");
+        if (existingItems == null || existingItems.length() == 0) {
+            long currentSaleId = 0L;
+            if (currentSale != null) {
+                currentSaleId = currentSale.optLong("id",
+                        currentSale.optLong("sale_id", 0L));
+            }
+
+            JSONArray enrichedItems = new JSONArray();
+            for (ItemRow ir : itemRows) {
+                if (ir.isRefunded) continue;
+                if (ir.checkbox == null || !ir.checkbox.isChecked()) continue;
+
+                JSONObject io = new JSONObject();
+                io.put("epc", ir.epc);
+                io.put("serial", ir.serialNo);
+                io.put("gtin", ir.gtin);
+                io.put("tid", ir.tid);
+                io.put("rfid_epc", ir.rfidEpc);
+                io.put("item_id", ir.itemId);
+                io.put("sale_id", currentSaleId);
+                enrichedItems.put(io);
+            }
+
+            if (enrichedItems.length() > 0) {
+                result.put("items", enrichedItems);
+                Log.i(TAG, "✅ Injected " + enrichedItems.length()
+                        + " items into refund result");
+            }
+        }
+    } catch (Exception e) {
+        Log.w(TAG, "enrich result error", e);
+    }
+
     if (callback != null) callback.onRefundSuccess(result);
     dismiss();
 } else {
