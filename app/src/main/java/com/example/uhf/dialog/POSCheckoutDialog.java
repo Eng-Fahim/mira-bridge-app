@@ -309,11 +309,15 @@ private void loadCurrencies() {
     private List<PaymentMethodDto> getFallbackMethods() {
     List<PaymentMethodDto> list = new ArrayList<>();
     String[][] fallback = {
-        {"CASH",       "نقداً",       "Cash",           "💵", "1101", "الصندوق الرئيسي",  "Main Cash Box"},
-        {"POS_MADA",   "شبكة مدى",    "POS Mada",       "💳", "112521", "شبكة مدى",       "Mada Network"},
-        {"VISA_MASTER","فيزا/ماستر",  "Visa/Master",    "💳", "112521", "فيزا/ماستر",     "Visa/Mastercard"},
-        {"BANK_TRANSFER","تحويل بنكي","Bank Transfer",  "🏦", "1102", "البنك",          "Bank"},
-        {"E_WALLET",   "محفظة إلكترونية","E-Wallet",   "📱", "1103", "محفظة",          "Wallet"},
+        {"CASH", "نقداً", "Cash", "💵", "111001", "الصندوق الرئيسي", "Main Cash Box"},
+        {"POS_MADA", "شبكة مدى", "POS Mada", "💳", "112521", "شبكة مدى", "Mada"},
+        {"VISA_MASTER", "فيزا/ماستر", "Visa", "💳", "112521", "فيزا/ماستر", "Visa"},
+        {"BANK_TADHAMON", "بنك التضامن", "Tadhamon", "🏦", "112001", "بنك التضامن", "Tadhamon Bank"},
+        {"BANK_KURAIMI", "بنك الكريمي", "Kuraimi", "🏦", "112004", "بنك الكريمي", "Kuraimi Bank"},
+        {"BANK_AHLI", "البنك الأهلي", "Ahli", "🏦", "112003", "البنك الأهلي", "Ahli Bank"},
+        {"BANK_YKB", "بنك اليمن والكويت", "YKB", "🏦", "112006", "بنك اليمن والكويت", "YKB"},
+        {"BANK_SABA", "بنك سبأ", "Saba", "🏦", "112008", "بنك سبأ", "Saba Bank"},
+        {"BANK_CAC", "كاك بنك", "CAC", "🏦", "112010", "كاك بنك", "CAC Bank"},
     };
     for (String[] f : fallback) {
         PaymentMethodDto m = new PaymentMethodDto();
