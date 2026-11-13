@@ -60,6 +60,7 @@ public class POSCheckoutDialog extends DialogFragment {
         void onDialogDismissed();
     }
 
+    // ✅ DTO نظيف — بيانات فقط بدون عناصر UI وبدون تكرار
     public static class POSCheckoutData {
         public String customerName = "";
         public String customerPhone = "";
@@ -73,15 +74,10 @@ public class POSCheckoutDialog extends DialogFragment {
         public double discount = 0.0;
         public double discountAmount = 0.0;
         public double finalAmount = 0.0;
-        private LinearLayout llTradeInSummary;
-        private Button btnTradeIn;
-        private TextView tvTradeInTotal;
-        private double tradeInTotal = 0.0;
-        private JSONArray tradeInLines = new JSONArray();
 
         public JSONArray payments = new JSONArray();
         public String localUuid = "";
-        
+
         public JSONArray tradeIns = new JSONArray();
         public double tradeInTotal = 0.0;
     }
@@ -108,6 +104,13 @@ public class POSCheckoutDialog extends DialogFragment {
     private LinearLayout llPaymentsContainer;
     private Button btnAddPayment;
     private TextView tvRemaining;
+
+    // ✅ حقول Trade-In أصبحت في كلاس الـ Dialog (مكانها الصحيح)
+    private LinearLayout llTradeInSummary;
+    private Button btnTradeIn;
+    private TextView tvTradeInTotal;
+    private double tradeInTotal = 0.0;
+    private JSONArray tradeInLines = new JSONArray();
 
     private final List<PaymentMethodDto> paymentMethods = new ArrayList<>();
     private PaymentMethodDto selectedMethod = null;
@@ -226,9 +229,10 @@ public class POSCheckoutDialog extends DialogFragment {
         llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
         btnAddPayment       = view.findViewById(R.id.btnAddPayment);
         tvRemaining         = view.findViewById(R.id.tvRemaining);
-        llTradeInSummary = view.findViewById(R.id.llTradeInSummary);
-        btnTradeIn = view.findViewById(R.id.btnTradeIn);
-        tvTradeInTotal = view.findViewById(R.id.tvTradeInTotal);
+
+        llTradeInSummary    = view.findViewById(R.id.llTradeInSummary);
+        btnTradeIn          = view.findViewById(R.id.btnTradeIn);
+        tvTradeInTotal      = view.findViewById(R.id.tvTradeInTotal);
     }
 
     private void applyLanguage() {
@@ -242,6 +246,7 @@ public class POSCheckoutDialog extends DialogFragment {
         if (btnCancelCheckout != null) btnCancelCheckout.setText(isArabic ? "إلغاء" : "Cancel");
         if (btnConfirmCheckout != null) btnConfirmCheckout.setText(isArabic ? "تأكيد البيع ✓" : "Confirm Sale ✓");
         if (btnAddPayment != null) btnAddPayment.setText(isArabic ? "+ إضافة عملة أخرى" : "+ Add Currency");
+        if (btnTradeIn != null) btnTradeIn.setText(isArabic ? "🔄 إضافة ذهب (Trade-In)" : "🔄 Add Trade-In");
     }
 
     private void setupSpinner() {
@@ -344,7 +349,6 @@ public class POSCheckoutDialog extends DialogFragment {
             updateAccountNumberFromMethod(selectedMethod);
         }
 
-        // تحديث قوائم طرق الدفع للسطور التي تمت إضافتها قبل التحميل
         for (View row : paymentRows) {
             Spinner spMethod = row.findViewById(R.id.spMethod);
             if (spMethod != null) {
@@ -380,8 +384,8 @@ public class POSCheckoutDialog extends DialogFragment {
         if ("YER".equalsIgnoreCase(currency)) return 1.0;
 
         if (priceManager != null) {
-            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER); // 530
-            double currencyRate = priceManager.getExchangeRate(currency); // USD = 1.0, SAR = 3.75
+            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
+            double currencyRate = priceManager.getExchangeRate(currency);
 
             if (currencyRate > 10) return currencyRate;
 
@@ -497,21 +501,19 @@ public class POSCheckoutDialog extends DialogFragment {
         }
 
         double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
-        // ✅ الذهب يُحسب كدفعة
         double totalPaidWithGold = totalPaidInYer + tradeInTotal;
         double remaining = requiredTotalInYer - totalPaidWithGold;
+
         if (Math.abs(remaining) < 1) {
-           tvRemaining.setText("0.00 YER");
-           tvRemaining.setTextColor(Color.parseColor("#16A34A"));
+            tvRemaining.setText("0.00 YER");
+            tvRemaining.setTextColor(Color.parseColor("#16A34A"));
         } else if (remaining > 0) {
-    // ناقص → أحمر
-    tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-    tvRemaining.setTextColor(Color.parseColor("#DC2626"));
-} else {
-    // زائد → أزرق (سيُضاف رصيد دائن)
-    tvRemaining.setText(String.format(Locale.US, "💰 + %,.2f YER", Math.abs(remaining)));
-    tvRemaining.setTextColor(Color.parseColor("#2563EB"));
-}
+            tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
+            tvRemaining.setTextColor(Color.parseColor("#DC2626"));
+        } else {
+            tvRemaining.setText(String.format(Locale.US, "💰 + %,.2f YER", Math.abs(remaining)));
+            tvRemaining.setTextColor(Color.parseColor("#2563EB"));
+        }
     }
 
     private boolean validateInputs() {
@@ -529,22 +531,23 @@ public class POSCheckoutDialog extends DialogFragment {
         return isValid;
     }
 
-private void openTradeInDialog() {
-    double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
-    TradeInDialog dialog = TradeInDialog.newInstance(maxValue);
-    dialog.setOnTradeInListener((tradeIns, totalValue) -> {
-        this.tradeInLines = tradeIns;
-        this.tradeInTotal = totalValue;
-        if (tvTradeInTotal != null) {
-            tvTradeInTotal.setText(String.format(Locale.US, "%,.0f YER", totalValue));
-        }
-        if (llTradeInSummary != null) {
-            llTradeInSummary.setVisibility(totalValue > 0 ? View.VISIBLE : View.GONE);
-        }
-        updateRemainingBalance();
-    });
-    dialog.show(getParentFragmentManager(), "TradeInDialog");
-}
+    private void openTradeInDialog() {
+        double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
+        TradeInDialog dialog = TradeInDialog.newInstance(maxValue);
+        dialog.setOnTradeInListener((tradeIns, totalValue) -> {
+            this.tradeInLines = tradeIns;
+            this.tradeInTotal = totalValue;
+            if (tvTradeInTotal != null) {
+                tvTradeInTotal.setText(String.format(Locale.US, "%,.0f YER", totalValue));
+            }
+            if (llTradeInSummary != null) {
+                llTradeInSummary.setVisibility(totalValue > 0 ? View.VISIBLE : View.GONE);
+            }
+            updateRemainingBalance();
+        });
+        dialog.show(getParentFragmentManager(), "TradeInDialog");
+    }
+
     private void setupListeners() {
         if (etDiscount != null) {
             etDiscount.addTextChangedListener(new TextWatcher() {
@@ -553,9 +556,11 @@ private void openTradeInDialog() {
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
+
         if (btnTradeIn != null) {
-        btnTradeIn.setOnClickListener(v -> openTradeInDialog());
+            btnTradeIn.setOnClickListener(v -> openTradeInDialog());
         }
+
         if (btnCancelCheckout != null) btnCancelCheckout.setOnClickListener(v -> dismissAllowingStateLoss());
 
         if (btnAddPayment != null) btnAddPayment.setOnClickListener(v -> addPaymentRow(CURRENCIES[0], 0.0));
@@ -564,7 +569,6 @@ private void openTradeInDialog() {
             btnConfirmCheckout.setOnClickListener(v -> {
                 if (!validateInputs()) return;
 
-                // ✅ 1) عرّف data أولاً (قبل أي استخدام وداخل أي lambda)
                 final POSCheckoutData data = new POSCheckoutData();
                 if (etCustomerName    != null) data.customerName    = etCustomerName.getText().toString().trim();
                 if (etCustomerPhone   != null) data.customerPhone   = etCustomerPhone.getText().toString().trim();
@@ -584,7 +588,6 @@ private void openTradeInDialog() {
                 data.discountAmount  = totalAmount * (data.discount / 100.0);
                 data.finalAmount     = totalAmount - data.discountAmount;
 
-                // ✅ 2) جمع الدفعات
                 final JSONArray paymentsArray = new JSONArray();
                 double totalPaidInYer = 0;
 
@@ -623,12 +626,10 @@ private void openTradeInDialog() {
 
                 data.payments = paymentsArray;
 
-                // ✅ 3) المقارنة بين المدفوع والمطلوب
                 double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
                 double totalWithGold = totalPaidInYer + tradeInTotal;
                 double diff = totalWithGold - requiredTotalInYer;
 
-                // ❌ نقص → ممنوع
                 if (diff < -1.0) {
                     Toast.makeText(requireContext(),
                         isArabic ? "⚠️ المبلغ ناقص " + String.format(Locale.US, "%,.0f", Math.abs(diff)) + " YER"
@@ -637,7 +638,6 @@ private void openTradeInDialog() {
                     return;
                 }
 
-                // ✅ زيادة → مسموحة (ستُصبح رصيداً دائناً) لكن تتطلب رقم هاتف + تأكيد
                 if (diff > 1.0) {
                     String phone = (etCustomerPhone != null) ? etCustomerPhone.getText().toString().trim() : "";
                     if (phone.isEmpty()) {
@@ -660,19 +660,18 @@ private void openTradeInDialog() {
                     return;
                 }
 
-                // ✅ متطابق
                 proceedCheckout(data, paymentsArray, isArabic);
             });
         }
     }
 
     private void proceedCheckout(POSCheckoutData data, JSONArray paymentsArray, boolean isArabic) {
-    data.payments = paymentsArray;
-    data.tradeIns = tradeInLines;
-    data.tradeInTotal = tradeInTotal;
-    dismissAllowingStateLoss();
-    if (listener != null) listener.onCheckout(data);
-}
+        data.payments = paymentsArray;
+        data.tradeIns = tradeInLines;
+        data.tradeInTotal = tradeInTotal;
+        dismissAllowingStateLoss();
+        if (listener != null) listener.onCheckout(data);
+    }
 
     private void updateFinalAmount() {
         if (priceManager == null) return;
@@ -704,4 +703,4 @@ private void openTradeInDialog() {
         if (selectedMethod != null && selectedMethod.accountCode != null) return selectedMethod.accountCode;
         return "1101";
     }
-                    }
+}
