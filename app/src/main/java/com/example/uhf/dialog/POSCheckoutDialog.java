@@ -2,6 +2,7 @@ package com.example.uhf.dialog;
 
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -36,6 +37,8 @@ import com.example.uhf.api.dto.PaymentMethodDto;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.utils.DiagTracer;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.gson.Gson;
@@ -60,7 +63,6 @@ public class POSCheckoutDialog extends DialogFragment {
         void onDialogDismissed();
     }
 
-    // ✅ DTO نظيف — بيانات فقط بدون عناصر UI وبدون تكرار
     public static class POSCheckoutData {
         public String customerName = "";
         public String customerPhone = "";
@@ -93,6 +95,12 @@ public class POSCheckoutDialog extends DialogFragment {
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
 
+    private EditText etSimpleAmount;
+    private MaterialCardView btnTabCash, btnTabGold;
+    private MaterialButton btnCloseDialog;
+    private LinearLayout llCustomerToggle, llCustomerFields, llDiscountToggle, llDiscountFields;
+    private TextView tvCustomerArrow, tvDiscountArrow;
+
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount,
             tvFinalTotal, tvAccountNumber;
     private EditText etCustomerName, etCustomerPhone, etCustomerEmail,
@@ -105,7 +113,6 @@ public class POSCheckoutDialog extends DialogFragment {
     private Button btnAddPayment;
     private TextView tvRemaining;
 
-    // ✅ حقول Trade-In أصبحت في كلاس الـ Dialog (مكانها الصحيح)
     private LinearLayout llTradeInSummary;
     private Button btnTradeIn;
     private TextView tvTradeInTotal;
@@ -233,16 +240,28 @@ public class POSCheckoutDialog extends DialogFragment {
         llTradeInSummary    = view.findViewById(R.id.llTradeInSummary);
         btnTradeIn          = view.findViewById(R.id.btnTradeIn);
         tvTradeInTotal      = view.findViewById(R.id.tvTradeInTotal);
+
+        etSimpleAmount    = view.findViewById(R.id.etSimpleAmount);
+        btnTabCash        = view.findViewById(R.id.btnTabCash);
+        btnTabGold        = view.findViewById(R.id.btnTabGold);
+        btnCloseDialog    = view.findViewById(R.id.btnCloseDialog);
+        llCustomerToggle  = view.findViewById(R.id.llCustomerToggle);
+        llCustomerFields  = view.findViewById(R.id.llCustomerFields);
+        llDiscountToggle  = view.findViewById(R.id.llDiscountToggle);
+        llDiscountFields  = view.findViewById(R.id.llDiscountFields);
+        tvCustomerArrow   = view.findViewById(R.id.tvCustomerArrow);
+        tvDiscountArrow   = view.findViewById(R.id.tvDiscountArrow);
     }
 
     private void applyLanguage() {
         if (tvDialogTitle != null) tvDialogTitle.setText(isArabic ? "إتمام عملية البيع" : "Complete Sale");
-        if (tilCustomerName != null) tilCustomerName.setHint(isArabic ? "اسم العميل *" : "Customer Name *");
-        if (tilCustomerPhone != null) tilCustomerPhone.setHint(isArabic ? "رقم الهاتف *" : "Phone Number *");
+        if (tilCustomerName != null) tilCustomerName.setHint(isArabic ? "اسم العميل" : "Customer Name");
+        if (tilCustomerPhone != null) tilCustomerPhone.setHint(isArabic ? "رقم الهاتف" : "Phone Number");
         if (etCustomerEmail != null) etCustomerEmail.setHint(isArabic ? "البريد الإلكتروني (اختياري)" : "Email (Optional)");
         if (etCustomerAddress != null) etCustomerAddress.setHint(isArabic ? "العنوان (اختياري)" : "Address (Optional)");
         if (etCustomerNotes != null) etCustomerNotes.setHint(isArabic ? "ملاحظات (اختياري)" : "Notes (Optional)");
         if (etDiscount != null) etDiscount.setHint(isArabic ? "نسبة الخصم" : "Discount");
+        if (etSimpleAmount != null) etSimpleAmount.setHint(isArabic ? "المبلغ المدفوع (YER)" : "Amount Paid (YER)");
         if (btnCancelCheckout != null) btnCancelCheckout.setText(isArabic ? "إلغاء" : "Cancel");
         if (btnConfirmCheckout != null) btnConfirmCheckout.setText(isArabic ? "تأكيد البيع ✓" : "Confirm Sale ✓");
         if (btnAddPayment != null) btnAddPayment.setText(isArabic ? "+ إضافة عملة أخرى" : "+ Add Currency");
@@ -377,7 +396,7 @@ public class POSCheckoutDialog extends DialogFragment {
             tvItemCount.setText(isArabic ? String.format(Locale.getDefault(), "%d قطعة", itemCount) : String.format(Locale.getDefault(), "%d items", itemCount));
         }
         updateFinalAmount();
-        addPaymentRow(CURRENCIES[0], 0.0);
+        // ✅ حُذف addPaymentRow — التصميم الجديد يستخدم etSimpleAmount فقط
     }
 
     private double getRateToYER(String currency) {
@@ -486,7 +505,11 @@ public class POSCheckoutDialog extends DialogFragment {
     private void updateRemainingBalance() {
         if (tvRemaining == null) return;
 
-        double totalPaidInYer = 0;
+        double cashPaid = 0;
+        if (etSimpleAmount != null) {
+            try { cashPaid = Double.parseDouble(etSimpleAmount.getText().toString().trim()); }
+            catch (Exception ignored) {}
+        }
         for (View row : paymentRows) {
             Spinner spCurrency = row.findViewById(R.id.spCurrency);
             EditText et = row.findViewById(R.id.etAmount);
@@ -496,16 +519,16 @@ public class POSCheckoutDialog extends DialogFragment {
                 double rate = getRateToYER(currency);
                 double amount = 0;
                 try { amount = Double.parseDouble(et.getText().toString()); } catch (Exception ignored) {}
-                totalPaidInYer += (amount * rate);
+                cashPaid += (amount * rate);
             }
         }
 
         double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
-        double totalPaidWithGold = totalPaidInYer + tradeInTotal;
+        double totalPaidWithGold = cashPaid + tradeInTotal;
         double remaining = requiredTotalInYer - totalPaidWithGold;
 
         if (Math.abs(remaining) < 1) {
-            tvRemaining.setText("0.00 YER");
+            tvRemaining.setText("✓ 0.00 YER");
             tvRemaining.setTextColor(Color.parseColor("#16A34A"));
         } else if (remaining > 0) {
             tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
@@ -516,19 +539,59 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
+    /**
+     * ✅ منطق التحقق الجديد:
+     * - الاسم والهاتف اختياريان في الوضع الطبيعي (القسم مخفي افتراضياً)
+     * - فقط عند الدفع الزائد (diff > 1.0) → يُطلب الهاتف لإنشاء رصيد دائن
+     * - يفتح قسم العميل تلقائياً عند الحاجة
+     */
     private boolean validateInputs() {
-        boolean isValid = true;
-        if (etCustomerName != null && etCustomerName.getText().toString().trim().isEmpty()) {
-            if (tilCustomerName != null) tilCustomerName.setError(isArabic ? "اسم العميل مطلوب" : "Required");
-            isValid = false;
-        } else if (tilCustomerName != null) tilCustomerName.setError(null);
+        // ✅ الاسم والهاتف اختياريان في الوضع الطبيعي
+        if (tilCustomerName != null) tilCustomerName.setError(null);
+        if (tilCustomerPhone != null) tilCustomerPhone.setError(null);
 
-        if (etCustomerPhone != null && etCustomerPhone.getText().toString().trim().isEmpty()) {
-            if (tilCustomerPhone != null) tilCustomerPhone.setError(isArabic ? "رقم الهاتف مطلوب" : "Required");
-            isValid = false;
-        } else if (tilCustomerPhone != null) tilCustomerPhone.setError(null);
+        // حساب المدفوع (نقد + ذهب)
+        double cashPaid = 0;
+        if (etSimpleAmount != null) {
+            try { cashPaid = Double.parseDouble(etSimpleAmount.getText().toString().trim()); }
+            catch (Exception ignored) {}
+        }
+        for (View row : paymentRows) {
+            Spinner spCurrency = row.findViewById(R.id.spCurrency);
+            EditText et = row.findViewById(R.id.etAmount);
+            int pos = spCurrency.getSelectedItemPosition();
+            if (pos >= 0) {
+                double amount = 0;
+                try { amount = Double.parseDouble(et.getText().toString()); } catch (Exception ignored) {}
+                cashPaid += (amount * getRateToYER(CURRENCIES[pos]));
+            }
+        }
 
-        return isValid;
+        double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
+        double totalWithGold = cashPaid + tradeInTotal;
+        double diff = totalWithGold - requiredTotalInYer;
+
+        // ✅ فقط عند الدفع الزائد → نتطلب رقم هاتف (لإصدار الرصيد)
+        if (diff > 1.0) {
+            String phone = (etCustomerPhone != null) ? etCustomerPhone.getText().toString().trim() : "";
+            if (phone.isEmpty()) {
+                // افتح قسم العميل تلقائياً
+                if (llCustomerFields != null) llCustomerFields.setVisibility(View.VISIBLE);
+                if (tvCustomerArrow != null) tvCustomerArrow.setText("▲");
+                if (tilCustomerPhone != null) {
+                    tilCustomerPhone.setError(isArabic
+                            ? "مطلوب لإنشاء رصيد دائن"
+                            : "Required to create store credit");
+                }
+                Toast.makeText(requireContext(),
+                        isArabic ? "⚠️ الدفع الزائد يتطلب رقم هاتف العميل"
+                                 : "⚠️ Overpayment requires customer phone",
+                        Toast.LENGTH_LONG).show();
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void openTradeInDialog() {
@@ -553,6 +616,50 @@ public class POSCheckoutDialog extends DialogFragment {
             etDiscount.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateFinalAmount(); }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+        }
+
+        if (btnCloseDialog != null) {
+            btnCloseDialog.setOnClickListener(v -> dismissAllowingStateLoss());
+        }
+
+        if (btnTabCash != null) {
+            btnTabCash.setOnClickListener(v -> {
+                // ✅ استخدام ColorStateList بدلاً من int (Material 1.4+)
+                btnTabCash.setStrokeColor(ColorStateList.valueOf(Color.parseColor("#3B82F6")));
+                btnTabCash.setCardBackgroundColor(ColorStateList.valueOf(Color.parseColor("#EFF6FF")));
+                if (btnTabGold != null) {
+                    btnTabGold.setStrokeColor(ColorStateList.valueOf(Color.parseColor("#D97706")));
+                    btnTabGold.setCardBackgroundColor(ColorStateList.valueOf(Color.parseColor("#FEF3C7")));
+                }
+            });
+        }
+
+        if (btnTabGold != null) {
+            btnTabGold.setOnClickListener(v -> openTradeInDialog());
+        }
+
+        if (llCustomerToggle != null && llCustomerFields != null) {
+            llCustomerToggle.setOnClickListener(v -> {
+                boolean visible = llCustomerFields.getVisibility() == View.VISIBLE;
+                llCustomerFields.setVisibility(visible ? View.GONE : View.VISIBLE);
+                if (tvCustomerArrow != null) tvCustomerArrow.setText(visible ? "▼" : "▲");
+            });
+        }
+
+        if (llDiscountToggle != null && llDiscountFields != null) {
+            llDiscountToggle.setOnClickListener(v -> {
+                boolean visible = llDiscountFields.getVisibility() == View.VISIBLE;
+                llDiscountFields.setVisibility(visible ? View.GONE : View.VISIBLE);
+                if (tvDiscountArrow != null) tvDiscountArrow.setText(visible ? "▼" : "▲");
+            });
+        }
+
+        if (etSimpleAmount != null) {
+            etSimpleAmount.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void onTextChanged(CharSequence s, int a, int b, int c) { updateRemainingBalance(); }
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
@@ -588,9 +695,28 @@ public class POSCheckoutDialog extends DialogFragment {
                 data.discountAmount  = totalAmount * (data.discount / 100.0);
                 data.finalAmount     = totalAmount - data.discountAmount;
 
+                // ✅ جمع الدفعات من الحقل المبسط (YER) + سطور الدفع المتعددة
                 final JSONArray paymentsArray = new JSONArray();
                 double totalPaidInYer = 0;
 
+                // 1) الحقل المبسط
+                if (etSimpleAmount != null) {
+                    try {
+                        double simpleAmt = Double.parseDouble(etSimpleAmount.getText().toString().trim());
+                        if (simpleAmt > 0) {
+                            totalPaidInYer += simpleAmt;
+                            JSONObject pObj = new JSONObject();
+                            pObj.put("currency", "YER");
+                            pObj.put("amount", simpleAmt);
+                            pObj.put("exchange_rate", 1.0);
+                            pObj.put("base_amount", simpleAmt);
+                            pObj.put("method", "CASH");
+                            paymentsArray.put(pObj);
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                // 2) سطور الدفع المتعددة
                 for (View row : paymentRows) {
                     Spinner spCurrency = row.findViewById(R.id.spCurrency);
                     Spinner spMethod   = row.findViewById(R.id.spMethod);
@@ -639,15 +765,7 @@ public class POSCheckoutDialog extends DialogFragment {
                 }
 
                 if (diff > 1.0) {
-                    String phone = (etCustomerPhone != null) ? etCustomerPhone.getText().toString().trim() : "";
-                    if (phone.isEmpty()) {
-                        Toast.makeText(requireContext(),
-                            isArabic ? "⚠️ الدفع الزائد يتطلب رقم هاتف العميل (لحفظ الرصيد الدائن)"
-                                     : "⚠️ Overpayment requires customer phone (to save credit)",
-                            Toast.LENGTH_LONG).show();
-                        return;
-                    }
-
+                    // validateInputs() ضمن بالفعل وجود الهاتف هنا — نعرض تأكيد الرصيد فقط
                     new androidx.appcompat.app.AlertDialog.Builder(requireContext())
                         .setTitle(isArabic ? "💰 سيُضاف رصيد دائن" : "💰 Store Credit")
                         .setMessage(isArabic
