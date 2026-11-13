@@ -2401,6 +2401,23 @@ public class MiraApiClient {
         });
     }
 
+// ==================== حساب قيمة الذهب الكسر ====================
+public ApiResponse calculateScrap(double weightGrams, String karat) {
+    try {
+        JSONObject payload = new JSONObject();
+        payload.put("weight_grams", weightGrams);
+        payload.put("karat", karat);
+        if (!payload.has("gate_id")) {
+            payload.put("gate_id", getEffectiveGateId());
+        }
+        return postWithAuth("/scrap/calculate", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "calculateScrap error: " + e.getMessage());
+        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        r.isNetworkError = true;
+        return r;
+    }
+}
     public static class ApiResponse {
         public final int code;
         public final JSONObject data;
