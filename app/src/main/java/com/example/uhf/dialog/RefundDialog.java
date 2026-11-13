@@ -38,15 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * RefundDialog v2 — Sale-Centric Refund
- * مطابق لتجربة الويب:
- *  - بحث برقم الفاتورة
- *  - عرض كل القطع مع حالة كل واحدة
- *  - اختيار جزئي
- *  - طريقة إرجاع (نقد/رصيد) مع توصية
- *  - إرسال إلى /api/v1/refunds
- */
 public class RefundDialog extends Dialog {
 
     private static final String TAG = "RefundDialog";
@@ -186,9 +177,6 @@ public class RefundDialog extends Dialog {
         setCanceledOnTouchOutside(true);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  API Search
-    // ═══════════════════════════════════════════════════════════
     private void performSearch() {
         if (etQuery == null) return;
         String query = etQuery.getText().toString().trim();
@@ -203,7 +191,7 @@ public class RefundDialog extends Dialog {
                 MiraApiClient.ApiResponse resp = client.findSaleForRefund(query);
 
                 handler.post(() -> {
-                    if (mySeq != searchSeq) return; // stale
+                    if (mySeq != searchSeq) return;
                     if (resp != null && resp.isSuccess && resp.data != null) {
                         JSONObject sale = resp.data.optJSONObject("sale");
                         if (sale != null) {
@@ -230,9 +218,6 @@ public class RefundDialog extends Dialog {
         }).start();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Render
-    // ═══════════════════════════════════════════════════════════
     private void renderSale(JSONObject sale) {
         try {
             currentSale = sale;
@@ -260,10 +245,8 @@ public class RefundDialog extends Dialog {
             }
             tvSaleMeta.setText(meta.toString());
 
-            // Payments summary
             renderPayments(sale);
 
-            // Items
             JSONArray items = sale.optJSONArray("items");
             if (items != null && items.length() > 0) {
                 for (int i = 0; i < items.length(); i++) {
@@ -272,19 +255,16 @@ public class RefundDialog extends Dialog {
                 }
             }
 
-            // Customer credit info
             hasCustomer = sale.optInt("customer_id", 0) > 0;
             creditCreated = sale.optDouble("credit_created_local", 0);
             defaultMethod = sale.optString("default_refund_method", "cash");
             creditRecommended = "credit".equalsIgnoreCase(defaultMethod);
 
-            // Disable credit card if no customer
             if (cardCredit != null) {
                 cardCredit.setEnabled(hasCustomer);
                 cardCredit.setAlpha(hasCustomer ? 1f : 0.5f);
             }
 
-            // Preselect method
             if (creditRecommended && hasCustomer) {
                 setMethod("credit");
             } else {
@@ -321,10 +301,11 @@ public class RefundDialog extends Dialog {
             }
             tvPaymentsList.setText(sb.toString().trim());
 
+            // ✅ [FIX] TextView.append() تُرجع void — لا يمكن ربطها
             if (creditCreated > 0.01) {
-                tvPaymentsList.append("\n💰 أنشأت رصيداً: ")
-                    .append(String.format(Locale.US, "%,.0f", creditCreated))
-                    .append(" YER");
+                tvPaymentsList.append("\n💰 أنشأت رصيداً: ");
+                tvPaymentsList.append(String.format(Locale.US, "%,.0f", creditCreated));
+                tvPaymentsList.append(" YER");
             }
         } catch (Exception e) {
             Log.e(TAG, "renderPayments error", e);
@@ -368,13 +349,12 @@ public class RefundDialog extends Dialog {
                 tvPrice.setTextColor(Color.parseColor("#9CA3AF"));
                 spCond.setVisibility(View.GONE);
             } else {
-                cb.setChecked(true); // مختارة افتراضياً
+                cb.setChecked(true);
                 cb.setOnCheckedChangeListener((b, checked) -> {
                     spCond.setVisibility(checked ? View.VISIBLE : View.GONE);
                     updateTotal();
                 });
 
-                // Condition spinner
                 ArrayAdapter<String> adp = new ArrayAdapter<>(getContext(),
                     android.R.layout.simple_spinner_dropdown_item,
                     new String[]{
@@ -453,9 +433,6 @@ public class RefundDialog extends Dialog {
         updateWarning();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Submit
-    // ═══════════════════════════════════════════════════════════
     private void submitRefund() {
         if (currentSale == null) return;
 
@@ -528,9 +505,6 @@ public class RefundDialog extends Dialog {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════
     private void showState(String state) {
         if (llEmpty != null) llEmpty.setVisibility("empty".equals(state) ? View.VISIBLE : View.GONE);
         if (llLoading != null) llLoading.setVisibility("loading".equals(state) ? View.VISIBLE : View.GONE);
@@ -550,9 +524,9 @@ public class RefundDialog extends Dialog {
         dismiss();
     }
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
     //  Public API
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
 
     public void setQueryFromScan(String code) {
         if (etQuery == null || code == null) return;
@@ -574,6 +548,32 @@ public class RefundDialog extends Dialog {
 
     public void setOnHardwareKeyListener(@Nullable DialogInterface.OnKeyListener listener) {
         this.hardwareKeyListener = listener;
+    }
+
+    // ✅ [FIX] الدالتان المفقودتان — تستخدمهما MiraPosFragment في showRefundItemInfoInDialog / showRefundItemErrorInDialog
+    public void showRefundItemInfo(@Nullable String title, @Nullable String details) {
+        if (tvWarning == null) return;
+        StringBuilder sb = new StringBuilder();
+        if (title != null && !title.isEmpty()) sb.append("📦 ").append(title);
+        if (details != null && !details.isEmpty()) {
+            if (sb.length() > 0) sb.append("\n");
+            sb.append(details);
+        }
+        if (sb.length() > 0) {
+            tvWarning.setText(sb.toString());
+            tvWarning.setTextColor(Color.parseColor("#92400E"));
+            tvWarning.setVisibility(View.VISIBLE);
+        }
+    }
+
+    public void showRefundItemError(@Nullable String message) {
+        if (message == null) return;
+        if (tvWarning != null) {
+            tvWarning.setText("⚠️ " + message);
+            tvWarning.setTextColor(Color.parseColor("#DC2626"));
+            tvWarning.setVisibility(View.VISIBLE);
+        }
+        toast("⚠️ " + message);
     }
 
     @Override
