@@ -2439,34 +2439,27 @@ private long extractSaleIdFromResponse(MiraApiClient.ApiResponse response) {
 
 private void showRefundDialog() {
     if (!isFragmentAlive()) return;
-
-    // ✅ [SECURITY] فحص صلاحية refund
     if (!canPerformRefund()) {
         showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized to refund");
         return;
     }
-
     try {
-        selectedRefundItem.set(null);
         isRefundDialogHiddenForScan = false;
 
-        refundDialog = new RefundDialog(requireContext(),
-                new RefundDialog.RefundCallback() {
+        refundDialog = new RefundDialog(requireContext(), new RefundDialog.RefundCallback() {
             @Override
-            public void onRefundConfirm(String code, String reason, String refundMethodCode) {
-                processRefund(code, reason, refundMethodCode);
+            public void onRefundSuccess(JSONObject result) {
+                handleRefundSuccessV2(result);
             }
-
             @Override
             public void onBarcodeScan() {
                 isRefundDialogHiddenForScan = true;
                 if (refundDialog != null) refundDialog.hide();
                 openRefundBarcodeScanner();
             }
-
             @Override
-            public void onCodeChanged(String code) {
-                searchItemForRefund(code);
+            public void onDialogClosed() {
+                // تنظيف
             }
         });
 
@@ -2474,6 +2467,43 @@ private void showRefundDialog() {
         refundDialog.show();
     } catch (Exception e) {
         Log.e(TAG, "showRefundDialog error", e);
+    }
+}
+
+private void handleRefundSuccessV2(JSONObject result) {
+    try {
+        if (result == null) return;
+
+        String refundNumber = result.optString("refund_number", "");
+        double amountLocal = result.optDouble("amount_local", 0);
+        String method = result.optString("method", "cash");
+        boolean isFull = result.optBoolean("is_full", false);
+
+        String methodLabel = "credit".equals(method)
+            ? (isArabic ? "رصيد دائن" : "Store Credit")
+            : (isArabic ? "نقدي" : "Cash");
+
+        String msg = isArabic
+            ? "✅ تم الإرجاع بنجاح!\n"
+              + "رقم الإرجاع: " + refundNumber + "\n"
+              + "المبلغ: " + String.format(Locale.US, "%,.2f", amountLocal) + " YER\n"
+              + "الطريقة: " + methodLabel
+              + (isFull ? "\n(إرجاع كامل)" : "\n(إرجاع جزئي)")
+            : "✅ Refund successful!\n"
+              + "Refund #: " + refundNumber + "\n"
+              + "Amount: " + String.format(Locale.US, "%,.2f", amountLocal) + " YER\n"
+              + "Method: " + methodLabel
+              + (isFull ? "\n(Full refund)" : "\n(Partial refund)");
+
+        PosUIManager.showResultDialog(requireContext(),
+            isArabic ? "تم الإرجاع" : "Refund Success",
+            msg, true, isArabic);
+
+        // إشعار تحديث البيانات
+        PosUIManager.notifyDataChanged(requireContext(), "refund", getActiveBranchId());
+
+    } catch (Exception e) {
+        Log.e(TAG, "handleRefundSuccessV2 error", e);
     }
 }
 
@@ -2568,8 +2598,7 @@ private void openRefundBarcodeScanner() {
             }
 
             if (refundDialog != null) {
-                refundDialog.setRefundCode(data);
-                searchItemForRefund(data);
+            refundDialog.setQueryFromScan(data);
             }
         } catch (Exception e) {
             Log.e(TAG, "Refund barcode callback error", e);
