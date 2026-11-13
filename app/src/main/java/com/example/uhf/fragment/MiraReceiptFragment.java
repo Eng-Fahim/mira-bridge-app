@@ -768,6 +768,7 @@ public class MiraReceiptFragment extends DialogFragment {
                 h.append(paymentsHtml);
             }
 
+
             // ═══ Totals ═══
             double subtotalUSD = safeDouble(t, "subtotal_usd",
                     paymentObj != null ? safeDouble(paymentObj, "subtotal_usd",
@@ -847,6 +848,45 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("</td></tr>");
 
             h.append("</table></div></div>");
+            // ✅ قسم الرصيد الدائن المُنشأ (Store Credit)
+double creditCreated = safeDouble(t, "credit_created_local",
+                       paymentObj != null ? safeDouble(paymentObj, "credit_created_local", 0) : 0);
+
+// fallback: ابحث في sale
+if (creditCreated <= 0.01) {
+    JSONObject saleObj = t.optJSONObject("sale");
+    if (saleObj != null) creditCreated = safeDouble(saleObj, "credit_created_local", 0);
+}
+
+if (creditCreated > 0.01) {
+    long creditId = 0;
+    try {
+        creditId = t.optLong("credit_id_created", 0);
+        if (creditId == 0) {
+            JSONObject saleObj = t.optJSONObject("sale");
+            if (saleObj != null) creditId = saleObj.optLong("credit_id_created", 0);
+        }
+    } catch (Exception ignored) {}
+
+    h.append("<div style='margin:12px 0; padding:14px; background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border:2px solid #3b82f6; border-radius:10px;'>")
+     .append("<div style='text-align:center; font-weight:bold; color:#1e40af; font-size:13px; margin-bottom:8px;'>💰 ")
+     .append(isArabic ? "رصيد دائن للعميل" : "Customer Store Credit")
+     .append("</div>")
+     .append("<div style='text-align:center; font-size:22px; font-weight:900; color:#1e3a8a; padding:6px; background:#fff; border-radius:6px; margin:4px 0;'>+")
+     .append(String.format(Locale.US, "%,.2f", creditCreated))
+     .append(" YER</div>");
+
+    if (creditId > 0) {
+        h.append("<div style='text-align:center; font-size:9px; color:#3b82f6; font-family:monospace; margin-top:4px;'>")
+         .append(isArabic ? "معرف الرصيد: " : "Credit ID: ")
+         .append(creditId)
+         .append("</div>");
+    }
+
+    h.append("<div style='text-align:center; font-size:10px; color:#1e40af; margin-top:6px;'>")
+     .append(isArabic ? "✅ صالح 12 شهراً — استخدمه في مشترياتك القادمة" : "✅ Valid 12 months — use in future purchases")
+     .append("</div></div>");
+}
 
             // ═══ Tafqeet ═══
             if (finalUSD > 0 || finalLocal > 0) {
