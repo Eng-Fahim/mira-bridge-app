@@ -1,486 +1,292 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="@dimen/space_4">
+    android:fillViewport="false">
 
-    <!-- ══════════════════════════════════════════════════
-         رأس الصفحة: عنوان + زر إغلاق
-         ══════════════════════════════════════════════════ -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="@dimen/space_4">
-
-        <TextView
-            android:id="@+id/tvDialogTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="إتمام عملية البيع"
-            android:textAppearance="@style/TextAppearance.App.Title.Large"
-            android:textColor="@color/text_gold_accent"
-            android:textStyle="bold" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCloseDialog"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:text="✕"
-            android:textSize="20sp" />
-    </LinearLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         بطاقة الإجمالي (Focus Card)
-         ══════════════════════════════════════════════════ -->
     <com.google.android.material.card.MaterialCardView
+        style="@style/AppCardViewStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/space_4"
-        app:cardBackgroundColor="#FFF9E6"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="0dp"
-        app:strokeColor="#F4D58D"
-        app:strokeWidth="2dp">
+        android:layout_margin="@dimen/space_2">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:gravity="center"
-            android:padding="20dp">
+            android:padding="@dimen/space_4">
 
-            <TextView
-                android:id="@+id/tvItemCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="1 قطعة"
-                android:textSize="12sp"
-                android:textColor="#92400E" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="الإجمالي المطلوب"
-                android:textSize="11sp"
-                android:textColor="#78350F" />
-
-            <TextView
-                android:id="@+id/tvFinalTotal"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="0 YER"
-                android:textSize="32sp"
-                android:textStyle="bold"
-                android:textColor="#B45309"
-                android:textDirection="ltr" />
-
-            <!-- شارات صغيرة للإجمالي الفرعي والخصم -->
+            <!-- Header -->
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
                 <TextView
+                    android:id="@+id/tvDialogTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="الدفع"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCloseDialog"
+                    style="@style/Widget.Material3.Button.IconButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="الإجمالي: "
-                    android:textSize="10sp"
-                    android:textColor="#78350F" />
+                    app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                    app:iconTint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <!-- Total Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="الإجمالي المطلوب"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvFinalTotal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="0 YER"
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textDirection="ltr" />
+                        
+                    <TextView
+                        android:id="@+id/tvItemCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1 قطعة"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginTop="4dp" />
+                        
+                    <!-- Hidden fields for compatibility -->
+                    <TextView android:id="@+id/tvSubtotal" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+                    <TextView android:id="@+id/tvDiscountAmount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+                    <TextView android:id="@+id/tvAccountNumber" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Payments Header -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
 
                 <TextView
-                    android:id="@+id/tvSubtotal"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="المدفوعات"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTradeIn"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="دفع بالذهب"
+                    android:textSize="12sp"
+                    app:icon="@android:drawable/ic_menu_add"
+                    app:iconSize="16dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddPayment"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="+ إضافة دفعة"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Dynamic Payment Container -->
+            <LinearLayout
+                android:id="@+id/llPaymentsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- Trade-In Summary -->
+            <LinearLayout
+                android:id="@+id/llTradeInSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?attr/colorSecondaryContainer"
+                android:padding="10dp"
+                android:layout_marginVertical="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="+ ذهب مُستلم:"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSecondaryContainer" />
+
+                <TextView
+                    android:id="@+id/tvTradeInTotal"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0 YER"
-                    android:textSize="10sp"
+                    android:textSize="13sp"
                     android:textStyle="bold"
-                    android:textColor="#78350F"
-                    android:textDirection="ltr"
-                    android:layout_marginEnd="12dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="الخصم: "
-                    android:textSize="10sp"
-                    android:textColor="#78350F" />
-
-                <TextView
-                    android:id="@+id/tvDiscountAmount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 YER"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:textColor="#DC2626"
+                    android:textColor="?attr/colorOnSecondaryContainer"
                     android:textDirection="ltr" />
             </LinearLayout>
+
+            <!-- Status Banner (Shortage/Excess) -->
+            <LinearLayout
+                android:id="@+id/llStatusBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#FEE2E2"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/tvStatusIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚠️"
+                    android:textSize="16sp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="مبلغ ناقص"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#B91C1C" />
+
+                <TextView
+                    android:id="@+id/tvRemaining"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 YER"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#B91C1C"
+                    android:textDirection="ltr" />
+            </LinearLayout>
+
+            <!-- Customer Info -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilCustomerName"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:hint="اسم العميل (اختياري)">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etCustomerName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPersonName" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilCustomerPhone"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="رقم الهاتف">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etCustomerPhone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="phone" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <!-- Hidden fields for compatibility -->
+            <EditText android:id="@+id/etSimpleAmount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <EditText android:id="@+id/etDiscount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <EditText android:id="@+id/etCustomerEmail" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <EditText android:id="@+id/etCustomerAddress" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <EditText android:id="@+id/etCustomerNotes" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <LinearLayout android:id="@+id/llDiscountToggle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <LinearLayout android:id="@+id/llDiscountFields" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <TextView android:id="@+id/tvDiscountArrow" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <LinearLayout android:id="@+id/llCustomerToggle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <LinearLayout android:id="@+id/llCustomerFields" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <TextView android:id="@+id/tvCustomerArrow" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+            <com.google.android.material.card.MaterialCardView android:id="@+id/btnTabCash" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <com.google.android.material.card.MaterialCardView android:id="@+id/btnTabGold" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <com.google.android.material.textfield.TextInputLayout android:id="@+id/tilPaymentMethod" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"><com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/spPaymentMethod" android:layout_width="match_parent" android:layout_height="wrap_content" /></com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Action Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCancelCheckout"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="إلغاء" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnConfirmCheckout"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="2"
+                    android:text="تأكيد الدفع" />
+            </LinearLayout>
+
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
-
-    <!-- ══════════════════════════════════════════════════
-         قسم الدفع — التبويبات الرئيسية
-         ══════════════════════════════════════════════════ -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="💳 طريقة السداد"
-        android:textAppearance="@style/TextAppearance.App.Title.Small"
-        android:textColor="@color/text_gold_accent"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
-
-    <!-- أزرار التبويب: نقد / ذهب -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="12dp">
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/btnTabCash"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            app:cardBackgroundColor="#EFF6FF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#3B82F6"
-            app:strokeWidth="2dp"
-            android:clickable="true"
-            android:focusable="true">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="12dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="💵"
-                    android:textSize="22sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="نقد / بطاقة"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:textColor="#1E40AF"
-                    android:layout_marginTop="4dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/btnTabGold"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            app:cardBackgroundColor="#FEF3C7"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#F59E0B"
-            app:strokeWidth="2dp"
-            android:clickable="true"
-            android:focusable="true">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="12dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🥇"
-                    android:textSize="22sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="ذهب كسر"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:textColor="#92400E"
-                    android:layout_marginTop="4dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-    </LinearLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         حقل المبلغ النقدي (مبسط - عملة واحدة)
-         ══════════════════════════════════════════════════ -->
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/tilSimpleAmount"
-        style="@style/AppTextInputStyle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:hint="المبلغ المدفوع (YER)"
-        app:prefixText="﷼  "
-        app:startIconDrawable="@android:drawable/ic_input_add">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etSimpleAmount"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="numberDecimal"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textDirection="ltr"
-            android:textColor="?attr/colorOnSurface" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <!-- عرض الذهب المُستلم إن وُجد -->
-    <LinearLayout
-        android:id="@+id/llTradeInSummary"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="#FEF3C7"
-        android:padding="10dp"
-        android:layout_marginBottom="8dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🥇 ذهب مُستلم:"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#92400E" />
-
-        <TextView
-            android:id="@+id/tvTradeInTotal"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0 YER"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="#92400E"
-            android:textDirection="ltr" />
-    </LinearLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         شريط الحالة (متبقي / مدفوع / رصيد)
-         ══════════════════════════════════════════════════ -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="?attr/colorSurfaceVariant"
-        android:padding="12dp"
-        android:layout_marginBottom="12dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="المتبقي:"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnSurface" />
-
-        <TextView
-            android:id="@+id/tvRemaining"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0 YER"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:textColor="@color/danger_500"
-            android:textDirection="ltr" />
-    </LinearLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         قسم الخصم (قابل للطي — مخفي افتراضياً)
-         ══════════════════════════════════════════════════ -->
-    <LinearLayout
-        android:id="@+id/llDiscountToggle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="?attr/selectableItemBackground"
-        android:padding="10dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:layout_marginBottom="6dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🏷️ تطبيق خصم"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-
-        <TextView
-            android:id="@+id/tvDiscountArrow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="▼"
-            android:textSize="10sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/llDiscountFields"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:layout_marginBottom="6dp">
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/AppTextInputStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="نسبة الخصم"
-            app:suffixText="%">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etDiscount"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="numberDecimal"
-                android:text="0"
-                android:textDirection="ltr" />
-        </com.google.android.material.textfield.TextInputLayout>
-    </LinearLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         قسم العميل (قابل للطي — مخفي افتراضياً)
-         ══════════════════════════════════════════════════ -->
-    <LinearLayout
-        android:id="@+id/llCustomerToggle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="?attr/selectableItemBackground"
-        android:padding="10dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:layout_marginBottom="6dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="👤 بيانات العميل (اختياري)"
-            android:textSize="12sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-
-        <TextView
-            android:id="@+id/tvCustomerArrow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="▼"
-            android:textSize="10sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/llCustomerFields"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:layout_marginBottom="6dp">
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/tilCustomerName"
-            style="@style/AppTextInputStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
-            app:errorEnabled="true">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etCustomerName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="اسم العميل *"
-                android:inputType="textPersonName" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/tilCustomerPhone"
-            style="@style/AppTextInputStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:errorEnabled="true">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etCustomerPhone"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="رقم الهاتف *"
-                android:inputType="phone" />
-        </com.google.android.material.textfield.TextInputLayout>
-    </LinearLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         الحقول المخفية (متوافقة مع الكود القديم)
-         ══════════════════════════════════════════════════ -->
-    <TextView android:id="@+id/tvAccountNumber" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-    <EditText android:id="@+id/etCustomerEmail" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-    <EditText android:id="@+id/etCustomerAddress" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-    <EditText android:id="@+id/etCustomerNotes" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-    <LinearLayout android:id="@+id/llPaymentsContainer" android:layout_width="0dp" android:layout_height="0dp" android:orientation="vertical" android:visibility="gone" />
-    <Button android:id="@+id/btnAddPayment" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-    <com.google.android.material.textfield.TextInputLayout android:id="@+id/tilPaymentMethod" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone">
-        <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/spPaymentMethod" android:layout_width="match_parent" android:layout_height="wrap_content" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <!-- ══════════════════════════════════════════════════
-         الأزرار السفلية
-         ══════════════════════════════════════════════════ -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCancelCheckout"
-            style="@style/AppButtonStyle.Outlined"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:text="إلغاء" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnConfirmCheckout"
-            style="@style/AppButtonStyle"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_weight="2"
-            android:text="تأكيد البيع ✓" />
-    </LinearLayout>
-
-</LinearLayout>
+</ScrollView>
