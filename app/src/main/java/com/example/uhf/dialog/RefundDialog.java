@@ -22,6 +22,7 @@ import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.android.material.textfield.TextInputLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -301,10 +302,11 @@ private void renderPayments(JSONObject sale) {
         }
         tvPaymentsList.setText(sb.toString().trim());
 
+        // ✅ لا سلسلة append — كل استدعاء على سطر منفصل
         if (creditCreated > 0.01) {
-            tvPaymentsList.append("\n💰 أنشأت رصيداً: ")
-                .append(String.format(Locale.US, "%,.0f", creditCreated))
-                .append(" YER");
+            tvPaymentsList.append("\n💰 أنشأت رصيداً: ");
+            tvPaymentsList.append(String.format(Locale.US, "%,.0f", creditCreated));
+            tvPaymentsList.append(" YER");
         }
     } catch (Exception e) {
         Log.e(TAG, "renderPayments error", e);
