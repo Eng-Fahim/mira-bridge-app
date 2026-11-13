@@ -153,7 +153,7 @@ public class MiraReceiptFragment extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // دوال مساعدة آمنة لقراءة JSON
+    // Safe JSON helpers
     // ═══════════════════════════════════════════════════════
 
     private String safeString(JSONObject obj, String key, String defaultValue) {
@@ -162,9 +162,7 @@ public class MiraReceiptFragment extends DialogFragment {
             Object val = obj.opt(key);
             if (val == null || val == JSONObject.NULL) return defaultValue;
             String s = String.valueOf(val).trim();
-            if (s.isEmpty() || "null".equalsIgnoreCase(s)) {
-                return defaultValue;
-            }
+            if (s.isEmpty() || "null".equalsIgnoreCase(s)) return defaultValue;
             return s;
         } catch (Exception e) {
             return defaultValue;
@@ -175,9 +173,7 @@ public class MiraReceiptFragment extends DialogFragment {
         if (obj == null || keys == null) return "—";
         for (String key : keys) {
             String val = safeString(obj, key, null);
-            if (val != null && !val.isEmpty()) {
-                return val;
-            }
+            if (val != null && !val.isEmpty()) return val;
         }
         return "—";
     }
@@ -187,9 +183,7 @@ public class MiraReceiptFragment extends DialogFragment {
         try {
             Object val = obj.opt(key);
             if (val == null || val == JSONObject.NULL) return defaultValue;
-            if (val instanceof Number) {
-                return ((Number) val).doubleValue();
-            }
+            if (val instanceof Number) return ((Number) val).doubleValue();
             String s = String.valueOf(val).trim().replace(",", "");
             if (s.isEmpty() || "null".equalsIgnoreCase(s)) return defaultValue;
             return Double.parseDouble(s);
@@ -217,9 +211,7 @@ public class MiraReceiptFragment extends DialogFragment {
         try {
             if (priceManager != null) {
                 String formatted = priceManager.formatPriceDefault(amount);
-                if (formatted != null && !formatted.isEmpty()) {
-                    return formatted;
-                }
+                if (formatted != null && !formatted.isEmpty()) return formatted;
             }
             return String.format(Locale.US, "%,.2f", amount);
         } catch (Exception e) {
@@ -237,7 +229,7 @@ public class MiraReceiptFragment extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ✅ دوال مساعدة للعملات وطرق الدفع
+    // Currency & Method helpers
     // ═══════════════════════════════════════════════════════
 
     private String getCurrencyIcon(String currency) {
@@ -275,7 +267,9 @@ public class MiraReceiptFragment extends DialogFragment {
             case "check":
             case "cheque": return "شيك 📝";
             case "credit": return "آجل ⏳";
-            case "split": return "متعدد 💰";
+            case "split":
+            case "mix":
+            case "mixed": return "متعدد 💰";
             default: return method;
         }
     }
@@ -407,29 +401,29 @@ public class MiraReceiptFragment extends DialogFragment {
     }
 
     // ═══════════════════════════════════════════════════════
-    // ✅ دالة جديدة: بناء HTML لتفاصيل الدفع المتعدد
+    // Payments breakdown (FIXED: no longer hidden when trade-in exists)
     // ═══════════════════════════════════════════════════════
+
     private String buildPaymentsHtml(JSONObject t, JSONObject paymentObj) {
         try {
-            // البحث عن مصفوفة payments في عدة أماكن محتملة
             JSONArray payments = t.optJSONArray("payments");
             if (payments == null && paymentObj != null) {
                 payments = paymentObj.optJSONArray("payments");
             }
 
-            // إذا لم توجد مصفوفة، ارجع نصاً فارغاً
-            if (payments == null || payments.length() == 0) {
-                return "";
-            }
+            if (payments == null || payments.length() == 0) return "";
 
-            // إذا كانت دفعة واحدة فقط، لا داعي لعرض القسم (السطر الأساسي يكفي)
+            // ✅ لا نُخفي التقرير لو كان هناك ذهب مُستلم
             if (payments.length() == 1) {
                 JSONObject single = payments.optJSONObject(0);
                 if (single != null) {
                     String curr = safeString(single, "currency", "YER");
                     String method = safeString(single, "method", "cash");
-                    // إذا كانت العملة الأساسية ونقداً، لا نعرض تفاصيل
-                    if ("YER".equalsIgnoreCase(curr) && "cash".equalsIgnoreCase(method)) {
+
+                    JSONArray tradeInsCheck = t.optJSONArray("trade_ins");
+                    boolean hasTradeIn = tradeInsCheck != null && tradeInsCheck.length() > 0;
+
+                    if (!hasTradeIn && "YER".equalsIgnoreCase(curr) && "cash".equalsIgnoreCase(method)) {
                         return "";
                     }
                 }
@@ -463,10 +457,8 @@ public class MiraReceiptFragment extends DialogFragment {
                 totalInBase += baseAmount;
 
                 String icon = getCurrencyIcon(currency);
-                String currName = getCurrencyArabicName(currency);
                 String methodAr = getPaymentMethodArabic(method);
 
-                // عرض سعر الصرف إذا كانت العملة مختلفة عن YER
                 String rateInfo = "";
                 if (!"YER".equalsIgnoreCase(currency) && exchangeRate > 0) {
                     rateInfo = " <span style='font-size:9px; color:#718096;'>(1 " + currency + " = "
@@ -488,7 +480,6 @@ public class MiraReceiptFragment extends DialogFragment {
                   .append("</tr>");
             }
 
-            // سطر الإجمالي
             if (payments.length() > 1) {
                 sb.append("<tr class='payment-total-row'>")
                   .append("<td colspan='3' style='text-align:right; font-weight:bold;'>")
@@ -505,6 +496,222 @@ public class MiraReceiptFragment extends DialogFragment {
 
         } catch (Exception e) {
             Log.e(TAG, "buildPaymentsHtml error: " + e.getMessage());
+            return "";
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ NEW: Trade-ins table (الذهب المُستلم)
+    // ═══════════════════════════════════════════════════════
+
+    private String buildTradeInsHtml(JSONObject t) {
+        try {
+            JSONArray tradeIns = t.optJSONArray("trade_ins");
+            if (tradeIns == null) {
+                JSONObject p = t.optJSONObject("payment");
+                if (p != null) tradeIns = p.optJSONArray("trade_ins");
+            }
+            if (tradeIns == null) {
+                JSONObject s = t.optJSONObject("sale");
+                if (s != null) tradeIns = s.optJSONArray("trade_ins");
+            }
+            if (tradeIns == null || tradeIns.length() == 0) return "";
+
+            // القيمة الإجمالية للذهب (fallback)
+            double tradeInTotalFallback = safeDouble(t, "trade_in_total",
+                    safeDouble(t, "tradeInTotal", 0));
+            if (tradeInTotalFallback <= 0) {
+                JSONObject pObj = t.optJSONObject("payment");
+                if (pObj != null) {
+                    tradeInTotalFallback = safeDouble(pObj, "trade_in_total",
+                            safeDouble(pObj, "tradeInTotal", 0));
+                }
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("<div class='trade-in-section'>")
+              .append("<div class='trade-in-title'>🥇 ")
+              .append(isArabic ? "الذهب المُستلم كجزء من الدفع" : "Gold Trade-In Received")
+              .append("</div>")
+              .append("<table class='trade-ins-table'>")
+              .append("<thead><tr>")
+              .append("<th style='width:25px;'>#</th>")
+              .append("<th>").append(isArabic ? "الوصف" : "Description").append("</th>")
+              .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>")
+              .append("<th>").append(isArabic ? "الوزن (g)" : "Weight (g)").append("</th>")
+              .append("<th>").append(isArabic ? "القيمة (YER)" : "Value (YER)").append("</th>")
+              .append("</tr></thead><tbody>");
+
+            double totalWeight = 0;
+            double totalValue = 0;
+            boolean allValuesPresent = true;
+
+            for (int i = 0; i < tradeIns.length(); i++) {
+                JSONObject ti = tradeIns.optJSONObject(i);
+                if (ti == null) continue;
+
+                double weight = safeDouble(ti, "weight_grams",
+                                safeDouble(ti, "weight", 0));
+                double value = safeDouble(ti, "value_yer",
+                              safeDouble(ti, "value", 0));
+                String karat = safeString(ti, "karat", "21K");
+                String desc = safeString(ti, "description",
+                        isArabic ? "ذهب كسر" : "Scrap Gold");
+
+                totalWeight += weight;
+                if (value <= 0) allValuesPresent = false;
+                totalValue += value;
+
+                String valueCell = value > 0
+                        ? String.format(Locale.US, "%,.0f", value) + " YER"
+                        : "—";
+
+                sb.append("<tr>")
+                  .append("<td>").append(i + 1).append("</td>")
+                  .append("<td>").append(escapeHtml(desc)).append("</td>")
+                  .append("<td><span class='karat-badge'>").append(escapeHtml(karat)).append("</span></td>")
+                  .append("<td><b>").append(String.format(Locale.US, "%.3f", weight)).append("</b> g</td>")
+                  .append("<td style='font-weight:bold; color:#b45309;'>")
+                  .append(valueCell).append("</td>")
+                  .append("</tr>");
+            }
+
+            // ✅ صف الإجمالي - يستخدم fallback إن لم توجد قيم فردية
+            double displayTotal = totalValue > 0 ? totalValue : tradeInTotalFallback;
+            String totalValueCell = displayTotal > 0
+                    ? String.format(Locale.US, "%,.0f", displayTotal) + " YER"
+                    : "—";
+
+            sb.append("<tr class='trade-in-total-row'>")
+              .append("<td colspan='3' style='text-align:right; font-weight:bold;'>")
+              .append(isArabic ? "الإجمالي:" : "Total:").append("</td>")
+              .append("<td style='font-weight:bold;'>")
+              .append(String.format(Locale.US, "%.3f", totalWeight)).append(" g</td>")
+              .append("<td style='font-weight:bold; color:#b45309;'>")
+              .append(totalValueCell).append("</td>")
+              .append("</tr></tbody></table></div>");
+
+            return sb.toString();
+
+        } catch (Exception e) {
+            Log.e(TAG, "buildTradeInsHtml error: " + e.getMessage());
+            return "";
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ✅ NEW: Payment summary (invoice total vs cash + gold)
+    // ═══════════════════════════════════════════════════════
+
+    private String buildPaymentSummaryHtml(JSONObject t, double finalLocal) {
+        try {
+            if (finalLocal <= 0) return "";
+
+            // جمع المدفوعات النقدية/البطاقة
+            JSONArray payments = t.optJSONArray("payments");
+            if (payments == null) {
+                JSONObject p = t.optJSONObject("payment");
+                if (p != null) payments = p.optJSONArray("payments");
+            }
+
+            double cashPaid = 0;
+            if (payments != null) {
+                for (int i = 0; i < payments.length(); i++) {
+                    JSONObject p = payments.optJSONObject(i);
+                    if (p != null) {
+                        cashPaid += safeDouble(p, "base_amount",
+                                    safeDouble(p, "amount", 0));
+                    }
+                }
+            }
+
+            // جمع قيمة الذهب المُستلم
+            JSONArray tradeIns = t.optJSONArray("trade_ins");
+            if (tradeIns == null) {
+                JSONObject p = t.optJSONObject("payment");
+                if (p != null) tradeIns = p.optJSONArray("trade_ins");
+            }
+            if (tradeIns == null) {
+                JSONObject s = t.optJSONObject("sale");
+                if (s != null) tradeIns = s.optJSONArray("trade_ins");
+            }
+
+            double tradeInValue = 0;
+            if (tradeIns != null) {
+                for (int i = 0; i < tradeIns.length(); i++) {
+                    JSONObject ti = tradeIns.optJSONObject(i);
+                    if (ti != null) {
+                        tradeInValue += safeDouble(ti, "value_yer",
+                                        safeDouble(ti, "value", 0));
+                    }
+                }
+            }
+
+            // fallback: إذا لم توجد قيم فردية للذهب، استخدم trade_in_total
+            if (tradeInValue <= 0) {
+                tradeInValue = safeDouble(t, "trade_in_total",
+                               safeDouble(t, "tradeInTotal", 0));
+            }
+
+            // إذا لم يكن هناك أي دفع ولا ذهب → لا نعرض الملخص
+            if (cashPaid <= 0 && tradeInValue <= 0) return "";
+
+            double diff = cashPaid + tradeInValue - finalLocal;
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("<div class='payment-summary'>")
+              .append("<div class='payment-summary-title'>📊 ")
+              .append(isArabic ? "ملخص السداد" : "Payment Summary")
+              .append("</div>")
+              .append("<table class='payment-summary-table'>")
+              .append("<tr><td class='label'>")
+              .append(isArabic ? "إجمالي الفاتورة:" : "Invoice Total:")
+              .append("</td><td class='value'>")
+              .append(String.format(Locale.US, "%,.0f", finalLocal))
+              .append(" YER</td></tr>");
+
+            if (cashPaid > 0) {
+                sb.append("<tr><td class='label'>💵 ")
+                  .append(isArabic ? "المدفوع نقداً/بطاقة:" : "Cash/Card Paid:")
+                  .append("</td><td class='value'>")
+                  .append(String.format(Locale.US, "%,.0f", cashPaid))
+                  .append(" YER</td></tr>");
+            }
+
+            if (tradeInValue > 0) {
+                sb.append("<tr><td class='label'>🥇 ")
+                  .append(isArabic ? "قيمة الذهب المُستلم:" : "Trade-In Value:")
+                  .append("</td><td class='value'>")
+                  .append(String.format(Locale.US, "%,.0f", tradeInValue))
+                  .append(" YER</td></tr>");
+            }
+
+            if (Math.abs(diff) < 1) {
+                sb.append("<tr class='payment-summary-equal'>")
+                  .append("<td colspan='2' style='text-align:center;'>")
+                  .append(isArabic ? "✅ الدفع مطابق للفاتورة" : "✅ Payment matches invoice")
+                  .append("</td></tr>");
+            } else if (diff > 0) {
+                sb.append("<tr class='payment-summary-credit'>")
+                  .append("<td class='label'>")
+                  .append(isArabic ? "💰 رصيد دائن للعميل:" : "💰 Customer Credit:")
+                  .append("</td><td class='value'>+")
+                  .append(String.format(Locale.US, "%,.0f", diff))
+                  .append(" YER</td></tr>");
+            } else {
+                sb.append("<tr class='payment-summary-short'>")
+                  .append("<td class='label'>")
+                  .append(isArabic ? "⚠️ المتبقي على العميل:" : "⚠️ Balance Due:")
+                  .append("</td><td class='value'>")
+                  .append(String.format(Locale.US, "%,.0f", Math.abs(diff)))
+                  .append(" YER</td></tr>");
+            }
+
+            sb.append("</table></div>");
+            return sb.toString();
+
+        } catch (Exception e) {
+            Log.e(TAG, "buildPaymentSummaryHtml error: " + e.getMessage());
             return "";
         }
     }
@@ -547,8 +754,6 @@ public class MiraReceiptFragment extends DialogFragment {
          .append(".returned-row { background-color: #fff5f5 !important; color: #e53e3e; text-decoration: line-through; }")
          .append(".serial-box { font-family: monospace; font-size: 9px; background: #edf2f7; padding: 2px 4px; border-radius: 3px; color: #2b6cb0; word-break: break-all; display: inline-block; }")
          .append(".karat-badge { display: inline-block; padding: 1px 5px; border-radius: 8px; font-weight: bold; background: #fefcbf; color: #744210; border: 1px solid #f6e05e; }")
-         
-         // ✅ CSS جديد لجدول المدفوعات
          .append(".payment-breakdown { margin: 12px 0; border: 2px solid #c59b27; border-radius: 8px; overflow: hidden; background: #fffdf5; }")
          .append(".payment-title { background: #0d1b2a; color: #f4d58d; padding: 8px 12px; font-weight: bold; font-size: 12px; text-align: center; letter-spacing: 0.5px; }")
          .append("table.payments-table { width: 100%; border-collapse: collapse; font-size: 10px; }")
@@ -556,7 +761,6 @@ public class MiraReceiptFragment extends DialogFragment {
          .append("table.payments-table td { padding: 8px 4px; border-bottom: 1px solid #f0ead0; color: #2d3748; text-align: center; }")
          .append("table.payments-table tr:last-child td { border-bottom: none; }")
          .append(".payment-total-row td { background: #faf8f0; padding-top: 8px; padding-bottom: 8px; }")
-         
          .append(".summary-container { display: flex; justify-content: space-between; margin-top: 10px; gap: 10px; }")
          .append(".notes-box { width: 50%; font-size: 9px; border: 1px dashed #cbd5e0; padding: 8px; border-radius: 6px; background: #f7fafc; }")
          .append(".totals-box { width: 48%; }")
@@ -572,6 +776,26 @@ public class MiraReceiptFragment extends DialogFragment {
          .append(".sig-box { text-align: center; width: 100px; font-size: 9px; font-weight: bold; color: #4a5568; }")
          .append(".sig-line { border-top: 1px solid #a0aec0; margin-top: 30px; padding-top: 3px; }")
          .append(".copyright { text-align: center; margin-top: 15px; font-size: 8px; color: #a0aec0; border-top: 1px solid #edf2f7; padding-top: 6px; }")
+
+         // ✅ CSS جديد: قسم الذهب المُستلم
+         .append(".trade-in-section { margin: 12px 0; border: 2px solid #d97706; border-radius: 8px; overflow: hidden; background: #fffbeb; }")
+         .append(".trade-in-title { background: linear-gradient(135deg,#92400e,#b45309); color: #fff; padding: 8px 12px; font-weight: bold; font-size: 12px; text-align: center; letter-spacing: 0.5px; }")
+         .append("table.trade-ins-table { width: 100%; border-collapse: collapse; font-size: 10px; }")
+         .append("table.trade-ins-table th { background: #fef3c7; color: #78350f; padding: 6px 4px; text-align: center; border-bottom: 2px solid #fde68a; font-weight: bold; }")
+         .append("table.trade-ins-table td { padding: 8px 4px; border-bottom: 1px solid #fde68a; color: #2d3748; text-align: center; }")
+         .append(".trade-in-total-row td { background: #fef3c7; padding-top: 8px; padding-bottom: 8px; border-top: 2px solid #f59e0b; }")
+
+         // ✅ CSS جديد: ملخص السداد
+         .append(".payment-summary { margin: 12px 0; border: 2px solid #0d1b2a; border-radius: 8px; overflow: hidden; background: #f8fafc; }")
+         .append(".payment-summary-title { background: #0d1b2a; color: #f4d58d; padding: 8px 12px; font-weight: bold; font-size: 12px; text-align: center; }")
+         .append("table.payment-summary-table { width: 100%; border-collapse: collapse; font-size: 11px; }")
+         .append("table.payment-summary-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }")
+         .append("table.payment-summary-table td.label { color: #4a5568; text-align: right; }")
+         .append("table.payment-summary-table td.value { font-weight: bold; text-align: left; color: #0d1b2a; }")
+         .append(".payment-summary-equal { background: #dcfce7; color: #166534; font-weight: bold; }")
+         .append(".payment-summary-credit { background: #dbeafe; color: #1e40af; font-weight: bold; }")
+         .append(".payment-summary-short { background: #fee2e2; color: #991b1b; font-weight: bold; }")
+
          .append("</style></head><body>");
 
         try {
@@ -585,7 +809,6 @@ public class MiraReceiptFragment extends DialogFragment {
             JSONObject paymentObj = t.optJSONObject("payment");
 
             String sellerName = findFirstNonEmpty(t, "seller_name", "seller", "cashier_name", "created_by");
-            if ("—".equals(sellerName)) sellerName = "—";
 
             String branchName = safeString(t, "branch_name", safeString(t, "branch", ""));
             if (branchName.isEmpty() && getContext() != null) {
@@ -613,8 +836,16 @@ public class MiraReceiptFragment extends DialogFragment {
                     paymentObj != null ? safeString(paymentObj, "payment_method", "CASH") : "CASH");
             if ("—".equals(paymentMethod)) paymentMethod = "CASH";
 
-            // ✅ تحديث اسم طريقة الدفع ليعرض "متعدد" عند وجود دفع مقسم
-            String paymentMethodDisplay = getPaymentMethodArabic(paymentMethod);
+            // ✅ [FIX] عرض "متعدد" عند وجود دفع مقسم أو ذهب
+            JSONArray tradeInsHdr = t.optJSONArray("trade_ins");
+            JSONArray paymentsHdr = t.optJSONArray("payments");
+            boolean isMixedPayment = (tradeInsHdr != null && tradeInsHdr.length() > 0)
+                                  || (paymentsHdr != null && paymentsHdr.length() > 1)
+                                  || "MIX".equalsIgnoreCase(safeString(t, "currency", ""));
+
+            String paymentMethodDisplay = isMixedPayment
+                    ? (isArabic ? "متعدد 💰" : "Mixed 💰")
+                    : getPaymentMethodArabic(paymentMethod);
 
             String currency = safeString(t, "currency",
                     paymentObj != null ? safeString(paymentObj, "currency_code", "") : "");
@@ -630,24 +861,16 @@ public class MiraReceiptFragment extends DialogFragment {
                 }
             }
 
-            // ✅ قراءة exchange_rate
             double exchangeRate = safeDouble(t, "exchange_rate",
                     paymentObj != null ? safeDouble(paymentObj, "exchange_rate", 0) : 0);
 
             if (exchangeRate <= 1.0 && priceManager != null) {
                 try {
                     double pmRate = priceManager.getExchangeRate(currency);
-                    if (pmRate > 1.0) {
-                        exchangeRate = pmRate;
-                        Log.d(TAG, "✅ exchangeRate from priceManager: " + exchangeRate);
-                    }
+                    if (pmRate > 1.0) exchangeRate = pmRate;
                 } catch (Exception ignored) {}
             }
-
-            if (exchangeRate <= 1.0) {
-                exchangeRate = 530.0;
-                Log.d(TAG, "⚠️ exchangeRate fallback to 530");
-            }
+            if (exchangeRate <= 1.0) exchangeRate = 530.0;
 
             String refundStatus = findFirstNonEmpty(t, "refund_status", "status");
             if ("—".equals(refundStatus)) refundStatus = "completed";
@@ -722,9 +945,7 @@ public class MiraReceiptFragment extends DialogFragment {
                     double weight = safeDouble(it, "weight",
                                     safeDouble(it, "gross_weight",
                                     safeDouble(it, "gross_weight_grams", 0)));
-                    if (!isItemRefunded) {
-                        totalWeightSum += weight;
-                    }
+                    if (!isItemRefunded) totalWeightSum += weight;
 
                     double laborFee = safeDouble(it, "making_fee",
                                        safeDouble(it, "labor_price", 0));
@@ -735,10 +956,8 @@ public class MiraReceiptFragment extends DialogFragment {
                     String serial = findFirstNonEmpty(it,
                             "serial_number", "serial_no", "item_code", "epc",
                             "barcode", "gtin", "tag", "code");
-
                     String title = findFirstNonEmpty(it,
                             "title", "item_title", "name", "product_name", "description");
-
                     String karat = findFirstNonEmpty(it, "karat", "gold_karat");
                     if ("—".equals(karat)) karat = "21K";
 
@@ -761,13 +980,20 @@ public class MiraReceiptFragment extends DialogFragment {
             }
 
             // ═══════════════════════════════════════════════════════
-            // ✅ [جديد] قسم تفاصيل الدفع المتعدد
+            // ✅ [1] تفاصيل طرق الدفع المتعددة
             // ═══════════════════════════════════════════════════════
             String paymentsHtml = buildPaymentsHtml(t, paymentObj);
             if (!paymentsHtml.isEmpty()) {
                 h.append(paymentsHtml);
             }
 
+            // ═══════════════════════════════════════════════════════
+            // ✅ [2] جدول الذهب المُستلم
+            // ═══════════════════════════════════════════════════════
+            String tradeInsHtml = buildTradeInsHtml(t);
+            if (!tradeInsHtml.isEmpty()) {
+                h.append(tradeInsHtml);
+            }
 
             // ═══ Totals ═══
             double subtotalUSD = safeDouble(t, "subtotal_usd",
@@ -794,12 +1020,11 @@ public class MiraReceiptFragment extends DialogFragment {
 
             if (finalLocal <= 0 && finalUSD > 0) {
                 finalLocal = finalUSD * exchangeRate;
-                Log.d(TAG, "⚠️ finalLocal calculated: " + finalLocal + " = " + finalUSD + " × " + exchangeRate);
             }
 
             h.append("<div class='summary-container'>");
 
-            // ✅ Notes box
+            // Notes box
             h.append("<div class='notes-box'>")
              .append("<b>📌 ").append(isArabic ? "ملاحظات وإرشادات الضمان:" : "Terms & Conditions:").append("</b><br>")
              .append("1. ").append(isArabic ? "المجوهرات المباعة مضمونة من عيوب التصنيع لمدة عام كامل." : "Jewelry guaranteed against defects for 1 year.").append("<br>")
@@ -807,17 +1032,15 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("3. ").append(isArabic ? "صافي الوزن المباع المتبقي: " : "Net Active Weight: ").append("<b>").append(String.format(Locale.US, "%.3f g", totalWeightSum)).append("</b>")
              .append("</div>");
 
-            // ✅ Totals box
+            // Totals box
             h.append("<div class='totals-box'><table class='totals-table'>");
 
-            // ✅ Subtotal
             h.append("<tr><td class='label'>")
              .append(isArabic ? "المبلغ الإجمالي:" : "Subtotal:")
              .append("</td><td class='value' style='text-align:left;'>")
              .append(safeFormatPrice(subtotalUSD))
              .append("</td></tr>");
 
-            // ✅ Discount
             if (discountUSD > 0) {
                 h.append("<tr><td class='label'>")
                  .append(isArabic ? "الخصم الممنوح:" : "Discount:")
@@ -826,7 +1049,6 @@ public class MiraReceiptFragment extends DialogFragment {
                  .append("</td></tr>");
             }
 
-            // ✅ Grand Total
             String displayAmount;
             String displayCurrencyLabel;
 
@@ -848,45 +1070,53 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("</td></tr>");
 
             h.append("</table></div></div>");
-            // ✅ قسم الرصيد الدائن المُنشأ (Store Credit)
-double creditCreated = safeDouble(t, "credit_created_local",
-                       paymentObj != null ? safeDouble(paymentObj, "credit_created_local", 0) : 0);
 
-// fallback: ابحث في sale
-if (creditCreated <= 0.01) {
-    JSONObject saleObj = t.optJSONObject("sale");
-    if (saleObj != null) creditCreated = safeDouble(saleObj, "credit_created_local", 0);
-}
+            // ═══════════════════════════════════════════════════════
+            // ✅ [3] ملخص السداد (الإجمالي مقابل المدفوع)
+            // ═══════════════════════════════════════════════════════
+            String summaryHtml = buildPaymentSummaryHtml(t, finalLocal);
+            if (!summaryHtml.isEmpty()) {
+                h.append(summaryHtml);
+            }
 
-if (creditCreated > 0.01) {
-    long creditId = 0;
-    try {
-        creditId = t.optLong("credit_id_created", 0);
-        if (creditId == 0) {
-            JSONObject saleObj = t.optJSONObject("sale");
-            if (saleObj != null) creditId = saleObj.optLong("credit_id_created", 0);
-        }
-    } catch (Exception ignored) {}
+            // ═══ Store Credit (if any) ═══
+            double creditCreated = safeDouble(t, "credit_created_local",
+                                   paymentObj != null ? safeDouble(paymentObj, "credit_created_local", 0) : 0);
 
-    h.append("<div style='margin:12px 0; padding:14px; background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border:2px solid #3b82f6; border-radius:10px;'>")
-     .append("<div style='text-align:center; font-weight:bold; color:#1e40af; font-size:13px; margin-bottom:8px;'>💰 ")
-     .append(isArabic ? "رصيد دائن للعميل" : "Customer Store Credit")
-     .append("</div>")
-     .append("<div style='text-align:center; font-size:22px; font-weight:900; color:#1e3a8a; padding:6px; background:#fff; border-radius:6px; margin:4px 0;'>+")
-     .append(String.format(Locale.US, "%,.2f", creditCreated))
-     .append(" YER</div>");
+            if (creditCreated <= 0.01) {
+                JSONObject saleObj = t.optJSONObject("sale");
+                if (saleObj != null) creditCreated = safeDouble(saleObj, "credit_created_local", 0);
+            }
 
-    if (creditId > 0) {
-        h.append("<div style='text-align:center; font-size:9px; color:#3b82f6; font-family:monospace; margin-top:4px;'>")
-         .append(isArabic ? "معرف الرصيد: " : "Credit ID: ")
-         .append(creditId)
-         .append("</div>");
-    }
+            if (creditCreated > 0.01) {
+                long creditId = 0;
+                try {
+                    creditId = t.optLong("credit_id_created", 0);
+                    if (creditId == 0) {
+                        JSONObject saleObj = t.optJSONObject("sale");
+                        if (saleObj != null) creditId = saleObj.optLong("credit_id_created", 0);
+                    }
+                } catch (Exception ignored) {}
 
-    h.append("<div style='text-align:center; font-size:10px; color:#1e40af; margin-top:6px;'>")
-     .append(isArabic ? "✅ صالح 12 شهراً — استخدمه في مشترياتك القادمة" : "✅ Valid 12 months — use in future purchases")
-     .append("</div></div>");
-}
+                h.append("<div style='margin:12px 0; padding:14px; background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border:2px solid #3b82f6; border-radius:10px;'>")
+                 .append("<div style='text-align:center; font-weight:bold; color:#1e40af; font-size:13px; margin-bottom:8px;'>💰 ")
+                 .append(isArabic ? "رصيد دائن للعميل" : "Customer Store Credit")
+                 .append("</div>")
+                 .append("<div style='text-align:center; font-size:22px; font-weight:900; color:#1e3a8a; padding:6px; background:#fff; border-radius:6px; margin:4px 0;'>+")
+                 .append(String.format(Locale.US, "%,.2f", creditCreated))
+                 .append(" YER</div>");
+
+                if (creditId > 0) {
+                    h.append("<div style='text-align:center; font-size:9px; color:#3b82f6; font-family:monospace; margin-top:4px;'>")
+                     .append(isArabic ? "معرف الرصيد: " : "Credit ID: ")
+                     .append(creditId)
+                     .append("</div>");
+                }
+
+                h.append("<div style='text-align:center; font-size:10px; color:#1e40af; margin-top:6px;'>")
+                 .append(isArabic ? "✅ صالح 12 شهراً — استخدمه في مشترياتك القادمة" : "✅ Valid 12 months — use in future purchases")
+                 .append("</div></div>");
+            }
 
             // ═══ Tafqeet ═══
             if (finalUSD > 0 || finalLocal > 0) {
@@ -921,7 +1151,6 @@ if (creditCreated > 0.01) {
              .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
              .append("<span style='font-size:8px; color:#718096;'>").append(isArabic ? "رمز التحقق الرقمي" : "Digital Verification").append("</span>")
              .append("</div>")
-
              .append("<div class='signatures'>")
              .append("<div class='sig-box'><div class='sig-line'>").append(isArabic ? "توقيع المشتري" : "Customer Sign").append("</div></div>")
              .append("<div class='sig-box'><div class='sig-line'>").append(isArabic ? "ختم وتوقيع المحل" : "Authorized Stamp").append("</div></div>")
