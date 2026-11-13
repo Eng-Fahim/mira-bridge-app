@@ -73,9 +73,17 @@ public class POSCheckoutDialog extends DialogFragment {
         public double discount = 0.0;
         public double discountAmount = 0.0;
         public double finalAmount = 0.0;
+        private LinearLayout llTradeInSummary;
+        private Button btnTradeIn;
+        private TextView tvTradeInTotal;
+        private double tradeInTotal = 0.0;
+        private JSONArray tradeInLines = new JSONArray();
 
         public JSONArray payments = new JSONArray();
         public String localUuid = "";
+        
+        public JSONArray tradeIns = new JSONArray();
+        public double tradeInTotal = 0.0;
     }
 
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
@@ -218,6 +226,9 @@ public class POSCheckoutDialog extends DialogFragment {
         llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
         btnAddPayment       = view.findViewById(R.id.btnAddPayment);
         tvRemaining         = view.findViewById(R.id.tvRemaining);
+        llTradeInSummary = view.findViewById(R.id.llTradeInSummary);
+        btnTradeIn = view.findViewById(R.id.btnTradeIn);
+        tvTradeInTotal = view.findViewById(R.id.tvTradeInTotal);
     }
 
     private void applyLanguage() {
@@ -486,18 +497,21 @@ public class POSCheckoutDialog extends DialogFragment {
         }
 
         double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
-        double remaining = requiredTotalInYer - totalPaidInYer;
-
+        // ✅ الذهب يُحسب كدفعة
+        double totalPaidWithGold = totalPaidInYer + tradeInTotal;
+        double remaining = requiredTotalInYer - totalPaidWithGold;
         if (Math.abs(remaining) < 1) {
-            tvRemaining.setText("0.00 YER");
-            tvRemaining.setTextColor(Color.parseColor("#16A34A"));
+           tvRemaining.setText("0.00 YER");
+           tvRemaining.setTextColor(Color.parseColor("#16A34A"));
         } else if (remaining > 0) {
-            tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor("#DC2626"));
-        } else {
-            tvRemaining.setText(String.format(Locale.US, "+ %,.2f YER", Math.abs(remaining)));
-            tvRemaining.setTextColor(Color.parseColor("#F59E0B"));
-        }
+    // ناقص → أحمر
+    tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
+    tvRemaining.setTextColor(Color.parseColor("#DC2626"));
+} else {
+    // زائد → أزرق (سيُضاف رصيد دائن)
+    tvRemaining.setText(String.format(Locale.US, "💰 + %,.2f YER", Math.abs(remaining)));
+    tvRemaining.setTextColor(Color.parseColor("#2563EB"));
+}
     }
 
     private boolean validateInputs() {
@@ -515,6 +529,22 @@ public class POSCheckoutDialog extends DialogFragment {
         return isValid;
     }
 
+private void openTradeInDialog() {
+    double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
+    TradeInDialog dialog = TradeInDialog.newInstance(maxValue);
+    dialog.setOnTradeInListener((tradeIns, totalValue) -> {
+        this.tradeInLines = tradeIns;
+        this.tradeInTotal = totalValue;
+        if (tvTradeInTotal != null) {
+            tvTradeInTotal.setText(String.format(Locale.US, "%,.0f YER", totalValue));
+        }
+        if (llTradeInSummary != null) {
+            llTradeInSummary.setVisibility(totalValue > 0 ? View.VISIBLE : View.GONE);
+        }
+        updateRemainingBalance();
+    });
+    dialog.show(getParentFragmentManager(), "TradeInDialog");
+}
     private void setupListeners() {
         if (etDiscount != null) {
             etDiscount.addTextChangedListener(new TextWatcher() {
@@ -523,7 +553,9 @@ public class POSCheckoutDialog extends DialogFragment {
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
-
+        if (btnTradeIn != null) {
+        btnTradeIn.setOnClickListener(v -> openTradeInDialog());
+        }
         if (btnCancelCheckout != null) btnCancelCheckout.setOnClickListener(v -> dismissAllowingStateLoss());
 
         if (btnAddPayment != null) btnAddPayment.setOnClickListener(v -> addPaymentRow(CURRENCIES[0], 0.0));
@@ -593,7 +625,8 @@ public class POSCheckoutDialog extends DialogFragment {
 
                 // ✅ 3) المقارنة بين المدفوع والمطلوب
                 double requiredTotalInYer = currentTotalWithDiscountUsd * getRateToYER("USD");
-                double diff = totalPaidInYer - requiredTotalInYer;
+                double totalWithGold = totalPaidInYer + tradeInTotal;
+                double diff = totalWithGold - requiredTotalInYer;
 
                 // ❌ نقص → ممنوع
                 if (diff < -1.0) {
@@ -634,10 +667,12 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private void proceedCheckout(POSCheckoutData data, JSONArray paymentsArray, boolean isArabic) {
-        data.payments = paymentsArray;
-        dismissAllowingStateLoss();
-        if (listener != null) listener.onCheckout(data);
-    }
+    data.payments = paymentsArray;
+    data.tradeIns = tradeInLines;
+    data.tradeInTotal = tradeInTotal;
+    dismissAllowingStateLoss();
+    if (listener != null) listener.onCheckout(data);
+}
 
     private void updateFinalAmount() {
         if (priceManager == null) return;
