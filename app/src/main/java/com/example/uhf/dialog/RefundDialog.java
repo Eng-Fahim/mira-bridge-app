@@ -12,10 +12,13 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,58 +28,82 @@ import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.api.dto.PaymentMethodDto;
 import com.google.android.material.button.MaterialButton;
-import com.google.gson.Gson;
+import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
+/**
+ * RefundDialog v2 — Sale-Centric Refund
+ * مطابق لتجربة الويب:
+ *  - بحث برقم الفاتورة
+ *  - عرض كل القطع مع حالة كل واحدة
+ *  - اختيار جزئي
+ *  - طريقة إرجاع (نقد/رصيد) مع توصية
+ *  - إرسال إلى /api/v1/refunds
+ */
 public class RefundDialog extends Dialog {
 
     private static final String TAG = "RefundDialog";
-
-    // ✅ تحديث الواجهة لتستقبل طريقة الإرجاع
-    public interface RefundCallback {
-        void onRefundConfirm(String code, String reason, String refundMethodCode);
-        void onBarcodeScan();
-        void onCodeChanged(String code);
-    }
-
-    private static final long SEARCH_DEBOUNCE_MS = 700L;
-    private static final int  MIN_SEARCH_LEN = 4;
+    private static final long SEARCH_DEBOUNCE_MS = 600L;
+    private static final int MIN_QUERY_LEN = 3;
 
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
     private static final int KEYCODE_RFID_TRIGGER_3 = 293;
 
-    private EditText etRefundCode;
-    private EditText etReason;
-    private Spinner spRefundMethod; // ✅ تمت الإضافة
-    private TextView tvRefundItemTitle;
-    private TextView tvRefundItemStatus;
-    private android.view.View cardRefundItemInfo;
-    private RefundCallback callback;
-    private boolean isRefundable = false;
-    private boolean isArabic;
+    public interface RefundCallback {
+        void onRefundSuccess(JSONObject result);
+        void onBarcodeScan();
+        void onDialogClosed();
+    }
 
+    private static class ItemRow {
+        int itemId;
+        String title;
+        String karat;
+        double weight;
+        double price;
+        boolean isRefunded;
+        String condition = "in_stock";
+        CheckBox checkbox;
+        Spinner conditionSpinner;
+        View rowView;
+    }
+
+    private final RefundCallback callback;
+    private final boolean isArabic;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    @Nullable private Runnable pendingSearch = null;
+    private final List<ItemRow> itemRows = new ArrayList<>();
+
+    private EditText etQuery;
+    private View llEmpty, llLoading, llSale;
+    private MaterialButton btnScan, btnClose, btnCancel, btnConfirm;
+    private LinearLayout llItemsContainer;
+    private TextView tvSaleNumber, tvSaleMeta, tvTotal, tvPaymentsList, tvWarning;
+    private MaterialCardView cardCash, cardCredit;
+
+    private JSONObject currentSale;
+    private String selectedMethod = "cash";
+    private String defaultMethod = "cash";
+    private boolean hasCustomer = false;
+    private boolean creditRecommended = false;
+    private double creditCreated = 0;
     private boolean suppressWatcher = false;
+    private Runnable pendingSearch;
+    private int searchSeq = 0;
 
     @Nullable private DialogInterface.OnKeyListener hardwareKeyListener;
-
-    // ✅ قائمة طرق الدفع
-    private final List<PaymentMethodDto> paymentMethods = new ArrayList<>();
 
     public RefundDialog(@NonNull Context context, RefundCallback callback) {
         super(context);
         this.callback = callback;
-        this.isArabic = context.getResources().getConfiguration()
-                .locale.getLanguage().equals("ar");
+        this.isArabic = context.getResources().getConfiguration().locale.getLanguage().equals("ar");
     }
 
     @Override
@@ -88,146 +115,461 @@ public class RefundDialog extends Dialog {
         if (getWindow() != null) {
             getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             getWindow().setLayout(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.WRAP_CONTENT);
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT
+            );
         }
 
         initViews();
-        loadPaymentMethods(); // ✅ جلب طرق الدفع
         setupListeners();
+        showState("empty");
     }
 
     private void initViews() {
-        etRefundCode = findViewById(R.id.etRefundScanCode);
-        etReason = findViewById(R.id.etRefundReason);
-        spRefundMethod = findViewById(R.id.spRefundMethod); // ✅
-        tvRefundItemTitle = findViewById(R.id.tvRefundItemTitle);
-        tvRefundItemStatus = findViewById(R.id.tvRefundItemStatus);
-        cardRefundItemInfo = findViewById(R.id.cardRefundItemInfo);
-        MaterialButton btnScanBarcode = findViewById(R.id.btnRefundScanBarcode);
-        MaterialButton btnCancel = findViewById(R.id.btnRefundCancel);
-        MaterialButton btnConfirm = findViewById(R.id.btnRefundConfirm);
+        etQuery = findViewById(R.id.etRefundQuery);
+        llEmpty = findViewById(R.id.llRefundEmpty);
+        llLoading = findViewById(R.id.llRefundLoading);
+        llSale = findViewById(R.id.llRefundSale);
 
-        btnCancel.setOnClickListener(v -> dismiss());
+        btnScan = findViewById(R.id.btnRefundScan);
+        btnClose = findViewById(R.id.btnRefundClose);
+        btnCancel = findViewById(R.id.btnRefundCancel);
+        btnConfirm = findViewById(R.id.btnRefundConfirm);
 
-        btnScanBarcode.setOnClickListener(v -> {
-            if (callback != null) callback.onBarcodeScan();
-        });
+        llItemsContainer = findViewById(R.id.llRefundItems);
+        tvSaleNumber = findViewById(R.id.tvRefundSaleNumber);
+        tvSaleMeta = findViewById(R.id.tvRefundSaleMeta);
+        tvTotal = findViewById(R.id.tvRefundTotal);
+        tvPaymentsList = findViewById(R.id.tvRefundPaymentsList);
+        tvWarning = findViewById(R.id.tvRefundWarning);
 
-        btnConfirm.setOnClickListener(v -> {
-            String code = etRefundCode.getText().toString().trim();
-            String reason = etReason.getText().toString().trim();
-
-            if (code.isEmpty()) {
-                Toast.makeText(getContext(), isArabic ? "⚠️ أدخل رمز القطعة" : "⚠️ Enter item code", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            if (!isRefundable) {
-                Toast.makeText(getContext(), isArabic ? "⚠️ لا يمكن إرجاع هذه القطعة" : "⚠️ Item not refundable", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // ✅ استخراج كود طريقة الإرجاع
-            String methodCode = "CASH";
-            if (!paymentMethods.isEmpty()) {
-                int pos = spRefundMethod.getSelectedItemPosition();
-                if (pos >= 0 && pos < paymentMethods.size()) {
-                    methodCode = paymentMethods.get(pos).code;
-                }
-            }
-
-            if (callback != null) {
-                callback.onRefundConfirm(code, reason.isEmpty() ? (isArabic ? "مرتجع مبيعات" : "Sales Refund") : reason, methodCode);
-            }
-        });
-
-        etRefundCode.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (suppressWatcher) return;
-                if (pendingSearch != null) {
-                    handler.removeCallbacks(pendingSearch);
-                    pendingSearch = null;
-                }
-                final String text = s != null ? s.toString().trim() : "";
-                if (text.length() < MIN_SEARCH_LEN) {
-                    hideRefundItemInfo();
-                    return;
-                }
-                pendingSearch = () -> {
-                    pendingSearch = null;
-                    if (callback != null && etRefundCode != null && text.equals(etRefundCode.getText().toString().trim())) {
-                        callback.onCodeChanged(text);
-                    }
-                };
-                handler.postDelayed(pendingSearch, SEARCH_DEBOUNCE_MS);
-            }
-        });
-    }
-
-    // ✅ دالة جلب طرق الدفع ديناميكياً من السيرفر
-    private void loadPaymentMethods() {
-        new Thread(() -> {
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(getContext().getApplicationContext());
-                MiraApiClient.ApiResponse response = client.getPaymentMethods();
-
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray arr = response.data.optJSONArray("data");
-                    if (arr == null) arr = response.data.optJSONArray("methods");
-
-                    if (arr != null) {
-                        Gson gson = new Gson();
-                        for (int i = 0; i < arr.length(); i++) {
-                            PaymentMethodDto m = gson.fromJson(arr.getJSONObject(i).toString(), PaymentMethodDto.class);
-                            if (m != null && m.code != null) paymentMethods.add(m);
-                        }
-                    }
-                }
-            } catch (Exception ignored) {}
-
-            // احتياطي
-            if (paymentMethods.isEmpty()) {
-                PaymentMethodDto cash = new PaymentMethodDto();
-                cash.code = "CASH"; cash.nameAr = "نقداً"; cash.icon = "💵";
-                paymentMethods.add(cash);
-            }
-
-            handler.post(() -> {
-                if (spRefundMethod != null) {
-                    List<String> names = new ArrayList<>();
-                    for (PaymentMethodDto m : paymentMethods) {
-                        names.add((m.icon != null ? m.icon : "") + " " + m.getDisplayName(isArabic));
-                    }
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, names);
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spRefundMethod.setAdapter(adapter);
-                }
-            });
-        }).start();
+        cardCash = findViewById(R.id.cardRefundCash);
+        cardCredit = findViewById(R.id.cardRefundCredit);
     }
 
     private void setupListeners() {
-        setOnDismissListener(dialog -> {
-            if (pendingSearch != null) {
-                handler.removeCallbacks(pendingSearch);
-                pendingSearch = null;
-            }
-            etRefundCode = null;
-            tvRefundItemTitle = null;
-            tvRefundItemStatus = null;
-            cardRefundItemInfo = null;
-            isRefundable = false;
-            suppressWatcher = false;
-            hardwareKeyListener = null;
+        if (btnClose != null) btnClose.setOnClickListener(v -> close());
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> close());
+        if (btnScan != null) btnScan.setOnClickListener(v -> {
+            if (callback != null) callback.onBarcodeScan();
         });
 
+        if (btnConfirm != null) btnConfirm.setOnClickListener(v -> submitRefund());
+
+        if (cardCash != null) cardCash.setOnClickListener(v -> setMethod("cash"));
+        if (cardCredit != null) cardCredit.setOnClickListener(v -> setMethod("credit"));
+
+        if (etQuery != null) {
+            etQuery.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (suppressWatcher) return;
+                    if (pendingSearch != null) handler.removeCallbacks(pendingSearch);
+                    String q = s != null ? s.toString().trim() : "";
+                    if (q.length() < MIN_QUERY_LEN) {
+                        showState("empty");
+                        return;
+                    }
+                    pendingSearch = () -> performSearch();
+                    handler.postDelayed(pendingSearch, SEARCH_DEBOUNCE_MS);
+                }
+            });
+        }
+
+        setOnDismissListener(dialog -> {
+            if (pendingSearch != null) handler.removeCallbacks(pendingSearch);
+            if (callback != null) callback.onDialogClosed();
+        });
         setCancelable(true);
         setCanceledOnTouchOutside(true);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  API Search
+    // ═══════════════════════════════════════════════════════════
+    private void performSearch() {
+        if (etQuery == null) return;
+        String query = etQuery.getText().toString().trim();
+        if (query.isEmpty()) return;
+
+        final int mySeq = ++searchSeq;
+        showState("loading");
+
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(getContext().getApplicationContext());
+                MiraApiClient.ApiResponse resp = client.findSaleForRefund(query);
+
+                handler.post(() -> {
+                    if (mySeq != searchSeq) return; // stale
+                    if (resp != null && resp.isSuccess && resp.data != null) {
+                        JSONObject sale = resp.data.optJSONObject("sale");
+                        if (sale != null) {
+                            renderSale(sale);
+                        } else {
+                            showState("empty");
+                            toast(isArabic ? "❌ لا توجد فاتورة" : "❌ Not found");
+                        }
+                    } else {
+                        String msg = (resp != null && resp.error != null) ? resp.error
+                                : (isArabic ? "لا توجد فاتورة بهذا الرقم" : "Sale not found");
+                        showState("empty");
+                        toast("❌ " + msg);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "performSearch error", e);
+                handler.post(() -> {
+                    if (mySeq != searchSeq) return;
+                    showState("empty");
+                    toast("⚠️ " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Render
+    // ═══════════════════════════════════════════════════════════
+    private void renderSale(JSONObject sale) {
+        try {
+            currentSale = sale;
+            itemRows.clear();
+            llItemsContainer.removeAllViews();
+
+            String saleNumber = sale.optString("sale_number", "");
+            String createdAt = sale.optString("created_at", "");
+            String customerName = sale.optString("customer_name", "");
+            String customerPhone = sale.optString("customer_phone", "");
+
+            tvSaleNumber.setText(saleNumber);
+
+            StringBuilder meta = new StringBuilder();
+            if (!createdAt.isEmpty()) {
+                meta.append(createdAt.length() > 16 ? createdAt.substring(0, 16) : createdAt);
+            }
+            if (!customerName.isEmpty()) {
+                if (meta.length() > 0) meta.append(" · ");
+                meta.append(customerName);
+            }
+            if (!customerPhone.isEmpty()) {
+                if (meta.length() > 0) meta.append(" · ");
+                meta.append(customerPhone);
+            }
+            tvSaleMeta.setText(meta.toString());
+
+            // Payments summary
+            renderPayments(sale);
+
+            // Items
+            JSONArray items = sale.optJSONArray("items");
+            if (items != null && items.length() > 0) {
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject it = items.getJSONObject(i);
+                    addItemRow(it);
+                }
+            }
+
+            // Customer credit info
+            hasCustomer = sale.optInt("customer_id", 0) > 0;
+            creditCreated = sale.optDouble("credit_created_local", 0);
+            defaultMethod = sale.optString("default_refund_method", "cash");
+            creditRecommended = "credit".equalsIgnoreCase(defaultMethod);
+
+            // Disable credit card if no customer
+            if (cardCredit != null) {
+                cardCredit.setEnabled(hasCustomer);
+                cardCredit.setAlpha(hasCustomer ? 1f : 0.5f);
+            }
+
+            // Preselect method
+            if (creditRecommended && hasCustomer) {
+                setMethod("credit");
+            } else {
+                setMethod("cash");
+            }
+
+            showState("sale");
+            updateTotal();
+
+        } catch (Exception e) {
+            Log.e(TAG, "renderSale error", e);
+            showState("empty");
+            toast("⚠️ " + e.getMessage());
+        }
+    }
+
+    private void renderPayments(JSONObject sale) {
+        try {
+            JSONArray pay = sale.optJSONArray("payments_summary");
+            if (pay == null || pay.length() == 0) {
+                tvPaymentsList.setText("—");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < pay.length(); i++) {
+                JSONObject p = pay.getJSONObject(i);
+                String name = p.optString("method_name_ar",
+                              p.optString("method", "CASH"));
+                double yer = p.optDouble("amount_in_yer", 0);
+                sb.append("• ").append(name).append(": ")
+                  .append(String.format(Locale.US, "%,.0f", yer))
+                  .append(" YER\n");
+            }
+            tvPaymentsList.setText(sb.toString().trim());
+
+            if (creditCreated > 0.01) {
+                tvPaymentsList.append("\n💰 أنشأت رصيداً: ")
+                    .append(String.format(Locale.US, "%,.0f", creditCreated))
+                    .append(" YER");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "renderPayments error", e);
+        }
+    }
+
+    private void addItemRow(JSONObject it) {
+        try {
+            View row = getLayoutInflater().inflate(R.layout.item_refund_row, llItemsContainer, false);
+
+            ItemRow ir = new ItemRow();
+            ir.itemId = it.optInt("item_id", 0);
+            ir.title = it.optString("item_title", "قطعة");
+            ir.karat = it.optString("gold_karat", "21K");
+            ir.weight = it.optDouble("net_weight_grams", 0);
+            ir.price = it.optDouble("line_total_local", 0);
+            ir.isRefunded = it.optBoolean("is_refunded", false);
+            ir.rowView = row;
+
+            TextView tvTitle = row.findViewById(R.id.tvRefundRowTitle);
+            TextView tvMeta = row.findViewById(R.id.tvRefundRowMeta);
+            TextView tvPrice = row.findViewById(R.id.tvRefundRowPrice);
+            TextView tvBadge = row.findViewById(R.id.tvRefundRowBadge);
+            CheckBox cb = row.findViewById(R.id.cbRefundItem);
+            Spinner spCond = row.findViewById(R.id.spRefundCondition);
+
+            ir.checkbox = cb;
+            ir.conditionSpinner = spCond;
+
+            tvTitle.setText(ir.title);
+            tvMeta.setText(String.format(Locale.US, "%s · %.3fg", ir.karat, ir.weight));
+            tvPrice.setText(String.format(Locale.US, "%,.0f YER", ir.price));
+
+            if (ir.isRefunded) {
+                cb.setEnabled(false);
+                cb.setChecked(false);
+                cb.setAlpha(0.4f);
+                tvBadge.setVisibility(View.VISIBLE);
+                tvTitle.setPaintFlags(tvTitle.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+                tvPrice.setPaintFlags(tvPrice.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+                tvPrice.setTextColor(Color.parseColor("#9CA3AF"));
+                spCond.setVisibility(View.GONE);
+            } else {
+                cb.setChecked(true); // مختارة افتراضياً
+                cb.setOnCheckedChangeListener((b, checked) -> {
+                    spCond.setVisibility(checked ? View.VISIBLE : View.GONE);
+                    updateTotal();
+                });
+
+                // Condition spinner
+                ArrayAdapter<String> adp = new ArrayAdapter<>(getContext(),
+                    android.R.layout.simple_spinner_dropdown_item,
+                    new String[]{
+                        isArabic ? "حالة ممتازة (مخزون)" : "Excellent (in stock)",
+                        isArabic ? "كسر (تالف)" : "Scrapped",
+                        isArabic ? "تالف (فحص)" : "Damaged"
+                    });
+                spCond.setAdapter(adp);
+                spCond.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+                    @Override public void onItemSelected(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                        ir.condition = pos == 1 ? "scrapped" : pos == 2 ? "damaged" : "in_stock";
+                    }
+                    @Override public void onNothingSelected(android.widget.AdapterView<?> p) {}
+                });
+                spCond.setVisibility(View.VISIBLE);
+            }
+
+            itemRows.add(ir);
+            llItemsContainer.addView(row);
+
+        } catch (Exception e) {
+            Log.e(TAG, "addItemRow error", e);
+        }
+    }
+
+    private void updateTotal() {
+        double total = 0;
+        int selectedCount = 0;
+        for (ItemRow ir : itemRows) {
+            if (!ir.isRefunded && ir.checkbox != null && ir.checkbox.isChecked()) {
+                total += ir.price;
+                selectedCount++;
+            }
+        }
+        if (tvTotal != null) {
+            tvTotal.setText(String.format(Locale.US, "%,.0f YER", total));
+        }
+        if (btnConfirm != null) {
+            boolean enabled = selectedCount > 0 && currentSale != null;
+            btnConfirm.setEnabled(enabled);
+            btnConfirm.setAlpha(enabled ? 1f : 0.5f);
+        }
+        updateWarning();
+    }
+
+    private void updateWarning() {
+        if (tvWarning == null) return;
+
+        if (creditRecommended && "cash".equals(selectedMethod) && creditCreated > 0.01) {
+            tvWarning.setText(isArabic
+                ? "⚠️ هذه الفاتورة أنشأت رصيداً دائناً بقيمة " + String.format(Locale.US, "%,.0f", creditCreated) + " YER. الإرجاع كرصيد يحفظ التوازن."
+                : "⚠️ This sale created " + String.format(Locale.US, "%,.0f", creditCreated) + " YER credit. Refunding as credit keeps balance.");
+            tvWarning.setVisibility(View.VISIBLE);
+        } else {
+            tvWarning.setVisibility(View.GONE);
+        }
+    }
+
+    private void setMethod(String method) {
+        selectedMethod = method;
+        try {
+            if ("cash".equals(method)) {
+                cardCash.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#3B82F6")));
+                cardCash.setCardBackgroundColor(Color.parseColor("#EFF6FF"));
+                cardCredit.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#D1D5DB")));
+                cardCredit.setCardBackgroundColor(Color.parseColor("#F9FAFB"));
+            } else {
+                cardCredit.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#16A34A")));
+                cardCredit.setCardBackgroundColor(Color.parseColor("#F0FDF4"));
+                cardCash.setStrokeColor(android.content.res.ColorStateList.valueOf(Color.parseColor("#D1D5DB")));
+                cardCash.setCardBackgroundColor(Color.parseColor("#F9FAFB"));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "setMethod color error: " + e.getMessage());
+        }
+        updateWarning();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Submit
+    // ═══════════════════════════════════════════════════════════
+    private void submitRefund() {
+        if (currentSale == null) return;
+
+        List<Integer> selected = new ArrayList<>();
+        for (ItemRow ir : itemRows) {
+            if (!ir.isRefunded && ir.checkbox != null && ir.checkbox.isChecked()) {
+                selected.add(ir.itemId);
+            }
+        }
+        if (selected.isEmpty()) {
+            toast(isArabic ? "⚠️ اختر قطعة واحدة على الأقل" : "⚠️ Select at least one item");
+            return;
+        }
+        if ("credit".equals(selectedMethod) && !hasCustomer) {
+            toast(isArabic ? "⚠️ الإرجاع كرصيد يتطلب عميلاً مسجلاً" : "⚠️ Credit refund requires registered customer");
+            return;
+        }
+
+        btnConfirm.setEnabled(false);
+        btnConfirm.setText(isArabic ? "جاري التنفيذ..." : "Processing...");
+
+        try {
+            JSONArray itemsArr = new JSONArray();
+            for (ItemRow ir : itemRows) {
+                if (ir.isRefunded || !ir.checkbox.isChecked()) continue;
+                JSONObject o = new JSONObject();
+                o.put("item_id", ir.itemId);
+                o.put("condition", ir.condition);
+                itemsArr.put(o);
+            }
+
+            final JSONObject payload = new JSONObject();
+            payload.put("sale_number", currentSale.optString("sale_number", ""));
+            payload.put("refund_method", selectedMethod);
+            payload.put("items", itemsArr);
+
+            new Thread(() -> {
+                try {
+                    MiraApiClient client = MiraApiClient.getInstance(getContext().getApplicationContext());
+                    MiraApiClient.ApiResponse resp = client.processRefundV2(payload);
+
+                    handler.post(() -> {
+                        if (resp != null && resp.isSuccess) {
+                            JSONObject result = resp.data != null ? resp.data : new JSONObject();
+                            if (result.has("data")) result = result.optJSONObject("data");
+                            if (callback != null) callback.onRefundSuccess(result);
+                            dismiss();
+                        } else {
+                            String err = (resp != null && resp.error != null) ? resp.error
+                                : (isArabic ? "فشل الإرجاع" : "Refund failed");
+                            toast("❌ " + err);
+                            btnConfirm.setEnabled(true);
+                            btnConfirm.setText(isArabic ? "تأكيد الإرجاع" : "Confirm Refund");
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "submitRefund error", e);
+                    handler.post(() -> {
+                        toast("⚠️ " + e.getMessage());
+                        btnConfirm.setEnabled(true);
+                        btnConfirm.setText(isArabic ? "تأكيد الإرجاع" : "Confirm Refund");
+                    });
+                }
+            }).start();
+
+        } catch (Exception e) {
+            Log.e(TAG, "submitRefund payload error", e);
+            btnConfirm.setEnabled(true);
+            btnConfirm.setText(isArabic ? "تأكيد الإرجاع" : "Confirm Refund");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Helpers
+    // ═══════════════════════════════════════════════════════════
+    private void showState(String state) {
+        if (llEmpty != null) llEmpty.setVisibility("empty".equals(state) ? View.VISIBLE : View.GONE);
+        if (llLoading != null) llLoading.setVisibility("loading".equals(state) ? View.VISIBLE : View.GONE);
+        if (llSale != null) llSale.setVisibility("sale".equals(state) ? View.VISIBLE : View.GONE);
+    }
+
+    private void toast(String msg) {
+        if (getContext() != null) {
+            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void close() {
+        try {
+            if (callback != null) callback.onDialogClosed();
+        } catch (Exception ignored) {}
+        dismiss();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Public API
+    // ═══════════════════════════════════════════════════════════
+
+    public void setQueryFromScan(String code) {
+        if (etQuery == null || code == null) return;
+        suppressWatcher = true;
+        try {
+            etQuery.setText(code);
+            etQuery.setSelection(code.length());
+        } finally {
+            suppressWatcher = false;
+        }
+        handler.postDelayed(this::performSearch, 150);
+    }
+
+    /** @deprecated استخدم setQueryFromScan بدلاً منها */
+    @Deprecated
+    public void setRefundCode(@Nullable String code) {
+        setQueryFromScan(code);
     }
 
     public void setOnHardwareKeyListener(@Nullable DialogInterface.OnKeyListener listener) {
@@ -238,50 +580,15 @@ public class RefundDialog extends Dialog {
     public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
         try {
             int code = event.getKeyCode();
-            boolean isTriggerKey = (code == KEYCODE_RFID_TRIGGER_1 || code == KEYCODE_RFID_TRIGGER_2 || code == KEYCODE_RFID_TRIGGER_3);
-            if (isTriggerKey && hardwareKeyListener != null) {
+            boolean isTrigger = (code == KEYCODE_RFID_TRIGGER_1
+                || code == KEYCODE_RFID_TRIGGER_2
+                || code == KEYCODE_RFID_TRIGGER_3);
+            if (isTrigger && hardwareKeyListener != null) {
                 return hardwareKeyListener.onKey(this, code, event);
             }
         } catch (Exception e) {
             Log.e(TAG, "dispatchKeyEvent error", e);
         }
         return super.dispatchKeyEvent(event);
-    }
-
-    public void setRefundCode(@Nullable String code) {
-        if (etRefundCode == null || code == null) return;
-        suppressWatcher = true;
-        try {
-            etRefundCode.setText(code);
-            etRefundCode.setSelection(code.length());
-        } finally {
-            suppressWatcher = false;
-        }
-        hideRefundItemInfo();
-    }
-
-    public void showRefundItemInfo(String title, String price) {
-        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
-        if (tvRefundItemTitle != null) tvRefundItemTitle.setText(title + " (" + price + ")");
-        if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic ? "✅ القطعة مباعة وقابلة للإرجاع" : "✅ Item sold and refundable");
-            tvRefundItemStatus.setTextColor(Color.parseColor("#2ECC71"));
-        }
-        isRefundable = true;
-    }
-
-    public void showRefundItemError(String message) {
-        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(android.view.View.VISIBLE);
-        if (tvRefundItemTitle != null) tvRefundItemTitle.setText(message);
-        if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic ? "غير قابلة للإرجاع ❌" : "Not Refundable ❌");
-            tvRefundItemStatus.setTextColor(Color.parseColor("#E74C3C"));
-        }
-        isRefundable = false;
-    }
-
-    private void hideRefundItemInfo() {
-        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(android.view.View.GONE);
-        isRefundable = false;
     }
 }
