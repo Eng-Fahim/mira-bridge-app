@@ -113,8 +113,8 @@ public class POSCheckoutDialog extends DialogFragment {
     private Button btnAddPayment;
     private TextView tvRemaining;
 
+    // ✅ btnTradeIn محذوف — btnTabGold يتولى فتح TradeInDialog
     private LinearLayout llTradeInSummary;
-    private Button btnTradeIn;
     private TextView tvTradeInTotal;
     private double tradeInTotal = 0.0;
     private JSONArray tradeInLines = new JSONArray();
@@ -237,9 +237,9 @@ public class POSCheckoutDialog extends DialogFragment {
         btnAddPayment       = view.findViewById(R.id.btnAddPayment);
         tvRemaining         = view.findViewById(R.id.tvRemaining);
 
-        llTradeInSummary    = view.findViewById(R.id.llTradeInSummary);
-        btnTradeIn          = view.findViewById(R.id.btnTradeIn);
-        tvTradeInTotal      = view.findViewById(R.id.tvTradeInTotal);
+        llTradeInSummary = view.findViewById(R.id.llTradeInSummary);
+        tvTradeInTotal   = view.findViewById(R.id.tvTradeInTotal);
+        // ✅ btnTradeIn محذوف — btnTabGold يتولى الفتح
 
         etSimpleAmount    = view.findViewById(R.id.etSimpleAmount);
         btnTabCash        = view.findViewById(R.id.btnTabCash);
@@ -265,7 +265,7 @@ public class POSCheckoutDialog extends DialogFragment {
         if (btnCancelCheckout != null) btnCancelCheckout.setText(isArabic ? "إلغاء" : "Cancel");
         if (btnConfirmCheckout != null) btnConfirmCheckout.setText(isArabic ? "تأكيد البيع ✓" : "Confirm Sale ✓");
         if (btnAddPayment != null) btnAddPayment.setText(isArabic ? "+ إضافة عملة أخرى" : "+ Add Currency");
-        if (btnTradeIn != null) btnTradeIn.setText(isArabic ? "🔄 إضافة ذهب (Trade-In)" : "🔄 Add Trade-In");
+        // ✅ btnTradeIn محذوف — btnTabGold يحمل النص من XML
     }
 
     private void setupSpinner() {
@@ -396,7 +396,7 @@ public class POSCheckoutDialog extends DialogFragment {
             tvItemCount.setText(isArabic ? String.format(Locale.getDefault(), "%d قطعة", itemCount) : String.format(Locale.getDefault(), "%d items", itemCount));
         }
         updateFinalAmount();
-        // ✅ حُذف addPaymentRow — التصميم الجديد يستخدم etSimpleAmount فقط
+        // التصميم الجديد يستخدم etSimpleAmount — لا نضيف سطر دفع افتراضي
     }
 
     private double getRateToYER(String currency) {
@@ -540,17 +540,15 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     /**
-     * ✅ منطق التحقق الجديد:
-     * - الاسم والهاتف اختياريان في الوضع الطبيعي (القسم مخفي افتراضياً)
+     * ✅ منطق التحقق:
+     * - الاسم والهاتف اختياريان في الوضع الطبيعي
      * - فقط عند الدفع الزائد (diff > 1.0) → يُطلب الهاتف لإنشاء رصيد دائن
      * - يفتح قسم العميل تلقائياً عند الحاجة
      */
     private boolean validateInputs() {
-        // ✅ الاسم والهاتف اختياريان في الوضع الطبيعي
         if (tilCustomerName != null) tilCustomerName.setError(null);
         if (tilCustomerPhone != null) tilCustomerPhone.setError(null);
 
-        // حساب المدفوع (نقد + ذهب)
         double cashPaid = 0;
         if (etSimpleAmount != null) {
             try { cashPaid = Double.parseDouble(etSimpleAmount.getText().toString().trim()); }
@@ -571,11 +569,9 @@ public class POSCheckoutDialog extends DialogFragment {
         double totalWithGold = cashPaid + tradeInTotal;
         double diff = totalWithGold - requiredTotalInYer;
 
-        // ✅ فقط عند الدفع الزائد → نتطلب رقم هاتف (لإصدار الرصيد)
         if (diff > 1.0) {
             String phone = (etCustomerPhone != null) ? etCustomerPhone.getText().toString().trim() : "";
             if (phone.isEmpty()) {
-                // افتح قسم العميل تلقائياً
                 if (llCustomerFields != null) llCustomerFields.setVisibility(View.VISIBLE);
                 if (tvCustomerArrow != null) tvCustomerArrow.setText("▲");
                 if (tilCustomerPhone != null) {
@@ -626,7 +622,6 @@ public class POSCheckoutDialog extends DialogFragment {
 
         if (btnTabCash != null) {
             btnTabCash.setOnClickListener(v -> {
-                // ✅ استخدام ColorStateList بدلاً من int (Material 1.4+)
                 btnTabCash.setStrokeColor(ColorStateList.valueOf(Color.parseColor("#3B82F6")));
                 btnTabCash.setCardBackgroundColor(ColorStateList.valueOf(Color.parseColor("#EFF6FF")));
                 if (btnTabGold != null) {
@@ -636,6 +631,7 @@ public class POSCheckoutDialog extends DialogFragment {
             });
         }
 
+        // ✅ btnTabGold يفتح TradeInDialog (بديل btnTradeIn)
         if (btnTabGold != null) {
             btnTabGold.setOnClickListener(v -> openTradeInDialog());
         }
@@ -664,9 +660,7 @@ public class POSCheckoutDialog extends DialogFragment {
             });
         }
 
-        if (btnTradeIn != null) {
-            btnTradeIn.setOnClickListener(v -> openTradeInDialog());
-        }
+        // ✅ تم حذف btnTradeIn — btnTabGold يتولى الفتح
 
         if (btnCancelCheckout != null) btnCancelCheckout.setOnClickListener(v -> dismissAllowingStateLoss());
 
@@ -695,11 +689,10 @@ public class POSCheckoutDialog extends DialogFragment {
                 data.discountAmount  = totalAmount * (data.discount / 100.0);
                 data.finalAmount     = totalAmount - data.discountAmount;
 
-                // ✅ جمع الدفعات من الحقل المبسط (YER) + سطور الدفع المتعددة
                 final JSONArray paymentsArray = new JSONArray();
                 double totalPaidInYer = 0;
 
-                // 1) الحقل المبسط
+                // 1) الحقل المبسط (YER)
                 if (etSimpleAmount != null) {
                     try {
                         double simpleAmt = Double.parseDouble(etSimpleAmount.getText().toString().trim());
@@ -765,7 +758,6 @@ public class POSCheckoutDialog extends DialogFragment {
                 }
 
                 if (diff > 1.0) {
-                    // validateInputs() ضمن بالفعل وجود الهاتف هنا — نعرض تأكيد الرصيد فقط
                     new androidx.appcompat.app.AlertDialog.Builder(requireContext())
                         .setTitle(isArabic ? "💰 سيُضاف رصيد دائن" : "💰 Store Credit")
                         .setMessage(isArabic
