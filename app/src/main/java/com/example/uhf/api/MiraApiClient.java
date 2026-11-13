@@ -1543,7 +1543,8 @@ public class MiraApiClient {
     }
 
     public ApiResponse getPaymentMethods() {
-        return getWithAuth("/pos/payment-methods");
+    // ✅ المسار الصحيح (بدون /pos/)
+    return getWithAuth("/payment-methods");
     }
 
     public ApiResponse getSalesStats() {
