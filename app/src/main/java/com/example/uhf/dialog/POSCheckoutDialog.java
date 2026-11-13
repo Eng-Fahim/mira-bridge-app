@@ -211,11 +211,9 @@ public class POSCheckoutDialog extends DialogFragment {
         try {
             MiraApiClient client = MiraApiClient.getInstance(requireContext());
             MiraApiClient.ApiResponse response = client.getPaymentMethods();
-            
+
             if (response != null && response.isSuccess && response.data != null) {
-                JSONArray arr = null;
-                // جرب كل تنسيقات الاستجابة الممكنة
-                arr = response.data.optJSONArray("data");
+                JSONArray arr = response.data.optJSONArray("data");
                 if (arr == null) arr = response.data.optJSONArray("methods");
                 if (arr == null) arr = response.data.optJSONArray("payment_methods");
                 if (arr == null) arr = response.data.optJSONArray("items");
@@ -233,23 +231,27 @@ public class POSCheckoutDialog extends DialogFragment {
                             Log.w(TAG, "skip malformed method", e);
                         }
                     }
-                    Log.i(TAG, "✅ Loaded " + loaded.size() + " payment methods from server");
-                } else {
-                    Log.w(TAG, "⚠️ Empty payment methods response");
+                    Log.i(TAG, "✅ Loaded " + loaded.size() + " methods from server");
                 }
-            } else {
-                Log.w(TAG, "⚠️ getPaymentMethods failed: " + (response != null ? response.error : "null"));
             }
-        } catch (Exception e) { Log.e(TAG, "loadPaymentMethods error", e); }
+        } catch (Exception e) {
+            Log.e(TAG, "loadPaymentMethods error", e);
+        }
 
-        final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty()) ? loaded : getFallbackMethods();
-        
-        // ✅ استبعاد طرق خاصة (لها مسار منفصل)
+        // ✅ 1. الفلترة أولاً
         if (loaded != null && !loaded.isEmpty()) {
             final int before = loaded.size();
-            loaded.removeIf(m -> m.code != null && (m.code.equalsIgnoreCase("TRADE_IN") || m.code.equalsIgnoreCase("CUSTOMER_CREDIT")));
+            loaded.removeIf(m -> m.code != null &&
+                    (m.code.equalsIgnoreCase("TRADE_IN") ||
+                     m.code.equalsIgnoreCase("CUSTOMER_CREDIT")));
             Log.i(TAG, "Filtered: " + before + " → " + loaded.size() + " methods");
-            }
+        }
+
+        // ✅ 2. الآن عيّن finalList (آمن)
+        final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty())
+                ? loaded
+                : getFallbackMethods();
+
         mainHandler.post(() -> {
             paymentMethods.clear();
             paymentMethods.addAll(finalList);
@@ -289,13 +291,16 @@ private void loadCurrencies() {
             CURRENCIES.clear();
             CURRENCIES.addAll(finalList);
             // تحديث كل السطور الموجودة
+            
             for (View row : paymentRows) {
-                AutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
-                if (actCurr != null) {
-                    actCurr.setAdapter(new ArrayAdapter<>(requireContext(),
-                        android.R.layout.simple_dropdown_item_1line, CURRENCIES));
-                }
-            }
+                com.google.android.material.textfield.MaterialAutoCompleteTextView actCurr = 
+        row.findViewById(R.id.actCurrency);
+    
+    if (actCurr != null) {
+        actCurr.setAdapter(new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_dropdown_item_1line, CURRENCIES));
+    }
+}
             Log.i(TAG, "✅ Loaded currencies: " + CURRENCIES);
         });
     }).start();
@@ -338,14 +343,13 @@ private void loadCurrencies() {
     private void addPaymentRow(String defaultCurrency, double amount) {
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
 
-        // ✅ [IMPROVEMENT-1] ترقيم السطر تلقائياً
+        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+        com.google.android.material.textfield.MaterialAutoCompleteTextView actCurrency =
+        row.findViewById(R.id.actCurrency);
         TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
         if (tvRowNumber != null) {
-            tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
+        tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
         }
-
-        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-        AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
         EditText etAmount = row.findViewById(R.id.etAmount);
         TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
         MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
@@ -548,14 +552,17 @@ private void loadCurrencies() {
 
         JSONArray paymentsArray = new JSONArray();
         for (View row : paymentRows) {
-            EditText et = row.findViewById(R.id.etAmount);
-            AutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
-            MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-            if (et == null || actCurr == null) continue;
-
-            double amt = parseDouble(et.getText().toString());
-            if (amt <= 0) continue;
-
+    EditText et = row.findViewById(R.id.etAmount);
+    com.google.android.material.textfield.MaterialAutoCompleteTextView actCurr = 
+        row.findViewById(R.id.actCurrency);
+    MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+    
+    // ✅ نضيف actMethod للتحقق
+    if (et == null || actCurr == null || actMethod == null) continue;
+    
+    double amt = parseDouble(et.getText().toString());
+    if (amt <= 0) continue;
+    
             String curr = actCurr.getText().toString();
             String methodCode = resolveMethodCode(actMethod);
 
