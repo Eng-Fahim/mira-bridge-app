@@ -1,5 +1,5 @@
 package com.example.uhf.activity
-    
+
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -156,18 +156,20 @@ class ActivationActivity : AppCompatActivity() {
         // ─── Validation ───
         if (licenseKey.isEmpty()) {
             val errMsg = if (isArabic) "أدخل رقم الترخيص" else "Enter license key"
-            tilLicenseKey?.error = errMsg ?: run {
+            if (tilLicenseKey != null) {
+                tilLicenseKey?.error = errMsg
+            } else {
                 showError(errMsg)
-                return
             }
             return
         }
 
         if (!LICENSE_KEY_PATTERN.matcher(licenseKey).matches()) {
             val msg = if (isArabic) "الصيغة: MIRA-XXXX-XXXX-XXXX" else "Format: MIRA-XXXX-XXXX-XXXX"
-            tilLicenseKey?.error = msg ?: run {
+            if (tilLicenseKey != null) {
+                tilLicenseKey?.error = msg
+            } else {
                 showError(msg)
-                return
             }
             return
         }
@@ -359,10 +361,10 @@ class ActivationActivity : AppCompatActivity() {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  TextWatcher المساعد
+    //  TextWatcher المساعد (صحيح 100% مع أنواع البارامترات)
     // ═══════════════════════════════════════════════════════════════════════════
     private abstract class SimpleTextWatcher : TextWatcher {
-        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after) {}
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count) {}
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
     }
 }
