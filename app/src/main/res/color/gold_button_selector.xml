@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- عندما يكون الزر معطلاً (غير مفعل) -->
+    <item android:state_enabled="false" android:color="#4A4A52" />
+    <!-- الحالة الافتراضية المفعلة (اللون الذهبي) -->
+    <item android:color="@color/gold_accent" />
+</selector>
