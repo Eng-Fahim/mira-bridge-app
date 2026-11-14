@@ -419,7 +419,11 @@ try {
     private void addPaymentRow(String defaultCurrency, double amount) {
         View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
 
-        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+        // ✅ نستخدم TextView بدل AutoCompleteTextView لفتح شاشة الاختيار المخصصة
+com.google.android.material.textfield.TextInputEditText actMethod = row.findViewById(R.id.actMethod);
+// اجعل الحقل read-only — النقر يفتح الشاشة
+actMethod.setFocusable(false);
+actMethod.setClickable(true);
         MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
         TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
         EditText etAmount = row.findViewById(R.id.etAmount);
@@ -448,9 +452,15 @@ try {
         actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, methodNames));
 
-        if (methodNames.length > 0) {
-            actMethod.setText(methodNames[0], false);
-            actMethod.setTag(displayToCode.get(methodNames[0]));
+        // ✅ عند النقر — افتح شاشة الاختيار المخصصة
+if (methodNames.length > 0) {
+    actMethod.setText(methodNames[0]);
+    actMethod.setTag(displayToCode.get(methodNames[0]));
+}
+
+actMethod.setOnClickListener(v -> {
+    showPaymentMethodPicker(actMethod, displayToCode);
+});
         } else {
             actMethod.setTag("CASH");
         }
@@ -690,10 +700,9 @@ try {
             String curr = actCurr.getText().toString();
 
             // ✅ اقرأ الكود من Tag (موثوق 100%)
-            String methodCode = actMethod.getTag() != null
-                    ? String.valueOf(actMethod.getTag())
-                    : resolveMethodCodeFallback(actMethod);
-
+            com.google.android.material.textfield.TextInputEditText methodField = row.findViewById(R.id.actMethod);
+            String methodCode = resolveMethodCode(methodField);
+        
             Log.d(TAG, "Payment row: currency=" + curr
                     + " amount=" + amt + " method=" + methodCode);
 
@@ -722,26 +731,23 @@ try {
     /**
      * Fallback فقط عند فقدان Tag (نادر) — يطابق النص العربي.
      */
-    private String resolveMethodCodeFallback(MaterialAutoCompleteTextView actMethod) {
-        if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
-
-        String selectedText = actMethod.getText() != null
-                ? actMethod.getText().toString().trim() : "";
-        if (selectedText.isEmpty()) return paymentMethods.get(0).code;
-
-        for (PaymentMethodDto m : paymentMethods) {
-            if (m == null) continue;
-            String display = m.getDisplayName(isArabic);
-            String account = m.getAccountDisplay(isArabic);
-            String full = (account != null && !account.isEmpty())
-                    ? display + " (" + account + ")"
-                    : display;
-            if (full.equals(selectedText)) {
-                return m.code != null ? m.code : "CASH";
-            }
+    private String resolveMethodCode(android.widget.TextView actMethod) {
+    if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
+    if (actMethod.getTag() != null) return String.valueOf(actMethod.getTag());
+    
+    String selectedText = actMethod.getText() != null
+            ? actMethod.getText().toString().trim() : "";
+    for (PaymentMethodDto m : paymentMethods) {
+        if (m == null) continue;
+        String display = m.getDisplayName(isArabic);
+        String account = m.getAccountDisplay(isArabic);
+        String full = (account != null && !account.isEmpty()) ? display + " (" + account + ")" : display;
+        if (full.equals(selectedText)) {
+            return m.code != null ? m.code : "CASH";
         }
-        return paymentMethods.get(0).code;
     }
+    return paymentMethods.get(0).code;
+}
 
     /**
      * ✅ لا تُغلق الديالوج — أبقها مفتوحة حتى يرد الـ Backend.
@@ -849,4 +855,106 @@ try {
         try { return Double.parseDouble(s.trim()); }
         catch (Exception e) { return 0; }
     }
+    /**
+ * يعرض شاشة اختيار مخصصة مع بحث وأيقونات.
+ * بدل Full-screen Radio Button dialog.
+ */
+private void showPaymentMethodPicker(
+        com.google.android.material.textfield.TextInputEditText targetField,
+        java.util.Map<String, String> displayToCode) {
+
+    if (paymentMethods == null || paymentMethods.isEmpty()) return;
+
+    // 1) بناء قائمة العرض
+    List<PaymentMethodDto> filtered = new ArrayList<>(paymentMethods);
+
+    // 2) بناء الـ Dialog
+    View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment_picker, null);
+    com.google.android.material.textfield.TextInputEditText etSearch =
+            dialogView.findViewById(R.id.etSearch);
+    android.widget.ListView lvMethods = dialogView.findViewById(R.id.lvMethods);
+
+    // 3) Adapter مخصص
+    class PickerAdapter extends android.widget.BaseAdapter {
+        List<PaymentMethodDto> data;
+        PickerAdapter(List<PaymentMethodDto> data) { this.data = data; }
+
+        @Override public int getCount() { return data.size(); }
+        @Override public Object getItem(int i) { return data.get(i); }
+        @Override public long getItemId(int i) { return i; }
+
+        @Override
+        public View getView(int position, View convertView, android.view.ViewGroup parent) {
+            if (convertView == null) {
+                convertView = getLayoutInflater().inflate(R.layout.item_payment_picker_row, parent, false);
+            }
+            PaymentMethodDto m = data.get(position);
+            TextView tvIcon = convertView.findViewById(R.id.tvIcon);
+            TextView tvName = convertView.findViewById(R.id.tvName);
+            TextView tvAccount = convertView.findViewById(R.id.tvAccount);
+
+            tvIcon.setText(m.icon != null && !m.icon.isEmpty() ? m.icon : "💳");
+            tvName.setText(m.getDisplayName(isArabic));
+            String acc = m.getAccountDisplay(isArabic);
+            tvAccount.setText(acc != null ? acc : "");
+            tvAccount.setVisibility(acc != null && !acc.isEmpty() ? View.VISIBLE : View.GONE);
+
+            return convertView;
+        }
+    }
+
+    final PickerAdapter adapter = new PickerAdapter(filtered);
+    lvMethods.setAdapter(adapter);
+
+    // 4) بناء الـ Dialog
+    androidx.appcompat.app.AlertDialog.Builder builder =
+            new androidx.appcompat.app.AlertDialog.Builder(requireContext());
+    builder.setView(dialogView);
+    androidx.appcompat.app.AlertDialog dialog = builder.create();
+
+    // 5) عند اختيار طريقة
+    lvMethods.setOnItemClickListener((parent, view, position, id) -> {
+        PaymentMethodDto selected = filtered.get(position);
+        String displayName = selected.getDisplayName(isArabic);
+        String account = selected.getAccountDisplay(isArabic);
+        String fullName = (account != null && !account.isEmpty())
+                ? displayName + " (" + account + ")"
+                : displayName;
+
+        targetField.setText(fullName);
+        targetField.setTag(selected.code);
+        dialog.dismiss();
+    });
+
+    // 6) فلترة أثناء البحث
+    etSearch.addTextChangedListener(new TextWatcher() {
+        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+        @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+            String q = s != null ? s.toString().trim().toLowerCase() : "";
+            List<PaymentMethodDto> newData = new ArrayList<>();
+            for (PaymentMethodDto m : paymentMethods) {
+                String name = m.getDisplayName(isArabic).toLowerCase();
+                String acc = m.getAccountDisplay(isArabic);
+                if (acc == null) acc = "";
+                acc = acc.toLowerCase();
+                if (q.isEmpty() || name.contains(q) || acc.contains(q)) {
+                    newData.add(m);
+                }
+            }
+            adapter.data = newData;
+            adapter.notifyDataSetChanged();
+        }
+        @Override public void afterTextChanged(Editable s) {}
+    });
+
+    dialog.show();
+
+    // ارتفاع ثابت (لا يأخذ الشاشة كاملة)
+    if (dialog.getWindow() != null) {
+        dialog.getWindow().setLayout(
+                (int) (getResources().getDisplayMetrics().widthPixels * 0.95),
+                (int) (getResources().getDisplayMetrics().heightPixels * 0.7));
+        dialog.getWindow().setBackgroundDrawableResource(R.drawable.rounded_dialog_bg);
+    }
+}
 }
