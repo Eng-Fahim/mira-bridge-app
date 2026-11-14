@@ -31,10 +31,11 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         // حماية الشاشة والأمان
-        getWindow().setFlags(
+       /* getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE
         );
+        */
 
         setContentView(R.layout.splash_screen);
 
