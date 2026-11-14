@@ -474,24 +474,44 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void setupQuickActionButtons(View root) {
-        if (root == null || permissionManager == null) return;
+    if (root == null || permissionManager == null) return;
+    
+    LinearLayout container = root.findViewById(R.id.llQuickActionsContainer);
+    if (container == null) return;
+    container.removeAllViews();
 
-        bindQuickButton(root, R.id.btnQuickPos,
-                permissionManager.canUsePos(),
-                new MiraPosFragment(), NavigationManager.TAG_POS);
-
-        bindQuickButton(root, R.id.btnQuickInventory,
-                permissionManager.canViewInventory(),
-                new MiraInventoryProFragment(), NavigationManager.TAG_INVENTORY);
-
-        bindQuickButton(root, R.id.btnQuickScrap,
-                permissionManager.canBuyScrapGold(),
-                new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
-
-        bindQuickButton(root, R.id.btnQuickReports,
-                permissionManager.canViewReports(),
-                new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+    // بناء الأزرار بناءً على الصلاحيات
+    if (permissionManager.canUsePos()) {
+        addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
     }
+    if (permissionManager.canViewInventory()) {
+        addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryProFragment(), NavigationManager.TAG_INVENTORY);
+    }
+    if (permissionManager.canBuyScrapGold()) {
+        addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+    }
+    if (permissionManager.canViewReports()) {
+        addQuickAction(container, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+    }
+    if (permissionManager.canViewAccounting()) {
+        addQuickAction(container, "المحاسبة", R.drawable.ic_accounting, new MiraAccountingFragment(), NavigationManager.TAG_ACCOUNTING);
+    }
+}
+
+private void addQuickAction(LinearLayout container, String title, int iconRes, Fragment target, String tag) {
+    View view = getLayoutInflater().inflate(R.layout.item_quick_action, container, false);
+    ImageView icon = view.findViewById(R.id.ivQuickIcon);
+    TextView text = view.findViewById(R.id.tvQuickText);
+
+    icon.setImageResource(iconRes);
+    text.setText(title);
+
+    view.setOnClickListener(v -> {
+        v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+        navigateToFragment(target, tag);
+    });
+    container.addView(view);
+}
 
     private void bindQuickButton(@Nullable View root,
                                  int buttonId,
@@ -1197,51 +1217,66 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchData() {
-        try {
-            if (roleController != null && !roleController.canFetchFullDashboard()) {
-                isLoading.set(false);
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                return;
-            }
-            if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
-            if (!isLoading.compareAndSet(false, true)) return;
+    if (roleController != null && !roleController.canFetchFullDashboard()) {
+        isLoading.set(false);
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        return;
+    }
+    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+    if (!isLoading.compareAndSet(false, true)) return;
 
-            boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
-            final int finalBranchId;
-            if (isGlobalAdmin) finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
-            else {
-                int fromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
-                int fromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-                finalBranchId = fromSession > 0 ? fromSession : (fromManager > 0 ? fromManager : 1);
-            }
-            if (finalBranchId <= 0 && !isGlobalAdmin) { isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
-
-            cancelFuture(dataFuture);
-            dataFuture = localExecutor.submit(() -> {
-                try {
-                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
-                    mainHandler.post(() -> {
-                        isLoading.set(false); lastDataFetchTime = System.currentTimeMillis();
-                        if (!isAdded()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
-                        if (response != null && response.isSuccess && response.data != null) {
-                            saveOfflineData(response.data); processData(response.data); computeAndShowAlerts(response.data);
-                            isDataLoaded = true; updateLiveStatusText(true); showShimmer(false);
-                        } else {
-                            updateLiveStatusText(false); loadOfflineData(); showShimmer(false);
-                        }
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    });
-                } catch (Exception e) {
-                    logNonFatal("fetchData.thread", e);
-                    mainHandler.post(() -> { isLoading.set(false); loadOfflineData(); showShimmer(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
-                }
-            });
-            fetchDashboardCharts();
-        } catch (Exception e) { logNonFatal("fetchData", e); isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
+    // تحديد معرف الفرع
+    int finalBranchId;
+    boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
+    if (isGlobalAdmin) {
+        finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
+    } else {
+        int fromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+        int fromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+        finalBranchId = fromSession > 0 ? fromSession : (fromManager > 0 ? fromManager : 1);
     }
 
-    private void processData(JSONObject data) {
+    cancelFuture(dataFuture);
+    dataFuture = localExecutor.submit(() -> {
         try {
+            // ⚡ الأمان: طلب البيانات حسب الصلاحيات
+            // يمكنك تعديل هذه الدالة في MiraApiClient لتقبل بارامترات تحدد ما تريده
+            MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
+            
+            mainHandler.post(() -> {
+                isLoading.set(false); 
+                lastDataFetchTime = System.currentTimeMillis();
+                if (!isAdded()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    saveOfflineData(response.data); 
+                    processData(response.data); 
+                    computeAndShowAlerts(response.data);
+                    isDataLoaded = true; 
+                    updateLiveStatusText(true); 
+                    showShimmer(false);
+                } else {
+                    updateLiveStatusText(false); 
+                    loadOfflineData(); 
+                    showShimmer(false);
+                }
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            });
+        } catch (Exception e) {
+            logNonFatal("fetchData.thread", e);
+            mainHandler.post(() -> { isLoading.set(false); loadOfflineData(); showShimmer(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
+        }
+    });
+    
+    if (roleController.canFetchCharts()) fetchDashboardCharts();
+    if (roleController.canFetchScrap()) fetchScrapSummary(finalBranchId);
+    if (roleController.canFetchScrapAging()) fetchScrapAging(finalBranchId);
+}
+
+    private void processData(JSONObject data) {
+    try {
+        // معالجة المخزون فقط إذا كان مسموحاً
+        if (permissionManager.canViewDashboardInventoryByKarat()) {
             JSONObject inv = data.optJSONObject("inventory");
             if (inv != null) {
                 currentItemCount = inv.optInt("total_items", 0);
@@ -1253,15 +1288,28 @@ public class MiraDashboardFragment extends Fragment {
                 if (byKarat != null) {
                     for (int i = 0; i < byKarat.length(); i++) {
                         JSONObject k = byKarat.optJSONObject(i);
-                        if (k != null) { int karat = k.optInt("karat", 0); if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); }
+                        if (k != null) { 
+                            int karat = k.optInt("karat", 0); 
+                            if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); 
+                        }
                     }
                 }
-                currentInventoryByKarat.clear(); currentInventoryByKarat.addAll(karatItems); renderInventoryByKarat(currentInventoryByKarat);
+                currentInventoryByKarat.clear(); 
+                currentInventoryByKarat.addAll(karatItems); 
+                renderInventoryByKarat(currentInventoryByKarat);
             }
+        }
+
+        // معالجة المبيعات فقط إذا كان مسموحاً
+        if (permissionManager.canViewDashboardSales()) {
             JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) { lastSalesData = sales; applySalesData(sales); }
-        } catch (Exception e) { logNonFatal("processData", e); }
-    }
+            if (sales != null) { 
+                lastSalesData = sales; 
+                applySalesData(sales); 
+            }
+        }
+    } catch (Exception e) { logNonFatal("processData", e); }
+}
 
     private void fetchRecentActivity() {
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
