@@ -1133,16 +1133,16 @@ private void showLicenseLoading(boolean show) {
     }
 
     private void showSuccessOverlayAndNavigate() {
-        if (successOverlay != null) {
-            successOverlay.setVisibility(View.VISIBLE);
-            successOverlay.animate().alpha(1.0f).setDuration(350).withEndAction(() -> {
-                mainHandler.postDelayed(this::navigateToMainDirect, 400);
-            }).start();
-        } else {
-            navigateToMainDirect();
-        }
+    if (successOverlay != null) {
+        successOverlay.setAlpha(0f);          // ← أضف هذا
+        successOverlay.setVisibility(View.VISIBLE);
+        successOverlay.animate().alpha(1.0f).setDuration(350)
+                .withEndAction(() -> mainHandler.postDelayed(this::navigateToMainDirect, 400))
+                .start();
+    } else {
+        navigateToMainDirect();
     }
-
+}
     private void navigateToMainDirect() {
         Intent intent = new Intent(this, UHFMainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
