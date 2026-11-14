@@ -1,432 +1,361 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
-    android:fitsSystemWindows="true"> <!-- إصلاح مشكلة القطع العلوي والسفلي -->
+    android:fitsSystemWindows="true"> 
+    <!-- fitsSystemWindows=true يمنع التداخل مع شريط الحالة العلوي (Status Bar) -->
 
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/mainScrollView"
+    <!-- ==================== التوهجات الخفية (اختياري) ==================== -->
+    <View
+        android:layout_width="220dp"
+        android:layout_height="220dp"
+        android:background="@drawable/radial_glow_gold"
+        android:translationX="-60dp"
+        android:translationY="-60dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ==================== الشريط العلوي: اللغة والإصدار ==================== -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnToggleLanguage"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="EN / AR"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        app:icon="@drawable/ic_language"
+        app:iconSize="18dp"
+        app:iconTint="?attr/colorOnSurfaceVariant"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvAppVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="v1.0.0 Enterprise"
+        android:textColor="?attr/colorOutline"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toBottomOf="@+id/btnToggleLanguage"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/btnToggleLanguage" />
+
+    <!-- ==================== تجميعة المنتصف (الشعار + الكارت) ==================== -->
+    <LinearLayout
+        android:id="@+id/centerContent"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:fillViewport="true"
-        android:overScrollMode="never"
-        android:scrollbars="none">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        app:layout_constraintBottom_toTopOf="@+id/tvFooter"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnToggleLanguage"
+        app:layout_constraintVertical_bias="0.4"> <!-- 0.4 يرفع المحتوى قليلاً للأعلى ويقلل الفراغ -->
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <!-- الشعار والأنشطة -->
+        <LinearLayout
+            android:id="@+id/logoContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="640dp"
-            android:paddingHorizontal="24dp"
-            android:paddingTop="32dp"
-            android:paddingBottom="24dp"> 
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingBottom="16dp">
 
-            <!-- ==================== التوهجات الخفية (Glows) ==================== -->
-            <View
-                android:id="@+id/topGlow"
-                android:layout_width="220dp"
-                android:layout_height="220dp"
-                android:background="@drawable/radial_glow_gold"
-                android:translationX="-60dp"
-                android:translationY="-60dp"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+            <FrameLayout
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:background="@drawable/bg_logo_glow"
+                android:padding="10dp">
 
-            <View
-                android:id="@+id/bottomGlow"
-                android:layout_width="180dp"
-                android:layout_height="180dp"
-                android:background="@drawable/radial_glow_gold"
-                android:translationX="40dp"
-                android:translationY="40dp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
-
-            <!-- ==================== الشريط العلوي: اللغة والإصدار ==================== -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnToggleLanguage"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="-8dp"
-                android:text="EN / AR"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                app:icon="@drawable/ic_language"
-                app:iconSize="18dp"
-                app:iconTint="?attr/colorOnSurfaceVariant"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                <ImageView
+                    android:id="@+id/ivAppLogo"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_luxury_mira_logo" />
+            </FrameLayout>
 
             <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tvAppVersion"
+                android:id="@+id/tvBrandName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="v1.0.0 Enterprise"
-                android:textColor="?attr/colorOutline"
-                android:textSize="11sp"
-                app:layout_constraintBottom_toBottomOf="@+id/btnToggleLanguage"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/btnToggleLanguage" />
+                android:layout_marginTop="8dp"
+                android:text="ميرا للتكنولوجيا"
+                android:textColor="?attr/colorOnBackground"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-            <!-- ==================== تجميعة المنتصف (الشعار + الكارت) ==================== -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvBrandSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MIRA ID™ SMART JEWELRY TAG"
+                android:textAllCaps="true"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvBrandDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
+                android:textAlignment="center"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- كارت تسجيل الدخول -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/loginCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="4dp"
+            app:strokeColor="?attr/colorOutlineVariant" 
+            app:strokeWidth="1dp"> 
+            <!-- strokeColor يحدد إطار الكارت لمنع تداخل الألوان -->
+
             <LinearLayout
-                android:id="@+id/centerContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:animateLayoutChanges="true"
                 android:orientation="vertical"
-                app:layout_constraintBottom_toTopOf="@+id/tvFooter"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/btnToggleLanguage"
-                app:layout_constraintVertical_bias="0.45"> <!-- Bias 0.45 يرفع العنصر قليلاً للأعلى ويعطيه توازناً أفضل -->
+                android:padding="24dp">
 
-                <!-- الشعار والأنشطة -->
-                <LinearLayout
-                    android:id="@+id/logoContainer"
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvSignInTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:text="مرحباً بعودتك"
+                    android:textAlignment="center"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvSignInSubtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="20dp"
+                    android:text="قم بتسجيل الدخول للمتابعة"
+                    android:textAlignment="center"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
+
+                <!-- اسم المستخدم -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilUsername"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:hint="اسم المستخدم"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:startIconDrawable="@drawable/ic_person">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etUsername"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:autofillHints="username"
+                        android:imeOptions="actionNext"
+                        android:importantForAutofill="yes"
+                        android:inputType="textNoSuggestions"
+                        android:textAlignment="viewStart"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- كلمة المرور -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilPassword"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    android:hint="كلمة المرور"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:endIconMode="password_toggle"
+                    app:startIconDrawable="@drawable/ic_lock">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:autofillHints="password"
+                        android:imeOptions="actionDone"
+                        android:importantForAutofill="yes"
+                        android:inputType="textPassword"
+                        android:textAlignment="viewStart"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- مؤشر حالة القفل -->
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvLockStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
                     android:gravity="center"
-                    android:orientation="vertical"
-                    android:paddingBottom="20dp">
+                    android:textColor="?attr/colorError"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
-                    <FrameLayout
-                        android:layout_width="90dp"
-                        android:layout_height="90dp"
-                        android:background="@drawable/bg_logo_glow"
-                        android:padding="14dp">
-
-                        <ImageView
-                            android:id="@+id/ivAppLogo"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_luxury_mira_logo" />
-                    </FrameLayout>
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/tvBrandName"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="MIRA Jewelry Enterprise"
-                        android:textColor="?attr/colorOnBackground"
-                        android:textSize="22sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/tvBrandSubtitle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="MIRA ID™ Smart Jewelry Tag"
-                        android:textAllCaps="true"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/tvBrandDescription"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
-                        android:textAlignment="center"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <!-- كارت تسجيل الدخول -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/loginCard"
+                <!-- تجميعة الأزرار والتحميل -->
+                <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="28dp" 
-                    app:cardElevation="8dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline"> <!-- حدود خفيفة جداً تعطي لمسة فخامة -->
+                    android:layout_height="wrap_content">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:animateLayoutChanges="true"
-                        android:orientation="vertical"
-                        android:padding="24dp">
+                        android:orientation="horizontal">
 
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/tvSignInTitle"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="مرحباً بعودتك"
-                            android:textAlignment="center"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="22sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/tvSignInSubtitle"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:layout_marginBottom="24dp"
-                            android:text="قم بتسجيل الدخول للمتابعة"
-                            android:textAlignment="center"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="14sp" />
-
-                        <!-- اسم المستخدم -->
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/tilUsername"
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="16dp"
-                            android:hint="اسم المستخدم"
-                            app:boxCornerRadiusBottomEnd="14dp"
-                            app:boxCornerRadiusBottomStart="14dp"
-                            app:boxCornerRadiusTopEnd="14dp"
-                            app:boxCornerRadiusTopStart="14dp"
-                            app:boxStrokeColor="?attr/colorPrimary"
-                            app:startIconDrawable="@drawable/ic_person">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etUsername"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:autofillHints="username"
-                                android:imeOptions="actionNext"
-                                android:importantForAutofill="yes"
-                                android:inputType="textNoSuggestions"
-                                android:textAlignment="viewStart"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="15sp" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <!-- كلمة المرور -->
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/tilPassword"
-                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="24dp"
-                            android:hint="كلمة المرور"
-                            app:boxCornerRadiusBottomEnd="14dp"
-                            app:boxCornerRadiusBottomStart="14dp"
-                            app:boxCornerRadiusTopEnd="14dp"
-                            app:boxCornerRadiusTopStart="14dp"
-                            app:boxStrokeColor="?attr/colorPrimary"
-                            app:endIconMode="password_toggle"
-                            app:startIconDrawable="@drawable/ic_lock">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etPassword"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:autofillHints="password"
-                                android:imeOptions="actionDone"
-                                android:importantForAutofill="yes"
-                                android:inputType="textPassword"
-                                android:textAlignment="viewStart"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="15sp" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <!-- مؤشر حالة القفل -->
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/tvLockStatus"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="12dp"
-                            android:gravity="center"
-                            android:textColor="?attr/colorError"
-                            android:textSize="12sp"
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnLogin"
+                            android:layout_width="0dp"
+                            android:layout_height="54dp"
+                            android:layout_weight="1"
+                            android:text="تسجيل الدخول"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:textSize="16sp"
                             android:textStyle="bold"
-                            android:visibility="gone" />
+                            app:backgroundTint="?attr/colorPrimary"
+                            app:cornerRadius="12dp" />
 
-                        <!-- تجميعة الأزرار والتحميل -->
-                        <RelativeLayout
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBiometric"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="54dp"
+                            android:layout_height="54dp"
+                            android:layout_marginStart="12dp"
+                            android:padding="0dp"
+                            android:visibility="gone"
+                            app:cornerRadius="12dp"
+                            app:icon="@drawable/ic_fingerprint"
+                            app:iconPadding="0dp"
+                            app:iconSize="28dp"
+                            app:iconTint="?attr/colorPrimary"
+                            app:strokeColor="?attr/colorPrimary"
+                            app:strokeWidth="1.5dp" />
+                    </LinearLayout>
+
+                    <!-- تحميل الدخول -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/loadingContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="54dp"
+                        android:visibility="gone"
+                        app:cardBackgroundColor="?attr/colorPrimary"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="0dp"
+                        app:strokeWidth="0dp">
+
+                        <ProgressBar
+                            android:id="@+id/pbLoading"
+                            android:layout_width="26dp"
+                            android:layout_height="26dp"
+                            android:layout_gravity="center"
+                            android:indeterminateTint="?attr/colorOnPrimary" />
+                    </com.google.android.material.card.MaterialCardView>
+                </RelativeLayout>
+
+                <!-- إعدادات الخادم -->
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvServerSettings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="16dp"
+                    android:padding="6dp"
+                    android:text="🔧 إعدادات الخادم والاتصال (Server Settings)"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/serverConfigCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                    app:cardCornerRadius="16dp"
+                    app:strokeWidth="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/tilServerUrl"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content">
+                            android:layout_height="wrap_content"
+                            android:hint="رابط الخادم (Server URL)">
 
-                            <LinearLayout
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etServerUrl"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:animateLayoutChanges="true"
-                                android:orientation="horizontal">
+                                android:importantForAutofill="no"
+                                android:inputType="textUri"
+                                android:textSize="13sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
 
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnLogin"
-                                    android:layout_width="0dp"
-                                    android:layout_height="54dp"
-                                    android:layout_weight="1"
-                                    android:insetTop="0dp" 
-                                    android:insetBottom="0dp"
-                                    android:text="تسجيل الدخول"
-                                    android:textColor="?attr/colorOnPrimary"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold"
-                                    app:backgroundTint="?attr/colorPrimary"
-                                    app:cornerRadius="14dp" />
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnBiometric"
-                                    style="@style/Widget.Material3.Button.OutlinedButton"
-                                    android:layout_width="54dp"
-                                    android:layout_height="54dp"
-                                    android:layout_marginStart="12dp"
-                                    android:insetTop="0dp"
-                                    android:insetBottom="0dp"
-                                    android:padding="0dp"
-                                    android:visibility="gone"
-                                    app:cornerRadius="14dp"
-                                    app:icon="@drawable/ic_fingerprint"
-                                    app:iconPadding="0dp"
-                                    app:iconSize="28dp"
-                                    app:iconTint="?attr/colorPrimary"
-                                    app:strokeColor="?attr/colorPrimary"
-                                    app:strokeWidth="1.5dp" />
-                            </LinearLayout>
-
-                            <!-- تحميل الدخول -->
-                            <com.google.android.material.card.MaterialCardView
-                                android:id="@+id/loadingContainer"
-                                android:layout_width="match_parent"
-                                android:layout_height="54dp"
-                                android:visibility="gone"
-                                app:cardBackgroundColor="?attr/colorPrimary"
-                                app:cardCornerRadius="14dp"
-                                app:cardElevation="0dp"
-                                app:strokeWidth="0dp">
-
-                                <ProgressBar
-                                    android:id="@+id/pbLoading"
-                                    android:layout_width="26dp"
-                                    android:layout_height="26dp"
-                                    android:layout_gravity="center"
-                                    android:indeterminateTint="?attr/colorOnPrimary" />
-                            </com.google.android.material.card.MaterialCardView>
-                        </RelativeLayout>
-
-                        <!-- إعدادات الخادم -->
-                        <com.google.android.material.textview.MaterialTextView
-                            android:id="@+id/tvServerSettings"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center_horizontal"
-                            android:layout_marginTop="20dp"
-                            android:padding="8dp"
-                            android:text="🔧 إعدادات الخادم والاتصال (Server Settings)"
-                            android:textColor="?attr/colorPrimary"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/serverConfigCard"
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSaveServer"
+                            style="@style/Widget.Material3.Button"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:visibility="gone"
-                            app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                            app:cardCornerRadius="16dp"
-                            app:strokeWidth="0dp">
-
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="16dp">
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    android:id="@+id/tilServerUrl"
-                                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:hint="رابط الخادم (Server URL)">
-
-                                    <com.google.android.material.textfield.TextInputEditText
-                                        android:id="@+id/etServerUrl"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:importantForAutofill="no"
-                                        android:inputType="textUri"
-                                        android:textSize="13sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
-                                <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnSaveServer"
-                                    style="@style/Widget.Material3.Button"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="12dp"
-                                    android:insetTop="0dp"
-                                    android:insetBottom="0dp"
-                                    android:text="حفظ الإعدادات"
-                                    app:cornerRadius="10dp" />
-                            </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
+                            android:text="حفظ الإعدادات"
+                            app:cornerRadius="8dp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
             </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-            <!-- ==================== التذييل ==================== -->
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tvFooter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"
-                android:gravity="center"
-                android:letterSpacing="0.05"
-                android:text="MIRA Trust Architecture™\nGlobal Standards &amp; RFID Solutions"
-                android:textColor="?attr/colorOutline"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-    </androidx.core.widget.NestedScrollView>
-
-    <!-- successOverlay -->
-    <LinearLayout
-        android:id="@+id/successOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0.0"
-        android:background="?attr/colorSurface"
-        android:elevation="16dp"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@drawable/ic_check_circle"
-            app:tint="?attr/colorPrimary" />
-
-        <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/tvSuccessMessage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="تم تسجيل الدخول بنجاح"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <ProgressBar
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginTop="24dp"
-            android:indeterminateTint="?attr/colorPrimary" />
     </LinearLayout>
 
-</FrameLayout>
+    <!-- ==================== التذييل ==================== -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvFooter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:gravity="center"
+        android:letterSpacing="0.05"
+        android:text="MIRA Trust Architecture™\nGlobal Standards &amp; RFID Solutions"
+        android:textColor="?attr/colorOutline"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
