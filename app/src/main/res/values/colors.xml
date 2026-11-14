@@ -929,5 +929,10 @@
     <color name="gold_bg_start">#FAF8F5</color>
     <color name="gold_bg_end">#EFECE6</color>
     <color name="gold_pattern_stroke">#12B8860B</color>
-
+<!-- ═══════════════════════════════════════════════════════
+     🆕 Splash Screen Colors (Light Mode)
+     ═══════════════════════════════════════════════════════ -->
+<color name="splash_text_main">#1A1A1A</color>      <!-- أسود داكن لاسم التطبيق -->
+<color name="splash_text_sub">#595959</color>       <!-- رمادي داكن للوصف -->
+<color name="splash_text_version">#8C8C8C</color>   <!-- رمادي للتذييل والإصدار -->
 </resources>
