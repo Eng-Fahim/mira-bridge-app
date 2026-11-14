@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground">
+    android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"> <!-- إصلاح مشكلة القطع العلوي والسفلي -->
 
-    <androidx.core.widget.NestedScrollView 
+    <androidx.core.widget.NestedScrollView
         android:id="@+id/mainScrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
         android:fillViewport="true"
         android:overScrollMode="never"
         android:scrollbars="none">
@@ -17,10 +18,12 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="600dp"
-            android:padding="24dp">
+            android:minHeight="640dp"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="32dp"
+            android:paddingBottom="24dp"> <!-- مسافات مريحة للعين -->
 
-            <!-- ==================== التوهجات الخفية ==================== -->
+            <!-- ==================== التوهجات الخفية (Glows) ==================== -->
             <View
                 android:id="@+id/topGlow"
                 android:layout_width="220dp"
@@ -47,6 +50,7 @@
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="-8dp" <!-- لسحب الزر قليلاً للأعلى وتوسيطه -->
                 android:text="EN / AR"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
@@ -79,7 +83,7 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/btnToggleLanguage"
-                app:layout_constraintVertical_bias="0.5">
+                app:layout_constraintVertical_bias="0.45"> <!-- Bias 0.45 يرفع العنصر قليلاً للأعلى ويعطيه توازناً أفضل -->
 
                 <!-- الشعار والأنشطة -->
                 <LinearLayout
@@ -88,13 +92,13 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:paddingBottom="16dp">
+                    android:paddingBottom="20dp">
 
                     <FrameLayout
-                        android:layout_width="88dp"
-                        android:layout_height="88dp"
+                        android:layout_width="90dp"
+                        android:layout_height="90dp"
                         android:background="@drawable/bg_logo_glow"
-                        android:padding="12dp">
+                        android:padding="14dp">
 
                         <ImageView
                             android:id="@+id/ivAppLogo"
@@ -108,7 +112,7 @@
                         android:id="@+id/tvBrandName"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
                         android:text="MIRA Jewelry Enterprise"
                         android:textColor="?attr/colorOnBackground"
                         android:textSize="22sp"
@@ -141,9 +145,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="24dp"
-                    app:cardElevation="6dp"
-                    app:strokeWidth="0dp">
+                    app:cardCornerRadius="28dp" <!-- زوايا أكثر انسيابية -->
+                    app:cardElevation="8dp" <!-- ظل أقوى قليلاً لبروز الكارت -->
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutline"> <!-- حدود خفيفة جداً تعطي لمسة فخامة -->
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -159,21 +164,21 @@
                             android:text="مرحباً بعودتك"
                             android:textAlignment="center"
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="20sp"
+                            android:textSize="22sp"
                             android:textStyle="bold" />
 
                         <com.google.android.material.textview.MaterialTextView
                             android:id="@+id/tvSignInSubtitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:layout_marginBottom="20dp"
+                            android:layout_marginTop="6dp"
+                            android:layout_marginBottom="24dp"
                             android:text="قم بتسجيل الدخول للمتابعة"
                             android:textAlignment="center"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="13sp" />
+                            android:textSize="14sp" />
 
-                        <!-- اسم المستخدم + دعم Autofill -->
+                        <!-- اسم المستخدم -->
                         <com.google.android.material.textfield.TextInputLayout
                             android:id="@+id/tilUsername"
                             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -181,10 +186,10 @@
                             android:layout_height="wrap_content"
                             android:layout_marginBottom="16dp"
                             android:hint="اسم المستخدم"
-                            app:boxCornerRadiusBottomEnd="12dp"
-                            app:boxCornerRadiusBottomStart="12dp"
-                            app:boxCornerRadiusTopEnd="12dp"
-                            app:boxCornerRadiusTopStart="12dp"
+                            app:boxCornerRadiusBottomEnd="14dp"
+                            app:boxCornerRadiusBottomStart="14dp"
+                            app:boxCornerRadiusTopEnd="14dp"
+                            app:boxCornerRadiusTopStart="14dp"
                             app:boxStrokeColor="?attr/colorPrimary"
                             app:startIconDrawable="@drawable/ic_person">
 
@@ -201,18 +206,18 @@
                                 android:textSize="15sp" />
                         </com.google.android.material.textfield.TextInputLayout>
 
-                        <!-- كلمة المرور + دعم Autofill -->
+                        <!-- كلمة المرور -->
                         <com.google.android.material.textfield.TextInputLayout
                             android:id="@+id/tilPassword"
                             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="20dp"
+                            android:layout_marginBottom="24dp"
                             android:hint="كلمة المرور"
-                            app:boxCornerRadiusBottomEnd="12dp"
-                            app:boxCornerRadiusBottomStart="12dp"
-                            app:boxCornerRadiusTopEnd="12dp"
-                            app:boxCornerRadiusTopStart="12dp"
+                            app:boxCornerRadiusBottomEnd="14dp"
+                            app:boxCornerRadiusBottomStart="14dp"
+                            app:boxCornerRadiusTopEnd="14dp"
+                            app:boxCornerRadiusTopStart="14dp"
                             app:boxStrokeColor="?attr/colorPrimary"
                             app:endIconMode="password_toggle"
                             app:startIconDrawable="@drawable/ic_lock">
@@ -258,12 +263,14 @@
                                     android:layout_width="0dp"
                                     android:layout_height="54dp"
                                     android:layout_weight="1"
+                                    android:insetTop="0dp" <!-- إزالة الهوامش الافتراضية للزر -->
+                                    android:insetBottom="0dp"
                                     android:text="تسجيل الدخول"
                                     android:textColor="?attr/colorOnPrimary"
                                     android:textSize="16sp"
                                     android:textStyle="bold"
                                     app:backgroundTint="?attr/colorPrimary"
-                                    app:cornerRadius="12dp" />
+                                    app:cornerRadius="14dp" />
 
                                 <com.google.android.material.button.MaterialButton
                                     android:id="@+id/btnBiometric"
@@ -271,9 +278,11 @@
                                     android:layout_width="54dp"
                                     android:layout_height="54dp"
                                     android:layout_marginStart="12dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
                                     android:padding="0dp"
                                     android:visibility="gone"
-                                    app:cornerRadius="12dp"
+                                    app:cornerRadius="14dp"
                                     app:icon="@drawable/ic_fingerprint"
                                     app:iconPadding="0dp"
                                     app:iconSize="28dp"
@@ -289,7 +298,7 @@
                                 android:layout_height="54dp"
                                 android:visibility="gone"
                                 app:cardBackgroundColor="?attr/colorPrimary"
-                                app:cardCornerRadius="12dp"
+                                app:cardCornerRadius="14dp"
                                 app:cardElevation="0dp"
                                 app:strokeWidth="0dp">
 
@@ -308,8 +317,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="center_horizontal"
-                            android:layout_marginTop="18dp"
-                            android:padding="6dp"
+                            android:layout_marginTop="20dp"
+                            android:padding="8dp"
                             android:text="🔧 إعدادات الخادم والاتصال (Server Settings)"
                             android:textColor="?attr/colorPrimary"
                             android:textSize="12sp"
@@ -353,8 +362,10 @@
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="12dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
                                     android:text="حفظ الإعدادات"
-                                    app:cornerRadius="8dp" />
+                                    app:cornerRadius="10dp" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
@@ -363,12 +374,13 @@
 
             </LinearLayout>
 
-            <!-- ==================== التذييل ثابت بأسفل الواجهة ==================== -->
+            <!-- ==================== التذييل ==================== -->
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/tvFooter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
                 android:gravity="center"
                 android:letterSpacing="0.05"
                 android:text="MIRA Trust Architecture™\nGlobal Standards &amp; RFID Solutions"
@@ -382,7 +394,7 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- successOverlay كامل الشاشة مع Elevation مرتفع -->
+    <!-- successOverlay -->
     <LinearLayout
         android:id="@+id/successOverlay"
         android:layout_width="match_parent"
