@@ -1,20 +1,17 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="64dp"
-    android:height="64dp"
-    android:viewportWidth="64"
-    android:viewportHeight="64">
-    <!-- معين خارجي (شكل الماسة) -->
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- معين هندسي دقيق للمجوهرات -->
     <path
-        android:pathData="M32,4 L60,32 L32,60 L4,32 Z"
-        android:strokeColor="@color/gold_pattern_stroke"
-        android:strokeWidth="0.8" />
-    <!-- معين داخلي متقاطع -->
+        android:pathData="M24,4 L44,24 L24,44 L4,24 Z"
+        android:strokeColor="@color/gold_accent"
+        android:strokeWidth="0.6"
+        android:fillColor="@color/transparent" />
     <path
-        android:pathData="M32,16 L48,32 L32,48 L16,32 Z"
-        android:strokeColor="@color/gold_pattern_stroke"
-        android:strokeWidth="0.5" />
-    <!-- نقطة بريق في المنتصف -->
-    <path
-        android:pathData="M32,30 L34,32 L32,34 L30,32 Z"
-        android:fillColor="@color/gold_pattern_stroke" />
+        android:pathData="M24,14 L34,24 L24,34 L14,24 Z"
+        android:strokeColor="@color/gold_accent"
+        android:strokeWidth="0.4"
+        android:fillColor="@color/transparent" />
 </vector>
