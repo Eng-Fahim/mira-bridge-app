@@ -1,13 +1,13 @@
 package com.example.uhf.activity;
 
 import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -28,8 +28,14 @@ public class SplashActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        setTheme(R.style.SplashTheme);
         super.onCreate(savedInstanceState);
+
+        // حماية الشاشة والأمان
+        getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+        );
+
         setContentView(R.layout.splash_screen);
 
         executeCinematicAnimation();
@@ -43,23 +49,34 @@ public class SplashActivity extends AppCompatActivity {
         View      divider   = findViewById(R.id.divider);
         TextView  tvTagline = findViewById(R.id.tvTagline);
 
-        ivLogo.setScaleX(0.5f);
-        ivLogo.setScaleY(0.5f);
-        tvAppName.setTranslationY(40f);
-        tvTagline.setTranslationY(30f);
-        divider.setScaleX(0f);
+        if (ivLogo != null) {
+            ivLogo.setScaleX(0.5f);
+            ivLogo.setScaleY(0.5f);
+            ivLogo.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(1200).setInterpolator(new FastOutSlowInInterpolator()).start();
+        }
 
-        FastOutSlowInInterpolator interpolator = new FastOutSlowInInterpolator();
+        if (vGlow != null) {
+            vGlow.animate().alpha(1f).setDuration(1500).setStartDelay(300).start();
+        }
 
-        ivLogo.animate().alpha(1f).scaleX(1f).scaleY(1f)
-                .setDuration(1200).setInterpolator(interpolator).start();
-        vGlow.animate().alpha(1f).setDuration(1500).setStartDelay(300).start();
-        tvAppName.animate().alpha(1f).translationY(0f)
-                .setDuration(1000).setStartDelay(400).setInterpolator(interpolator).start();
-        divider.animate().alpha(1f).scaleX(1f)
-                .setDuration(800).setStartDelay(700).setInterpolator(interpolator).start();
-        tvTagline.animate().alpha(1f).translationY(0f)
-                .setDuration(900).setStartDelay(850).setInterpolator(interpolator).start();
+        if (tvAppName != null) {
+            tvAppName.setTranslationY(40f);
+            tvAppName.animate().alpha(1f).translationY(0f)
+                    .setDuration(1000).setStartDelay(400).setInterpolator(new FastOutSlowInInterpolator()).start();
+        }
+
+        if (divider != null) {
+            divider.setScaleX(0f);
+            divider.animate().alpha(1f).scaleX(1f)
+                    .setDuration(800).setStartDelay(700).setInterpolator(new FastOutSlowInInterpolator()).start();
+        }
+
+        if (tvTagline != null) {
+            tvTagline.setTranslationY(30f);
+            tvTagline.animate().alpha(1f).translationY(0f)
+                    .setDuration(900).setStartDelay(850).setInterpolator(new FastOutSlowInInterpolator()).start();
+        }
     }
 
     private void scheduleNavigation() {
@@ -92,7 +109,6 @@ public class SplashActivity extends AppCompatActivity {
         try {
             SessionManager sm = new SessionManager(getApplicationContext());
 
-            // ─── 1) يجب وجود activation token (شرط إجباري) ───
             String token = null;
             try {
                 java.lang.reflect.Method m = sm.getClass().getMethod("getActivationToken");
@@ -107,7 +123,6 @@ public class SplashActivity extends AppCompatActivity {
                 return false;
             }
 
-            // ─── 2) يجب وجود serverUrl صالح (ليس مركز ولا WP) ───
             String serverUrl = sm.getServerUrl();
             if (serverUrl == null || serverUrl.isEmpty()) {
                 Log.d(TAG, "❌ No serverUrl → NOT activated");
@@ -117,7 +132,6 @@ public class SplashActivity extends AppCompatActivity {
                 Log.d(TAG, "❌ serverUrl is legacy WordPress → NOT activated");
                 return false;
             }
-            // عنوان المركز ينتهي بـ /api/v1 — غير صالح كسيرفر عميل
             if (serverUrl.endsWith("/api/v1") || serverUrl.endsWith("/api/v1/")) {
                 Log.d(TAG, "❌ serverUrl is center URL (/api/v1), not customer URL → NOT activated");
                 return false;
