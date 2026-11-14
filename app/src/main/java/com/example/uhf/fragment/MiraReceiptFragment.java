@@ -485,9 +485,11 @@ public class MiraReceiptFragment extends DialogFragment {
 
                 String currency = safeString(p, "currency", "YER");
                 double amount = safeDouble(p, "amount", 0);
-                double baseAmount = safeDouble(p, "base_amount", amount);
-                String method = safeString(p, "method", "cash");
-                double exchangeRate = safeDouble(p, "exchange_rate", 1.0);
+// ✅ ابحث عن amount_in_yer (الاسم الحقيقي في DB) كبديل أول
+double baseAmount = safeDouble(p, "base_amount", safeDouble(p, "amount_in_yer", amount));
+String method = safeString(p, "method", "cash");
+// ✅ ابحث عن server_rate (الاسم الحقيقي في DB) كبديل أول
+double exchangeRate = safeDouble(p, "exchange_rate", safeDouble(p, "server_rate", 1.0));
 
                 totalInBase += baseAmount;
 
