@@ -6,6 +6,13 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_gold_luxury_gradient"
     android:padding="24dp">
+    <!-- أضف هذا العنصر مباشرة كأول ابن داخل ConstraintLayout في activity_activation.xml -->
+<View
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:alpha="0.04"
+    android:background="@drawable/ic_jewelry_motif" />
+
 
     <!-- شعار أو أيقونة الشركة الملكية -->
     <ImageView
