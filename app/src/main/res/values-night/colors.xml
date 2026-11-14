@@ -525,4 +525,9 @@
 <color name="hero_text_secondary">#E0D1A8</color> <!-- ذهبي فاتح للنصوص الثانوية -->
 <color name="hero_box_bg">#1A000000</color>       <!-- خلفية العملات (أسود شفاف 10%) -->
 <color name="hero_badge_bg">#33FFFFFF</color>     <!-- خلفية شارة MIRA (أبيض شفاف) -->
+    <!-- ألوان الخلفية والنقشة - الوضع الداكن -->
+    <color name="gold_bg_start">#0F0F12</color>
+    <color name="gold_bg_end">#18181D</color>
+    <color name="gold_pattern_stroke">#14D4AF37</color>
+
 </resources>
