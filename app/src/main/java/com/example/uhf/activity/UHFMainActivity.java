@@ -2046,14 +2046,37 @@ if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         updateSecondaryToolbar(navigationManager.getCurrentFragmentTag());
     }
 
-    public void syncCurrentFragment() {
-        Fragment real = navigationManager != null
-                ? navigationManager.getCurrentFragment()
-                : null;
-        this.currentFragment = real;
-        Log.d(TAG, "🔄 currentFragment synced: "
-                + (real != null ? real.getTag() : "null"));
+    // ✅ أضف هذه الدالة إذا لم تكن موجودة
+private void updateGlobalFabVisibility(String currentTag) {
+    FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    if (fabActionCenter == null) return;
+
+    if (NavigationManager.TAG_DASHBOARD.equals(currentTag)) {
+        fabActionCenter.hide();
+    } else {
+        boolean hasQuickActions = permissionManager != null 
+                && permissionManager.getAllowedQuickActions().size() > 0;
+        if (hasQuickActions) {
+            fabActionCenter.show();
+        }
     }
+}
+
+// ✅ وعدل هذه الدالة لتستدعيها
+public void syncCurrentFragment() {
+    Fragment real = navigationManager != null
+            ? navigationManager.getCurrentFragment()
+            : null;
+    this.currentFragment = real;
+    
+    // إضافة السطرين التاليين
+    if (navigationManager != null) {
+        updateGlobalFabVisibility(navigationManager.getCurrentFragmentTag());
+    }
+    
+    Log.d(TAG, "🔄 currentFragment synced: "
+            + (real != null ? real.getTag() : "null"));
+}
 
     public Fragment createFragmentByTag(String tag) {
         return FragmentFactory.createFragmentByTag(tag);
@@ -2267,6 +2290,12 @@ private void applyNavPermissions() {
             boolean allowed = cfg.alwaysAllowed
                     || permissionManager.canAccessFragment(cfg.tag);
             
+            // ✅ للأدوار العليا: إخفاء سجل المبيعات والملف الشخصي من القائمة السفلية (متاحان في القائمة العلوية)
+    if (cfg.itemId == R.id.nav_sales_history || cfg.itemId == R.id.nav_profile) {
+        if (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin()) {
+            allowed = false;
+        }
+    }
             // ✅ [تعديل 1] إخفاء زر "الرئيسية" عن المحاسب والمدير المالي
             // ليصبحوا مركزين فقط على شاشة المالية
             if (cfg.itemId == R.id.nav_home) {
