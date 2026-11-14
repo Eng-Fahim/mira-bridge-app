@@ -45,45 +45,43 @@ public class SplashActivity extends AppCompatActivity {
     }
 
         private void executeCinematicAnimation() {
-        ImageView ivLogo    = findViewById(R.id.ivLogo);
-        View      vGlow     = findViewById(R.id.vGlow);
-        TextView  tvAppName = findViewById(R.id.tvAppName);
-        View      divider   = findViewById(R.id.divider);
-        TextView  tvTagline = findViewById(R.id.tvTagline);
+    ImageView ivLogo    = findViewById(R.id.ivLogo);
+    View      vGlow     = findViewById(R.id.vGlow);
+    TextView  tvAppName = findViewById(R.id.tvAppName);
+    View      divider   = findViewById(R.id.divider);
+    TextView  tvTagline = findViewById(R.id.tvTagline);
 
-        if (ivLogo != null) {
-            ivLogo.setScaleX(0.5f);
-            ivLogo.setScaleY(0.5f);
-            ivLogo.animate().alpha(1f).scaleX(1f).scaleY(1f)
-                    .setDuration(1200).setInterpolator(new FastOutSlowInInterpolator()).start();
-        }
-
-        if (vGlow != null) {
-            vGlow.animate().alpha(1f).setDuration(1500).setStartDelay(300).start();
-        }
-
-        if (tvAppName != null) {
-            tvAppName.setTranslationY(40f);
-            // ضمان ظهور النص باللون الأبيض/الذهبي الساطع تماماً وتجنب أي بهتان
-            tvAppName.setTextColor(ContextCompat.getColor(this, R.color.gold_text_primary));
-            tvAppName.animate().alpha(1f).translationY(0f)
-                    .setDuration(1000).setStartDelay(400).setInterpolator(new FastOutSlowInInterpolator()).start();
-        }
-
-        if (divider != null) {
-            divider.setScaleX(0f);
-            divider.animate().alpha(1f).scaleX(1f)
-                    .setDuration(800).setStartDelay(700).setInterpolator(new FastOutSlowInInterpolator()).start();
-        }
-
-        if (tvTagline != null) {
-            tvTagline.setTranslationY(30f);
-            // ضمان وضوح السلوجان والوصف تحت الشعار
-            tvTagline.setTextColor(ContextCompat.getColor(this, R.color.gold_text_secondary));
-            tvTagline.animate().alpha(1f).translationY(0f)
-                    .setDuration(900).setStartDelay(850).setInterpolator(new FastOutSlowInInterpolator()).start();
-        }
+    if (ivLogo != null) {
+        ivLogo.setScaleX(0.5f);
+        ivLogo.setScaleY(0.5f);
+        ivLogo.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(1200).setInterpolator(new FastOutSlowInInterpolator()).start();
     }
+
+    if (vGlow != null) {
+        vGlow.animate().alpha(1f).setDuration(1500).setStartDelay(300).start();
+    }
+
+    if (tvAppName != null) {
+        tvAppName.setTranslationY(40f);
+        // ❌ لا تضع أسطر setTextColor هنا، اتركها للـ XML
+        tvAppName.animate().alpha(1f).translationY(0f)
+                .setDuration(1000).setStartDelay(400).setInterpolator(new FastOutSlowInInterpolator()).start();
+    }
+
+    if (divider != null) {
+        divider.setScaleX(0f);
+        divider.animate().alpha(1f).scaleX(1f)
+                .setDuration(800).setStartDelay(700).setInterpolator(new FastOutSlowInInterpolator()).start();
+    }
+
+    if (tvTagline != null) {
+        tvTagline.setTranslationY(30f);
+        // ❌ لا تضع أسطر setTextColor هنا، اتركها للـ XML
+        tvTagline.animate().alpha(1f).translationY(0f)
+                .setDuration(900).setStartDelay(850).setInterpolator(new FastOutSlowInInterpolator()).start();
+    }
+}
 
 
     private void scheduleNavigation() {
