@@ -585,10 +585,10 @@ try {
             llInlineError.setVisibility(View.GONE);
         }
     }
-
     private void openTradeInDialog() {
-        TradeInDialog dialog = TradeInDialog.newInstance(
-                currentTotalWithDiscountUsd * getRateToYER("USD"));
+    double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
+    // ✅ مرّر الأسطر السابقة لكي تظهر عند إعادة الفتح
+    TradeInDialog dialog = TradeInDialog.newInstance(maxValue, this.tradeInLines);
         dialog.setOnTradeInListener((tradeIns, totalValue) -> {
             this.tradeInLines = tradeIns;
             this.tradeInTotal = totalValue;
