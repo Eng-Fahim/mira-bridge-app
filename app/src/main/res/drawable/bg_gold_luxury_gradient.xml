@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- الطبقة 1: التدرج اللوني المتكيف مع الوضعين -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="@color/gold_bg_start"
+                android:endColor="@color/gold_bg_end"
+                android:type="linear" />
+        </shape>
+    </item>
+
+    <!-- الطبقة 2: تكرار النقشة الماسية بنعومة فوق الخلفية -->
+    <item>
+        <bitmap
+            android:src="@drawable/ic_jewelry_motif"
+            android:tileMode="repeat" />
+    </item>
+</layer-list>
