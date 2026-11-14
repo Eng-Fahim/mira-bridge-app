@@ -488,24 +488,9 @@ private static final NavItemCfg[] NAV_CONFIGS = {
             boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
                     || SETUP_LOCKED.equals(cachedSetupStatus);
 
-            if (setupIsComplete) {
-                if (savedInstanceState == null) {
-                    navigateByRole();
-                } else {
-                    String savedTag = savedInstanceState.getString(
-                            "current_fragment", NavigationManager.TAG_DASHBOARD);
-                    Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
-                    if (savedFragment != null) {
-                        enableNavigationAfterSetup();
-                        loadFragmentDirectly(savedFragment, savedTag);
-                    } else {
-                        navigateByRole();
-                    }
-                }
-            } else {
-                Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState");
-                checkSetupStatusAndNavigate();
-            }
+            // ✅ اختبار مؤقت: تجاوز فحص الإعداد تماماً
+Log.d(TAG, "🧪 TESTING: Forcing navigateByRole without setup check");
+navigateByRole();
 
             try {
                 if (sessionManager != null) {
