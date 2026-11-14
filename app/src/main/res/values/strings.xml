@@ -44,7 +44,8 @@
     <string name="nav_gates">🛡️ البوابات</string>
     
     <string name="nav_home">الرئيسية</string>
-    <string name="nav_profile">Profile</string>
+<string name="nav_sales_history">سجل المبيعات</string>
+<string name="nav_profile">حسابي</string>
 <string name="nav_gate">البوابات</string>
 <string name="nav_accounting">المالية</string>
 <string name="nav_settings">الإعدادات</string>
@@ -2837,6 +2838,8 @@
 <string name="recent_activity_title">⚡ آخر العمليات</string>
 <string name="view_all_arrow">عرض الكل →</string>
 <string name="view_arrow">عرض →</string>
+
+
 
 <!-- General -->
 
