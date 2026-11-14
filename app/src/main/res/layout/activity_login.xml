@@ -21,7 +21,7 @@
             android:minHeight="640dp"
             android:paddingHorizontal="24dp"
             android:paddingTop="32dp"
-            android:paddingBottom="24dp"> <!-- مسافات مريحة للعين -->
+            android:paddingBottom="24dp"> 
 
             <!-- ==================== التوهجات الخفية (Glows) ==================== -->
             <View
@@ -50,7 +50,7 @@
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-8dp" <!-- لسحب الزر قليلاً للأعلى وتوسيطه -->
+                android:layout_marginTop="-8dp"
                 android:text="EN / AR"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
@@ -145,8 +145,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:cardBackgroundColor="?attr/colorSurface"
-                    app:cardCornerRadius="28dp" <!-- زوايا أكثر انسيابية -->
-                    app:cardElevation="8dp" <!-- ظل أقوى قليلاً لبروز الكارت -->
+                    app:cardCornerRadius="28dp" 
+                    app:cardElevation="8dp"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline"> <!-- حدود خفيفة جداً تعطي لمسة فخامة -->
 
@@ -263,7 +263,7 @@
                                     android:layout_width="0dp"
                                     android:layout_height="54dp"
                                     android:layout_weight="1"
-                                    android:insetTop="0dp" <!-- إزالة الهوامش الافتراضية للزر -->
+                                    android:insetTop="0dp" 
                                     android:insetBottom="0dp"
                                     android:text="تسجيل الدخول"
                                     android:textColor="?attr/colorOnPrimary"
