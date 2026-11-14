@@ -919,5 +919,9 @@
     <color name="gold_text_primary">#F5F5F7</color>
     <color name="gold_text_secondary">#B0B0B8</color>
     <color name="gold_text_hint">#6E6E73</color>
+    <!-- ألوان الخلفية والنقشة - الوضع الفاتح -->
+    <color name="gold_bg_start">#FAF8F5</color>
+    <color name="gold_bg_end">#EFECE6</color>
+    <color name="gold_pattern_stroke">#12B8860B</color>
 
 </resources>
