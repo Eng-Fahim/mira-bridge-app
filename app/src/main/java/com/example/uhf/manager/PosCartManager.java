@@ -407,4 +407,55 @@ public final class PosCartManager {
             mainHandler.post(notifier);
         }
     }
+    
+/**
+ * يحدّث سعر قطعة في السلة (بعد prepare-checkout).
+ * ✅ Thread-safe: كل التعديلات داخل lock.
+ * ✅ Notification واحدة فقط عند التغيير الفعلي.
+ * @return true إذا تغيّر السعر
+ */
+public boolean updateItemPrice(int itemId, double newPriceUsd) {
+    int position = -1;
+    double oldPrice = 0;
+
+    synchronized (lock) {
+        for (int i = 0; i < cartList.size(); i++) {
+            CartItem item = cartList.get(i);
+            if (item != null && item.itemId == itemId) {
+                if (Math.abs(item.price - newPriceUsd) <= 0.01) {
+                    return false;  // لا يوجد تغيير
+                }
+                oldPrice = item.price;
+                item.price = newPriceUsd;
+                position = i;
+                break;
+            }
+        }
+    }
+
+    if (position >= 0) {
+        Log.d(TAG, "💰 Price updated [itemId=" + itemId + "]: "
+                + oldPrice + " → " + newPriceUsd);
+        dispatch(ChangeType.ITEM_UPDATED, position);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * يزيل قطعة بمعرّف itemId.
+ */
+public void removeItemByItemId(int itemId) {
+    try {
+        List<CartItem> items = new ArrayList<>(getItems());
+        for (int i = items.size() - 1; i >= 0; i--) {
+            CartItem item = items.get(i);
+            if (item != null && item.itemId == itemId) {
+                removeItemAt(i);
+            }
+        }
+    } catch (Exception e) {
+        Log.e("PosCartManager", "removeItemByItemId error", e);
+    }
+}
 }
