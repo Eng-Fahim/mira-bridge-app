@@ -3260,4 +3260,77 @@ public class MiraPosFragment extends MiraBaseFragment {
     public void showDiscountDialog() {
         processCheckoutAndStockUpdate();
     }
+    
+        @Deprecated
+    public void showCartBottomSheet() {}
+
+    @Deprecated
+    public void showDiscountDialog() {
+        processCheckoutAndStockUpdate();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Auto-Open Refund Intent (كانت مفقودة في النسخة السابقة)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private void checkAutoOpenRefundIntent() {
+        if (getArguments() != null && getArguments().getBoolean("auto_open_refund", false)) {
+            String jsonStr = getArguments().getString("refund_data_json");
+
+            getArguments().remove("auto_open_refund");
+            getArguments().remove("refund_data_json");
+
+            if (jsonStr != null && !jsonStr.isEmpty()) {
+                try {
+                    JSONObject activityData = new JSONObject(jsonStr);
+                    String code = extractCodeForRefund(activityData);
+
+                    if (code != null && !code.isEmpty()) {
+                        mainHandler.postDelayed(() -> {
+                            if (!isFragmentAlive()) return;
+
+                            showRefundDialog();
+
+                            if (refundDialog != null && refundDialog.isShowing()) {
+                                // V2 API: البحث بالكود
+                                refundDialog.setQueryFromScan(code);
+                            }
+                        }, 500);
+                    } else {
+                        showToast(isArabic
+                                ? "⚠️ لم يتم العثور على رمز القطعة"
+                                : "⚠️ No item code found");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing auto refund data", e);
+                }
+            }
+        }
+    }
+
+    private String extractCodeForRefund(JSONObject data) {
+        try {
+            String epc = data.optString("epc", data.optString("rfid_epc", ""));
+            if (!epc.isEmpty()) return epc;
+
+            String serial = data.optString("serial", data.optString("serial_number", ""));
+            if (!serial.isEmpty()) return serial;
+
+            JSONArray items = data.optJSONArray("items");
+            if (items != null && items.length() > 0) {
+                JSONObject firstItem = items.optJSONObject(0);
+                if (firstItem != null) {
+                    String itemEpc = firstItem.optString("epc", firstItem.optString("rfid_epc", ""));
+                    if (!itemEpc.isEmpty()) return itemEpc;
+
+                    String itemSerial = firstItem.optString("serial", firstItem.optString("serial_number", ""));
+                    if (!itemSerial.isEmpty()) return itemSerial;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "extractCodeForRefund error", e);
+        }
+        return "";
+    }
+}
 }
