@@ -1,185 +1,215 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:fillViewport="true">
+    android:background="@drawable/bg_gold_luxury_gradient"
+    android:padding="24dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <!-- شعار أو أيقونة الشركة الملكية -->
+    <ImageView
+        android:id="@+id/ivLogo"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:layout_marginTop="40dp"
+        android:src="@drawable/ic_gold_diamond" 
+        app:tint="@color/gold_accent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- عنوان الشاشة الفخم -->
+    <TextView
+        android:id="@+id/tvActivationTitle"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal"
-        android:padding="24dp">
+        android:layout_marginTop="20dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="ترخيص نظام ميرا للذهب"
+        android:textColor="@color/gold_text_primary"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ivLogo" />
 
-        <!-- Logo/Header -->
-        <ImageView
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_marginTop="40dp"
-            android:src="@drawable/ic_luxury_mira_logo"
-            app:tint="?attr/colorPrimary"
-            android:contentDescription="@string/app_name" />
+    <!-- وصف تحفيزي فرعي -->
+    <TextView
+        android:id="@+id/tvActivationSubtitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="أدخل مفتاح الترخيص الخاص بمنشأتك لتفعيل النظام والبدء بأمان تام"
+        android:textColor="@color/gold_text_secondary"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvActivationTitle"
+        app:layout_constraintWidth_percent="0.85" />
 
-        <TextView
-            android:id="@+id/tvActivationTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="MIRA ID"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary" />
+    <!-- بطاقة الزجاج الفاخرة (Glassmorphism Effect) لإدخال البيانات -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="36dp"
+        app:cardBackgroundColor="@color/gold_card_background"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="12dp"
+        app:cardPreventCornerOverlap="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvActivationSubtitle"
+        app:layout_constraintWidth_percent="0.92">
 
-        <TextView
-            android:id="@+id/tvActivationSubtitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="تفعيل الترخيص"
-            android:textSize="16sp"
-            android:textColor="?android:attr/textColorSecondary" />
-
-        <com.google.android.material.card.MaterialCardView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp">
+            android:orientation="vertical"
+            android:padding="24dp">
 
-            <LinearLayout
+            <!-- حقل السيرفر (مخفي برمجياً كما طلبتم ولكن موجود لسلامة الكود) -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilServerUrl"
+                style="@com.google.android.material.R.style.Widget_MaterialComponents_TextInputLayout_OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="@color/gold_accent"
+                app:hintTextColor="@color/gold_accent">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etServerUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textUri"
+                    android:textColor="@color/white"
+                    android:textSize="14sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- حقل مفتاح الترخيص بتصميم ملكي -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilLicenseKey"
+                style="@Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:boxCornerRadiusBottomEnd="16dp"
+                app:boxCornerRadiusBottomStart="16dp"
+                app:boxCornerRadiusTopEnd="16dp"
+                app:boxCornerRadiusTopStart="16dp"
+                app:boxStrokeColor="@color/gold_accent"
+                app:boxStrokeWidthFocused="2dp"
+                app:hintTextColor="@color/gold_accent"
+                app:startIconDrawable="@drawable/ic_key_gold"
+                app:startIconTint="@color/gold_accent">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etLicenseKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:hint="MIRA-XXXX-XXXX-XXXX"
+                    android:inputType="textCapCharacters"
+                    android:letterSpacing="0.1"
+                    android:maxLines="1"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/gold_text_hint"
+                    android:textSize="16sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- رسالة الخطأ -->
+            <TextView
+                android:id="@+id/tvError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:drawableStart="@drawable/ic_error_alert"
+                android:drawablePadding="8dp"
+                android:gravity="center_vertical"
+                android:textColor="#FF5252"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!-- حاوية التحميل (ProgressBar + Status) -->
+            <LinearLayout
+                android:id="@+id/loadingContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:gravity="center"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    style="?android:attr/progressBarStyleLarge"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:indeterminateTint="@color/gold_accent" />
 
                 <TextView
+                    android:id="@+id/tvStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="أدخل رقم الترخيص الصادر عن ميرا تكنولوجي لتفعيل النظام على منشأتك."
-                    android:textSize="14sp"
-                    android:layout_marginBottom="20dp"
-                    android:textColor="?android:attr/textColorSecondary" />
-
-                <!-- ═══════════════════════════════════════════════════════
-                     Server URL — مخفي (يُكتشف تلقائياً من مركز الترخيص)
-                     القيمة الأولية الآن: Laravel
-                     ═══════════════════════════════════════════════════════ -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/tilServerUrl"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="عنوان الخادم"
-                    android:visibility="gone"
-                    app:startIconDrawable="@android:drawable/ic_menu_manage">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etServerUrl"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textUri"
-                        android:text="https://jewelry.ibreg.org/api" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- ═══════════════════════════════════════════════════════
-                     License Key — الحقل الأساسي
-                     ═══════════════════════════════════════════════════════ -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/tilLicenseKey"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:hint="رقم الترخيص"
-                    app:startIconDrawable="@android:drawable/ic_lock_lock"
-                    app:endIconMode="clear_text">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etLicenseKey"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textCapCharacters"
-                        android:maxLength="25"
-                        android:hint="MIRA-XXXX-XXXX-XXXX"
-                        android:fontFamily="monospace"
-                        android:letterSpacing="0.05"
-                        android:importantForAutofill="no" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- ═══════════════════════════════════════════════════════
-                     Loading — VISIBLE في XML، ويُخفى برمجياً عبر loadingContainer
-                     ✅ يصلح خطأ "المؤشر لا يظهر أبداً"
-                     ═══════════════════════════════════════════════════════ -->
-                <LinearLayout
-                    android:id="@+id/loadingContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:layout_marginTop="20dp"
-                    android:visibility="gone">
-
-                    <ProgressBar
-                        android:id="@+id/progressBar"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp" />
-
-                    <TextView
-                        android:id="@+id/tvStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="جارٍ التحقق من الترخيص…"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <!-- Error Message -->
-                <TextView
-                    android:id="@+id/tvError"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:padding="12dp"
-                    android:background="#FDECEA"
-                    android:textColor="#C0392B"
-                    android:textSize="14sp"
-                    android:visibility="gone" />
-
-                <!-- Primary Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnActivate"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="20dp"
-                    android:text="التحقق وتفعيل النظام"
-                    android:textSize="16sp"
-                    app:cornerRadius="12dp" />
-
-                <!-- Retry Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRetry"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
                     android:layout_marginTop="12dp"
-                    android:text="إعادة المحاولة"
-                    android:textSize="15sp"
-                    android:visibility="gone"
-                    app:cornerRadius="12dp" />
-
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="جاري التحقق من الترخيص..."
+                    android:textColor="@color/gold_text_primary"
+                    android:textSize="14sp" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Footer -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="يتم التحقق من الترخيص عبر خوادم ميرا تكنولوجي"
-            android:textSize="12sp"
-            android:textColor="?android:attr/textColorTertiary" />
+            <!-- زر التفعيل الملكي (Gradient Button) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnActivate"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:backgroundTint="@color/gold_button_selector"
+                android:fontFamily="sans-serif-medium"
+                android:text="تفعيل النظام الآن"
+                android:textColor="#1A1A1A"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:elevation="6dp" />
 
-    </LinearLayout>
-</ScrollView>
+            <!-- زر إعادة المحاولة -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRetry"
+                style="@Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="إعادة المحاولة"
+                android:textColor="@color/gold_accent"
+                android:textSize="15sp"
+                android:visibility="gone"
+                app:cornerRadius="16dp"
+                app:strokeColor="@color/gold_accent"
+                app:strokeWidth="1.5dp" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- تذييل الشاشة (حقوق النشر والطبعة الخاصة بالمجوهرات) -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:alpha="0.7"
+        android:text="MIRA Gold &amp; Jewelry ERP Systems v2.6"
+        android:textColor="@color/gold_text_secondary"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
