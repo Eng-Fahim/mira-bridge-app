@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
 
-    <!-- 1. حالة التحميل (Shimmer) - مطابقة لهيكل الواجهة -->
+    <!-- 1. حالة التحميل (Shimmer) -->
     <include
         android:id="@+id/shimmerLayout"
         layout="@layout/layout_dashboard_shimmer"
@@ -26,7 +26,7 @@
             android:clipToPadding="false"
             android:fillViewport="true"
             android:overScrollMode="never"
-            android:paddingBottom="24dp">
+            android:paddingBottom="32dp">
 
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
@@ -34,7 +34,7 @@
                 android:paddingTop="8dp">
 
                 <!-- ═══════════════════════════════════════════════════
-                     CAROUSEL: البطاقات العلوية (Hero, Gold, Sales)
+                     CAROUSEL: البطاقات العلوية
                      ═══════════════════════════════════════════════════ -->
                 <HorizontalScrollView
                     android:id="@+id/horizontalScrollCarousel"
@@ -51,8 +51,454 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical" />
+                        android:gravity="center_vertical">
 
+                        <!-- 1.1 LIVE GOLD PRICES -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardGoldPrices"
+                            android:layout_width="310dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="8dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="2dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="20dp">
+
+                                <RelativeLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="16dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_alignParentEnd="true"
+                                        android:layout_centerVertical="true"
+                                        android:text="أسعار الذهب العالمية"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="15sp"
+                                        android:textStyle="bold" />
+
+                                    <FrameLayout
+                                        android:layout_width="32dp"
+                                        android:layout_height="32dp"
+                                        android:layout_alignParentStart="true"
+                                        android:layout_centerVertical="true">
+
+                                        <ImageButton
+                                            android:id="@+id/btnRefreshGold"
+                                            android:layout_width="32dp"
+                                            android:layout_height="32dp"
+                                            android:background="?attr/selectableItemBackgroundBorderless"
+                                            android:src="@android:drawable/ic_popup_sync"
+                                            app:tint="?attr/colorPrimary" />
+
+                                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                                            android:id="@+id/pbGoldLoading"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_gravity="center"
+                                            android:indeterminate="true"
+                                            android:visibility="gone"
+                                            app:indicatorColor="?attr/colorPrimary"
+                                            app:indicatorSize="16dp"
+                                            app:trackThickness="2dp" />
+                                    </FrameLayout>
+                                </RelativeLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="سعر الأونصة العالمي"
+                                        android:textColor="?attr/colorOnSurfaceVariant"
+                                        android:textSize="13sp" />
+
+                                    <TextView
+                                        android:id="@+id/tvOuncePrice"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="$0.00"
+                                        android:textColor="?attr/colorPrimary"
+                                        android:textSize="36sp"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="20dp"
+                                    android:orientation="horizontal"
+                                    android:weightSum="3">
+
+                                    <TextView
+                                        android:id="@+id/tvGoldPrice24"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:textColor="?attr/colorPrimary"
+                                        android:textSize="13sp"
+                                        android:textStyle="bold" />
+
+                                    <TextView
+                                        android:id="@+id/tvGoldPrice21"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:textColor="?attr/colorOnSurfaceVariant"
+                                        android:textSize="13sp" />
+
+                                    <TextView
+                                        android:id="@+id/tvGoldPrice18"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:textColor="?attr/colorOnSurfaceVariant"
+                                        android:textSize="13sp" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="16dp"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <TextView
+                                        android:id="@+id/tvGoldTrend"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginEnd="4dp"
+                                        android:textSize="12sp"/>
+
+                                    <TextView
+                                        android:id="@+id/tvGoldChange"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginEnd="12dp"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="12sp" />
+
+                                    <TextView
+                                        android:id="@+id/tvPriceSource"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:gravity="end"
+                                        android:textColor="?attr/colorOnSurfaceVariant"
+                                        android:textSize="11sp" />
+                                </LinearLayout>
+
+                                <TextView
+                                    android:id="@+id/tvLastUpdate"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="end"
+                                    android:layout_marginTop="8dp"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- 1.2 HERO BALANCE CARD -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/heroBalanceCard"
+                            android:layout_width="310dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="8dp"
+                            app:cardBackgroundColor="@android:color/transparent"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="4dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:strokeWidth="1dp">
+
+                            <FrameLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="240dp"
+                                android:background="?attr/colorSurfaceVariant">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="vertical"
+                                    android:padding="20dp">
+
+                                    <LinearLayout
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center_vertical"
+                                        android:orientation="horizontal">
+
+                                        <TextView
+                                            android:layout_width="0dp"
+                                            android:layout_height="wrap_content"
+                                            android:layout_weight="1"
+                                            android:text="إجمالي قيمة المخزون"
+                                            android:textColor="?attr/colorOnSurface"
+                                            android:textSize="16sp"
+                                            android:textStyle="bold" />
+
+                                        <ImageButton
+                                            android:id="@+id/btnToggleHeroVisibility"
+                                            android:layout_width="28dp"
+                                            android:layout_height="28dp"
+                                            android:background="?attr/selectableItemBackgroundBorderless"
+                                            android:padding="2dp"
+                                            android:src="@drawable/ic_eye_off"
+                                            app:tint="?attr/colorOnSurface" />
+                                    </LinearLayout>
+
+                                    <TextView
+                                        android:id="@+id/tvHeroBalance"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="12dp"
+                                        android:text="••••••••"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="36sp"
+                                        android:textStyle="bold" />
+                                        
+                                    <TextView
+                                        android:id="@+id/tvHeroTrend"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:textSize="12sp"
+                                        android:textColor="?attr/colorOnSurfaceVariant"
+                                        android:visibility="gone"
+                                        tools:text="▲ 2.5%" />
+
+                                    <LinearLayout
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="20dp"
+                                        android:orientation="horizontal"
+                                        android:weightSum="2">
+
+                                        <LinearLayout
+                                            android:layout_width="0dp"
+                                            android:layout_height="wrap_content"
+                                            android:layout_weight="1"
+                                            android:orientation="vertical">
+                                            
+                                            <TextView
+                                                android:layout_width="wrap_content"
+                                                android:layout_height="wrap_content"
+                                                android:text="الوزن الإجمالي"
+                                                android:textColor="?attr/colorOnSurfaceVariant"
+                                                android:textSize="12sp" />
+                                            <TextView
+                                                android:id="@+id/tvHeroSubtitle"
+                                                android:layout_width="wrap_content"
+                                                android:layout_height="wrap_content"
+                                                android:layout_marginTop="4dp"
+                                                android:text="••• g"
+                                                android:textColor="?attr/colorOnSurface"
+                                                android:textSize="16sp"
+                                                android:textStyle="bold" />
+                                        </LinearLayout>
+
+                                        <LinearLayout
+                                            android:layout_width="0dp"
+                                            android:layout_height="wrap_content"
+                                            android:layout_weight="1"
+                                            android:orientation="vertical">
+                                            <TextView
+                                                android:layout_width="wrap_content"
+                                                android:layout_height="wrap_content"
+                                                android:text="عدد القطع"
+                                                android:textColor="?attr/colorOnSurfaceVariant"
+                                                android:textSize="12sp" />
+                                            <TextView
+                                                android:id="@+id/tvHeroItemCount"
+                                                android:layout_width="wrap_content"
+                                                android:layout_height="wrap_content"
+                                                android:layout_marginTop="4dp"
+                                                android:text="•••"
+                                                android:textColor="?attr/colorOnSurface"
+                                                android:textSize="16sp"
+                                                android:textStyle="bold" />
+                                        </LinearLayout>
+                                    </LinearLayout>
+                                    
+                                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="3">
+                                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="USD" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="10sp" />
+                                            <TextView android:id="@+id/tvHeroValueUSD" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:textStyle="bold" />
+                                        </LinearLayout>
+                                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SAR" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="10sp" />
+                                            <TextView android:id="@+id/tvHeroValueSAR" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="?attr/colorOnSurface" android:textSize="12sp" />
+                                        </LinearLayout>
+                                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="YER" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="10sp" />
+                                            <TextView android:id="@+id/tvHeroValueYER" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="?attr/colorOnSurface" android:textSize="12sp" />
+                                        </LinearLayout>
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </FrameLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- 1.3 SALES SUMMARY CARD -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/salesSummaryCard"
+                            android:layout_width="310dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="8dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="2dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="240dp"
+                                android:orientation="vertical"
+                                android:padding="20dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <TextView
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:text="ملخص المبيعات"
+                                        android:textColor="?attr/colorOnSurface"
+                                        android:textSize="15sp"
+                                        android:textStyle="bold" />
+
+                                    <ImageButton
+                                        android:id="@+id/btnToggleSalesVisibility"
+                                        android:layout_width="28dp"
+                                        android:layout_height="28dp"
+                                        android:background="?attr/selectableItemBackgroundBorderless"
+                                        android:padding="2dp"
+                                        android:src="@drawable/ic_eye_off"
+                                        app:tint="?attr/colorOnSurface" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="24dp"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:weightSum="5">
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1.5"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="اليوم"
+                                            android:textColor="?attr/colorOnSurfaceVariant"
+                                            android:textSize="12sp" />
+
+                                        <TextView
+                                            android:id="@+id/tvSalesToday"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="8dp"
+                                            android:text="••••"
+                                            android:textColor="?attr/colorPrimary"
+                                            android:textSize="18sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
+
+                                    <View
+                                        android:layout_width="1dp"
+                                        android:layout_height="40dp"
+                                        android:background="?attr/colorOutlineVariant"
+                                        android:alpha="0.5" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1.75"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="الشهر"
+                                            android:textColor="?attr/colorOnSurfaceVariant"
+                                            android:textSize="12sp" />
+
+                                        <TextView
+                                            android:id="@+id/tvSalesMonth"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="8dp"
+                                            android:text="••••"
+                                            android:textColor="?attr/colorPrimary"
+                                            android:textSize="18sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
+
+                                    <View
+                                        android:layout_width="1dp"
+                                        android:layout_height="40dp"
+                                        android:background="?attr/colorOutlineVariant"
+                                        android:alpha="0.5" />
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1.75"
+                                        android:gravity="center"
+                                        android:orientation="vertical">
+
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="السنة"
+                                            android:textColor="?attr/colorOnSurfaceVariant"
+                                            android:textSize="12sp" />
+
+                                        <TextView
+                                            android:id="@+id/tvSalesYear"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="8dp"
+                                            android:text="••••"
+                                            android:textColor="?attr/colorPrimary"
+                                            android:textSize="18sp"
+                                            android:textStyle="bold" />
+                                    </LinearLayout>
+                                </LinearLayout>
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                    </LinearLayout>
                 </HorizontalScrollView>
 
                 <!-- Dots Indicator -->
@@ -73,7 +519,7 @@
                 </LinearLayout>
 
                 <!-- ═══════════════════════════════════════════════════
-                     QUICK ACTIONS (ديناميكية بالكامل - يتم بناؤها برمجياً)
+                     QUICK ACTIONS
                      ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:id="@+id/llQuickActionsContainer"
@@ -127,7 +573,7 @@
                 </LinearLayout>
 
                 <!-- ═══════════════════════════════════════════════════
-                     DATA SECTIONS (تم تجميعها لتسهيل الإخفاء)
+                     DATA SECTIONS
                      ═══════════════════════════════════════════════════ -->
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -154,7 +600,6 @@
                             android:orientation="vertical"
                             android:padding="16dp">
 
-                            <!-- Header -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -226,13 +671,11 @@
                                 </LinearLayout>
                             </LinearLayout>
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnOpenScrapMenu"
-                                style="@style/Widget.Material3.Button.TonalButton"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="16dp"
-                                android:text="إدارة كسر الذهب" />
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal">
+                                <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapBuy" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="شراء" android:textSize="12sp" />
+                                <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapHistory" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="السجل" android:textSize="12sp" />
+                                <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapBatches" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="الدفعات" android:textSize="12sp" />
+                            </LinearLayout>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
@@ -264,12 +707,7 @@
                                 <TextView android:id="@+id/tvAgingStatusLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="سليم" android:textColor="#16A34A" android:textStyle="bold" android:textSize="12sp" />
                             </LinearLayout>
 
-                            <LinearLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="16dp"
-                                android:orientation="horizontal"
-                                android:weightSum="2">
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="2">
                                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
                                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن القديم" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
                                     <TextView android:id="@+id/tvAgingWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0.000 g" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
@@ -286,13 +724,7 @@
                                 <TextView android:id="@+id/tvAgingAlertText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:textColor="#DC2626" android:textSize="12sp" android:textStyle="bold" />
                             </LinearLayout>
 
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnOpenAgingReport"
-                                style="@style/Widget.Material3.Button.TextButton"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:text="عرض تقرير الأعمار" />
+                            <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenAgingReport" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="عرض تقرير الأعمار" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
@@ -335,7 +767,21 @@
         </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- 3. تحميل الدخول -->
+    <!-- ✅ 3. الزر العائم الذكي (FAB) - ابناً مباشراً للـ CoordinatorLayout ليعمل بشكل صحيح -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/smartFab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="24dp"
+        android:src="@drawable/ic_pos"
+        android:visibility="gone"
+        app:backgroundTint="?attr/colorPrimary"
+        app:tint="?attr/colorOnPrimary"
+        app:fabSize="normal"
+        app:layout_behavior="com.google.android.material.behavior.HideBottomViewOnScrollBehavior" />
+
+    <!-- 4. شاشة التحميل -->
     <LinearLayout
         android:id="@+id/loadingOverlay"
         android:layout_width="match_parent"
@@ -347,7 +793,11 @@
         android:clickable="true"
         android:focusable="true"
         android:alpha="0.9">
-        <com.google.android.material.progressindicator.CircularProgressIndicator android:layout_width="wrap_content" android:layout_height="wrap_content" app:indicatorColor="?attr/colorPrimary" app:indicatorSize="48dp" />
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:indicatorColor="?attr/colorPrimary"
+            app:indicatorSize="48dp" />
     </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
