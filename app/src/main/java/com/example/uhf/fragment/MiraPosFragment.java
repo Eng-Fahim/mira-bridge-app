@@ -3304,21 +3304,50 @@ private void openCheckoutDialogWithTotal(double totalUsd, String ratesJson) {
     }
 
     private void showExitConfirmation() {
-        if (!isFragmentAlive()) return;
+    if (!isFragmentAlive()) return;
 
-        new AlertDialog.Builder(requireContext())
-                .setTitle(isArabic ? "🛒 مغادرة شاشة البيع؟" : "🛒 Leave POS?")
-                .setMessage(isArabic
-                        ? "لديك " + cartManager.size() + " عنصر في السلة.\n\n"
-                        + "هل تريد المغادرة؟ (سيتم الاحتفاظ بالسلة)"
-                        : "You have " + cartManager.size()
-                        + " items in cart.\n\nLeave anyway?")
-                .setPositiveButton(isArabic ? "مغادرة" : "Leave",
-                        (d, w) -> navigateAwayFromPos())
-                .setNegativeButton(isArabic ? "البقاء" : "Stay", null)
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .show();
+    // 1. نفخ التصميم المخصص
+    View dialogView = getLayoutInflater().inflate(R.layout.dialog_exit_confirmation, null);
+    
+    TextView tvTitle = dialogView.findViewById(R.id.tvTitle);
+    TextView tvMessage = dialogView.findViewById(R.id.tvMessage);
+    com.google.android.material.button.MaterialButton btnStay = dialogView.findViewById(R.id.btnStay);
+    com.google.android.material.button.MaterialButton btnLeave = dialogView.findViewById(R.id.btnLeave);
+
+    // 2. تعيين النصوص بناءً على اللغة
+    int count = cartManager != null ? cartManager.size() : 0;
+    
+    if (isArabic) {
+        tvTitle.setText("مغادرة شاشة البيع؟");
+        tvMessage.setText("لديك " + count + " عنصر في السلة.\nهل تريد المغادرة؟ (سيتم الاحتفاظ بالسلة)");
+        btnStay.setText("البقاء");
+        btnLeave.setText("مغادرة");
+    } else {
+        tvTitle.setText("Leave POS?");
+        tvMessage.setText("You have " + count + " items in cart.\nLeave anyway? (Cart will be saved)");
+        btnStay.setText("Stay");
+        btnLeave.setText("Leave");
     }
+
+    // 3. بناء النافذة
+    androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setCancelable(true)
+            .create();
+
+    if (dialog.getWindow() != null) {
+        dialog.getWindow().setBackgroundDrawableResource(R.drawable.rounded_dialog_bg);
+    }
+
+    // 4. معالجة الأزرار
+    btnStay.setOnClickListener(v -> dialog.dismiss());
+    btnLeave.setOnClickListener(v -> {
+        dialog.dismiss();
+        navigateAwayFromPos();
+    });
+
+    dialog.show();
+}
 
     private void navigateAwayFromPos() {
         try {
