@@ -420,9 +420,9 @@ try {
     View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
 
     // ═══════════════════════════════════════════════════════════
-    // 1) الإعلانات أولاً — كل الـ views
+    // 1) الإعلانات — TextInputEditText (مطابق للـ XML)
     // ═══════════════════════════════════════════════════════════
-    MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+    TextInputEditText actMethod = row.findViewById(R.id.actMethod);
     MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
     TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
     EditText etAmount = row.findViewById(R.id.etAmount);
@@ -438,31 +438,26 @@ try {
     // 2) بناء خريطة display → code
     // ═══════════════════════════════════════════════════════════
     final Map<String, String> displayToCode = new LinkedHashMap<>();
-    String[] methodNames = new String[paymentMethods.size()];
-    for (int i = 0; i < paymentMethods.size(); i++) {
-        PaymentMethodDto m = paymentMethods.get(i);
+    for (PaymentMethodDto m : paymentMethods) {
         String display = m.getDisplayName(isArabic);
         String account = m.getAccountDisplay(isArabic);
         String fullName = (account != null && !account.isEmpty())
                 ? display + " (" + account + ")"
                 : display;
-        methodNames[i] = fullName;
         displayToCode.put(fullName, m.code != null ? m.code : "CASH");
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 3) إعداد actMethod (بعد الإعلان)
+    // 3) إعداد actMethod (لا adapter — نستخدم picker مخصص)
     // ═══════════════════════════════════════════════════════════
     if (actMethod != null) {
-        actMethod.setFocusable(false);
-        actMethod.setClickable(true);
-        actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, methodNames));
-
-        if (methodNames.length > 0) {
-            actMethod.setText(methodNames[0], false);  // ✅ false = لا تفتح dropdown
-            actMethod.setTag(displayToCode.get(methodNames[0]));
+        // اختيار افتراضي: أول طريقة في القائمة
+        if (!displayToCode.isEmpty()) {
+            String firstKey = displayToCode.keySet().iterator().next();
+            actMethod.setText(firstKey);
+            actMethod.setTag(displayToCode.get(firstKey));
         } else {
+            actMethod.setText(isArabic ? "نقداً" : "Cash");
             actMethod.setTag("CASH");
         }
 
@@ -717,7 +712,7 @@ try {
         for (View row : paymentRows) {
             EditText et = row.findViewById(R.id.etAmount);
             MaterialAutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
-            MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+            TextInputEditText actMethod = row.findViewById(R.id.actMethod);
             if (et == null || actCurr == null || actMethod == null) continue;
 
             double amt = parseDouble(et.getText().toString());
