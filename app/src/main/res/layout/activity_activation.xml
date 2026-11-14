@@ -115,20 +115,19 @@
                 app:hintTextColor="@color/gold_accent"
                 app:startIconDrawable="@drawable/ic_key_gold"
                 app:startIconTint="@color/gold_accent">
-
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etLicenseKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:hint="MIRA-XXXX-XXXX-XXXX"
-                    android:inputType="textCapCharacters"
-                    android:letterSpacing="0.1"
-                    android:maxLines="1"
-                    android:textColor="@color/white"
-                    android:textColorHint="@color/gold_text_hint"
-                    android:textSize="16sp" />
-            </com.google.android.material.textfield.TextInputLayout>
+    android:id="@+id/etLicenseKey"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:fontFamily="sans-serif-medium"
+    android:hint="MIRA-XXXX-XXXX-XXXX"
+    android:inputType="textCapCharacters"
+    android:letterSpacing="0.1"
+    android:maxLines="1"
+    android:textColor="?attr/colorOnSurface"
+    android:textColorHint="@color/gold_text_hint"
+    android:textSize="16sp" />
+</com.google.android.material.textfield.TextInputLayout>
 
             <!-- رسالة الخطأ -->
             <TextView
