@@ -14,22 +14,20 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.DialogFragment;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
+import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -37,17 +35,18 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
- * TradeInDialog — نسخة الأندرويد المطابقة لـ TradeInModal في الويب
- * - إدخال عيار ووزن الذهب الكسر
- * - حساب القيمة تلقائياً عبر API
- * - عرض "سيُضاف رصيد دائن" عند الزيادة
- * - دعم كامل للغتين العربية والإنجليزية
+ * TradeInDialog v2.0
+ * - ✅ يستعيد الأسطر السابقة عند إعادة الفتح
+ * - ✅ ليبل "العيار" فوق قائمة الـ karat
+ * - ✅ حقل وصف اختياري لكل قطعة
  */
 public class TradeInDialog extends DialogFragment {
     private static final String TAG = "TradeInDialog";
     private static final String ARG_MAX_VALUE = "max_value";
+    private static final String ARG_EXISTING_LINES = "existing_lines";
     private static final String[] KARATS = {"24K", "22K", "21K", "18K", "14K"};
 
     public interface OnTradeInListener {
@@ -55,32 +54,38 @@ public class TradeInDialog extends DialogFragment {
     }
 
     private static class Line {
-        // ✅ تم حذف حقل id غير المستخدم
+        String id;
         String karat = "21K";
         double weight = 0;
         double value = 0;
         double pure24k = 0;
         double pricePerGram = 0;
         double discountPct = 0;
+        String description = "";
         boolean calculating = false;
         View rowView;
     }
 
     private double maxValue = 0;
-    private boolean isArabic = false;
+    private boolean isArabic = true;
     private OnTradeInListener listener;
-
     private LinearLayout llLines;
     private TextView tvTotal, tvExcess, tvExcessLabel, tvMaxValue;
     private Button btnConfirm, btnCancel, btnAdd;
-
     private final List<Line> lines = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public static TradeInDialog newInstance(double maxValue) {
+        return newInstance(maxValue, null);
+    }
+
+    public static TradeInDialog newInstance(double maxValue, JSONArray existingLines) {
         TradeInDialog d = new TradeInDialog();
         Bundle args = new Bundle();
         args.putDouble(ARG_MAX_VALUE, maxValue);
+        if (existingLines != null) {
+            args.putString(ARG_EXISTING_LINES, existingLines.toString());
+        }
         d.setArguments(args);
         return d;
     }
@@ -90,16 +95,8 @@ public class TradeInDialog extends DialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            maxValue = getArguments().getDouble(ARG_MAX_VALUE, 0);
-        }
-        // ✅ توحيد اكتشاف اللغة مع POSCheckoutDialog
-        try {
-            isArabic = AppCompatDelegate.getApplicationLocales()
-                    .toLanguageTags().contains("ar");
-        } catch (Exception e) {
-            isArabic = false;
-        }
+        if (getArguments() != null) maxValue = getArguments().getDouble(ARG_MAX_VALUE, 0);
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
     }
 
     @NonNull
@@ -133,68 +130,80 @@ public class TradeInDialog extends DialogFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        llLines      = view.findViewById(R.id.llLines);
-        tvTotal      = view.findViewById(R.id.tvTotal);
-        tvExcess     = view.findViewById(R.id.tvExcess);
+        llLines = view.findViewById(R.id.llLines);
+        tvTotal = view.findViewById(R.id.tvTotal);
+        tvExcess = view.findViewById(R.id.tvExcess);
         tvExcessLabel = view.findViewById(R.id.tvExcessLabel);
-        tvMaxValue   = view.findViewById(R.id.tvMaxValue);
-        btnConfirm   = view.findViewById(R.id.btnConfirm);
-        btnCancel    = view.findViewById(R.id.btnCancel);
-        btnAdd       = view.findViewById(R.id.btnAdd);
+        tvMaxValue = view.findViewById(R.id.tvMaxValue);
+        btnConfirm = view.findViewById(R.id.btnConfirm);
+        btnCancel = view.findViewById(R.id.btnCancel);
+        btnAdd = view.findViewById(R.id.btnAdd);
 
-        // ✅ نصوص ثابتة حسب اللغة
-        if (tvMaxValue != null) {
-            tvMaxValue.setText(String.format(Locale.US, "%,.0f YER", maxValue));
-        }
-        if (btnAdd != null) {
-            btnAdd.setText(isArabic ? "+ إضافة قطعة" : "+ Add Item");
-        }
-        if (btnCancel != null) {
-            btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
-        }
-        if (tvExcessLabel != null) {
-            tvExcessLabel.setText(isArabic ? "سيُضاف رصيد دائن" : "Store credit to be added");
-        }
+        if (tvMaxValue != null) tvMaxValue.setText(String.format(Locale.US, "%,.0f YER", maxValue));
+        btnCancel.setOnClickListener(v -> dismiss());
+        btnAdd.setOnClickListener(v -> addEmptyLine());
+        btnConfirm.setOnClickListener(v -> onConfirmClicked());
 
-        if (btnCancel != null) btnCancel.setOnClickListener(v -> dismiss());
-        if (btnAdd != null)    btnAdd.setOnClickListener(v -> addLine());
-        if (btnConfirm != null) btnConfirm.setOnClickListener(v -> onConfirmClicked());
+        // ✅ استعادة الأسطر السابقة
+        restoreExistingLines();
 
-        // ✅ السطر الأول افتراضي
-        addLine();
+        if (lines.isEmpty()) {
+            addEmptyLine();
+        }
     }
 
-    private void addLine() {
-        Line line = new Line();
-        lines.add(line);
+    private void restoreExistingLines() {
+        try {
+            String json = getArguments() != null ? getArguments().getString(ARG_EXISTING_LINES, null) : null;
+            if (json == null || json.isEmpty()) return;
 
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.getJSONObject(i);
+                Line line = new Line();
+                line.id = UUID.randomUUID().toString();
+                line.karat = obj.optString("karat", "21K");
+                line.weight = obj.optDouble("weight_grams", 0);
+                line.value = obj.optDouble("value_yer", 0);
+                line.description = obj.optString("description", "");
+                addLineWithData(line);
+            }
+            Log.d(TAG, "Restored " + lines.size() + " trade-in lines");
+        } catch (Exception e) {
+            Log.e(TAG, "restoreExistingLines error", e);
+        }
+    }
+
+    private void addEmptyLine() {
+        Line line = new Line();
+        line.id = UUID.randomUUID().toString();
+        addLineWithData(line);
+    }
+
+    private void addLineWithData(Line line) {
+        lines.add(line);
         View row = getLayoutInflater().inflate(R.layout.item_trade_in_row, llLines, false);
         line.rowView = row;
 
-        Spinner spKarat    = row.findViewById(R.id.spKarat);
-        EditText etWeight  = row.findViewById(R.id.etWeight);
+        MaterialAutoCompleteTextView actKarat = row.findViewById(R.id.actKarat);
+        TextInputEditText etWeight = row.findViewById(R.id.etWeight);
+        TextInputEditText etDescription = row.findViewById(R.id.etDescription);
         ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
-        // ✅ hint للوزن حسب اللغة
-        if (etWeight != null) {
-            etWeight.setHint(isArabic ? "الوزن (جرام)" : "Weight (g)");
-        }
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_spinner_item, KARATS);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spKarat.setAdapter(adapter);
-        spKarat.setSelection(2); // 21K
-
-        spKarat.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                line.karat = KARATS[pos];
-                recalculate(line);
-            }
-            @Override public void onNothingSelected(AdapterView<?> p) {}
+        // Karat dropdown
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_dropdown_item_1line, KARATS);
+        actKarat.setAdapter(adapter);
+        actKarat.setText(line.karat, false);
+        actKarat.setOnItemClickListener((parent, v, pos, id) -> {
+            line.karat = KARATS[pos];
+            if (line.weight > 0) recalculate(line);
         });
 
+        // Weight
+        if (line.weight > 0) {
+            etWeight.setText(String.format(Locale.US, "%.3f", line.weight));
+        }
         etWeight.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
@@ -205,6 +214,17 @@ public class TradeInDialog extends DialogFragment {
             @Override public void afterTextChanged(Editable s) {}
         });
 
+        // Description
+        if (!line.description.isEmpty()) etDescription.setText(line.description);
+        etDescription.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+                line.description = s != null ? s.toString().trim() : "";
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
+        // Remove
         btnRemove.setOnClickListener(v -> {
             if (lines.size() <= 1) return;
             lines.remove(line);
@@ -213,6 +233,7 @@ public class TradeInDialog extends DialogFragment {
         });
 
         llLines.addView(row);
+        updateLineDisplay(line);
         updateTotals();
     }
 
@@ -225,26 +246,22 @@ public class TradeInDialog extends DialogFragment {
             return;
         }
         if (line.calculating) return;
-
         line.calculating = true;
-        updateLineDisplay(line);
 
         final double w = line.weight;
         final String k = line.karat;
 
         new Thread(() -> {
             try {
-                MiraApiClient client = MiraApiClient.getInstance(
-                        requireContext().getApplicationContext());
+                MiraApiClient client = MiraApiClient.getInstance(requireContext().getApplicationContext());
                 MiraApiClient.ApiResponse r = client.calculateScrap(w, k);
-
                 mainHandler.post(() -> {
                     line.calculating = false;
                     if (r != null && r.isSuccess && r.data != null) {
-                        line.value         = r.data.optDouble("total_value", 0);
-                        line.pure24k       = r.data.optDouble("pure_24k_grams", 0);
-                        line.pricePerGram  = r.data.optDouble("price_per_gram", 0);
-                        line.discountPct   = r.data.optDouble("discount_percent", 0);
+                        line.value = r.data.optDouble("total_value", 0);
+                        line.pure24k = r.data.optDouble("pure_24k_grams", 0);
+                        line.pricePerGram = r.data.optDouble("price_per_gram", 0);
+                        line.discountPct = r.data.optDouble("discount_percent", 0);
                     } else {
                         line.value = 0;
                     }
@@ -264,27 +281,16 @@ public class TradeInDialog extends DialogFragment {
 
     private void updateLineDisplay(Line line) {
         if (line.rowView == null) return;
-
-        TextView tvValue    = line.rowView.findViewById(R.id.tvValue);
+        TextView tvValue = line.rowView.findViewById(R.id.tvValue);
         TextView tvCalcInfo = line.rowView.findViewById(R.id.tvCalcInfo);
-
         if (tvValue != null) {
-            tvValue.setText(line.calculating
-                    ? "..."
-                    : String.format(Locale.US, "%,.0f YER", line.value));
+            tvValue.setText(line.calculating ? "..." : String.format(Locale.US, "%,.0f YER", line.value));
         }
-
         if (tvCalcInfo != null) {
             if (line.value > 0) {
-                // ✅ نص تفاصيل الحساب حسب اللغة
-                String details = isArabic
-                        ? String.format(Locale.US,
-                            "24K: %.3fg · سعر: %,.0f · خصم: %.1f%%",
-                            line.pure24k, line.pricePerGram, line.discountPct)
-                        : String.format(Locale.US,
-                            "24K: %.3fg · Price: %,.0f · Disc: %.1f%%",
-                            line.pure24k, line.pricePerGram, line.discountPct);
-                tvCalcInfo.setText(details);
+                tvCalcInfo.setText(String.format(Locale.US,
+                        "24K: %.3fg · سعر: %,.0f · خصم: %.1f%%",
+                        line.pure24k, line.pricePerGram, line.discountPct));
                 tvCalcInfo.setVisibility(View.VISIBLE);
             } else {
                 tvCalcInfo.setVisibility(View.GONE);
@@ -296,9 +302,7 @@ public class TradeInDialog extends DialogFragment {
         double total = 0;
         for (Line l : lines) total += l.value;
 
-        if (tvTotal != null) {
-            tvTotal.setText(String.format(Locale.US, "%,.0f YER", total));
-        }
+        if (tvTotal != null) tvTotal.setText(String.format(Locale.US, "%,.0f YER", total));
 
         double excess = total - maxValue;
         if (excess > 0.01) {
@@ -306,30 +310,20 @@ public class TradeInDialog extends DialogFragment {
                 tvExcess.setText(String.format(Locale.US, "+%,.0f YER", excess));
                 tvExcess.setTextColor(Color.parseColor("#2563EB"));
             }
-            if (tvExcessLabel != null) {
-                tvExcessLabel.setVisibility(View.VISIBLE);
-                tvExcessLabel.setText(isArabic
-                        ? "سيُضاف رصيد دائن"
-                        : "Store credit to be added");
-            }
+            if (tvExcessLabel != null) tvExcessLabel.setVisibility(View.VISIBLE);
         } else {
             if (tvExcess != null) {
                 tvExcess.setText("0 YER");
                 tvExcess.setTextColor(Color.parseColor("#6B7280"));
             }
-            if (tvExcessLabel != null) {
-                tvExcessLabel.setVisibility(View.GONE);
-            }
+            if (tvExcessLabel != null) tvExcessLabel.setVisibility(View.GONE);
         }
 
         if (btnConfirm != null) {
             boolean enabled = total > 0 && !anyCalculating();
             btnConfirm.setEnabled(enabled);
             btnConfirm.setAlpha(enabled ? 1f : 0.5f);
-            // ✅ نص زر التأكيد حسب اللغة
-            btnConfirm.setText(isArabic
-                    ? String.format(Locale.US, "تأكيد (%,.0f YER)", total)
-                    : String.format(Locale.US, "Confirm (%,.0f YER)", total));
+            btnConfirm.setText(String.format(Locale.US, "تأكيد (%,.0f YER)", total));
         }
     }
 
@@ -349,14 +343,15 @@ public class TradeInDialog extends DialogFragment {
                 o.put("weight_grams", l.weight);
                 o.put("karat", l.karat);
                 o.put("value_yer", l.value);
+                // ✅ الوصف: المُدخل يدوياً، أو الافتراضي
+                o.put("description", l.description != null && !l.description.isEmpty()
+                        ? l.description
+                        : (l.karat + " · " + String.format(Locale.US, "%.3fg", l.weight)));
                 arr.put(o);
                 total += l.value;
             }
             listener.onConfirm(arr, total);
-            // ✅ اتساق مع POSCheckoutDialog + حماية من crashes
-            if (getParentFragmentManager() != null) {
-                dismissAllowingStateLoss();
-            }
+            dismiss();
         } catch (Exception e) {
             Log.e(TAG, "confirm error", e);
         }
