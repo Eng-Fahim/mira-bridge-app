@@ -2033,7 +2033,13 @@ private void refreshPricesBeforeCheckout(List<Integer> itemIds) {
                     }
 
                     // 7) الآن افتح الديالوج بالإجمالي الصحيح
-                    openCheckoutDialogWithTotal(freshTotalUsd);
+                    // 6) استخرج أسعار الصرف من السيرفر
+JSONObject ratesObj = resp.data.optJSONObject("exchange_rates");
+String ratesJson = (ratesObj != null) ? ratesObj.toString() : "{}";
+Log.i(TAG, "📊 Server rates: " + ratesJson);
+
+// 7) افتح الديالوج بالإجمالي الصحيح + الأسعار
+openCheckoutDialogWithTotal(freshTotalUsd, ratesJson);
 
                 } catch (Exception e) {
                     Log.e(TAG, "refreshPrices parse error", e);
@@ -2051,14 +2057,14 @@ private void refreshPricesBeforeCheckout(List<Integer> itemIds) {
     });
 }
 
-private void openCheckoutDialogWithTotal(double totalUsd) {
+private void openCheckoutDialogWithTotal(double totalUsd, String ratesJson) {
     try {
         if (!isFragmentAlive()) return;
 
         isCheckoutDialogShowing = true;
         PosCartManager.CartSnapshot snap = cartManager.snapshot();
 
-        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count);
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count, ratesJson);
         activeCheckoutDialog = dialog;
 
         dialog.setCheckoutListener(data -> {
@@ -2076,6 +2082,7 @@ private void openCheckoutDialogWithTotal(double totalUsd) {
         } else {
             isCheckoutDialogShowing = false;
             activeCheckoutDialog = null;
+            Log.w(TAG, "Dialog not shown: FragmentManager state saved");
         }
     } catch (Exception e) {
         isCheckoutDialogShowing = false;
@@ -2083,7 +2090,6 @@ private void openCheckoutDialogWithTotal(double totalUsd) {
         Log.e(TAG, "openCheckoutDialogWithTotal error", e);
     }
 }
-
     private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData data) {
         if (data == null || !isFragmentAlive()) return;
 
