@@ -88,7 +88,25 @@ public class MiraApplication extends AppContext {
     @Override
     public void onCreate() {
     super.onCreate();
-    
+    // في MiraApplication.java — داخل onCreate() بعد super.onCreate()
+//ايقاف حماية التقاط screen shot مؤقتا 
+registerActivityLifecycleCallbacks(
+    new android.app.Application.ActivityLifecycleCallbacks() {
+        @Override public void onActivityCreated(@NonNull android.app.Activity a, Bundle s) {
+            a.getWindow().clearFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SECURE);
+        }
+        @Override public void onActivityResumed(@NonNull android.app.Activity a) {
+            a.getWindow().clearFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SECURE);
+        }
+        @Override public void onActivityStarted(@NonNull android.app.Activity a) {}
+        @Override public void onActivityPaused(@NonNull android.app.Activity a) {}
+        @Override public void onActivityStopped(@NonNull android.app.Activity a) {}
+        @Override public void onActivitySaveInstanceState(@NonNull android.app.Activity a, @NonNull Bundle s) {}
+        @Override public void onActivityDestroyed(@NonNull android.app.Activity a) {}
+    }
+);
     
      // ✅ تهيئة نظام التسجيل في ملف
     com.example.uhf.utils.MiraFileLogger.init(this);
@@ -684,4 +702,4 @@ public static MiraApplication getInstance() {
 
         return sb.toString();
     }
-}
+                    }
