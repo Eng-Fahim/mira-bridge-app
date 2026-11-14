@@ -1,12 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- القائمة الأساسية (سيتم إعادة بنائها برمجياً في applyNavPermissions) -->
+    <!-- هذا الملف مجرد "قالب أولي" قبل أن يعمل الكود -->
+    
     <item
         android:id="@+id/nav_home"
         android:icon="@drawable/ic_home"
         android:title="@string/nav_home" />
 
-    <!-- ✅ عنصر المالية (للمحاسب والمدير المالي) -->
+    <item
+        android:id="@+id/nav_sales"
+        android:icon="@drawable/ic_sales"
+        android:title="@string/nav_sales" />
+
+    <item
+        android:id="@+id/nav_sales_history"
+        android:icon="@drawable/ic_history"
+        android:title="@string/nav_sales_history" />
+
+    <item
+        android:id="@+id/nav_profile"
+        android:icon="@drawable/ic_person"
+        android:title="@string/nav_profile" />
+
     <item
         android:id="@+id/nav_accounting"
         android:icon="@drawable/ic_accounting"
@@ -18,13 +35,8 @@
         android:title="@string/nav_inventory" />
 
     <item
-        android:id="@+id/nav_sales"
-        android:icon="@drawable/ic_sales"
-        android:title="@string/nav_sales" />
-
-    <item
         android:id="@+id/nav_scrap"
         android:icon="@drawable/ic_diamond"
         android:title="@string/nav_scrap" />
-        
+
 </menu>
