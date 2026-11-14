@@ -39,6 +39,8 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.navigation.NavigationManager;
 import com.example.uhf.tools.RecentActivityCache;
+import com.example.uhf.widget.ShiftSummaryCardView;
+import com.example.uhf.widget.CountdownTimerView;
 import com.example.uhf.tools.SessionManager;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -171,6 +173,8 @@ public class MiraDashboardFragment extends Fragment {
     private double currentInventoryValue = 0;
     private int currentItemCount = 0;
     private double currentTotalWeight = 0;
+    
+    private ShiftSummaryCardView shiftSummaryCard;
 
     private static class KaratInventory {
         final int karat; final int itemCount; final double weight;
@@ -471,9 +475,11 @@ public class MiraDashboardFragment extends Fragment {
             updateScrapUI();
             setupQuickActionButtons(v);
 
-        } catch (Exception e) { logNonFatal("initViews", e); }
+        
         
     setupDynamicFabAndCarouselState(v);
+    shiftSummaryCard = v.findViewById(R.id.cardShiftSummary);
+    } catch (Exception e) { logNonFatal("initViews", e); }
 }
 private void purgeCacheCompletely() {
     try {
@@ -1366,6 +1372,23 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
                 applySalesData(sales); 
             }
         }
+    
+    
+    // ✅ تفعيل بطاقة الوردية لموظف المبيعات
+    if (permissionManager.isPosOperator() && shiftSummaryCard != null) {
+        shiftSummaryCard.setVisibility(View.VISIBLE);
+        
+        // افترض أن السيرفر يرسل هذه البيانات (أو استخدم البيانات المتاحة حالياً)
+        JSONObject shiftData = data.optJSONObject("shift_summary");
+        if (shiftData != null) {
+            shiftSummaryCard.bindData(
+                shiftData.optDouble("total_cash", 0.0),
+                shiftData.optInt("invoice_count", 0),
+                shiftData.optInt("returns", 0),
+                shiftData.optDouble("gold_weight", 0.0)
+            );
+        }
+    }
     } catch (Exception e) { logNonFatal("processData", e); }
 }
 
@@ -1436,8 +1459,24 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
                 else if ("warning".equals(status)) { tvStatusChip.setVisibility(View.VISIBLE); tvStatusChip.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning"); tvStatusChip.setTextColor(0xFFF59E0B); }
                 else tvStatusChip.setVisibility(View.GONE);
             }
-        } catch (Exception e) { Log.e(TAG, "bindActivityToView error", e); }
+        CountdownTimerView countdown = v.findViewById(R.id.countdownTimer);
+        if (countdown != null) {
+            String status = item.optString("status", "");
+            long expiresAt = item.optLong("expires_at", 0);
+            long createdAt = item.optLong("created_at", 0);
+            
+            if ("pending".equals(status) && expiresAt > 0) {
+                countdown.setVisibility(View.VISIBLE);
+                countdown.start(createdAt, expiresAt, () -> fetchData());
+            } else {
+                countdown.cancel();
+                countdown.setVisibility(View.GONE);
+            }
+        }
+    } catch (Exception e) { 
+        Log.e(TAG, "bindActivityToView error", e); 
     }
+}
 
     private String extractTime(String dateStr) {
         if (dateStr == null || dateStr.isEmpty()) return "";
@@ -1626,12 +1665,19 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
     }
     
     @Override
-    public void onPause() {
-        super.onPause();
-        try { unregisterDataRefreshReceiver(); stopAutoRefresh(); hideSensitiveValuesOnExit();
-            purgeCacheCompletely(); 
-        } catch (Exception e) {}
-    }
+public void onPause() {
+    super.onPause();
+    try { 
+        unregisterDataRefreshReceiver(); 
+        stopAutoRefresh(); 
+        hideSensitiveValuesOnExit();
+        
+        if (shiftSummaryCard != null) {
+            shiftSummaryCard.hideSensitiveValues();
+        }
+    } catch (Exception e) {}
+}
+
 
     private void hideSensitiveValuesOnExit() {
         try {
@@ -1675,6 +1721,7 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
             cancelFuture(dataFuture); cancelFuture(goldPriceFuture); cancelFuture(pingFuture);
             if (mainHandler != null) { mainHandler.removeCallbacks(autoRefreshRunnable); if (swipeTimeoutRunnable != null) mainHandler.removeCallbacks(swipeTimeoutRunnable); }
             shutdownExecutor(); isViewInitialized = false;
+             purgeCacheCompletely();
         } catch (Exception e) {}
     }
 
