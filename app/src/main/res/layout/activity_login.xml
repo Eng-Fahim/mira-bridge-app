@@ -209,7 +209,7 @@
                                 android:importantForAutofill="yes"
                                 android:inputType="textNoSuggestions"
                                 android:textAlignment="viewStart"
-                                android:textColor="@color/text_light_primary"
+                                android:textColor="?attr/colorOnSurface"
                                 android:textColorHint="@color/gold_text_hint"
                                 android:textSize="15sp" />
                         </com.google.android.material.textfield.TextInputLayout>
@@ -243,7 +243,7 @@
                                 android:importantForAutofill="yes"
                                 android:inputType="textPassword"
                                 android:textAlignment="viewStart"
-                                android:textColor="@color/text_light_primary"
+                                android:textColor="?attr/colorOnSurface"
                                 android:textColorHint="@color/gold_text_hint"
                                 android:textSize="15sp" />
                         </com.google.android.material.textfield.TextInputLayout>
@@ -347,7 +347,7 @@
                                         android:layout_height="wrap_content"
                                         android:importantForAutofill="no"
                                         android:inputType="textUri"
-                                        android:textColor="@color/text_light_primary"
+                                        android:textColor="?attr/colorOnSurface"
                                         android:textSize="13sp" />
                                 </com.google.android.material.textfield.TextInputLayout>
 
