@@ -417,90 +417,107 @@ try {
      * ✅ Critical: نخزن code الطريقة في actMethod.getTag() لضمان الدقة.
      */
     private void addPaymentRow(String defaultCurrency, double amount) {
-        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
+    View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
 
-        // ✅ نستخدم TextView بدل AutoCompleteTextView لفتح شاشة الاختيار المخصصة
-com.google.android.material.textfield.TextInputEditText actMethod = row.findViewById(R.id.actMethod);
-// اجعل الحقل read-only — النقر يفتح الشاشة
-actMethod.setFocusable(false);
-actMethod.setClickable(true);
-        MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
-        TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
-        EditText etAmount = row.findViewById(R.id.etAmount);
-        TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-        MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
-        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
+    // ═══════════════════════════════════════════════════════════
+    // 1) الإعلانات أولاً — كل الـ views
+    // ═══════════════════════════════════════════════════════════
+    MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+    MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
+    TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
+    EditText etAmount = row.findViewById(R.id.etAmount);
+    TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
+    MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
+    ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
-        if (tvRowNumber != null) {
-            tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
-        }
+    if (tvRowNumber != null) {
+        tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
+    }
 
-        // ✅ بناء قائمة الأسماء + خريطة display → code
-        final Map<String, String> displayToCode = new LinkedHashMap<>();
-        String[] methodNames = new String[paymentMethods.size()];
-        for (int i = 0; i < paymentMethods.size(); i++) {
-            PaymentMethodDto m = paymentMethods.get(i);
-            String display = m.getDisplayName(isArabic);
-            String account = m.getAccountDisplay(isArabic);
-            String fullName = (account != null && !account.isEmpty())
-                    ? display + " (" + account + ")"
-                    : display;
-            methodNames[i] = fullName;
-            displayToCode.put(fullName, m.code != null ? m.code : "CASH");
-        }
+    // ═══════════════════════════════════════════════════════════
+    // 2) بناء خريطة display → code
+    // ═══════════════════════════════════════════════════════════
+    final Map<String, String> displayToCode = new LinkedHashMap<>();
+    String[] methodNames = new String[paymentMethods.size()];
+    for (int i = 0; i < paymentMethods.size(); i++) {
+        PaymentMethodDto m = paymentMethods.get(i);
+        String display = m.getDisplayName(isArabic);
+        String account = m.getAccountDisplay(isArabic);
+        String fullName = (account != null && !account.isEmpty())
+                ? display + " (" + account + ")"
+                : display;
+        methodNames[i] = fullName;
+        displayToCode.put(fullName, m.code != null ? m.code : "CASH");
+    }
 
+    // ═══════════════════════════════════════════════════════════
+    // 3) إعداد actMethod (بعد الإعلان)
+    // ═══════════════════════════════════════════════════════════
+    if (actMethod != null) {
+        actMethod.setFocusable(false);
+        actMethod.setClickable(true);
         actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, methodNames));
 
-        // ✅ عند النقر — افتح شاشة الاختيار المخصصة
-if (methodNames.length > 0) {
-    actMethod.setText(methodNames[0]);
-    actMethod.setTag(displayToCode.get(methodNames[0]));
-}
-
-actMethod.setOnClickListener(v -> {
-    showPaymentMethodPicker(actMethod, displayToCode);
-});
+        if (methodNames.length > 0) {
+            actMethod.setText(methodNames[0], false);  // ✅ false = لا تفتح dropdown
+            actMethod.setTag(displayToCode.get(methodNames[0]));
         } else {
             actMethod.setTag("CASH");
         }
 
-        // ✅ عند تغيير الطريقة: حدّث Tag
-        actMethod.setOnItemClickListener((parent, view1, position, id) -> {
-            String selected = (String) parent.getItemAtPosition(position);
-            String code = displayToCode.get(selected);
-            actMethod.setTag(code != null ? code : "CASH");
-            Log.d(TAG, "Method selected: " + selected + " → code=" + actMethod.getTag());
+        // فتح الشاشة المخصصة عند النقر
+        actMethod.setOnClickListener(v -> {
+            showPaymentMethodPicker(actMethod, displayToCode);
         });
+    }
 
-        // Currency
+    // ═══════════════════════════════════════════════════════════
+    // 4) إعداد العملة
+    // ═══════════════════════════════════════════════════════════
+    if (actCurrency != null) {
         actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_dropdown_item_1line, CURRENCIES));
         actCurrency.setText(defaultCurrency, false);
+    }
 
-        // Text watcher للأوزان
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-                double amt = parseDouble(s.toString());
-                double rate = getRateToYER(actCurrency.getText().toString());
-                double base = amt * rate;
-                if (rate != 1.0) {
-                    tvBaseEquivalent.setVisibility(View.VISIBLE);
-                    tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
-                } else {
-                    tvBaseEquivalent.setVisibility(View.GONE);
-                }
-                updateStatus();
+    // ═══════════════════════════════════════════════════════════
+    // 5) TextWatcher للمبلغ
+    // ═══════════════════════════════════════════════════════════
+    TextWatcher watcher = new TextWatcher() {
+        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+        @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+            if (tvBaseEquivalent == null || actCurrency == null) return;
+            double amt = parseDouble(s.toString());
+            double rate = getRateToYER(actCurrency.getText().toString());
+            double base = amt * rate;
+            if (rate != 1.0) {
+                tvBaseEquivalent.setVisibility(View.VISIBLE);
+                tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
+            } else {
+                tvBaseEquivalent.setVisibility(View.GONE);
             }
-            @Override public void afterTextChanged(Editable s) {}
-        };
-        etAmount.addTextChangedListener(watcher);
-        actCurrency.setOnItemClickListener((p, v, pos, id) ->
-                watcher.onTextChanged(etAmount.getText(), 0, 0, 0));
+            updateStatus();
+        }
+        @Override public void afterTextChanged(Editable s) {}
+    };
 
-        // زر المتبقي
+    if (etAmount != null) etAmount.addTextChangedListener(watcher);
+
+    if (actCurrency != null) {
+        actCurrency.setOnItemClickListener((p, v, pos, id) -> {
+            if (etAmount != null) {
+                watcher.onTextChanged(etAmount.getText(), 0, 0, 0);
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 6) زر المتبقي
+    // ═══════════════════════════════════════════════════════════
+    if (btnRemaining != null) {
         btnRemaining.setOnClickListener(v -> {
+            if (etAmount == null || actCurrency == null) return;
             double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
             double currentRowAmount = parseDouble(etAmount.getText().toString())
                     * getRateToYER(actCurrency.getText().toString());
@@ -511,8 +528,12 @@ actMethod.setOnClickListener(v -> {
                 etAmount.setText(String.format(Locale.US, "%.2f", rem / rate));
             }
         });
+    }
 
-        // زر الحذف
+    // ═══════════════════════════════════════════════════════════
+    // 7) زر الحذف
+    // ═══════════════════════════════════════════════════════════
+    if (btnRemove != null) {
         btnRemove.setOnClickListener(v -> {
             if (paymentRows.size() > 1) {
                 llPaymentsContainer.removeView(row);
@@ -523,14 +544,19 @@ actMethod.setOnClickListener(v -> {
                 Toast.makeText(requireContext(), "يجب إبقاء سطر واحد", Toast.LENGTH_SHORT).show();
             }
         });
-
-        if (amount > 0) {
-            etAmount.setText(String.format(Locale.US, "%.2f", amount));
-        }
-        paymentRows.add(row);
-        llPaymentsContainer.addView(row);
-        updateStatus();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // 8) القيمة الابتدائية
+    // ═══════════════════════════════════════════════════════════
+    if (amount > 0 && etAmount != null) {
+        etAmount.setText(String.format(Locale.US, "%.2f", amount));
+    }
+
+    paymentRows.add(row);
+    llPaymentsContainer.addView(row);
+    updateStatus();
+}
 
     private void renumberRows() {
         for (int i = 0; i < paymentRows.size(); i++) {
@@ -700,8 +726,7 @@ actMethod.setOnClickListener(v -> {
             String curr = actCurr.getText().toString();
 
             // ✅ اقرأ الكود من Tag (موثوق 100%)
-            com.google.android.material.textfield.TextInputEditText methodField = row.findViewById(R.id.actMethod);
-            String methodCode = resolveMethodCode(methodField);
+            String methodCode = resolveMethodCode(actMethod);
         
             Log.d(TAG, "Payment row: currency=" + curr
                     + " amount=" + amt + " method=" + methodCode);
@@ -860,7 +885,7 @@ actMethod.setOnClickListener(v -> {
  * بدل Full-screen Radio Button dialog.
  */
 private void showPaymentMethodPicker(
-        com.google.android.material.textfield.TextInputEditText targetField,
+        android.widget.TextView targetField,
         java.util.Map<String, String> displayToCode) {
 
     if (paymentMethods == null || paymentMethods.isEmpty()) return;
@@ -921,8 +946,12 @@ private void showPaymentMethodPicker(
                 ? displayName + " (" + account + ")"
                 : displayName;
 
-        targetField.setText(fullName);
-        targetField.setTag(selected.code);
+        if (targetField instanceof MaterialAutoCompleteTextView) {
+    ((MaterialAutoCompleteTextView) targetField).setText(fullName, false);
+} else {
+    targetField.setText(fullName);
+}
+targetField.setTag(selected.code);
         dialog.dismiss();
     });
 
