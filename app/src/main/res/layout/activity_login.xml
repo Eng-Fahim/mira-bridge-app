@@ -365,7 +365,7 @@
     android:alpha="0"
     android:background="#E6101010"
     android:clickable="true"
-    android:elevation="1000dp"
+    android:elevation="16dp"
     android:focusable="true"
     android:visibility="gone"
     app:layout_constraintBottom_toBottomOf="parent"
@@ -382,10 +382,9 @@
         android:padding="24dp">
 
         <ImageView
-            android:layout_width="96dp"
-            android:layout_height="96dp"
-            android:src="@drawable/ic_luxury_mira_logo"
-            app:tint="?attr/colorPrimary" />
+    android:layout_width="96dp"
+    android:layout_height="96dp"
+    android:src="@drawable/ic_luxury_mira_logo"/>
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvSuccessMessage"
