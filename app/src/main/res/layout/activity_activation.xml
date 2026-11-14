@@ -76,10 +76,11 @@
             android:orientation="vertical"
             android:padding="24dp">
 
-            <!-- حقل إدخال السيرفر (مخفي برمجياً لكن وُضع لتجنب الأخطاء) -->
+            <!-- حقل إدخال السيرفر (مخفي برمجياً) -->
+            <!-- ✅ تم تصحيح style هنا -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilServerUrl"
-                style="@Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:visibility="gone">
@@ -90,10 +91,11 @@
                     android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- حقل مفتاح الترخيص بتصميم ملكي متناسق -->
+            <!-- حقل مفتاح الترخيص -->
+            <!-- ✅ تم تصحيح style هنا أيضاً -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilLicenseKey"
-                style="@Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:boxCornerRadiusBottomEnd="16dp"
@@ -115,7 +117,7 @@
                     android:inputType="textCapCharacters"
                     android:letterSpacing="0.08"
                     android:maxLines="1"
-                    android:textColor="@color/text_light_primary"
+                    android:textColor="?attr/colorOnSurface"
                     android:textColorHint="@color/gold_text_hint"
                     android:textSize="15sp" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -177,7 +179,7 @@
                 app:cornerRadius="16dp"
                 app:elevation="6dp" />
 
-            <!-- زر إعادة المحاولة (مصحح النمط) -->
+            <!-- زر إعادة المحاولة -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRetry"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
