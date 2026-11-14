@@ -1,5 +1,7 @@
 pluginManagement {
     repositories {
+        // ✅ إضافة مرآة جوجل أولاً لتجنب خطأ 429 من Maven Central
+        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -9,9 +11,11 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // ✅ إضافة مرآة جوجل أولاً
+        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }  // ⚠️ ضروري لـ MPAndroidChart
+        maven { url 'https://jitpack.io' }  // ⚠️ ضروري لـ MPAndroidChart (اتركه كما هو)
     }
 }
 
