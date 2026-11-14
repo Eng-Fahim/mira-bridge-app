@@ -70,9 +70,7 @@ import javax.crypto.spec.PBEKeySpec;
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
-    private static final String 
-    //DEFAULT_SERVER_URL = "https://id.ibreg.org/wp-json";
-    DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
+    private static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
 
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000;
@@ -107,227 +105,176 @@ public class LoginActivity extends AppCompatActivity {
     private boolean isArabic = true;
 
     @Override
-protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    Log.d(TAG, "onCreate started");
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate started");
 
-    // ═══════════════════════════════════════════════════════════════
-    // 1. حماية الشاشة
-    // ═══════════════════════════════════════════════════════════════
-    getWindow().setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-    );
-
-    isDestroyed.set(false);
-    initExecutor();
-
-    MemoryManager.getInstance().registerActivity(this);
-    registerComponentCallbacks(MemoryManager.getInstance());
-
-    setContentView(R.layout.activity_login);
-
-    // ═══════════════════════════════════════════════════════════════
-    // 2. اللغة + التهيئة الأساسية
-    // ═══════════════════════════════════════════════════════════════
-    String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-    isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
-
-    sessionManager = new SessionManager(getApplicationContext());
-    soundManager = MiraSoundManager.getInstance(getApplicationContext());
-
-    // ═══════════════════════════════════════════════════════════════
-    // 3. تهيئة الواجهة مبكراً (حتى نتمكن من استخدام loadingContainer)
-    // ═══════════════════════════════════════════════════════════════
-    initViews();
-    setupTextWatchers();
-    setupServerConfigToggle();
-    setupLanguageToggle();
-
-    // ═══════════════════════════════════════════════════════════════
-    // 4. ⚡ فحص الترخيص (ASYNC) — يبدأ بعد عرض الواجهة
-    // ═══════════════════════════════════════════════════════════════
-    checkLicenseIntegrityAsync();
-}
-
-// ═══════════════════════════════════════════════════════
-//  ⚡ فحص الترخيص — ASYNC (لا يحجب Main Thread)
-// ═══════════════════════════════════════════════════════
-private void checkLicenseIntegrityAsync() {
-    // ═══════════════════════════════════════════════════════════
-    //  ⚡ 1. فحص مسبق: هل يوجد activationToken؟
-    //     إذا لا → لا معنى لفحص blob، وجّه للتفعيل
-    // ═══════════════════════════════════════════════════════════
-    if (!sessionManager.hasActivationToken()) {
-        Log.d(TAG, "No activation token → skip blob check");
-        continueOnCreateAfterLicenseCheck();  // سيعيد التوجيه لـ ActivationActivity
-        return;
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  ⚡ 2. يوجد token → جرّب blob محلي (اختياري)
-    // ═══════════════════════════════════════════════════════════
-    MiraBlobStorage.BlobData storedBlob = MiraBlobStorage.load(this);
-
-    if (storedBlob != null) {
-        MiraBlobVerifier.VerifyResult result = MiraBlobVerifier.verify(
-                storedBlob.blobJson, storedBlob.signatureB64, storedBlob.publicKeyB64
+        getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
         );
 
-        if (result.valid) {
-            MiraBlobVerifier.VerifyResult fullResult =
-                    MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob);
+        isDestroyed.set(false);
+        initExecutor();
 
-            if (fullResult.valid) {
-                Log.d(TAG, "✅ License blob valid (v" + storedBlob.version + ")");
+        MemoryManager.getInstance().registerActivity(this);
+        registerComponentCallbacks(MemoryManager.getInstance());
+
+        setContentView(R.layout.activity_login);
+
+        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+
+        sessionManager = new SessionManager(getApplicationContext());
+        soundManager = MiraSoundManager.getInstance(getApplicationContext());
+
+        initViews();
+        setupTextWatchers();
+        setupServerConfigToggle();
+        setupLanguageToggle();
+
+        checkLicenseIntegrityAsync();
+    }
+
+    private void checkLicenseIntegrityAsync() {
+        if (!sessionManager.hasActivationToken()) {
+            Log.d(TAG, "No activation token → skip blob check");
+            continueOnCreateAfterLicenseCheck();
+            return;
+        }
+
+        MiraBlobStorage.BlobData storedBlob = MiraBlobStorage.load(this);
+
+        if (storedBlob != null) {
+            MiraBlobVerifier.VerifyResult result = MiraBlobVerifier.verify(
+                    storedBlob.blobJson, storedBlob.signatureB64, storedBlob.publicKeyB64
+            );
+
+            if (result.valid) {
+                MiraBlobVerifier.VerifyResult fullResult =
+                        MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob);
+
+                if (fullResult.valid) {
+                    Log.d(TAG, "✅ License blob valid (v" + storedBlob.version + ")");
+                    continueOnCreateAfterLicenseCheck();
+                    return;
+                } else {
+                    Log.w(TAG, "⚠️ Stored blob expired: " + fullResult.message + " — will try refresh");
+                }
+            } else {
+                Log.w(TAG, "⚠️ Stored blob tampered: " + result.message + " — will try refresh");
+            }
+        }
+
+        Log.d(TAG, "📥 Fetching blob from server (optional)");
+
+        executeSafeBg(() -> {
+            boolean fetched = false;
+            try {
+                fetched = MiraBlobFetcher.fetchVerifyAndStore(LoginActivity.this);
+            } catch (Exception e) {
+                Log.w(TAG, "blob fetch exception: " + e.getMessage());
+            }
+
+            final boolean finalFetched = fetched;
+            mainHandler.post(() -> {
+                if (!isActivityAlive()) return;
+
+                if (finalFetched) {
+                    Log.d(TAG, "✅ Blob fetched from server");
+                } else {
+                    Log.w(TAG, "⚠️ Blob fetch failed — proceeding without blob");
+                }
+
                 continueOnCreateAfterLicenseCheck();
+            });
+        });
+    }
+
+    private void continueOnCreateAfterLicenseCheck() {
+        if (!sessionManager.hasActivationToken()) {
+            Log.w(TAG, "⚠️ No activation token — redirecting to ActivationActivity");
+            Intent intent = new Intent(this, ActivationActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
+        String offlineStatus = sessionManager.getOfflineStatus();
+        if ("BLOCKED".equals(offlineStatus)) {
+            long days = sessionManager.getDaysSinceLastHeartbeat();
+            Log.w(TAG, "🚫 License BLOCKED — offline for " + days + " days");
+            new AlertDialog.Builder(this)
+                    .setTitle(isArabic ? "🔴 الترخيص يحتاج اتصالاً" : "🔴 License Needs Connection")
+                    .setMessage(isArabic
+                            ? "انقطع الاتصال بالخادم لأكثر من " + sessionManager.getOfflineGraceDays() + " أيام.\n\nيرجى الاتصال بالإنترنت لتجديد الترخيص."
+                            : "Offline for more than " + sessionManager.getOfflineGraceDays() + " days.\n\nPlease connect to internet.")
+                    .setCancelable(false)
+                    .setPositiveButton(isArabic ? "إعادة المحاولة" : "Retry", (d, w) -> recreate())
+                    .setNeutralButton(isArabic ? "إعادة التفعيل" : "Re-Activate", (d, w) -> {
+                        sessionManager.clearLicense();
+                        startActivity(new Intent(this, ActivationActivity.class));
+                        finish();
+                    })
+                    .show();
+            return;
+        }
+
+        if ("WARNING".equals(offlineStatus) || "RESTRICTED".equals(offlineStatus)) {
+            long daysLeft = sessionManager.getOfflineGraceDays() - sessionManager.getDaysSinceLastHeartbeat();
+            Toast.makeText(this,
+                    isArabic ? "⚠️ تحذير: انقطع الاتصال بـ " + daysLeft + " أيام."
+                            : "⚠️ Warning: offline for " + daysLeft + " days.",
+                    Toast.LENGTH_LONG).show();
+        }
+
+        if (sessionManager.isLoggedIn()) {
+            if (sessionManager.hasValidToken()) {
+                navigateToMainDirect();
                 return;
             } else {
-                // blob موجود لكن منتهي — جرب تحديثه
-                Log.w(TAG, "⚠️ Stored blob expired: " + fullResult.message
-                        + " — will try refresh");
-                // لا نُظهر dialog هنا — نجرب التحديث أولاً
+                sessionManager.logoutUser();
             }
-        } else {
-            Log.w(TAG, "⚠️ Stored blob tampered: " + result.message
-                    + " — will try refresh");
-            // لا نُظهر dialog — نجرب التحديث
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  ⚡ 3. جلب blob من السيرفر (اختياري)
-    //     إذا فشل → المتابعة تعمل (token موجود)
-    // ═══════════════════════════════════════════════════════════
-    Log.d(TAG, "📥 Fetching blob from server (optional)");
-
-    executeSafeBg(() -> {
-        boolean fetched = false;
-        try {
-            fetched = MiraBlobFetcher.fetchVerifyAndStore(LoginActivity.this);
-        } catch (Exception e) {
-            Log.w(TAG, "blob fetch exception: " + e.getMessage());
         }
 
-        final boolean finalFetched = fetched;
-        mainHandler.post(() -> {
-            if (!isActivityAlive()) return;
-
-            if (finalFetched) {
-                Log.d(TAG, "✅ Blob fetched from server");
-            } else {
-                // ⚡ لا نُظهر dialog — التطبيق يعمل بالتوكن حتى بدون blob
-                Log.w(TAG, "⚠️ Blob fetch failed — but activation token exists, "
-                        + "proceeding without blob");
+        if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
+            Toast.makeText(this,
+                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً"
+                            : "Session expired - Please sign in again",
+                    Toast.LENGTH_LONG).show();
+            if (soundManager != null) {
+                soundManager.play(MiraSoundManager.SoundEvent.LOGOUT);
             }
+        }
 
-            // في الحالتين → تابع
-            continueOnCreateAfterLicenseCheck();
-        });
-    });
-}
-// ═══════════════════════════════════════════════════════
-//  ⚡ يستأنف onCreate بعد نجاح فحص الترخيص
-// ═══════════════════════════════════════════════════════
-private void continueOnCreateAfterLicenseCheck() {
-    // [1] فحص activation token
-    if (!sessionManager.hasActivationToken()) {
-        Log.w(TAG, "⚠️ No activation token — redirecting to ActivationActivity");
-        Intent intent = new Intent(this, ActivationActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-        return;
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+
+        initializeEncryption();
+
+        animateEntrance();
+        setupProfileListener();
+
+        mainHandler.postDelayed(() -> {
+            if (isActivityAlive()) {
+                restoreLastUsername();
+                loadOrgProfileFromCloud();
+            }
+        }, 300);
+
+        Log.d(TAG, "onCreate completed");
     }
 
-    // [2] فحص offline status
-    String offlineStatus = sessionManager.getOfflineStatus();
-    if ("BLOCKED".equals(offlineStatus)) {
-        long days = sessionManager.getDaysSinceLastHeartbeat();
-        Log.w(TAG, "🚫 License BLOCKED — offline for " + days + " days");
-        new AlertDialog.Builder(this)
-                .setTitle(isArabic ? "🔴 الترخيص يحتاج اتصالاً" : "🔴 License Needs Connection")
-                .setMessage(isArabic
-                        ? "انقطع الاتصال بالخادم لأكثر من " + sessionManager.getOfflineGraceDays()
-                            + " أيام.\n\nيرجى الاتصال بالإنترنت لتجديد الترخيص."
-                        : "Offline for more than " + sessionManager.getOfflineGraceDays()
-                            + " days.\n\nPlease connect to internet.")
-                .setCancelable(false)
-                .setPositiveButton(isArabic ? "إعادة المحاولة" : "Retry", (d, w) -> recreate())
-                .setNeutralButton(isArabic ? "إعادة التفعيل" : "Re-Activate", (d, w) -> {
-                    sessionManager.clearLicense();
-                    startActivity(new Intent(this, ActivationActivity.class));
-                    finish();
-                })
-                .show();
-        return;
-    }
-
-    if ("WARNING".equals(offlineStatus) || "RESTRICTED".equals(offlineStatus)) {
-        long daysLeft = sessionManager.getOfflineGraceDays() - sessionManager.getDaysSinceLastHeartbeat();
-        Toast.makeText(this,
-                isArabic ? "⚠️ تحذير: انقطع الاتصال بـ " + daysLeft + " أيام."
-                        : "⚠️ Warning: offline for " + daysLeft + " days.",
-                Toast.LENGTH_LONG).show();
-    }
-
-    // [3] فحص الجلسة
-    if (sessionManager.isLoggedIn()) {
-        if (sessionManager.hasValidToken()) {
-            navigateToMainDirect();
-            return;
-        } else {
-            sessionManager.logoutUser();
+    private void showLicenseLoading(boolean show) {
+        if (loadingContainer != null) {
+            loadingContainer.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (show && loginCard != null) {
+            loginCard.setVisibility(View.GONE);
+        } else if (loginCard != null) {
+            loginCard.setVisibility(View.VISIBLE);
         }
     }
-
-    // [4] معالجة session_expired
-    if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
-        Toast.makeText(this,
-                isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً"
-                        : "Session expired - Please sign in again",
-                Toast.LENGTH_LONG).show();
-        if (soundManager != null) {
-            soundManager.play(MiraSoundManager.SoundEvent.LOGOUT);
-        }
-    }
-
-    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-
-    // ═══════════════════════════════════════════════════════════════
-    // 5. تهيئة التشفير في الخلفية
-    // ═══════════════════════════════════════════════════════════════
-    initializeEncryption();
-
-    // ═══════════════════════════════════════════════════════════════
-    // 6. تحريك الواجهة وتحميل البيانات
-    // ═══════════════════════════════════════════════════════════════
-    animateEntrance();
-    setupProfileListener();
-
-    mainHandler.postDelayed(() -> {
-        if (isActivityAlive()) {
-            restoreLastUsername();
-            loadOrgProfileFromCloud();
-        }
-    }, 300);
-
-    Log.d(TAG, "onCreate completed");
-}
-
-// ═══════════════════════════════════════════════════════
-//  ⚡ Loading أثناء فحص الترخيص
-// ═══════════════════════════════════════════════════════
-private void showLicenseLoading(boolean show) {
-    if (loadingContainer != null) {
-        loadingContainer.setVisibility(show ? View.VISIBLE : View.GONE);
-    }
-    if (show && loginCard != null) {
-        loginCard.setVisibility(View.GONE);
-    } else if (loginCard != null) {
-        loginCard.setVisibility(View.VISIBLE);
-    }
-}
 
     private synchronized static void initExecutor() {
         if (bgExecutor == null || bgExecutor.isShutdown() || bgExecutor.isTerminated()) {
@@ -574,13 +521,31 @@ private void showLicenseLoading(boolean show) {
 
     private void animateEntrance() {
         if (loginCard == null) return;
+        
         loginCard.setAlpha(0f);
-        loginCard.setTranslationY(60f);
-        loginCard.animate().alpha(1f).translationY(0f).setDuration(600)
-                .setInterpolator(new AccelerateDecelerateInterpolator()).setStartDelay(150).start();
+        loginCard.setTranslationY(80f);
+        
         if (logoContainer != null) {
-            logoContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in_up));
+            logoContainer.setScaleX(0.4f);
+            logoContainer.setScaleY(0.4f);
+            logoContainer.setAlpha(0f);
+            
+            logoContainer.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(900)
+                    .setInterpolator(new AccelerateDecelerateInterpolator())
+                    .start();
         }
+
+        loginCard.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(700)
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .setStartDelay(200)
+                .start();
     }
 
     private void setupTextWatchers() {
@@ -963,10 +928,6 @@ private void showLicenseLoading(boolean show) {
                         bm.setUserBranchLocked(true);
                     }
 
-                    if (sessionManager.getLastBiometricUser().isEmpty() == false) {
-                        sessionManager.saveBiometricUser(lastUser, lastRole, lastDisplayName, lastUserId, lastToken);
-                    }
-
                     sessionManager.resetAutoLock();
                     resetFailedAttempts();
                     playTone(true);
@@ -1174,28 +1135,4 @@ private void showLicenseLoading(boolean show) {
         mainHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
-    // ═══════════════════════════════════════════════════════
-//  ⚡ MIRA License Integrity Check
-// ═══════════════════════════════════════════════════════
-
-/**
- * حوار مانع — يُغلق التطبيق بعد الضغط
- */
-private void showBlockingDialog(String title, String message) {
-    if (isFinishing()) return;
-    
-    new AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage(message)
-            .setCancelable(false)
-            .setPositiveButton(
-                    isArabic ? "حسناً" : "OK",
-                    (d, w) -> finish()
-            )
-            .setNeutralButton(
-                    isArabic ? "إعادة المحاولة" : "Retry",
-                    (d, w) -> recreate()
-            )
-            .show();
-}
 }
