@@ -3253,14 +3253,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    @Deprecated
-    public void showCartBottomSheet() {}
-
-    @Deprecated
-    public void showDiscountDialog() {
-        processCheckoutAndStockUpdate();
-    }
-    
         @Deprecated
     public void showCartBottomSheet() {}
 
@@ -3270,7 +3262,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Auto-Open Refund Intent (كانت مفقودة في النسخة السابقة)
+    //  Auto-Open Refund Intent
     // ═══════════════════════════════════════════════════════════════════
 
     private void checkAutoOpenRefundIntent() {
@@ -3292,7 +3284,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                             showRefundDialog();
 
                             if (refundDialog != null && refundDialog.isShowing()) {
-                                // V2 API: البحث بالكود
                                 refundDialog.setQueryFromScan(code);
                             }
                         }, 500);
@@ -3332,5 +3323,4 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
         return "";
     }
-}
-}
+} // ← هذا يجب أن يكون القوس الأخير الوحيد
