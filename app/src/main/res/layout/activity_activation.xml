@@ -26,7 +26,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- عنوان الشاشة الفخم (مصحح ليكون ساطعاً وواضماً دائماً) -->
+    <!-- عنوان الشاشة الفخم -->
     <TextView
         android:id="@+id/tvActivationTitle"
         android:layout_width="wrap_content"
@@ -41,7 +41,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/ivLogo" />
 
-    <!-- وصف تحفيزي فرعي (مصحح ليكون مقروءاً بوضوح) -->
+    <!-- وصف تحفيزي فرعي -->
     <TextView
         android:id="@+id/tvActivationSubtitle"
         android:layout_width="0dp"
@@ -75,6 +75,20 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="24dp">
+
+            <!-- حقل إدخال السيرفر (مخفي برمجياً لكن وُضع لتجنب الأخطاء) -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilServerUrl"
+                style="@Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etServerUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- حقل مفتاح الترخيص بتصميم ملكي متناسق -->
             <com.google.android.material.textfield.TextInputLayout
@@ -163,10 +177,10 @@
                 app:cornerRadius="16dp"
                 app:elevation="6dp" />
 
-            <!-- زر إعادة المحاولة -->
+            <!-- زر إعادة المحاولة (مصحح النمط) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRetry"
-                style="@Widget.MaterialComponents.Button.OutlinedBoxButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginTop="12dp"
