@@ -319,20 +319,26 @@ private static final class NavItemCfg {
 }
 
 private static final NavItemCfg[] NAV_CONFIGS = {
-    // الرئيسية (للجميع)
-    new NavItemCfg(R.id.nav_home,       R.drawable.ic_home,       R.string.nav_home,       R.string.nav_home,       NavigationManager.TAG_DASHBOARD,    true),
+    // 1. الرئيسية (للجميع)
+    new NavItemCfg(R.id.nav_home,          R.drawable.ic_home,       R.string.nav_home,          R.string.nav_home,          NavigationManager.TAG_DASHBOARD,          true),
     
-    // المالية (للمحاسب والمدير المالي والإدارة)
-    new NavItemCfg(R.id.nav_accounting, R.drawable.ic_accounting, R.string.nav_accounting, R.string.nav_accounting, NavigationManager.TAG_ACCOUNTING,   false),
+    // 2. نقطة البيع (لموظف المبيعات ومدير الفرع)
+    new NavItemCfg(R.id.nav_sales,         R.drawable.ic_sales,      R.string.nav_sales,         R.string.nav_sales,         NavigationManager.TAG_POS,                false),
     
-    // المخزون (لمدير المخزون ومدير الفرع)
-    new NavItemCfg(R.id.nav_inventory,  R.drawable.ic_inventory,  R.string.nav_inventory,  R.string.nav_inventory,  NavigationManager.TAG_INVENTORY,    false),
+    // 3. سجل المبيعات (لموظف المبيعات، المحاسب، ومدير الفرع) ⭐ جديد
+    new NavItemCfg(R.id.nav_sales_history, R.drawable.ic_history,    R.string.nav_sales_history, R.string.nav_sales_history, NavigationManager.TAG_SALES_HISTORY,      false),
     
-    // المبيعات (لموظف المبيعات ومدير الفرع)
-    new NavItemCfg(R.id.nav_sales,      R.drawable.ic_sales,      R.string.nav_sales,      R.string.nav_sales,      NavigationManager.TAG_POS,          false),
+    // 4. الملف الشخصي (للجميع) ⭐ جديد
+    new NavItemCfg(R.id.nav_profile,       R.drawable.ic_person,     R.string.nav_profile,       R.string.nav_profile,       NavigationManager.TAG_PROFILE,            true),
     
-    // كسر الذهب (لمدير المخزون ومدير الفرع)
-    new NavItemCfg(R.id.nav_scrap,      R.drawable.ic_diamond,    R.string.nav_scrap,      R.string.nav_scrap,      NavigationManager.TAG_SCRAP_GOLD_BUY, false),
+    // 5. المالية (للمحاسب والمدير المالي فقط)
+    new NavItemCfg(R.id.nav_accounting,    R.drawable.ic_accounting, R.string.nav_accounting,    R.string.nav_accounting,    NavigationManager.TAG_ACCOUNTING,         false),
+    
+    // 6. المخزون (لمدير المخزون ومدير الفرع)
+    new NavItemCfg(R.id.nav_inventory,     R.drawable.ic_inventory,  R.string.nav_inventory,     R.string.nav_inventory,     NavigationManager.TAG_INVENTORY,          false),
+    
+    // 7. كسر الذهب (لمدير المخزون ومدير الفرع)
+    new NavItemCfg(R.id.nav_scrap,         R.drawable.ic_diamond,    R.string.nav_scrap,         R.string.nav_scrap,         NavigationManager.TAG_SCRAP_GOLD_BUY,     false),
 };
 
     @Override
@@ -792,10 +798,12 @@ private static final NavItemCfg[] NAV_CONFIGS = {
         Fragment targetFragment;
         String targetTag;
 
-        if (permissionManager.isPosOperator()) {
+        /*if (permissionManager.isPosOperator()) {
             targetFragment = new MiraPosFragment();
             targetTag = NavigationManager.TAG_POS;
-        } else if (permissionManager.isInventoryManager()) {
+        } else */
+        
+        if (permissionManager.isInventoryManager()) {
             targetFragment = new MiraInventoryProFragment();
             targetTag = NavigationManager.TAG_INVENTORY;
         } else if (permissionManager.isSecurity() || permissionManager.isGateSecurity()) {
