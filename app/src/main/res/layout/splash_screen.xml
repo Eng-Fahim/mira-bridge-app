@@ -7,6 +7,13 @@
     android:background="@drawable/bg_gold_luxury_gradient"
     android:clipChildren="false">
 
+    <!-- 🌟 نقش الموتيف الهندسي الفاخر (نفس شاشة الترخيص) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.04"
+        android:background="@drawable/ic_jewelry_motif" />
+
     <!-- ==================== الخلفية والتوهجات السينمائية ==================== -->
     <View
         android:id="@+id/vGlow"
@@ -39,7 +46,7 @@
         android:layout_marginTop="48dp"
         android:letterSpacing="0.08"
         android:text="v1.0.0 Enterprise"
-        android:textColor="?attr/colorOutline"
+        android:textColor="@color/gold_text_secondary"
         android:textSize="11sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -86,7 +93,7 @@
             android:letterSpacing="0.02"
             android:text="MIRA JEWELRY"
             android:textAlignment="center"
-            android:textColor="?attr/colorOnBackground"
+            android:textColor="@color/gold_text_primary"
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -98,7 +105,7 @@
             android:letterSpacing="0.12"
             android:text="MIRA ID™ SMART JEWELRY TAG"
             android:textAllCaps="true"
-            android:textColor="?attr/colorPrimary"
+            android:textColor="@color/gold_accent"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -108,7 +115,7 @@
             android:layout_width="120dp"
             android:layout_height="2dp"
             android:layout_marginVertical="16dp"
-            android:background="?attr/colorPrimary" />
+            android:background="@color/gold_accent" />
 
         <!-- السلوجان والتوصيف -->
         <com.google.android.material.textview.MaterialTextView
@@ -118,7 +125,7 @@
             android:gravity="center"
             android:letterSpacing="0.03"
             android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
-            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textColor="@color/gold_text_secondary"
             android:textSize="13sp" />
 
     </LinearLayout>
@@ -139,7 +146,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:layout_marginBottom="16dp"
-            android:indeterminateTint="?attr/colorPrimary" />
+            android:indeterminateTint="@color/gold_accent" />
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvFooterBrand"
@@ -148,7 +155,7 @@
             android:gravity="center"
             android:letterSpacing="0.06"
             android:text="MIRA Trust Architecture™\nGlobal Standards &amp; RFID Solutions"
-            android:textColor="?attr/colorOutline"
+            android:textColor="@color/gold_text_secondary"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
