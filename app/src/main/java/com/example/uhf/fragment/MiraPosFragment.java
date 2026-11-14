@@ -1918,60 +1918,171 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ═══════════════════════════════════════════════════════════════════
 
     private void processCheckoutAndStockUpdate() {
+    try {
+        if (!hasPosPermission()) {
+            showToast(getString(R.string.pos_msg_no_permission));
+            return;
+        }
+        if (!canPerformCheckout()) {
+            showToast(isArabic ? "⛔ غير مصرح بإجراء البيع" : "⛔ Not authorized");
+            return;
+        }
+        if (cartManager == null || cartManager.isEmpty()) {
+            showToast(getString(R.string.pos_msg_cart_empty_toast));
+            return;
+        }
+        if (isCheckoutDialogShowing) return;
+        if (!isFragmentAlive()) return;
+
+        UIHelper.hideKeyboard(getActivity());
+
+        // ✅ 1) احفظ item_ids الحالية
+        final List<Integer> itemIds = new ArrayList<>();
+        for (CartItem item : cartManager.getItems()) {
+            if (item != null && item.itemId > 0) {
+                itemIds.add(item.itemId);
+            }
+        }
+
+        if (itemIds.isEmpty()) {
+            showToast(isArabic
+                    ? "لا يمكن تحديد معرّفات القطع"
+                    : "Cannot identify items");
+            return;
+        }
+
+        // ✅ 2) اجلب الأسعار الحقيقية من السيرفر أولاً
+        showToast(isArabic ? "🔍 جاري التحقق من الأسعار..." : "🔍 Checking prices...");
+        refreshPricesBeforeCheckout(itemIds);
+
+    } catch (Exception e) {
+        Log.e(TAG, "processCheckoutAndStockUpdate error", e);
+    }
+}
+
+private void refreshPricesBeforeCheckout(List<Integer> itemIds) {
+    final AlertDialog loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic);
+
+    miraExecutor.getNetworkExecutor().execute(() -> {
         try {
-            if (!hasPosPermission()) {
-                showToast(getString(R.string.pos_msg_no_permission));
-                return;
-            }
-            if (!canPerformCheckout()) {
-                showToast(isArabic
-                        ? "⛔ غير مصرح بإجراء البيع"
-                        : "⛔ Not authorized to checkout");
-                return;
-            }
-            if (cartManager == null || cartManager.isEmpty()) {
-                showToast(getString(R.string.pos_msg_cart_empty_toast));
-                return;
-            }
-            if (isCheckoutDialogShowing) return;
-            if (!isFragmentAlive()) return;
+            Context ctx = getSafeAppContext();
+            if (ctx == null) return;
 
-            UIHelper.hideKeyboard(getActivity());
-            isCheckoutDialogShowing = true;
+            MiraApiClient client = MiraApiClient.getInstance(ctx);
+            MiraApiClient.ApiResponse resp = client.prepareCheckout(itemIds);
 
-            PosCartManager.CartSnapshot snap = cartManager.snapshot();
+            safeRun(() -> {
+                PosUIManager.dismissDialog(loadingDialog);
 
-            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(
-                    snap.totalUsd, snap.count);
+                if (resp == null || !resp.isSuccess || resp.data == null) {
+                    String err = (resp != null && resp.error != null)
+                            ? resp.error
+                            : (isArabic ? "فشل التحقق من الأسعار" : "Price check failed");
+                    showToast("❌ " + err);
+                    return;
+                }
 
-            // ✅ احفظ مرجع للديالوج
-            activeCheckoutDialog = dialog;
+                try {
+                    // ✅ 3) اقرأ الأسعار الحقيقية
+                    JSONArray freshItems = resp.data.optJSONArray("items");
+                    JSONArray unavailable = resp.data.optJSONArray("unavailable");
+                    double freshTotalUsd = resp.data.optDouble("total_usd", 0);
+                    double freshTotalYer = resp.data.optDouble("total_yer", 0);
+                    double cachedTotalUsd = cartManager.snapshot().totalUsd;
 
-            dialog.setCheckoutListener(data -> {
-                // ✅ لا نُغلق الديالوج هنا — تُغلق فقط عند الرد من الـ Backend
-                //    عبر onCheckoutSuccess() أو onCheckoutError()
-                if (data != null) executeCheckoutDirectly(data);
+                    boolean pricesChanged = Math.abs(freshTotalUsd - cachedTotalUsd) > 0.01;
+
+                    // ✅ 4) املأ القطع المتاحة (أو أزل غير المتاحة)
+                    if (freshItems != null) {
+                        for (int i = 0; i < freshItems.length(); i++) {
+                            JSONObject it = freshItems.getJSONObject(i);
+                            int id = it.optInt("id", 0);
+                            double newPrice = it.optDouble("retail_price_usd", 0);
+                            if (id > 0 && newPrice > 0) {
+                                cartManager.updateItemPrice(id, newPrice);
+                            }
+                        }
+                    }
+
+                    // 5) أزل القطع التي أصبحت غير متاحة (مباعة، إلخ)
+                    if (unavailable != null && unavailable.length() > 0) {
+                        StringBuilder names = new StringBuilder();
+                        for (int i = 0; i < unavailable.length(); i++) {
+                            JSONObject u = unavailable.getJSONObject(i);
+                            int id = u.optInt("id", 0);
+                            String serial = u.optString("serial", "");
+                            if (id > 0) {
+                                cartManager.removeItemByItemId(id);
+                                if (names.length() > 0) names.append(", ");
+                                names.append(serial.isEmpty() ? ("#" + id) : serial);
+                            }
+                        }
+                        showToast(isArabic
+                                ? "⚠️ تم إزالة قطع غير متاحة: " + names
+                                : "⚠️ Removed unavailable items: " + names);
+                    }
+
+                    // 6) إذا تغيّر الإجمالي → أعلم المستخدم
+                    if (pricesChanged) {
+                        String msg = isArabic
+                                ? "💰 تم تحديث الأسعار. الإجمالي الجديد: "
+                                  + String.format(Locale.US, "%,.0f", freshTotalYer) + " YER"
+                                : "💰 Prices updated. New total: "
+                                  + String.format(Locale.US, "%,.0f", freshTotalYer) + " YER";
+                        showToast(msg);
+                    }
+
+                    // 7) الآن افتح الديالوج بالإجمالي الصحيح
+                    openCheckoutDialogWithTotal(freshTotalUsd);
+
+                } catch (Exception e) {
+                    Log.e(TAG, "refreshPrices parse error", e);
+                    showToast("⚠️ " + e.getMessage());
+                }
             });
 
-            dialog.setOnDismissListener(() -> {
-                isCheckoutDialogShowing = false;
-                activeCheckoutDialog = null;
-            });
-
-            FragmentManager fm = getParentFragmentManager();
-            if (fm != null && !fm.isStateSaved()) {
-                dialog.show(fm, "POSCheckoutDialog");
-            } else {
-                isCheckoutDialogShowing = false;
-                activeCheckoutDialog = null;
-                Log.w(TAG, "Dialog not shown: FragmentManager state saved");
-            }
         } catch (Exception e) {
+            Log.e(TAG, "refreshPricesBeforeCheckout error", e);
+            safeRun(() -> {
+                PosUIManager.dismissDialog(loadingDialog);
+                showToast("⚠️ " + e.getMessage());
+            });
+        }
+    });
+}
+
+private void openCheckoutDialogWithTotal(double totalUsd) {
+    try {
+        if (!isFragmentAlive()) return;
+
+        isCheckoutDialogShowing = true;
+        PosCartManager.CartSnapshot snap = cartManager.snapshot();
+
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count);
+        activeCheckoutDialog = dialog;
+
+        dialog.setCheckoutListener(data -> {
+            if (data != null) executeCheckoutDirectly(data);
+        });
+
+        dialog.setOnDismissListener(() -> {
             isCheckoutDialogShowing = false;
             activeCheckoutDialog = null;
-            Log.e(TAG, "processCheckoutAndStockUpdate error", e);
+        });
+
+        FragmentManager fm = getParentFragmentManager();
+        if (fm != null && !fm.isStateSaved()) {
+            dialog.show(fm, "POSCheckoutDialog");
+        } else {
+            isCheckoutDialogShowing = false;
+            activeCheckoutDialog = null;
         }
+    } catch (Exception e) {
+        isCheckoutDialogShowing = false;
+        activeCheckoutDialog = null;
+        Log.e(TAG, "openCheckoutDialogWithTotal error", e);
     }
+}
 
     private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData data) {
         if (data == null || !isFragmentAlive()) return;
