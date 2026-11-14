@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- 🥇 GOLD FAMILY (هوية الذهب والمجوهرات) -->
+    <!-- 🥇 GOLD FAMILY -->
     <color name="gold_50">#FFFBF0</color>
     <color name="gold_100">#FDF3D7</color>
     <color name="gold_200">#F5D77E</color>
@@ -11,14 +11,8 @@
     <color name="gold_900">#3D2E00</color>
     <color name="gold_accent">#D4AF37</color>
     <color name="gold_dark">#0F0F10</color>
-    <color name="gold_luxury">#C59B27</color>
-    <color name="gold_luxury_dark">#8B6914</color>
-    <color name="gold_luxury_light">#E5C158</color>
-    <color name="gold_luxury_soft">#FFFBF0</color>
-    <color name="gold_luxury_highlight">#F5D77E</color>
-    <color name="gold_luxury_dark_deep">#3D2E00</color>
 
-    <!-- 💎 الأساسيات للوضع الفاتح (لمنع اختفاء النصوص) -->
+    <!-- 💎 تعديلات الوضع الفاتح الأساسية لضمان وضوح النصوص -->
     <color name="gold_card_background">#FFFFFF</color>
     <color name="gold_text_primary">#1A1A1A</color>
     <color name="gold_text_secondary">#595959</color>
@@ -27,7 +21,7 @@
     <color name="gold_bg_end">#EFECE6</color>
     <color name="gold_pattern_stroke">#12B8860B</color>
 
-    <!-- 🌑 INK FAMILY (التدرجات الداكنة والرمادية) -->
+    <!-- 🌑 INK FAMILY -->
     <color name="ink_50">#F8FAFC</color>
     <color name="ink_100">#F1F5F9</color>
     <color name="ink_200">#E2E8F0</color>
@@ -39,7 +33,7 @@
     <color name="ink_800">#1E293B</color>
     <color name="ink_900">#0F172A</color>
 
-    <!-- ✅ STATUS & ALERTS FAMILY -->
+    <!-- ✅ STATUS FAMILY -->
     <color name="success_500">#16A34A</color>
     <color name="success_50">#DCFCE7</color>
     <color name="success_700">#15803D</color>
@@ -53,39 +47,78 @@
     <color name="info_50">#E0F2FE</color>
     <color name="info_700">#0369A1</color>
 
-    <!-- 🎨 PURE & BASIC -->
+    <!-- 🎨 PURE -->
     <color name="pure_white">#FFFFFF</color>
     <color name="pure_black">#000000</color>
     <color name="transparent">#00000000</color>
-    <color name="full_transparent">#00000000</color>
-    <color name="half_transparent">#AA000000</color>
-    <color name="white">#FFFFFF</color>
-    <color name="black">#000000</color>
-    <color name="gray">#808080</color>
-    <color name="red">#FF0000</color>
-    <color name="gold">#C59B27</color>
-    <color name="yellow">#FFFF00</color>
-    <color name="green">#008000</color>
-    <color name="blue">#0000FF</color>
-    <color name="orange">#FFA500</color>
 
-    <!-- 🎨 MATERIAL 3 & SYSTEM ROLES -->
+    <!-- 🎨 MATERIAL 3 COLOR ROLES (Light Scheme) -->
     <color name="md_primary">@color/gold_500</color>
     <color name="md_on_primary">@color/pure_white</color>
     <color name="md_primary_container">@color/gold_50</color>
     <color name="md_on_primary_container">@color/gold_900</color>
+    <color name="md_primary_fixed">@color/gold_200</color>
+    <color name="md_primary_fixed_dim">@color/gold_300</color>
+    <color name="md_on_primary_fixed">@color/gold_900</color>
+    <color name="md_on_primary_fixed_variant">@color/gold_700</color>
+    <color name="md_inverse_primary">@color/gold_200</color>
+
     <color name="md_secondary">@color/ink_600</color>
     <color name="md_on_secondary">@color/pure_white</color>
+    <color name="md_secondary_container">@color/ink_100</color>
+    <color name="md_on_secondary_container">@color/ink_900</color>
+    <color name="md_secondary_fixed">@color/ink_200</color>
+    <color name="md_secondary_fixed_dim">@color/ink_300</color>
+    <color name="md_on_secondary_fixed">@color/ink_900</color>
+    <color name="md_on_secondary_fixed_variant">@color/ink_600</color>
+
+    <color name="md_tertiary">@color/gold_700</color>
+    <color name="md_on_tertiary">@color/pure_white</color>
+    <color name="md_tertiary_container">@color/gold_100</color>
+    <color name="md_on_tertiary_container">@color/gold_900</color>
+    <color name="md_tertiary_fixed">@color/gold_100</color>
+    <color name="md_tertiary_fixed_dim">@color/gold_200</color>
+    <color name="md_on_tertiary_fixed">@color/gold_900</color>
+    <color name="md_on_tertiary_fixed_variant">@color/gold_700</color>
+
     <color name="md_error">@color/danger_500</color>
+    <color name="md_on_error">@color/pure_white</color>
+    <color name="md_error_container">@color/danger_50</color>
+    <color name="md_on_error_container">@color/danger_700</color>
+
     <color name="md_background">@color/ink_50</color>
     <color name="md_on_background">@color/ink_900</color>
     <color name="md_surface">@color/pure_white</color>
     <color name="md_on_surface">@color/ink_900</color>
     <color name="md_surface_variant">@color/ink_100</color>
     <color name="md_on_surface_variant">@color/ink_600</color>
-    <color name="md_outline">@color/ink_400</color>
+    <color name="md_surface_tint">@color/gold_500</color>
+    <color name="md_inverse_surface">@color/ink_900</color>
+    <color name="md_inverse_on_surface">@color/ink_50</color>
+    <color name="md_surface_bright">@color/pure_white</color>
+    <color name="md_surface_dim">@color/ink_200</color>
+    <color name="md_surface_container_lowest">@color/pure_white</color>
+    <color name="md_surface_container_low">@color/ink_50</color>
+    <color name="md_surface_container">@color/ink_50</color>
+    <color name="md_surface_container_high">@color/ink_100</color>
+    <color name="md_surface_container_highest">@color/ink_200</color>
 
-    <!-- 📊 APP SEMANTIC TOKENS & ALIASES (لتجنب أي كسر في الشاشات) -->
+    <color name="md_outline">@color/ink_400</color>
+    <color name="md_outline_variant">@color/ink_200</color>
+    <color name="md_scrim">@color/pure_black</color>
+
+    <!-- State Layers -->
+    <color name="state_layer_hover">#14000000</color>
+    <color name="state_layer_focus">#1F000000</color>
+    <color name="state_layer_pressed">#29000000</color>
+    <color name="state_layer_gold_hover">#14C59B27</color>
+    <color name="state_layer_gold_pressed">#29C59B27</color>
+
+    <!-- Overlay -->
+    <color name="overlay_dark_40">#66000000</color>
+    <color name="overlay_dark_70">#B3000000</color>
+
+    <!-- APP SEMANTIC TOKENS -->
     <color name="text_primary">@color/md_on_surface</color>
     <color name="text_secondary">@color/md_on_surface_variant</color>
     <color name="text_tertiary">@color/ink_500</color>
@@ -93,32 +126,148 @@
     <color name="text_gold_accent">@color/gold_700</color>
     <color name="bg_main">@color/md_background</color>
     <color name="bg_card">@color/md_surface</color>
+    <color name="bg_card_elevated">@color/pure_white</color>
+    <color name="bg_gold_soft">@color/gold_50</color>
+    <color name="bg_gold_highlight">@color/gold_100</color>
     <color name="border_subtle">@color/ink_200</color>
     <color name="border_strong">@color/ink_300</color>
     <color name="border_gold">@color/gold_200</color>
+
+    <color name="shimmer_base">@color/ink_100</color>
+    <color name="shimmer_highlight">@color/ink_50</color>
+
+    <!-- BACKWARD COMPATIBILITY LAYER -->
+    <color name="brand_primary">@color/gold_500</color>
+    <color name="brand_primary_dark">@color/gold_700</color>
+    <color name="fab_background">@color/gold_500</color>
+    <color name="fab_icon_color">@color/pure_white</color>
+    <color name="progress_indicator_color">@color/gold_500</color>
+
+    <color name="status_online_green">@color/success_500</color>
+    <color name="status_offline_red">@color/danger_500</color>
+    <color name="status_online">@color/success_500</color>
+    <color name="status_offline">@color/danger_500</color>
+    <color name="status_updating">@color/warning_500</color>
+    <color name="status_draft">@color/ink_500</color>
+    <color name="status_pending">@color/warning_500</color>
+    <color name="status_in_transit">@color/info_500</color>
+    <color name="status_completed">@color/success_700</color>
+
+    <color name="nav_bar_background">@color/pure_white</color>
+    <color name="nav_item_selected">@color/gold_500</color>
+    <color name="nav_item_unselected">@color/ink_500</color>
+
+    <color name="action_sheet_bg">#1E222B</color>
+    <color name="action_sheet_card_bg">#2C313E</color>
+    <color name="action_sheet_text_primary">#FFFFFF</color>
+    <color name="action_sheet_text_secondary">#A0A5B5</color>
+    <color name="action_sheet_divider">#383E4D</color>
 
     <color name="colorPrimary">@color/md_primary</color>
     <color name="colorOnPrimary">@color/md_on_primary</color>
     <color name="colorSurface">@color/md_surface</color>
     <color name="colorOnSurface">@color/md_on_surface</color>
+    <color name="colorSurfaceVariant">@color/md_surface_variant</color>
+    <color name="colorOnSurfaceVariant">@color/md_on_surface_variant</color>
+    <color name="colorOutline">@color/md_outline</color>
+    <color name="colorOutlineVariant">@color/md_outline_variant</color>
     <color name="colorBackground">@color/md_background</color>
     <color name="colorWhite">@color/pure_white</color>
     <color name="primary">@color/gold_500</color>
     <color name="outline">@color/ink_300</color>
 
-    <!-- 🏷️ MODULES & FEATURES (Inventory, POS, Accounting, Charts) -->
-    <color name="brand_primary">@color/gold_500</color>
-    <color name="brand_primary_dark">@color/gold_700</color>
-    <color name="fab_background">@color/gold_500</color>
-    <color name="status_online">@color/success_500</color>
-    <color name="status_offline">@color/danger_500</color>
-    <color name="status_updating">@color/warning_500</color>
-    
-    <color name="inventory_stop">@color/danger_500</color>
-    <color name="inventory_safe">@color/success_500</color>
-    <color name="profit_green">@color/success_500</color>
-    <color name="loss_red">@color/danger_500</color>
-    
+    <!-- Legacy Dashboard & Colors -->
+    <color name="primary_text">@color/ink_900</color>
+    <color name="primary_text_variant">@color/ink_800</color>
+    <color name="text_secondary_variant">@color/ink_500</color>
+    <color name="background_dark">@color/ink_50</color>
+    <color name="background_card">@color/pure_white</color>
+    <color name="accent_color">@color/gold_500</color>
+    <color name="card_background">@color/pure_white</color>
+    <color name="card_stroke">@color/ink_200</color>
+    <color name="karat_text">@color/ink_900</color>
+    <color name="karat_text_empty">@color/ink_500</color>
+
+    <color name="text_light">@color/pure_white</color>
+    <color name="text_muted">@color/ink_600</color>
+    <color name="accent">@color/gold_500</color>
+    <color name="accent_light">@color/gold_300</color>
+    <color name="accent_dark">@color/gold_700</color>
+    <color name="gold_luxury">@color/gold_500</color>
+    <color name="gold_luxury_dark">@color/gold_700</color>
+    <color name="gold_luxury_light">@color/gold_300</color>
+    <color name="gold_luxury_soft">@color/gold_50</color>
+    <color name="gold_luxury_highlight">@color/gold_200</color>
+    <color name="gold_luxury_dark_deep">@color/gold_900</color>
+    <color name="chocolate">@color/ink_900</color>
+    <color name="chocolate_dark">#020617</color>
+    <color name="chocolate_light">@color/ink_700</color>
+    <color name="cream_warm">@color/ink_50</color>
+    <color name="border_warm">@color/ink_200</color>
+    <color name="text_dark_primary">@color/ink_900</color>
+    <color name="text_dark_secondary">@color/ink_600</color>
+
+    <!-- Reports & Charts -->
+    <color name="report_profit_green">#2E7D32</color>
+    <color name="report_loss_red">#C62828</color>
+    <color name="report_gold_amber">@color/warning_500</color>
+    <color name="report_neutral_gray">@color/ink_500</color>
+    <color name="chart_blue">#3B82F6</color>
+    <color name="chart_green">@color/success_500</color>
+    <color name="chart_orange">@color/warning_500</color>
+    <color name="chart_red">@color/danger_500</color>
+    <color name="chart_purple">#8B5CF6</color>
+    <color name="chart_teal">#14B8A6</color>
+
+    <!-- Base Palette -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray">#808080</color>
+    <color name="red">#FF0000</color>
+    <color name="gold">@color/gold_500</color>
+    <color name="yellow">#FFFF00</color>
+    <color name="green">#008000</color>
+    <color name="blue">#0000FF</color>
+    <color name="orange">#FFA500</color>
+    <color name="full_transparent">#00000000</color>
+    <color name="half_transparent">#AA000000</color>
+
+    <!-- Sliding Menu & ZXing -->
+    <color name="sliding_menu_back">#FF2C2C2E</color>
+    <color name="sliding_menu_title_text_color">#FF999999</color>
+    <color name="sliding_menu_item_text_color">#FFB1B1B1</color>
+    <color name="sliding_menu_item_text_color_pressed">#FFFFFFFF</color>
+    <color name="contents_text">#FF000000</color>
+    <color name="encode_view">#FFFFFFFF</color>
+    <color name="viewfinder_frame">#FF000000</color>
+    <color name="viewfinder_laser">#FFFF0000</color>
+    <color name="viewfinder_mask">#60000000</color>
+
+    <!-- Extended Palettes & Module Colors -->
+    <color name="warning_amber">#FFA000</color>
+    <color name="info_blue">#2196F3</color>
+    <color name="success_green">#4CAF50</color>
+    <color name="error_red">#F44336</color>
+    <color name="neutral_gray">#9E9E9E</color>
+
+    <color name="shimmer_start">#F1F5F9</color>
+    <color name="shimmer_end">#E2E8F0</color>
+    <color name="skeleton_bg">#F1F5F9</color>
+    <color name="divider">#E2E8F0</color>
+    <color name="border">#E2E8F0</color>
+    <color name="text_hint">#94A3B8</color>
+    <color name="text_disabled">#CBD5E1</color>
+    <color name="text_link">#0284C7</color>
+
+    <color name="inventory_stop">#DC2626</color>
+    <color name="inventory_safe">#16A34A</color>
+    <color name="profit_green">#16A34A</color>
+    <color name="loss_red">#DC2626</color>
+    <color name="badge_red">#DC2626</color>
+    <color name="badge_green">#16A34A</color>
+    <color name="badge_blue">#3B82F6</color>
+    <color name="badge_yellow">#F59E0B</color>
+
     <color name="karat_24">#C59B27</color>
     <color name="karat_22">#D4A932</color>
     <color name="karat_21">#E5C158</color>
@@ -149,7 +298,6 @@
     <color name="gold_card_stroke">#33D4AF37</color>
     <color name="gold_text_accent">#B8860B</color>
 
-    <!-- 📋 STRING ARRAY (منتقي الألوان إن وجد) -->
     <string-array name="colors" translatable="false">
         <item>#99cc00</item>
         <item>#33b5e5</item>
