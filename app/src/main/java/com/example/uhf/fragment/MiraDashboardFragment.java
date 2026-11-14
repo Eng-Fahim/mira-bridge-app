@@ -471,7 +471,54 @@ public class MiraDashboardFragment extends Fragment {
             setupQuickActionButtons(v);
 
         } catch (Exception e) { logNonFatal("initViews", e); }
+        
+    setupDynamicFabAndCarouselState(v);
+}
+private void purgeCacheCompletely() {
+    try {
+        if (offlineCache != null) offlineCache.edit().clear().apply();
+        if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
+        if (activityCache != null) activityCache.clear();
+        Log.d(TAG, "🔒 Dashboard Cache Purged successfully");
+    } catch (Exception e) {
+        logNonFatal("purgeCacheCompletely", e);
     }
+}
+
+private void setupDynamicFabAndCarouselState(View root) {
+    if (root == null || permissionManager == null) return;
+
+    // 1. إخفاء الـ Dots إذا كانت البطاقات الظاهرة أقل من 2
+    int visibleCards = 0;
+    if (permissionManager.canViewDashboardHero()) visibleCards++;
+    if (permissionManager.canViewDashboardGoldPrices()) visibleCards++;
+    if (permissionManager.canViewDashboardSales()) visibleCards++;
+
+    View dots = root.findViewById(R.id.dotsIndicator);
+    if (dots != null) {
+        dots.setVisibility(visibleCards > 1 ? View.VISIBLE : View.GONE);
+    }
+
+    // 2. زر عائم ذكي (FAB) - يحتاج إضافته لملف XML أولاً (انظر الخطوة 4)
+    com.google.android.material.floatingactionbutton.FloatingActionButton fab = root.findViewById(R.id.smartFab);
+    if (fab == null) return;
+
+    if (permissionManager.canUsePos()) {
+        fab.setImageResource(R.drawable.ic_pos);
+        fab.setOnClickListener(v -> navigateToFragment(new MiraPosFragment(), NavigationManager.TAG_POS));
+        fab.show();
+    } else if (permissionManager.canBuyScrapGold()) {
+        fab.setImageResource(R.drawable.ic_gold_scrap);
+        fab.setOnClickListener(v -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
+        fab.show();
+    } else if (permissionManager.canViewReports()) {
+        fab.setImageResource(R.drawable.ic_reports);
+        fab.setOnClickListener(v -> navigateToFragment(new MiraReportsProFragment(), NavigationManager.TAG_REPORTS));
+        fab.show();
+    } else {
+        fab.hide();
+    }
+}
 
     private void setupQuickActionButtons(View root) {
     if (root == null || permissionManager == null) return;
@@ -1196,25 +1243,35 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
     }
 
     private void saveOfflineData(JSONObject data) {
-        try {
-            if (offlineCache == null || !isSessionValid() || !ensureExecutor()) return;
-            localExecutor.execute(() -> {
-                try {
-                    JSONObject inv   = data.optJSONObject("inventory"); JSONObject sales = data.optJSONObject("sales");
-                    android.content.SharedPreferences.Editor editor = offlineCache.edit()
-                            .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
-                            .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
-                            .putFloat("inventory_value", (float) (inv != null ? inv.optDouble("total_value", 0.0) : 0.0))
-                            .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
-                            .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
-                            .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
-                            .putFloat("sales_year",  (float) (sales != null ? sales.optDouble("year",  0.0) : 0.0));
-                    if (inv != null && inv.optJSONArray("by_karat") != null) editor.putString("inventory_by_karat", inv.optJSONArray("by_karat").toString());
-                    editor.putLong("last_update", System.currentTimeMillis()).apply();
-                } catch (Exception e) { logNonFatal("saveOfflineData.inner", e); }
-            });
-        } catch (Exception e) { logNonFatal("saveOfflineData", e); }
-    }
+    try {
+        if (offlineCache == null || !isSessionValid() || !ensureExecutor()) return;
+        localExecutor.execute(() -> {
+            try {
+                android.content.SharedPreferences.Editor editor = offlineCache.edit();
+
+                if (permissionManager.canViewDashboardInventoryByKarat()) {
+                    JSONObject inv = data.optJSONObject("inventory");
+                    editor.putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                          .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
+                          .putFloat("inventory_value", (float) (inv != null ? inv.optDouble("total_value", 0.0) : 0.0));
+                    if (inv != null && inv.optJSONArray("by_karat") != null) {
+                        editor.putString("inventory_by_karat", inv.optJSONArray("by_karat").toString());
+                    }
+                }
+
+                if (permissionManager.canViewDashboardSales()) {
+                    JSONObject sales = data.optJSONObject("sales");
+                    editor.putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                          .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                          .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                          .putFloat("sales_year",  (float) (sales != null ? sales.optDouble("year",  0.0) : 0.0));
+                }
+
+                editor.putLong("last_update", System.currentTimeMillis()).apply();
+            } catch (Exception e) { logNonFatal("saveOfflineData.inner", e); }
+        });
+    } catch (Exception e) { logNonFatal("saveOfflineData", e); }
+}
 
     private void fetchData() {
     if (roleController != null && !roleController.canFetchFullDashboard()) {
@@ -1506,6 +1563,7 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
             if (!isAdded()) return;
             int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             if (newBranchId != currentBranchId) {
+                purgeCacheCompletely();
                 currentBranchId = newBranchId; initBranchCache(currentBranchId); updateHeader();
                 if (roleController != null && getView() != null) roleController.applyVisibility(getView());
 
@@ -1565,11 +1623,13 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
             });
         } catch (Exception e) {}
     }
-
+    
     @Override
     public void onPause() {
         super.onPause();
-        try { unregisterDataRefreshReceiver(); stopAutoRefresh(); hideSensitiveValuesOnExit(); } catch (Exception e) {}
+        try { unregisterDataRefreshReceiver(); stopAutoRefresh(); hideSensitiveValuesOnExit();
+            purgeCacheCompletely(); 
+        } catch (Exception e) {}
     }
 
     private void hideSensitiveValuesOnExit() {
