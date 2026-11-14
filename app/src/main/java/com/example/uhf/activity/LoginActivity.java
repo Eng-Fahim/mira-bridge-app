@@ -16,6 +16,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -28,14 +29,18 @@ import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 import androidx.core.os.LocaleListCompat;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKey;
 
 import com.example.uhf.R;
-import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.license.MiraBlobStorage;
 import com.example.uhf.license.MiraBlobVerifier;
+import com.example.uhf.license.MiraBlobFetcher;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.MiraRfid.sound.MiraSoundManager;
 import com.example.uhf.tools.MemoryManager;
 import com.example.uhf.tools.SessionManager;
@@ -47,9 +52,12 @@ import com.google.android.material.textview.MaterialTextView;
 
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -62,7 +70,9 @@ import javax.crypto.spec.PBEKeySpec;
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
-    private static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
+    private static final String 
+    //DEFAULT_SERVER_URL = "https://id.ibreg.org/wp-json";
+    DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
 
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000;
@@ -93,126 +103,235 @@ public class LoginActivity extends AppCompatActivity {
     private final AtomicInteger failedAttempts = new AtomicInteger(0);
     private long lockoutUntil = 0;
 
-    private SharedPreferences safePrefs;
+    private SharedPreferences encryptedPrefs;
     private boolean isArabic = true;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate started");
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    Log.d(TAG, "onCreate started");
 
-        try {
-            getWindow().setFlags(
-                    WindowManager.LayoutParams.FLAG_SECURE,
-                    WindowManager.LayoutParams.FLAG_SECURE
-            );
-        } catch (Exception e) {
-            Log.w(TAG, "Flag secure error: " + e.getMessage());
-        }
+    // ═══════════════════════════════════════════════════════════════
+    // 1. حماية الشاشة
+    // ═══════════════════════════════════════════════════════════════
+    getWindow().setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+    );
 
-        isDestroyed.set(false);
-        initExecutor();
+    isDestroyed.set(false);
+    initExecutor();
 
-        MemoryManager.getInstance().registerActivity(this);
-        registerComponentCallbacks(MemoryManager.getInstance());
+    MemoryManager.getInstance().registerActivity(this);
+    registerComponentCallbacks(MemoryManager.getInstance());
 
-        setContentView(R.layout.activity_login);
+    setContentView(R.layout.activity_login);
 
-        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+    // ═══════════════════════════════════════════════════════════════
+    // 2. اللغة + التهيئة الأساسية
+    // ═══════════════════════════════════════════════════════════════
+    String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+    isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
 
-        sessionManager = new SessionManager(getApplicationContext());
-        soundManager = MiraSoundManager.getInstance(getApplicationContext());
+    sessionManager = new SessionManager(getApplicationContext());
+    soundManager = MiraSoundManager.getInstance(getApplicationContext());
 
-        // ✅ استخدام SharedPreferences عادية لتجنب تجمد التطبيق (MasterKey يسبب ANR)
-        safePrefs = getSharedPreferences("mira_secure_login_prefs", MODE_PRIVATE);
+    // ═══════════════════════════════════════════════════════════════
+    // 3. تهيئة الواجهة مبكراً (حتى نتمكن من استخدام loadingContainer)
+    // ═══════════════════════════════════════════════════════════════
+    initViews();
+    setupTextWatchers();
+    setupServerConfigToggle();
+    setupLanguageToggle();
 
-        initViews();
-        setupTextWatchers();
-        setupServerConfigToggle();
-        setupLanguageToggle();
+    // ═══════════════════════════════════════════════════════════════
+    // 4. ⚡ فحص الترخيص (ASYNC) — يبدأ بعد عرض الواجهة
+    // ═══════════════════════════════════════════════════════════════
+    checkLicenseIntegrityAsync();
+}
 
-        // ✅ نقل فحص الترخيص إلى الخلفية بالكامل
-        executeSafeBg(this::checkLicenseIntegrityBg);
+// ═══════════════════════════════════════════════════════
+//  ⚡ فحص الترخيص — ASYNC (لا يحجب Main Thread)
+// ═══════════════════════════════════════════════════════
+private void checkLicenseIntegrityAsync() {
+    // ═══════════════════════════════════════════════════════════
+    //  ⚡ 1. فحص مسبق: هل يوجد activationToken؟
+    //     إذا لا → لا معنى لفحص blob، وجّه للتفعيل
+    // ═══════════════════════════════════════════════════════════
+    if (!sessionManager.hasActivationToken()) {
+        Log.d(TAG, "No activation token → skip blob check");
+        continueOnCreateAfterLicenseCheck();  // سيعيد التوجيه لـ ActivationActivity
+        return;
     }
 
-    // ✅ تم نقلها للخلفية (Background Thread)
-    private void checkLicenseIntegrityBg() {
-        if (!sessionManager.hasActivationToken()) {
-            Log.d(TAG, "No activation token → skip blob check");
-            mainHandler.post(this::continueOnCreateAfterLicenseCheck);
-            return;
-        }
+    // ═══════════════════════════════════════════════════════════
+    //  ⚡ 2. يوجد token → جرّب blob محلي (اختياري)
+    // ═══════════════════════════════════════════════════════════
+    MiraBlobStorage.BlobData storedBlob = MiraBlobStorage.load(this);
 
-        try {
-            MiraBlobStorage.BlobData storedBlob = MiraBlobStorage.load(this);
+    if (storedBlob != null) {
+        MiraBlobVerifier.VerifyResult result = MiraBlobVerifier.verify(
+                storedBlob.blobJson, storedBlob.signatureB64, storedBlob.publicKeyB64
+        );
 
-            if (storedBlob != null) {
-                MiraBlobVerifier.VerifyResult result = MiraBlobVerifier.verify(
-                        storedBlob.blobJson, storedBlob.signatureB64, storedBlob.publicKeyB64
-                );
+        if (result.valid) {
+            MiraBlobVerifier.VerifyResult fullResult =
+                    MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob);
 
-                if (result.valid) {
-                    MiraBlobVerifier.VerifyResult fullResult =
-                            MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob);
-
-                    if (fullResult.valid) {
-                        Log.d(TAG, "✅ License blob valid");
-                        mainHandler.post(this::continueOnCreateAfterLicenseCheck);
-                        return;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "License check error: " + e.getMessage());
-        }
-
-        mainHandler.post(this::continueOnCreateAfterLicenseCheck);
-    }
-
-    private void continueOnCreateAfterLicenseCheck() {
-        if (isDestroyed.get()) return;
-
-        if (!sessionManager.hasActivationToken()) {
-            Log.w(TAG, "⚠️ No activation token — redirecting to ActivationActivity");
-            Intent intent = new Intent(this, ActivationActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-            return;
-        }
-
-        if (sessionManager.isLoggedIn()) {
-            if (sessionManager.hasValidToken()) {
-                navigateToMainDirect();
+            if (fullResult.valid) {
+                Log.d(TAG, "✅ License blob valid (v" + storedBlob.version + ")");
+                continueOnCreateAfterLicenseCheck();
                 return;
             } else {
-                sessionManager.logoutUser();
+                // blob موجود لكن منتهي — جرب تحديثه
+                Log.w(TAG, "⚠️ Stored blob expired: " + fullResult.message
+                        + " — will try refresh");
+                // لا نُظهر dialog هنا — نجرب التحديث أولاً
             }
+        } else {
+            Log.w(TAG, "⚠️ Stored blob tampered: " + result.message
+                    + " — will try refresh");
+            // لا نُظهر dialog — نجرب التحديث
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ⚡ 3. جلب blob من السيرفر (اختياري)
+    //     إذا فشل → المتابعة تعمل (token موجود)
+    // ═══════════════════════════════════════════════════════════
+    Log.d(TAG, "📥 Fetching blob from server (optional)");
+
+    executeSafeBg(() -> {
+        boolean fetched = false;
+        try {
+            fetched = MiraBlobFetcher.fetchVerifyAndStore(LoginActivity.this);
+        } catch (Exception e) {
+            Log.w(TAG, "blob fetch exception: " + e.getMessage());
         }
 
-        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+        final boolean finalFetched = fetched;
+        mainHandler.post(() -> {
+            if (!isActivityAlive()) return;
 
-        checkLockoutStatus();
-        setupBiometric();
-        updateBiometricButtonState();
-
-        animateEntrance();
-        setupProfileListener();
-
-        mainHandler.postDelayed(() -> {
-            if (isActivityAlive()) {
-                restoreLastUsername();
-                loadOrgProfileFromCloud();
+            if (finalFetched) {
+                Log.d(TAG, "✅ Blob fetched from server");
+            } else {
+                // ⚡ لا نُظهر dialog — التطبيق يعمل بالتوكن حتى بدون blob
+                Log.w(TAG, "⚠️ Blob fetch failed — but activation token exists, "
+                        + "proceeding without blob");
             }
-        }, 200);
 
-        Log.d(TAG, "onCreate completed successfully");
+            // في الحالتين → تابع
+            continueOnCreateAfterLicenseCheck();
+        });
+    });
+}
+// ═══════════════════════════════════════════════════════
+//  ⚡ يستأنف onCreate بعد نجاح فحص الترخيص
+// ═══════════════════════════════════════════════════════
+private void continueOnCreateAfterLicenseCheck() {
+    // [1] فحص activation token
+    if (!sessionManager.hasActivationToken()) {
+        Log.w(TAG, "⚠️ No activation token — redirecting to ActivationActivity");
+        Intent intent = new Intent(this, ActivationActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+        return;
     }
+
+    // [2] فحص offline status
+    String offlineStatus = sessionManager.getOfflineStatus();
+    if ("BLOCKED".equals(offlineStatus)) {
+        long days = sessionManager.getDaysSinceLastHeartbeat();
+        Log.w(TAG, "🚫 License BLOCKED — offline for " + days + " days");
+        new AlertDialog.Builder(this)
+                .setTitle(isArabic ? "🔴 الترخيص يحتاج اتصالاً" : "🔴 License Needs Connection")
+                .setMessage(isArabic
+                        ? "انقطع الاتصال بالخادم لأكثر من " + sessionManager.getOfflineGraceDays()
+                            + " أيام.\n\nيرجى الاتصال بالإنترنت لتجديد الترخيص."
+                        : "Offline for more than " + sessionManager.getOfflineGraceDays()
+                            + " days.\n\nPlease connect to internet.")
+                .setCancelable(false)
+                .setPositiveButton(isArabic ? "إعادة المحاولة" : "Retry", (d, w) -> recreate())
+                .setNeutralButton(isArabic ? "إعادة التفعيل" : "Re-Activate", (d, w) -> {
+                    sessionManager.clearLicense();
+                    startActivity(new Intent(this, ActivationActivity.class));
+                    finish();
+                })
+                .show();
+        return;
+    }
+
+    if ("WARNING".equals(offlineStatus) || "RESTRICTED".equals(offlineStatus)) {
+        long daysLeft = sessionManager.getOfflineGraceDays() - sessionManager.getDaysSinceLastHeartbeat();
+        Toast.makeText(this,
+                isArabic ? "⚠️ تحذير: انقطع الاتصال بـ " + daysLeft + " أيام."
+                        : "⚠️ Warning: offline for " + daysLeft + " days.",
+                Toast.LENGTH_LONG).show();
+    }
+
+    // [3] فحص الجلسة
+    if (sessionManager.isLoggedIn()) {
+        if (sessionManager.hasValidToken()) {
+            navigateToMainDirect();
+            return;
+        } else {
+            sessionManager.logoutUser();
+        }
+    }
+
+    // [4] معالجة session_expired
+    if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
+        Toast.makeText(this,
+                isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً"
+                        : "Session expired - Please sign in again",
+                Toast.LENGTH_LONG).show();
+        if (soundManager != null) {
+            soundManager.play(MiraSoundManager.SoundEvent.LOGOUT);
+        }
+    }
+
+    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+
+    // ═══════════════════════════════════════════════════════════════
+    // 5. تهيئة التشفير في الخلفية
+    // ═══════════════════════════════════════════════════════════════
+    initializeEncryption();
+
+    // ═══════════════════════════════════════════════════════════════
+    // 6. تحريك الواجهة وتحميل البيانات
+    // ═══════════════════════════════════════════════════════════════
+    animateEntrance();
+    setupProfileListener();
+
+    mainHandler.postDelayed(() -> {
+        if (isActivityAlive()) {
+            restoreLastUsername();
+            loadOrgProfileFromCloud();
+        }
+    }, 300);
+
+    Log.d(TAG, "onCreate completed");
+}
+
+// ═══════════════════════════════════════════════════════
+//  ⚡ Loading أثناء فحص الترخيص
+// ═══════════════════════════════════════════════════════
+private void showLicenseLoading(boolean show) {
+    if (loadingContainer != null) {
+        loadingContainer.setVisibility(show ? View.VISIBLE : View.GONE);
+    }
+    if (show && loginCard != null) {
+        loginCard.setVisibility(View.GONE);
+    } else if (loginCard != null) {
+        loginCard.setVisibility(View.VISIBLE);
+    }
+}
 
     private synchronized static void initExecutor() {
         if (bgExecutor == null || bgExecutor.isShutdown() || bgExecutor.isTerminated()) {
-            bgExecutor = Executors.newFixedThreadPool(2);
+            bgExecutor = Executors.newFixedThreadPool(3);
         }
     }
 
@@ -228,6 +347,36 @@ public class LoginActivity extends AppCompatActivity {
 
     private boolean isActivityAlive() {
         return !isFinishing() && !isDestroyed() && !isDestroyed.get();
+    }
+
+    private void initializeEncryption() {
+        executeSafeBg(() -> {
+            try {
+                MasterKey masterKey = new MasterKey.Builder(this)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+
+                encryptedPrefs = EncryptedSharedPreferences.create(
+                        this,
+                        "secure_login_prefs_v2",
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                Log.d(TAG, "Encryption initialized successfully");
+            } catch (GeneralSecurityException | IOException e) {
+                Log.e(TAG, "EncryptedSharedPreferences failed, using private fallback", e);
+                encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+            }
+
+            mainHandler.post(() -> {
+                if (isActivityAlive()) {
+                    checkLockoutStatus();
+                    setupBiometric();
+                    updateBiometricButtonState();
+                }
+            });
+        });
     }
 
     private void initViews() {
@@ -260,9 +409,9 @@ public class LoginActivity extends AppCompatActivity {
 
         String savedUrl = sessionManager.getServerUrl();
         if (savedUrl != null && !savedUrl.isEmpty()) {
-            if (etServerUrl != null) etServerUrl.setText(savedUrl);
+            etServerUrl.setText(savedUrl);
         } else {
-            if (etServerUrl != null) etServerUrl.setText(DEFAULT_SERVER_URL);
+            etServerUrl.setText(DEFAULT_SERVER_URL);
             sessionManager.setServerUrl(DEFAULT_SERVER_URL);
             MiraServerConfig.getInstance(this).setBaseUrl(DEFAULT_SERVER_URL);
         }
@@ -270,37 +419,40 @@ public class LoginActivity extends AppCompatActivity {
         hideServerConfigFields();
 
         try {
-            if (tvAppVersion != null) {
-                tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " Enterprise");
-            }
+            tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " Enterprise");
         } catch (Exception e) {
-            if (tvAppVersion != null) tvAppVersion.setText("v1.0.0 Enterprise");
+            tvAppVersion.setText("v1.0.0 Enterprise");
         }
 
         apiClient = MiraApiClient.getInstance(getApplicationContext());
 
-        if (btnLogin != null) {
-            btnLogin.setOnClickListener(v -> attemptApiLogin());
-        }
+        btnLogin.setOnClickListener(v -> attemptApiLogin());
 
-        if (btnSaveServer != null) {
-            btnSaveServer.setOnClickListener(v -> {
-                String url = getText(etServerUrl);
-                if (isValidServerUrl(url)) {
-                    if (!url.endsWith("/")) url += "/";
-                    sessionManager.setServerUrl(url);
-                    MiraServerConfig.getInstance(this).setBaseUrl(url);
+        btnSaveServer.setOnClickListener(v -> {
+            String url = getText(etServerUrl);
+            if (isValidServerUrl(url)) {
+                if (!url.endsWith("/")) url += "/";
+                sessionManager.setServerUrl(url);
+                MiraServerConfig.getInstance(this).setBaseUrl(url);
 
-                    Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
-                    if (serverConfigCard != null) {
-                        serverConfigCard.animate().alpha(0f).setDuration(200)
-                                .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
-                    }
-                } else {
-                    Toast.makeText(this, isArabic ? "⚠️ يجب استخدام HTTPS للاتصال الآمن" : "⚠️ HTTPS required", Toast.LENGTH_LONG).show();
+                MiraApiClient client = MiraApiClient.getInstance(getApplicationContext());
+                if (client != null) {
+                    client.refreshUrl();
+                    client.invalidateTokenCache();
                 }
-            });
-        }
+                apiClient = client;
+
+                Log.d(TAG, "✅ Server URL saved, using same instance: " + url);
+
+                Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
+                serverConfigCard.animate().alpha(0f).setDuration(200)
+                        .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
+            } else {
+                Toast.makeText(this,
+                        isArabic ? "⚠️ يجب استخدام HTTPS للاتصال الآمن" : "⚠️ HTTPS required for secure connection",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
 
         updateUiTexts();
         applyOrgProfile();
@@ -317,19 +469,17 @@ public class LoginActivity extends AppCompatActivity {
     private void setupServerConfigToggle() {
         if (tvServerSettings != null) {
             tvServerSettings.setOnClickListener(v -> {
-                if (serverConfigCard != null) {
-                    if (serverConfigCard.getVisibility() == View.GONE) {
-                        if (tilServerUrl != null) tilServerUrl.setVisibility(View.VISIBLE);
-                        if (etServerUrl != null) etServerUrl.setVisibility(View.VISIBLE);
-                        if (btnSaveServer != null) btnSaveServer.setVisibility(View.VISIBLE);
+                if (serverConfigCard.getVisibility() == View.GONE) {
+                    if (tilServerUrl != null) tilServerUrl.setVisibility(View.VISIBLE);
+                    if (etServerUrl != null) etServerUrl.setVisibility(View.VISIBLE);
+                    if (btnSaveServer != null) btnSaveServer.setVisibility(View.VISIBLE);
 
-                        serverConfigCard.setVisibility(View.VISIBLE);
-                        serverConfigCard.setAlpha(0f);
-                        serverConfigCard.animate().alpha(1f).setDuration(300).start();
-                    } else {
-                        serverConfigCard.animate().alpha(0f).setDuration(200)
-                                .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
-                    }
+                    serverConfigCard.setVisibility(View.VISIBLE);
+                    serverConfigCard.setAlpha(0f);
+                    serverConfigCard.animate().alpha(1f).setDuration(300).start();
+                } else {
+                    serverConfigCard.animate().alpha(0f).setDuration(200)
+                            .withEndAction(() -> serverConfigCard.setVisibility(View.GONE)).start();
                 }
             });
         }
@@ -347,15 +497,13 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void updateUiTexts() {
-        if (getWindow() != null && getWindow().getDecorView() != null) {
-            getWindow().getDecorView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        }
+        getWindow().getDecorView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
 
         if (tvSignInTitle != null) tvSignInTitle.setText(isArabic ? "مرحباً بعودتك" : "Welcome Back");
         if (tvSignInSubtitle != null) tvSignInSubtitle.setText(isArabic ? "قم بتسجيل الدخول للمتابعة" : "Sign in to continue");
         if (tilUsername != null) tilUsername.setHint(isArabic ? "اسم المستخدم" : "Username");
         if (tilPassword != null) tilPassword.setHint(isArabic ? "كلمة المرور" : "Password");
-        if (btnLogin != null) btnLogin.setText(isArabic ? "تسجيل الدخول" : "Sign In");
+        if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText(isArabic ? "تسجيل الدخول" : "Sign In");
         if (btnToggleLanguage != null) btnToggleLanguage.setText(isArabic ? "EN / AR" : "AR / EN");
         if (tvSuccessMessage != null) tvSuccessMessage.setText(isArabic ? "تم تسجيل الدخول بنجاح" : "Login Successful");
     }
@@ -378,10 +526,20 @@ public class LoginActivity extends AppCompatActivity {
                     "منظومة التتبع والمصادقة المعتمدة للمجوهرات" :
                     "Enterprise Jewelry Traceability & Authentication");
         }
-        
-        // تم إزالة تحميل الشعار (Base64) لتجنب التجميد، الشعار الافتراضي يكفي في هذه المرحلة
+
         if (ivAppLogo != null) {
-            ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+            String logoBase64 = orgProfileManager.getOrgLogo();
+            if (logoBase64 != null && !logoBase64.isEmpty()) {
+                try {
+                    byte[] bytes = Base64.decode(logoBase64, Base64.DEFAULT);
+                    android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    ivAppLogo.setImageBitmap(bitmap);
+                } catch (Exception e) {
+                    ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+                }
+            } else {
+                ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+            }
         }
     }
 
@@ -416,31 +574,13 @@ public class LoginActivity extends AppCompatActivity {
 
     private void animateEntrance() {
         if (loginCard == null) return;
-        
         loginCard.setAlpha(0f);
-        loginCard.setTranslationY(80f);
-        
+        loginCard.setTranslationY(60f);
+        loginCard.animate().alpha(1f).translationY(0f).setDuration(600)
+                .setInterpolator(new AccelerateDecelerateInterpolator()).setStartDelay(150).start();
         if (logoContainer != null) {
-            logoContainer.setScaleX(0.4f);
-            logoContainer.setScaleY(0.4f);
-            logoContainer.setAlpha(0f);
-            
-            logoContainer.animate()
-                    .alpha(1f)
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(900)
-                    .setInterpolator(new AccelerateDecelerateInterpolator())
-                    .start();
+            logoContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in_up));
         }
-
-        loginCard.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(700)
-                .setInterpolator(new AccelerateDecelerateInterpolator())
-                .setStartDelay(200)
-                .start();
     }
 
     private void setupTextWatchers() {
@@ -495,10 +635,10 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void checkLockoutStatus() {
-        if (safePrefs == null) return;
+        if (encryptedPrefs == null) return;
 
-        lockoutUntil = safePrefs.getLong("lockout_until", 0);
-        int savedAttempts = safePrefs.getInt("failed_attempts", 0);
+        lockoutUntil = encryptedPrefs.getLong("lockout_until", 0);
+        int savedAttempts = encryptedPrefs.getInt("failed_attempts", 0);
         failedAttempts.set(savedAttempts);
 
         if (System.currentTimeMillis() < lockoutUntil) {
@@ -526,14 +666,14 @@ public class LoginActivity extends AppCompatActivity {
 
     private void recordFailedAttempt() {
         int attempts = failedAttempts.incrementAndGet();
-        if (safePrefs != null) {
-            safePrefs.edit().putInt("failed_attempts", attempts).apply();
+        if (encryptedPrefs != null) {
+            encryptedPrefs.edit().putInt("failed_attempts", attempts).apply();
         }
 
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
             lockoutUntil = System.currentTimeMillis() + LOCKOUT_DURATION_MS;
-            if (safePrefs != null) {
-                safePrefs.edit()
+            if (encryptedPrefs != null) {
+                encryptedPrefs.edit()
                         .putLong("lockout_until", lockoutUntil)
                         .putInt("failed_attempts", 0)
                         .apply();
@@ -543,8 +683,19 @@ public class LoginActivity extends AppCompatActivity {
             mainHandler.post(() -> {
                 checkLockoutStatus();
                 Toast.makeText(this,
-                        isArabic ? "⛔ تم قفل تسجيل الدخول لمدة 5 دقائق" : "⛔ Login locked for 5 minutes",
+                        isArabic ? "⛔ تم قفل تسجيل الدخول لمدة 5 دقائق بسبب محاولات كثيرة" :
+                                "⛔ Login locked for 5 minutes due to too many attempts",
                         Toast.LENGTH_LONG).show();
+
+                mainHandler.postDelayed(() -> {
+                    if (isActivityAlive()) {
+                        checkLockoutStatus();
+                        Toast.makeText(this,
+                                isArabic ? "✓ تم فتح تسجيل الدخول - يمكنك المحاولة الآن" :
+                                        "✓ Login unlocked - You can try now",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                }, LOCKOUT_DURATION_MS);
             });
         }
     }
@@ -552,8 +703,8 @@ public class LoginActivity extends AppCompatActivity {
     private void resetFailedAttempts() {
         failedAttempts.set(0);
         lockoutUntil = 0;
-        if (safePrefs != null) {
-            safePrefs.edit()
+        if (encryptedPrefs != null) {
+            encryptedPrefs.edit()
                     .putInt("failed_attempts", 0)
                     .putLong("lockout_until", 0)
                     .apply();
@@ -566,18 +717,27 @@ public class LoginActivity extends AppCompatActivity {
         String password = getText(etPassword);
         String serverUrl = getText(etServerUrl);
 
+        Log.d(TAG, "Login Attempt username=" + username);
+
         if (System.currentTimeMillis() < lockoutUntil) {
-            Toast.makeText(this, isArabic ? "⛔ محظور مؤقتاً" : "⛔ Temporarily locked", Toast.LENGTH_SHORT).show();
+            long remainingMinutes = (lockoutUntil - System.currentTimeMillis()) / (60 * 1000);
+            Toast.makeText(this,
+                    String.format(isArabic ? "⛔ محظور - حاول بعد %d دقيقة" : "⛔ Locked - Try in %d min",
+                            Math.max(1, remainingMinutes)),
+                    Toast.LENGTH_LONG).show();
             return;
         }
 
         if (serverUrl.isEmpty()) {
             serverUrl = sessionManager.getServerUrl();
             if (serverUrl.isEmpty()) serverUrl = DEFAULT_SERVER_URL;
+            etServerUrl.setText(serverUrl);
         }
 
         if (!isValidServerUrl(serverUrl)) {
-            if (tilServerUrl != null) tilServerUrl.setError(isArabic ? "يجب استخدام HTTPS" : "HTTPS required");
+            tilServerUrl.setError(isArabic ? "يجب استخدام HTTPS" : "HTTPS required");
+            shakeView(tilServerUrl);
+            playTone(false);
             return;
         }
 
@@ -585,17 +745,29 @@ public class LoginActivity extends AppCompatActivity {
         MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
 
         if (username.isEmpty()) {
-            if (tilUsername != null) tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
+            tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
+            shakeView(tilUsername);
+            playTone(false);
             return;
         }
         if (password.length() < 4) {
-            if (tilPassword != null) tilPassword.setError(isArabic ? "كلمة المرور قصيرة جداً" : "Password too short");
+            tilPassword.setError(isArabic ? "كلمة المرور قصيرة جداً" : "Password too short");
+            shakeView(tilPassword);
+            playTone(false);
             return;
         }
 
+        tilUsername.setError(null);
+        tilPassword.setError(null);
+        tilServerUrl.setError(null);
         showLoading(true);
 
         apiClient = MiraApiClient.getInstance(getApplicationContext());
+        if (apiClient != null) {
+            apiClient.invalidateTokenCache();
+            apiClient.refreshUrl();
+            Log.d(TAG, "✅ Using same MiraApiClient instance, cache invalidated");
+        }
 
         executeSafeBg(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -619,46 +791,66 @@ public class LoginActivity extends AppCompatActivity {
                 if (finalResponse != null && finalResponse.isSuccess) {
                     resetFailedAttempts();
                     sessionManager.saveLastUsername(username);
-                    
-                    // حفظ الهاش للدخول أوفلاين
-                    if (safePrefs != null) {
+
+                    if (encryptedPrefs != null) {
                         byte[] salt = generateSalt();
                         String passwordHash = hashPasswordWithSalt(password, salt);
                         if (passwordHash != null) {
-                            safePrefs.edit()
+                            encryptedPrefs.edit()
                                     .putString("offline_salt_" + username, Base64.encodeToString(salt, Base64.NO_WRAP))
                                     .putString("offline_hash_" + username, passwordHash)
                                     .apply();
                         }
                     }
 
-                    handleLoginSuccess(finalResponse, username);
+                    handleLoginSuccess(finalResponse, username, password);
+
                 } else if (finalIsNetworkError || finalResponse == null) {
                     if (verifyOfflineLogin(username, password)) {
-                        resetFailedAttempts();
-                        showSuccessOverlayAndNavigate();
+                        new AlertDialog.Builder(LoginActivity.this)
+                                .setTitle(isArabic ? "📡 وضع الأوفلاين" : "📡 Offline Mode")
+                                .setMessage(isArabic ?
+                                        "أنت غير متصل بالإنترنت.\n\nسيتم تسجيل الدخول باستخدام البيانات المحلية.\nهل تريد المتابعة؟" :
+                                        "You are offline.\n\nLogin will use local data.\nDo you want to continue?")
+                                .setPositiveButton(isArabic ? "✅ متابعة" : "✅ Continue", (dialog, which) -> {
+                                    dialog.dismiss();
+                                    resetFailedAttempts();
+                                    playTone(true);
+                                    showSuccessOverlayAndNavigate();
+                                })
+                                .setNegativeButton(isArabic ? "❌ إلغاء" : "❌ Cancel", (dialog, which) -> dialog.dismiss())
+                                .setCancelable(false)
+                                .show();
                     } else {
                         recordFailedAttempt();
+                        playTone(false);
                         Toast.makeText(LoginActivity.this,
-                                isArabic ? "❌ فشل التحقق أوفلاين" : "❌ Offline verification failed",
+                                isArabic ? "❌ لا يمكن التحقق من بيانات الدخول بدون اتصال\nيجب تسجيل الدخول مرة واحدة على الأقل بالإنترنت" :
+                                        "❌ Cannot verify credentials offline\nYou must login at least once with internet connection",
                                 Toast.LENGTH_LONG).show();
                     }
                 } else {
                     recordFailedAttempt();
+                    playTone(false);
                     int errorCode = finalResponse.code;
-                    String errorMsg = getErrorMessage(errorCode, isArabic ? "فشل الاتصال" : "Connection failed");
+                    String errorMsg = getErrorMessage(errorCode, isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
                     Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                    shakeView(loginCard);
                 }
             });
         });
     }
 
-    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username) {
+    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
+        Log.d(TAG, "Login Success for user: " + username);
+        playTone(true);
+
         if (sessionManager != null) {
             sessionManager.resetAutoLock();
         }
 
         Context appContext = getApplicationContext();
+
         String token = response.optString("token", "");
         String roleStr = response.optString("role", "ADMIN");
         String displayName = response.optString("display_name", username);
@@ -670,6 +862,28 @@ public class LoginActivity extends AppCompatActivity {
 
         if (serverUrl.isEmpty()) serverUrl = sessionManager.getServerUrl();
 
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        String apiKey = response.optString("api_key", "");
+        String gateId = response.optString("gate_id", "");
+
+        if (!apiKey.isEmpty()) {
+            String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
+            sessionManager.saveApiKey(apiKey);
+            sessionManager.saveGateId(effectiveGateId);
+        }
+
+        if (!serverUrl.isEmpty()) {
+            sessionManager.setServerUrl(serverUrl);
+            MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
+        }
+
+        String permissionsJson = response.optString("permissions", "");
+        if (!permissionsJson.isEmpty()) {
+            PermissionManager.resetInstance();
+            PermissionManager pm = PermissionManager.getInstance(appContext);
+            pm.savePermissions(permissionsJson);
+        }
+
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
         sessionManager.setUserId(userId);
@@ -677,11 +891,23 @@ public class LoginActivity extends AppCompatActivity {
 
         sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
         sessionManager.saveBiometricBranch(branchId, branchName);
-        sessionManager.setBiometricLoginEnabled(true);
+
+        boolean biometricEnabled = true;
+        if (response.data != null) {
+            biometricEnabled = response.data.optBoolean("biometric_enabled", true);
+        }
+        sessionManager.setBiometricLoginEnabled(biometricEnabled);
 
         MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
         bm.setActiveBranch(branchId, branchName, branchCode, "", "");
         bm.setUserBranchLocked(true);
+
+        MiraApiClient client = MiraApiClient.getInstance(appContext);
+        if (client != null) {
+            client.invalidateTokenCache();
+            client.refreshUrl();
+            Log.d(TAG, "✅ Token cache invalidated, using same instance");
+        }
 
         showSuccessOverlayAndNavigate();
     }
@@ -695,12 +921,15 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             BiometricManager bm = BiometricManager.from(this);
-            if (bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) != BiometricManager.BIOMETRIC_SUCCESS) {
+            int canAuthenticate = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+
+            if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
                 if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
                 return;
             }
 
-            biometricPrompt = new BiometricPrompt(this, ContextCompat.getMainExecutor(this), new BiometricPrompt.AuthenticationCallback() {
+            Executor executor = ContextCompat.getMainExecutor(this);
+            biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
                 @Override
                 public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                     String lastUser        = sessionManager.getLastBiometricUser();
@@ -710,15 +939,37 @@ public class LoginActivity extends AppCompatActivity {
                     String lastToken       = sessionManager.getLastBiometricToken();
 
                     if (lastUser.isEmpty()) {
-                        Toast.makeText(LoginActivity.this, isArabic ? "سجل الدخول بكلمة المرور أولاً" : "Sign in with password first", Toast.LENGTH_SHORT).show();
+                        playTone(false);
+                        Toast.makeText(LoginActivity.this,
+                                isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
+                                Toast.LENGTH_LONG).show();
                         return;
                     }
 
-                    sessionManager.createLoginSession(lastUser, lastRole, lastToken, sessionManager.getServerUrl());
+                    sessionManager.createLoginSession(
+                            lastUser,
+                            lastRole,
+                            lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
+                            sessionManager.getServerUrl()
+                    );
                     sessionManager.setDisplayName(lastDisplayName);
                     sessionManager.setUserId(lastUserId);
+
+                    int savedBranchId = sessionManager.getLastBiometricBranchId();
+                    String savedBranchName = sessionManager.getLastBiometricBranchName();
+                    if (savedBranchId > 0) {
+                        MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+                        bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                        bm.setUserBranchLocked(true);
+                    }
+
+                    if (sessionManager.getLastBiometricUser().isEmpty() == false) {
+                        sessionManager.saveBiometricUser(lastUser, lastRole, lastDisplayName, lastUserId, lastToken);
+                    }
+
                     sessionManager.resetAutoLock();
                     resetFailedAttempts();
+                    playTone(true);
 
                     showSuccessOverlayAndNavigate();
                 }
@@ -726,51 +977,71 @@ public class LoginActivity extends AppCompatActivity {
                 @Override
                 public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
                     if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                        playTone(false);
                         Toast.makeText(LoginActivity.this, errString, Toast.LENGTH_SHORT).show();
                     }
                 }
 
                 @Override
                 public void onAuthenticationFailed() {
+                    playTone(false);
                     Toast.makeText(LoginActivity.this,
-                            isArabic ? "لم يتم التعرف على البصمة" : "Fingerprint not recognized",
+                            isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized",
                             Toast.LENGTH_SHORT).show();
                 }
             });
 
-            promptInfo = new BiometricPrompt.PromptInfo.Builder()
+            BiometricPrompt.PromptInfo.Builder promptBuilder = new BiometricPrompt.PromptInfo.Builder()
                     .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
-                    .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
-                    .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
-                    .build();
+                    .setSubtitle(isArabic ? "استخدم بصمة الإصبع للمتابعة" : "Use fingerprint to continue")
+                    .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel");
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+            }
+
+            promptInfo = promptBuilder.build();
 
             if (btnBiometric != null) {
                 btnBiometric.setOnClickListener(v -> {
-                    if (biometricPrompt != null && promptInfo != null) {
-                        biometricPrompt.authenticate(promptInfo);
+                    if (!sessionManager.isBiometricLoginEnabled()) {
+                        Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+
+                    if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
+                        if (biometricPrompt != null && promptInfo != null) {
+                            biometricPrompt.authenticate(promptInfo);
+                        }
+                    } else {
+                        playTone(false);
+                        Toast.makeText(this,
+                                isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
+                                Toast.LENGTH_LONG).show();
                     }
                 });
             }
+
         } catch (Exception e) {
-            Log.e(TAG, "Biometric error: " + e.getMessage());
+            Log.e(TAG, "Biometric setup error: " + e.getMessage(), e);
             if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
         }
     }
 
     private void updateBiometricButtonState() {
         if (btnBiometric != null) {
-            boolean enabled = sessionManager.isBiometricLoginEnabled() && !sessionManager.getLastBiometricUser().isEmpty();
-            btnBiometric.setVisibility(enabled ? View.VISIBLE : View.GONE);
+            boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
+            boolean hasBiometricUser = !sessionManager.getLastBiometricUser().isEmpty();
+            btnBiometric.setVisibility(biometricEnabled && hasBiometricUser ? View.VISIBLE : View.GONE);
         }
     }
 
-    // ✅ دالة أوفلاين صحيحة وآمنة ولا تسبب تجميد
     private boolean verifyOfflineLogin(String username, String password) {
         try {
-            if (safePrefs == null) return false;
+            if (encryptedPrefs == null) return false;
 
-            String savedSaltBase64 = safePrefs.getString("offline_salt_" + username, "");
-            String savedHash = safePrefs.getString("offline_hash_" + username, "");
+            String savedSaltBase64 = encryptedPrefs.getString("offline_salt_" + username, "");
+            String savedHash = encryptedPrefs.getString("offline_hash_" + username, "");
 
             if (savedSaltBase64.isEmpty() || savedHash.isEmpty()) return false;
 
@@ -785,7 +1056,16 @@ public class LoginActivity extends AppCompatActivity {
                 sessionManager.setDisplayName(sessionManager.getLastBiometricDisplayName());
                 sessionManager.setUserId(sessionManager.getLastBiometricUserId());
 
+                int savedBranchId = sessionManager.getLastBiometricBranchId();
+                String savedBranchName = sessionManager.getLastBiometricBranchName();
+                if (savedBranchId > 0) {
+                    MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+                    bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                    bm.setUserBranchLocked(true);
+                }
+
                 sessionManager.resetAutoLock();
+
                 return true;
             }
             return false;
@@ -814,11 +1094,25 @@ public class LoginActivity extends AppCompatActivity {
         return salt;
     }
 
-    private String getErrorMessage(int errorCode, String fallback) {
+    private void playTone(boolean isSuccess) {
+        if (soundManager == null) return;
+        soundManager.play(isSuccess
+                ? MiraSoundManager.SoundEvent.LOGIN_SUCCESS
+                : MiraSoundManager.SoundEvent.LOGIN_FAILED);
+    }
+
+    private String getErrorMessage(int errorCode, String fallbackMessage) {
         switch (errorCode) {
+            case 400: return isArabic ? "بيانات غير صالحة - تحقق من المدخلات" : "Invalid data - Check inputs";
             case 401: return isArabic ? "بيانات الدخول غير صحيحة" : "Invalid credentials";
-            case 404: return isArabic ? "الخادم غير موجود" : "Server not found";
-            default: return fallback;
+            case 403: return isArabic ? "ليس لديك صلاحية للدخول" : "Access denied";
+            case 404: return isArabic ? "الخادم غير موجود - تحقق من الرابط" : "Server not found";
+            case 408:
+            case 504: return isArabic ? "انتهت مهلة الاتصال - حاول مرة أخرى" : "Connection timeout";
+            case 429: return isArabic ? "محاولات كثيرة - انتظر قليلاً" : "Too many attempts";
+            case 500: return isArabic ? "خطأ في الخادم - حاول لاحقاً" : "Server error";
+            case 503: return isArabic ? "الخدمة غير متاحة حالياً" : "Service unavailable";
+            default: return fallbackMessage != null ? fallbackMessage : (isArabic ? "خطأ في الاتصال" : "Connection error");
         }
     }
 
@@ -828,12 +1122,22 @@ public class LoginActivity extends AppCompatActivity {
             btnLogin.setEnabled(!loading);
             btnLogin.setText(loading ? "" : (isArabic ? "تسجيل الدخول" : "Sign In"));
         }
+        if (btnBiometric != null) btnBiometric.setEnabled(!loading);
+        if (etUsername != null) etUsername.setEnabled(!loading);
+        if (etPassword != null) etPassword.setEnabled(!loading);
+    }
+
+    private void shakeView(View view) {
+        if (view == null) return;
+        ObjectAnimator.ofFloat(view, "translationX", 0, 20, -20, 20, -20, 10, -10, 5, -5, 0).setDuration(500).start();
     }
 
     private void showSuccessOverlayAndNavigate() {
         if (successOverlay != null) {
             successOverlay.setVisibility(View.VISIBLE);
-            successOverlay.animate().alpha(1.0f).setDuration(350).withEndAction(this::navigateToMainDirect).start();
+            successOverlay.animate().alpha(1.0f).setDuration(350).withEndAction(() -> {
+                mainHandler.postDelayed(this::navigateToMainDirect, 400);
+            }).start();
         } else {
             navigateToMainDirect();
         }
@@ -858,6 +1162,7 @@ public class LoginActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        Log.d(TAG, "onDestroy called");
         MemoryManager.getInstance().unregisterActivity(this);
         unregisterComponentCallbacks(MemoryManager.getInstance());
         isDestroyed.set(true);
@@ -869,4 +1174,28 @@ public class LoginActivity extends AppCompatActivity {
         mainHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
+    // ═══════════════════════════════════════════════════════
+//  ⚡ MIRA License Integrity Check
+// ═══════════════════════════════════════════════════════
+
+/**
+ * حوار مانع — يُغلق التطبيق بعد الضغط
+ */
+private void showBlockingDialog(String title, String message) {
+    if (isFinishing()) return;
+    
+    new AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton(
+                    isArabic ? "حسناً" : "OK",
+                    (d, w) -> finish()
+            )
+            .setNeutralButton(
+                    isArabic ? "إعادة المحاولة" : "Retry",
+                    (d, w) -> recreate()
+            )
+            .show();
+}
 }
