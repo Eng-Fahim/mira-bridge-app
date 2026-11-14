@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
+import androidx.core.content.ContextCompat;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator;
@@ -43,7 +44,7 @@ public class SplashActivity extends AppCompatActivity {
         scheduleNavigation();
     }
 
-    private void executeCinematicAnimation() {
+        private void executeCinematicAnimation() {
         ImageView ivLogo    = findViewById(R.id.ivLogo);
         View      vGlow     = findViewById(R.id.vGlow);
         TextView  tvAppName = findViewById(R.id.tvAppName);
@@ -63,6 +64,8 @@ public class SplashActivity extends AppCompatActivity {
 
         if (tvAppName != null) {
             tvAppName.setTranslationY(40f);
+            // ضمان ظهور النص باللون الأبيض/الذهبي الساطع تماماً وتجنب أي بهتان
+            tvAppName.setTextColor(ContextCompat.getColor(this, R.color.gold_text_primary));
             tvAppName.animate().alpha(1f).translationY(0f)
                     .setDuration(1000).setStartDelay(400).setInterpolator(new FastOutSlowInInterpolator()).start();
         }
@@ -75,10 +78,13 @@ public class SplashActivity extends AppCompatActivity {
 
         if (tvTagline != null) {
             tvTagline.setTranslationY(30f);
+            // ضمان وضوح السلوجان والوصف تحت الشعار
+            tvTagline.setTextColor(ContextCompat.getColor(this, R.color.gold_text_secondary));
             tvTagline.animate().alpha(1f).translationY(0f)
                     .setDuration(900).setStartDelay(850).setInterpolator(new FastOutSlowInInterpolator()).start();
         }
     }
+
 
     private void scheduleNavigation() {
         navigateRunnable = () -> {
