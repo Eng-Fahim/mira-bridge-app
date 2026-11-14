@@ -2456,6 +2456,28 @@ public ApiResponse processRefundV2(JSONObject payload) {
         return r;
     }
 }
+
+/**
+ * يجلب الأسعار الحقيقية من السيرفر قبل فتح الدفع.
+ * الحل الجذري لمشكلة "الأسعار القديمة في الكاش".
+ */
+public ApiResponse prepareCheckout(java.util.List<Integer> itemIds) {
+    try {
+        JSONObject payload = new JSONObject();
+        JSONArray arr = new JSONArray();
+        for (Integer id : itemIds) {
+            if (id != null && id > 0) arr.put(id);
+        }
+        payload.put("item_ids", arr);
+
+        return postWithAuth("/pos/prepare-checkout", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "prepareCheckout error: " + e.getMessage());
+        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        r.isNetworkError = true;
+        return r;
+    }
+}
     public static class ApiResponse {
         public final int code;
         public final JSONObject data;
