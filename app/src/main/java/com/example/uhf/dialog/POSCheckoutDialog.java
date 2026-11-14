@@ -96,6 +96,7 @@ public class POSCheckoutDialog extends DialogFragment {
     private OnDialogDismissListener dismissListener;
     private boolean isArabic;
     private MiraPriceManager priceManager;
+    private final java.util.Map<String, Double> serverRates = new java.util.HashMap<>();
 
     // View references
     private TextView tvDialogTitle, tvItemCount, tvFinalTotal, tvRemaining, tvStatusIcon,
@@ -121,14 +122,20 @@ public class POSCheckoutDialog extends DialogFragment {
     //  Constructor / Lifecycle
     // ═══════════════════════════════════════════════════════════════════
 
-    public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
-        POSCheckoutDialog dialog = new POSCheckoutDialog();
-        Bundle args = new Bundle();
-        args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
-        args.putInt(ARG_ITEM_COUNT, itemCount);
-        dialog.setArguments(args);
-        return dialog;
-    }
+    public static POSCheckoutDialog newInstance(double totalAmount, int itemCount, String ratesJson) {
+    POSCheckoutDialog dialog = new POSCheckoutDialog();
+    Bundle args = new Bundle();
+    args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
+    args.putInt(ARG_ITEM_COUNT, itemCount);
+    args.putString("rates_json", ratesJson != null ? ratesJson : "{}");
+    dialog.setArguments(args);
+    return dialog;
+}
+
+// للتوافق العكسي
+public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
+    return newInstance(totalAmount, itemCount, "{}");
+}
 
     public void setCheckoutListener(OnCheckoutListener listener) { this.listener = listener; }
     public void setOnDismissListener(OnDialogDismissListener listener) { this.dismissListener = listener; }
@@ -148,6 +155,21 @@ public class POSCheckoutDialog extends DialogFragment {
             totalAmount = getArguments().getDouble(ARG_TOTAL_AMOUNT, 0.0);
             itemCount = getArguments().getInt(ARG_ITEM_COUNT, 0);
         }
+        // ✅ استخرج أسعار الصرف المُمررة من السيرفر
+try {
+    String ratesJson = getArguments() != null
+            ? getArguments().getString("rates_json", "{}") : "{}";
+    JSONObject ratesObj = new JSONObject(ratesJson);
+    java.util.Iterator<String> keys = ratesObj.keys();
+    while (keys.hasNext()) {
+        String k = keys.next();
+        double v = ratesObj.optDouble(k, 0);
+        if (v > 0) serverRates.put(k.toUpperCase(Locale.US), v);
+    }
+    Log.i(TAG, "✅ Server rates loaded: " + serverRates);
+} catch (Exception e) {
+    Log.w(TAG, "Failed to parse server rates: " + e.getMessage());
+}
         try {
             isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         } catch (Exception e) { isArabic = false; }
@@ -795,17 +817,32 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private double getRateToYER(String currency) {
-        if ("YER".equalsIgnoreCase(currency)) return 1.0;
-        if (priceManager != null) {
-            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
-            double currencyRate = priceManager.getExchangeRate(currency);
-            if (currencyRate > 10) return currencyRate;
-            if (yerRate > 0 && currencyRate > 0) return yerRate / currencyRate;
-        }
-        if ("SAR".equalsIgnoreCase(currency)) return 141.33;
-        if ("USD".equalsIgnoreCase(currency)) return 530.0;
-        return 1.0;
+    if (currency == null) return 1.0;
+    String curr = currency.toUpperCase(Locale.US).trim();
+
+    if ("YER".equals(curr)) return 1.0;
+
+    // ✅ أولوية 1: أسعار السيرفر (مضمونة التطابق)
+    if (serverRates.containsKey(curr)) {
+        double r = serverRates.get(curr);
+        if (r > 0) return r;
     }
+
+    // Fallback: أسعار priceManager المحلية (في حالة عدم وجود السعر)
+    if (priceManager != null) {
+        double currencyRate = priceManager.getExchangeRate(curr);
+        if (currencyRate > 10) return currencyRate;
+
+        double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
+        if (yerRate > 0 && currencyRate > 0) {
+            return yerRate / currencyRate;
+        }
+    }
+
+    if ("SAR".equals(curr)) return 140.0;  // ✅ القيمة الحقيقية من DB
+    if ("USD".equals(curr)) return 530.0;
+    return 1.0;
+}
 
     private double parseDouble(String s) {
         try { return Double.parseDouble(s.trim()); }
