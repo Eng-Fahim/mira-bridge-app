@@ -686,59 +686,88 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void processData(JSONObject data) {
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            if (inv == null) inv = data.optJSONObject("inventory_data");
+    try {
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv == null) inv = data.optJSONObject("inventory_data");
+        
+        if (inv != null) {
+            currentItemCount = inv.optInt("total_items", 0);
+            currentTotalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0));
+            currentInventoryValue = inv.optDouble("total_value", 0.0);
             
-            if (inv != null) {
-                currentItemCount = inv.optInt("total_items", 0);
-                currentTotalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0));
-                currentInventoryValue = inv.optDouble("total_value", 0.0);
-                updateHeroBalance();
-                
-                JSONArray byKarat = inv.optJSONArray("by_karat");
-                if (byKarat == null) byKarat = inv.optJSONArray("karats"); 
-                
-                List<KaratInventory> karatItems = new ArrayList<>();
-                if (byKarat != null) {
-                    for (int i = 0; i < byKarat.length(); i++) {
-                        JSONObject k = byKarat.optJSONObject(i);
-                        if (k != null) { 
-                            int karat = k.optInt("karat", 0); 
-                            double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
-                            if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight)); 
+            // ✅ قراءة العيارات
+            JSONArray byKarat = inv.optJSONArray("by_karat");
+            if (byKarat == null) byKarat = inv.optJSONArray("karats"); 
+            
+            List<KaratInventory> karatItems = new ArrayList<>();
+            double calculatedWeight = 0;
+            double calculatedValue = 0;
+
+            if (byKarat != null) {
+                for (int i = 0; i < byKarat.length(); i++) {
+                    JSONObject k = byKarat.optJSONObject(i);
+                    if (k != null) { 
+                        int karat = k.optInt("karat", 0); 
+                        double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
+                        
+                        if (karat > 0) {
+                            karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight)); 
+                            calculatedWeight += weight; // جمع الأوزان
+                            
+                            // حساب القيمة إذا لم تكن قادمة من السيرفر
+                            if (priceManager != null) {
+                                double price = priceManager.getGoldPricePerGram(karat);
+                                calculatedValue += (weight * price);
+                            }
                         }
                     }
                 }
-                currentInventoryByKarat.clear(); 
-                currentInventoryByKarat.addAll(karatItems); 
-                renderInventoryByKarat(currentInventoryByKarat);
             }
             
-            JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) { lastSalesData = sales; applySalesData(sales); }
-
-            if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
-                if (isPosDashboardHidden) {
-                    tvPosTotalWeight.setText("•••••");
-                    tvPosTotalValue.setText("•••••••");
-                    tvPosCashBalance.setText("•••••••");
-                } else {
-                    tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
-                    tvPosTotalValue.setText(String.format(Locale.US, "%,.2f YER", currentInventoryValue * 530.0)); 
-                    double cash = 0.0;
-                    if (data.optJSONObject("shift_summary") != null) cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
-                    else if (sales != null) cash = sales.optDouble("today", 0.0);
-                    tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
-                }
-                renderPosKaratCards(inv);
-                if (priceManager != null && !isPosDashboardHidden) {
-                    tvPosSellPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(24)));
-                    tvPosBuyPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(21)));
-                }
+            // ✅ الخطة البديلة: إذا كان الإجمالي صفر، استخدم المجموع المحسوب من العيارات
+            if (currentTotalWeight == 0 && calculatedWeight > 0) {
+                currentTotalWeight = calculatedWeight;
             }
-        } catch (Exception e) { Log.e(TAG, "processData", e); }
-    }
+            if (currentInventoryValue == 0 && calculatedValue > 0) {
+                currentInventoryValue = calculatedValue;
+            }
+
+            currentInventoryByKarat.clear(); 
+            currentInventoryByKarat.addAll(karatItems); 
+            renderInventoryByKarat(currentInventoryByKarat);
+        }
+        
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) { lastSalesData = sales; applySalesData(sales); }
+
+        if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
+            if (isPosDashboardHidden) {
+                tvPosTotalWeight.setText("•••••");
+                tvPosTotalValue.setText("•••••••");
+                tvPosCashBalance.setText("•••••••");
+            } else {
+                // عرض الوزن الإجمالي (الذي تم إصلاحه)
+                tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
+                
+                // عرض القيمة بالدولار (لأن البطاقات تعرض الدولار) بدلاً من ضربها في 530
+                tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue)); 
+                
+                double cash = 0.0;
+                if (data.optJSONObject("shift_summary") != null) cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
+                else if (sales != null) cash = sales.optDouble("today", 0.0);
+                tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+            }
+            
+            renderPosKaratCards(inv);
+            
+            // تحديث أسعار البيع والشراء في الشارات
+            if (priceManager != null && !isPosDashboardHidden) {
+                tvPosSellPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(24)));
+                tvPosBuyPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(21)));
+            }
+        }
+    } catch (Exception e) { Log.e(TAG, "processData", e); }
+}
 
     private void renderPosKaratCards(JSONObject inv) {
         if (llPosKaratContainer == null) return;
