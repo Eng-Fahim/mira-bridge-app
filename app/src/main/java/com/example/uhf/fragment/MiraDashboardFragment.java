@@ -168,7 +168,9 @@ public class MiraDashboardFragment extends Fragment {
     private int currentItemCount = 0;
     private double currentTotalWeight = 0;
 
+    
     private ShiftSummaryCardView shiftSummaryCard;
+    private boolean isShiftCardAnimated = false; // ✅ أضف هذا السطر هنا
 
     private static class KaratInventory {
         final int karat; final int itemCount; final double weight;
@@ -320,6 +322,7 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Throwable e) { Log.e(TAG, "onViewCreated", e); }
     }
 
+
     private void initViews(View v) {
         try {
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
@@ -462,14 +465,16 @@ public class MiraDashboardFragment extends Fragment {
 
             if (roleController != null) roleController.applyVisibility(v);
 
-            applyCarouselLayout();
-            applyChartTheme();
-            updateHeroBalance();
-            applySalesVisibility();
-            updateScrapUI();
-            
-            setupQuickActionButtons(v);
-            updateLayoutVisibilityForRole(v); // ✅ تطبيق الواجهة الديناميكية
+        applyCarouselLayout();
+        applyChartTheme();
+        updateHeroBalance();
+        applySalesVisibility();
+        updateScrapUI();
+        
+        setupQuickActionButtons(v);
+        
+        // ✅ استدعاء الدالة الذكية لضبط إظهار/إخفاء العناصر بناءً على الصلاحية
+        updateLayoutVisibilityForRole(v);
 
         } catch (Exception e) { Log.e(TAG, "initViews", e); }
     }
@@ -490,7 +495,7 @@ private void updateLayoutVisibilityForRole(View v) {
         
         // إخفاء بطاقة المخزون (Hero) فقط من الكاروسيل، وإبقاء أسعار الذهب وملخص المبيعات
         if (heroBalanceCard != null) heroBalanceCard.setVisibility(View.GONE);
-        if (dot1 != null) dot1.setVisibility(View.GONE); // إخفاء النقطة الأولى لأن البطاقة الأولى اختفت
+        if (dot1 != null) dot1.setVisibility(View.GONE); 
         
         // إبقاء الكاروسيل ظاهراً (سيحتوي على الذهب والمبيعات)
         if (hsvCarousel != null) hsvCarousel.setVisibility(View.VISIBLE);
@@ -1278,48 +1283,83 @@ private void updateLayoutVisibilityForRole(View v) {
     }
 
     private void processData(JSONObject data) {
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            if (inv != null) {
-                currentItemCount = inv.optInt("total_items", 0);
-                currentTotalWeight = inv.optDouble("total_weight", 0.0);
-                currentInventoryValue = inv.optDouble("total_value", 0.0);
-                updateHeroBalance();
-                JSONArray byKarat = inv.optJSONArray("by_karat");
-                List<KaratInventory> karatItems = new ArrayList<>();
-                if (byKarat != null) {
-                    for (int i = 0; i < byKarat.length(); i++) {
-                        JSONObject k = byKarat.optJSONObject(i);
-                        if (k != null) { int karat = k.optInt("karat", 0); if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); }
-                    }
-                }
-                currentInventoryByKarat.clear(); currentInventoryByKarat.addAll(karatItems); renderInventoryByKarat(currentInventoryByKarat);
-            }
-            JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) { lastSalesData = sales; applySalesData(sales); }
-
-            if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
-                shiftSummaryCard.setVisibility(View.VISIBLE);
-                JSONObject shiftData = data.optJSONObject("shift_summary");
-                if (shiftData != null) {
-                    shiftSummaryCard.bindData(
-                        shiftData.optDouble("total_cash", 0.0),
-                        shiftData.optInt("invoice_count", 0),
-                        shiftData.optInt("returns", 0),
-                        shiftData.optDouble("gold_weight", 0.0)
-                    );
-                } else if (sales != null) {
-                    shiftSummaryCard.bindData(
-                        sales.optDouble("today", 0.0),
-                        sales.optInt("count_today", 0),
-                        0,
-                        0
-                    );
+    try {
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv != null) {
+            currentItemCount = inv.optInt("total_items", 0);
+            currentTotalWeight = inv.optDouble("total_weight", 0.0);
+            currentInventoryValue = inv.optDouble("total_value", 0.0);
+            updateHeroBalance();
+            JSONArray byKarat = inv.optJSONArray("by_karat");
+            List<KaratInventory> karatItems = new ArrayList<>();
+            if (byKarat != null) {
+                for (int i = 0; i < byKarat.length(); i++) {
+                    JSONObject k = byKarat.optJSONObject(i);
+                    if (k != null) { int karat = k.optInt("karat", 0); if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); }
                 }
             }
+            currentInventoryByKarat.clear(); currentInventoryByKarat.addAll(karatItems); renderInventoryByKarat(currentInventoryByKarat);
+        }
+        
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) { 
+            lastSalesData = sales; 
+            applySalesData(sales); 
+        }
 
-        } catch (Exception e) { Log.e(TAG, "processData", e); }
-    }
+        // ✅ معالجة بطاقة ملخص الوردية (البيانات الحقيقية + الخطة البديلة)
+        if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
+            shiftSummaryCard.setVisibility(View.VISIBLE);
+
+            JSONObject shiftData = data.optJSONObject("shift_summary");
+            
+            double totalCash = 0.0;
+            int invoiceCount = 0;
+            int returnsCount = 0;
+            double goldWeight = 0.0;
+
+            if (shiftData != null && shiftData.length() > 0) {
+                // ✅ السيناريو الأول: السيرفر أرسل بيانات ملخص الوردية
+                totalCash = shiftData.optDouble("total_cash", 0.0);
+                invoiceCount = shiftData.optInt("invoice_count", 0);
+                returnsCount = shiftData.optInt("returns", 0);
+                goldWeight = shiftData.optDouble("gold_weight", 0.0);
+            } else if (sales != null) {
+                // 🛡️ السيناريو الثاني (الخطة البديلة): السيرفر لم يرسل ملخص وردية، نأخذ من ملخص المبيعات
+                totalCash = sales.optDouble("today", 0.0);
+                invoiceCount = sales.optInt("count_today", 0);
+                returnsCount = 0; 
+                goldWeight = 0.0; 
+            }
+
+            // ربط البيانات بالبطاقة
+            shiftSummaryCard.bindData(totalCash, invoiceCount, returnsCount, goldWeight);
+
+            // ✅ إضافة حركة (Animation) عند الظهور لأول مرة
+            if (!isShiftCardAnimated) {
+                animateShiftCard(shiftSummaryCard);
+                isShiftCardAnimated = true;
+            }
+        }
+
+    } catch (Exception e) { logNonFatal("processData", e); }
+}
+    
+    /**
+ * ✅ دالة تحريك بطاقة الوردية عند ظهورها لأول مرة (Fade-in + Slide-up)
+ */
+private void animateShiftCard(View view) {
+    if (view == null || !isAdded()) return;
+    
+    view.setAlpha(0f);
+    view.setTranslationY(60f); // تبدأ من الأسفل قليلاً
+    view.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(600)
+            .setInterpolator(new android.view.animation.DecelerateInterpolator())
+            .start();
+}
 
     private void fetchRecentActivity() {
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
@@ -1579,12 +1619,19 @@ private void updateLayoutVisibilityForRole(View v) {
     }
 
     @Override
-    public void onPause() {
-        super.onPause();
-        try { unregisterDataRefreshReceiver(); stopAutoRefresh(); hideSensitiveValuesOnExit(); 
-            if (shiftSummaryCard != null) shiftSummaryCard.hideSensitiveValues();
-        } catch (Exception e) {}
-    }
+public void onPause() {
+    super.onPause();
+    try { 
+        unregisterDataRefreshReceiver(); 
+        stopAutoRefresh(); 
+        hideSensitiveValuesOnExit(); 
+        if (shiftSummaryCard != null) shiftSummaryCard.hideSensitiveValues();
+        
+        // ✅ إعادة تعيين حالة الحركة
+        isShiftCardAnimated = false;
+        
+    } catch (Exception e) {}
+}
 
     private void hideSensitiveValuesOnExit() {
         try {
