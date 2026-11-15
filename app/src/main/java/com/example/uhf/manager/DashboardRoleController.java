@@ -28,8 +28,8 @@ public class DashboardRoleController {
         setVisible(root, R.id.cardScrapGold, permissions.canViewDashboardScrap() && !isPos);
         setVisible(root, R.id.cardScrapAging, permissions.canViewDashboardScrapAging() && !isPos);
 
-        // 3. الرسوم البيانية
-        setVisible(root, R.id.cardCharts, permissions.canViewDashboardCharts());
+        // 3. الرسوم البيانية (للإدارة)
+        setVisible(root, R.id.cardCharts, permissions.canViewDashboardCharts() && !isPos);
 
         // 4. التنبيهات
         if (!permissions.canViewDashboardAlerts()) {
@@ -37,15 +37,32 @@ public class DashboardRoleController {
         }
     }
 
-    // Guards: منع طلب البيانات من السيرفر
+    // Guards: منع أو السماح بطلب البيانات من السيرفر
     public boolean canFetchFullDashboard() {
-        return permissions.canViewDashboardHero() || permissions.canViewDashboardSales();
+        return permissions.isPosOperator() || permissions.canViewDashboardHero() || permissions.canViewDashboardSales();
     }
-    public boolean canFetchCharts() { return permissions.canViewDashboardCharts(); }
-    public boolean canFetchScrap() { return permissions.canViewDashboardScrap() && !permissions.isPosOperator(); }
-    public boolean canFetchScrapAging() { return permissions.canViewDashboardScrapAging() && !permissions.isPosOperator(); }
-    public boolean canFetchGoldPrices() { return permissions.canViewDashboardGoldPrices(); }
-    public boolean canFetchRecentActivity() { return permissions.canViewDashboardRecentActivity(); }
+    
+    // ✅ السماح للكاشير بجلب الرسوم البيانية (الخاصة به)
+    public boolean canFetchCharts() { 
+        return permissions.isPosOperator() || permissions.canViewDashboardCharts(); 
+    }
+    
+    public boolean canFetchScrap() { 
+        return permissions.canViewDashboardScrap() && !permissions.isPosOperator(); 
+    }
+    
+    public boolean canFetchScrapAging() { 
+        return permissions.canViewDashboardScrapAging() && !permissions.isPosOperator(); 
+    }
+    
+    public boolean canFetchGoldPrices() { 
+        return permissions.canViewDashboardGoldPrices(); 
+    }
+    
+    // ✅ السماح للكاشير بجلب العمليات الأخيرة
+    public boolean canFetchRecentActivity() { 
+        return permissions.isPosOperator() || permissions.canViewDashboardRecentActivity(); 
+    }
 
     private void setVisible(View root, int id, boolean visible) {
         View v = root.findViewById(id);
