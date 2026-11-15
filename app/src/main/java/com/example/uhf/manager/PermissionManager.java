@@ -422,4 +422,59 @@ public class PermissionManager {
 
         return false;
     }
+
+    public boolean canEditInventory() {
+    return isSystemAdmin() || isOrgAdmin() || isInventoryManager() || isBranchManager()
+        || canEdit(FEATURE_INVENTORY);
+}
+
+public boolean canDeleteInventory() {
+    return isSystemAdmin() || isOrgAdmin() || canDelete(FEATURE_INVENTORY);
+}
+
+public boolean canExportReports() {
+    return isSystemAdmin() || isOrgAdmin() || isBranchManager() || isFinanceManager()
+        || isAccountant() || canExport(FEATURE_REPORTS);
+}
+
+public boolean canCreateTransfer() {
+    return isSystemAdmin() || isOrgAdmin() || isBranchManager() || isInventoryManager()
+        || canEdit(FEATURE_TRANSFERS);
+}
+
+public boolean canApproveTransfer() {
+    return isSystemAdmin() || isOrgAdmin() || isBranchManager()
+        || canEdit(FEATURE_TRANSFERS);
+}
+
+public boolean canManageQuickAccess() {
+    return isSystemAdmin() || isOrgAdmin() || isBranchManager()
+        || canEdit(FEATURE_QUICK_ACCESS);
+}
+
+public boolean canManageUsersAdvanced() {
+    return isSystemAdmin() || isOrgAdmin();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Quick Actions (FAB) — ضرورية لـ UHFMainActivity
+// ═══════════════════════════════════════════════════════
+public List<String> getAllowedQuickActions() {
+    List<String> allowed = new ArrayList<>();
+    if (canAccessFragment("IdentityStudio"))    allowed.add("identity");
+    if (canAccessFragment("Radar"))             allowed.add("radar");
+    if (canAccessFragment("SecureGate"))        allowed.add("gate");
+    if (canAccessFragment("Reports"))           allowed.add("reports");
+    if (canAccessFragment("Accounting"))        allowed.add("accounting");
+    if (canAccessFragment("Transfers"))         allowed.add("transfers");
+    if (canAccessFragment("AdminHub"))          allowed.add("admin_hub");
+    if (canAccessFragment("SalesHistory"))      allowed.add("sales_history");
+    if (canAccessFragment("ServerConfig"))      allowed.add("server_config");
+    if (canAccessFragment("GoldRates"))         allowed.add("gold_rates");
+    if (canAccessFragment("UsersManagement"))   allowed.add("users");
+    if (canAccessFragment("Branches"))          allowed.add("branches");
+    if (canAccessFragment("RFIDWrite"))         allowed.add("rfid_write");
+    if (canAccessFragment("RfidBindings"))      allowed.add("rfid_bindings");
+    return allowed;
+}
 }
