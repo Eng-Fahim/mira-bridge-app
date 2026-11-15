@@ -120,7 +120,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ✅ زر التقارير (متمركز فوق الزر الأصفر - تنطلق منه حركة القوس) -->
+        <!-- ✅ زر التقارير (مخفي افتراضياً) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabReports"
             android:layout_width="wrap_content"
@@ -130,12 +130,13 @@
             app:fabSize="mini"
             app:backgroundTint="?attr/colorSecondary"
             app:tint="?attr/colorOnSecondary"
+            app:elevation="12dp"
             app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
             app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
             app:layout_constraintStart_toStartOf="@id/fabActionCenter"
             app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
 
-        <!-- ✅ زر الملف الشخصي (متمركز فوق الزر الأصفر - تنطلق منه حركة القوس) -->
+        <!-- ✅ زر الملف الشخصي (مخفي افتراضياً) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabProfile"
             android:layout_width="wrap_content"
@@ -145,12 +146,13 @@
             app:fabSize="mini"
             app:backgroundTint="?attr/colorSecondary"
             app:tint="?attr/colorOnSecondary"
+            app:elevation="12dp"
             app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
             app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
             app:layout_constraintStart_toStartOf="@id/fabActionCenter"
             app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
 
-        <!-- الزر الرئيسي (الأصفر) -->
+        <!-- ✅ الزر الرئيسي (الأصفر) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="60dp"
@@ -168,5 +170,6 @@
             app:maxImageSize="24dp"
             app:pressedTranslationZ="4dp"
             app:tint="?attr/colorOnPrimary" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
