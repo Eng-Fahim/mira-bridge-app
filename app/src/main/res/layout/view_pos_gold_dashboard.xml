@@ -114,7 +114,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="0.00 YER"
+                        android:text="$0.00"
                         android:textColor="#FFD700"
                         android:textSize="16sp"
                         android:textStyle="bold" />
@@ -237,6 +237,45 @@
                 android:layout_width="match_parent"
                 android:layout_height="200dp"
                 android:layout_marginTop="16dp" />
+                
+            <!-- ✅ إضافة أزرار الإجراءات السريعة أسفل الرسم البياني لتسهيل العملية -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal"
+                android:weightSum="3">
+                
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPosActionSell"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:text="بيع"
+                    android:textSize="12sp" />
+                    
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPosActionBuyScrap"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:text="شراء كسر"
+                    android:textSize="12sp" />
+                    
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPosActionReturn"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="مرتجع"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </LinearLayout>
