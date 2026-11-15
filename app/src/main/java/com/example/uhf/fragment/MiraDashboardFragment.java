@@ -594,22 +594,25 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchDashboardCharts() {
-        boolean isPos = permissionManager != null && permissionManager.isPosOperator();
-        if (!isPos && roleController != null && !roleController.canFetchCharts()) return;
-        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-        
-        localExecutor.execute(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
-                    if (rootData != null) {
-                        mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
-                    }
+    boolean isPos = permissionManager != null && permissionManager.isPosOperator();
+    if (!isPos && roleController != null && !roleController.canFetchCharts()) return;
+    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+    
+    localExecutor.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
+                if (rootData != null) {
+                    mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
                 }
-            } catch (Exception e) { Log.e(TAG, "fetchDashboardCharts", e); }
-        });
-    }
+            } else {
+                // ✅ إضافة لوج الخطأ
+                Log.e(TAG, "❌ Charts API failed: " + (response != null ? response.error : "null"));
+            }
+        } catch (Exception e) { Log.e(TAG, "fetchDashboardCharts", e); }
+    });
+}
 
     private void renderCharts(JSONObject data) {
         try {
@@ -1328,32 +1331,44 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchRecentActivity() {
-        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor() || (roleController != null && !roleController.canFetchRecentActivity())) return;
-        
-        localExecutor.execute(() -> {
-            try {
-                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-                MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
-                mainHandler.post(() -> {
-                    if (!isAdded() || response == null) return;
-                    if (response.isSuccess && response.data != null) {
-                        try {
-                            JSONArray activities = extractActivitiesArray(response.data);
-
-if (activities != null && activities.length() > 0) {
-    if (activityCache != null) activityCache.save(activities);
-    updateRecentActivityUI(activities);
-    updatePosRecentActivityUI(activities);
-    Log.d(TAG, "✅ Recent activities: " + activities.length());
-} else {
-    Log.w(TAG, "No recent activities | body=" + safeBody(response));
-}
-                        } catch (Exception e) { Log.e(TAG, "Error parsing recent activity", e); }
+    // ✅ 1. السماح للموظف بجلب النشاطات (مثلما فعلنا في الرسوم البيانية)
+    boolean isPos = permissionManager != null && permissionManager.isPosOperator();
+    if (!isPos && roleController != null && !roleController.canFetchRecentActivity()) return;
+    
+    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+    
+    localExecutor.execute(() -> {
+        try {
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
+            
+            mainHandler.post(() -> {
+                if (!isAdded() || response == null) return;
+                
+                if (response.isSuccess && response.data != null) {
+                    try {
+                        JSONArray activities = extractActivitiesArray(response.data);
+                        if (activities != null && activities.length() > 0) {
+                            if (activityCache != null) activityCache.save(activities);
+                            updateRecentActivityUI(activities);
+                            updatePosRecentActivityUI(activities);
+                            Log.d(TAG, "✅ Recent activities loaded: " + activities.length());
+                        } else {
+                            Log.w(TAG, "⚠️ No recent activities found in response.");
+                        }
+                    } catch (Exception e) { 
+                        Log.e(TAG, "Error parsing recent activity", e); 
                     }
-                });
-            } catch (Exception e) { Log.e(TAG, "fetchRecentActivity error", e); }
-        });
-    }
+                } else {
+                    // ✅ 2. إظهار الخطأ في اللوج لمعرفة السبب
+                    Log.e(TAG, "❌ Activity API failed: " + (response != null ? response.error : "null"));
+                }
+            });
+        } catch (Exception e) { 
+            Log.e(TAG, "fetchRecentActivity exception", e); 
+        }
+    });
+}
 
     private void updateRecentActivityUI(JSONArray activities) {
         if (activities == null || llRecentActivity == null) return;
