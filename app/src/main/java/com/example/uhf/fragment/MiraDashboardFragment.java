@@ -1338,18 +1338,16 @@ public class MiraDashboardFragment extends Fragment {
                     if (!isAdded() || response == null) return;
                     if (response.isSuccess && response.data != null) {
                         try {
-                            // ✅ فك تغليف البيانات والبحث عن المصفوفة
-                            JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
-                            JSONArray activities = rootData.optJSONArray("activities");
-                            if (activities == null) activities = rootData.optJSONArray("logs");
-                            
-                            if (activities != null && activities.length() > 0) { 
-                                if (activityCache != null) activityCache.save(activities); 
-                                updateRecentActivityUI(activities); 
-                                updatePosRecentActivityUI(activities);
-                            } else {
-                                Log.w(TAG, "No recent activities found in server response.");
-                            }
+                            JSONArray activities = extractActivitiesArray(response.data);
+
+if (activities != null && activities.length() > 0) {
+    if (activityCache != null) activityCache.save(activities);
+    updateRecentActivityUI(activities);
+    updatePosRecentActivityUI(activities);
+    Log.d(TAG, "✅ Recent activities: " + activities.length());
+} else {
+    Log.w(TAG, "No recent activities | body=" + safeBody(response));
+}
                         } catch (Exception e) { Log.e(TAG, "Error parsing recent activity", e); }
                     }
                 });
@@ -1372,6 +1370,50 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) {}
     }
     
+    @Nullable
+private JSONArray extractActivitiesArray(@NonNull JSONObject top) {
+    // 1) مفاتيح top-level
+    JSONArray arr = top.optJSONArray("activities");
+    if (arr != null) return arr;
+
+    arr = top.optJSONArray("data");
+    if (arr != null) return arr;
+
+    arr = top.optJSONArray("items");
+    if (arr != null) return arr;
+
+    arr = top.optJSONArray("logs");
+    if (arr != null) return arr;
+
+    arr = top.optJSONArray("result");
+    if (arr != null) return arr;
+
+    // 2) متداخل داخل "data" (نمط response.data.data)
+    JSONObject nested = top.optJSONObject("data");
+    if (nested != null) {
+        arr = nested.optJSONArray("activities");
+        if (arr != null) return arr;
+
+        arr = nested.optJSONArray("items");
+        if (arr != null) return arr;
+
+        arr = nested.optJSONArray("logs");
+        if (arr != null) return arr;
+    }
+
+    return null;
+}
+
+private String safeBody(MiraApiClient.ApiResponse r) {
+    try {
+        String b = r.getBody();
+        if (b == null) return "<null>";
+        return b.length() > 300 ? b.substring(0, 300) + "..." : b;
+    } catch (Throwable e) {
+        return "<unreadable>";
+    }
+}
+
     private void updatePosRecentActivityUI(JSONArray activities) {
         if (activities == null || llPosRecentActivity == null) return;
         try {
@@ -1697,4 +1739,4 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private boolean canManuallyRefreshGold() { return permissionManager != null && permissionManager.canRefreshGoldManually(); }
-            }
+                }
