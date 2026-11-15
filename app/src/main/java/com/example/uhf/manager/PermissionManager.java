@@ -217,9 +217,13 @@ public class PermissionManager {
     }
 
     public boolean canViewReports() {
-        return isSystemAdmin() || isOrgAdmin() || isBranchManager() || isInventoryManager()
-            || isFinanceManager() || isAccountant() || isAuditor() || canView(FEATURE_REPORTS);
-    }
+    return isSystemAdmin() || isOrgAdmin() || isBranchManager() || isInventoryManager()
+        || isFinanceManager() || isAccountant() || isAuditor() 
+        || isPosOperator()  // ✅ POS يرى تقاريره الخاصة
+        || canView(FEATURE_REPORTS);
+}
+
+
 
     public boolean canViewAccounting() {
         return isSystemAdmin() || isOrgAdmin() || isFinanceManager() || isAccountant()
@@ -280,13 +284,15 @@ public class PermissionManager {
     public boolean canViewSnapshots() { return canViewInventory(); }
 
     public boolean canViewScrapGold() {
-        return isSystemAdmin() || isOrgAdmin() || isInventoryManager() || isBranchManager()
-            || isAuditor() || canView(FEATURE_INVENTORY);
+    return isSystemAdmin() || isOrgAdmin() || isInventoryManager() || isBranchManager()
+        || isAuditor() 
+        || isPosOperator()  // ✅ POS يشتري كسر من العملاء
+        || canView(FEATURE_INVENTORY);
     }
-
     public boolean canBuyScrapGold() {
-        return isSystemAdmin() || isOrgAdmin() || isInventoryManager() || isBranchManager()
-            || canEdit(FEATURE_INVENTORY);
+    return isSystemAdmin() || isOrgAdmin() || isInventoryManager() || isBranchManager()
+        || isPosOperator()  // ✅ POS يشتري كسر من العملاء
+        || canEdit(FEATURE_INVENTORY);
     }
 
     public boolean canViewScrapAging() { return canViewScrapGold() || isAuditor(); }
