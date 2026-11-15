@@ -477,7 +477,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         
         
     setupDynamicFabAndCarouselState(v);
-    shiftSummaryCard = v.findViewById(R.id.cardShiftSummary);
+    //shiftSummaryCard = v.findViewById(R.id.cardShiftSummary);
     } catch (Exception e) { logNonFatal("initViews", e); }
 }
 private void purgeCacheCompletely() {
