@@ -115,7 +115,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- ✅✅✅ الإصلاح الحاسم: الغطاء أصبح أسود شبه شفاف مع نص واضح -->
+        <!-- غطاء التحميل -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
@@ -185,21 +185,23 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
+        <!-- ✅ الزر العائم أصبح أصغر (60dp) وتم رفعه قليلاً (marginBottom) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_marginBottom="36dp"
             android:src="@drawable/ic_diamond"
             app:backgroundTint="?attr/colorPrimary"
             app:borderWidth="0dp"
-            app:elevation="12dp"
+            app:elevation="8dp"
             app:fabSize="normal"
             app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
             app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
             app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
             app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-            app:maxImageSize="32dp"
-            app:pressedTranslationZ="8dp"
+            app:maxImageSize="24dp"
+            app:pressedTranslationZ="4dp"
             app:tint="?attr/colorOnPrimary" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
