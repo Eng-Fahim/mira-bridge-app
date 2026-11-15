@@ -1,56 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    android:background="?attr/colorSurfaceVariant"
-    android:orientation="horizontal"
-    android:padding="12dp">
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="1dp"
+    app:strokeWidth="0dp">
 
-    <!-- أيقونة العملية -->
-    <TextView
-        android:id="@+id/tvPosActIcon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:gravity="center"
-        android:text="🛒"
-        android:textSize="20sp" />
-
-    <!-- تفاصيل العملية -->
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp">
 
+        <!-- أيقونة العملية (على اليمين) -->
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:layout_marginEnd="12dp">
+            <TextView
+                android:id="@+id/tvPosActIcon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="🛒"
+                android:textSize="20sp" />
+        </FrameLayout>
+
+        <!-- التفاصيل (في المنتصف) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPosActTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="فاتورة مبيعات"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvPosActTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="15/11/2026 • 17:19"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- المبلغ (على اليسار) -->
         <TextView
-            android:id="@+id/tvPosActTitle"
+            android:id="@+id/tvPosActAmount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="فاتورة مبيعات"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp"
+            android:text="- 950 YER"
+            android:textColor="#DC2626" 
+            android:textSize="15sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvPosActTime"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="منذ 5 دقائق • بواسطة أحمد"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="11sp" />
     </LinearLayout>
-
-    <!-- المبلغ -->
-    <TextView
-        android:id="@+id/tvPosActAmount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:text="+ 150,000 YER"
-        android:textColor="#16A34A"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>
