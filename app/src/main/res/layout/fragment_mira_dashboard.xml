@@ -501,65 +501,68 @@
                     </LinearLayout>
                 </HorizontalScrollView>
 
-                <!-- Dots Indicator -->
-<LinearLayout
-    android:id="@+id/dotsIndicator"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
-    android:layout_marginBottom="16dp"
-    android:orientation="horizontal"
-    app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintTop_toBottomOf="@id/horizontalScrollCarousel">
+                <!-- ═══════════════════════════════════════════════════
+                     DOTS INDICATOR
+                     ═══════════════════════════════════════════════════ -->
+                <LinearLayout
+                    android:id="@+id/dotsIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="16dp"
+                    android:orientation="horizontal"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/horizontalScrollCarousel">
 
-    <View android:id="@+id/dot1" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_active" />
-    <View android:id="@+id/dot2" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
-    <View android:id="@+id/dot3" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
-</LinearLayout>
+                    <View android:id="@+id/dot1" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_active" />
+                    <View android:id="@+id/dot2" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
+                    <View android:id="@+id/dot3" android:layout_width="6dp" android:layout_height="6dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
+                </LinearLayout>
 
-<!-- ═══════════════════════════════════════════════════
-     بطاقة ملخص الوردية (تم إضافة الـ Constraints)
-     ═══════════════════════════════════════════════════ -->
-<!--<com.example.uhf.widget.ShiftSummaryCardView
-    android:id="@+id/cardShiftSummary"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginBottom="16dp"
-    android:visibility="gone"
-    app:layout_constraintTop_toBottomOf="@id/dotsIndicator"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintEnd_toEndOf="parent" />
--->
-<!-- ═══════════════════════════════════════════════════
-     QUICK ACTIONS (تم تعديل القيد ليكون أسفل البطاقة الجديدة)
-     ═══════════════════════════════════════════════════ -->
-<LinearLayout
-    android:id="@+id/llQuickActionsContainer"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center"
-    android:paddingHorizontal="16dp"
-    android:layout_marginBottom="24dp"
-    app:layout_constraintTop_toBottomOf="@id/dotsIndicator">
+                <!-- ═══════════════════════════════════════════════════
+                     SHIFT SUMMARY CARD (معلقة مؤقتاً للاختبار)
+                     ═══════════════════════════════════════════════════
+                <com.example.uhf.widget.ShiftSummaryCardView
+                    android:id="@+id/cardShiftSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/dotsIndicator"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+                -->
 
-<!-- ═══════════════════════════════════════════════════
-     ALERTS STRIP
-     ═══════════════════════════════════════════════════ -->
-<LinearLayout
-    android:id="@+id/alertsStrip"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginBottom="16dp"
-    android:background="@drawable/bg_alert_strip"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="12dp"
-    android:visibility="gone"
-    app:layout_constraintTop_toBottomOf="@id/llQuickActionsContainer">
+                <!-- ═══════════════════════════════════════════════════
+                     QUICK ACTIONS (مغلقة بشكل صحيح ✅)
+                     ═══════════════════════════════════════════════════ -->
+                <LinearLayout
+                    android:id="@+id/llQuickActionsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="16dp"
+                    android:layout_marginBottom="24dp"
+                    app:layout_constraintTop_toBottomOf="@id/dotsIndicator" />
+
+                <!-- ═══════════════════════════════════════════════════
+                     ALERTS STRIP
+                     ═══════════════════════════════════════════════════ -->
+                <LinearLayout
+                    android:id="@+id/alertsStrip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@drawable/bg_alert_strip"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp"
+                    android:visibility="gone"
+                    app:layout_constraintTop_toBottomOf="@id/llQuickActionsContainer">
 
                     <TextView
                         android:id="@+id/tvAlertIcon"
