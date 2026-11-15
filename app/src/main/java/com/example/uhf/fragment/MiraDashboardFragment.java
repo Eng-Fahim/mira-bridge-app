@@ -382,18 +382,7 @@ public class MiraDashboardFragment extends Fragment {
                 tvPosViewAllActivity.setOnClickListener(v2 -> navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
             }
 
-            View btnPosSell = v.findViewById(R.id.btnPosActionSell);
-            View btnPosBuyScrap = v.findViewById(R.id.btnPosActionBuyScrap);
-            View btnPosReturn = v.findViewById(R.id.btnPosActionReturn);
-
-            if (btnPosSell != null) btnPosSell.setOnClickListener(v2 -> navigateToFragment(new MiraPosFragment(), NavigationManager.TAG_POS));
-            if (btnPosBuyScrap != null) btnPosBuyScrap.setOnClickListener(v2 -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
-            if (btnPosReturn != null) btnPosReturn.setOnClickListener(v2 -> {
-                Fragment salesFragment = new MiraPosFragment();
-                Bundle bundle = new Bundle(); bundle.putBoolean("auto_open_refund", true);
-                salesFragment.setArguments(bundle);
-                navigateToFragment(salesFragment, "Sales");
-            });
+            
 
             if (hsvCarousel != null) {
                 final LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
