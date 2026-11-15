@@ -4,21 +4,22 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:clipToPadding="false"
+    android:paddingBottom="140dp"> <!-- مسافة سفلية لتفادي الشريط العائم -->
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="100dp">
+        android:paddingTop="16dp"
+        android:paddingHorizontal="16dp">
 
         <!-- 1. الترحيب -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingTop="16dp"
             android:paddingBottom="16dp">
             <TextView
                 android:layout_width="wrap_content"
@@ -32,156 +33,139 @@
                 android:layout_height="wrap_content"
                 android:text="موظف المبيعات"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="20sp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 2. الكاروسيل (بطاقة رصيد الذهب) -->
-        <HorizontalScrollView
-            android:id="@+id/hsvPosCarousel"
+        <!-- 2. البطاقة الذهبية (بدون HorizontalScrollView لضمان عدم التقطيع) -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipToPadding="false"
-            android:paddingHorizontal="16dp"
-            android:scrollbars="none">
+            app:cardBackgroundColor="@android:color/transparent"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="8dp">
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:background="@drawable/bg_gold_balance_card"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-                <!-- البطاقة الذهبية -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="300dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="12dp"
-                    app:cardBackgroundColor="@android:color/transparent"
-                    app:cardCornerRadius="24dp"
-                    app:cardElevation="8dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_gold_balance_card"
-                        android:orientation="vertical"
-                        android:padding="20dp">
+                        android:layout_alignParentEnd="true"
+                        android:text="رصيد الذهب"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp" />
+                    
+                    <ImageButton
+                        android:id="@+id/btnTogglePosGoldVisibility"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_alignParentStart="true"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_eye_off"
+                        app:tint="#FFFFFF" />
+                </RelativeLayout>
 
-                        <RelativeLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content">
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_alignParentEnd="true"
-                                android:text="رصيد الذهب"
-                                android:textColor="#FFFFFF"
-                                android:textSize="16sp" />
-                            
-                            <ImageButton
-                                android:id="@+id/btnTogglePosGoldVisibility"
-                                android:layout_width="32dp"
-                                android:layout_height="32dp"
-                                android:layout_alignParentStart="true"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:src="@drawable/ic_eye_off"
-                                app:tint="#FFFFFF" />
-                        </RelativeLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/tvPosTotalWeight"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0.00"
+                        android:textColor="#FFFFFF"
+                        android:textSize="40sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="جم"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp" />
+                </LinearLayout>
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="16dp"
+                    android:background="#33FFFFFF" />
+
+                <!-- العيارات (هنا فقط نستخدم السحب الأفقي) -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:scrollbars="none">
+                    <LinearLayout
+                        android:id="@+id/llPosKaratContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="24dp"
-                            android:gravity="center"
-                            android:orientation="horizontal">
-                            <TextView
-                                android:id="@+id/tvPosTotalWeight"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0.00"
-                                android:textColor="#FFFFFF"
-                                android:textSize="36sp"
-                                android:textStyle="bold" />
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:text="جم"
-                                android:textColor="#FFFFFF"
-                                android:textSize="16sp" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:layout_marginVertical="16dp"
-                            android:background="#33FFFFFF" />
-
-                        <!-- العيارات (أفقي) -->
-                        <HorizontalScrollView
-                            android:layout_width="match_parent"
+                            android:text="القيمة الحالية"
+                            android:textColor="#CCFFFFFF"
+                            android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/tvPosTotalValue"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:clipToPadding="false"
-                            android:scrollbars="none">
-                            <LinearLayout
-                                android:id="@+id/llPosKaratContainer"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal" />
-                        </HorizontalScrollView>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
-                            android:orientation="horizontal"
-                            android:weightSum="2">
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="القيمة الحالية"
-                                    android:textColor="#CCFFFFFF"
-                                    android:textSize="11sp" />
-                                <TextView
-                                    android:id="@+id/tvPosTotalValue"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="$0.00"
-                                    android:textColor="#FFD700"
-                                    android:textSize="15sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="النقدية"
-                                    android:textColor="#CCFFFFFF"
-                                    android:textSize="11sp" />
-                                <TextView
-                                    android:id="@+id/tvPosCashBalance"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="0.00 YER"
-                                    android:textColor="#FFFFFF"
-                                    android:textSize="15sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-                        </LinearLayout>
+                            android:layout_marginTop="4dp"
+                            android:text="$0.00"
+                            android:textColor="#FFD700"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="النقدية"
+                            android:textColor="#CCFFFFFF"
+                            android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/tvPosCashBalance"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="0.00 YER"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
-        </HorizontalScrollView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- 3. شبكة الأزرار (Grid) -->
         <GridLayout
@@ -189,16 +173,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:paddingHorizontal="12dp"
             android:columnCount="3"
             android:rowCount="2" />
 
-        <!-- 4. قسم الرسم البياني -->
+        <!-- 4. الرسم البياني -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:layout_marginHorizontal="16dp"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="24dp"
             app:cardElevation="1dp"
@@ -214,47 +196,15 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="حركة السعر (أسبوع)"
+                    android:text="أدائي (أسبوع)"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="15sp"
+                    android:textSize="16sp"
                     android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:orientation="horizontal"
-                    android:weightSum="2">
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_chart_badge_gold"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:padding="8dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="بيع" android:textColor="#B8860B" android:textSize="11sp" />
-                        <TextView android:id="@+id/tvPosSellPrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#3E2723" android:textSize="14sp" android:textStyle="bold" />
-                    </LinearLayout>
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_chart_badge_green"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:padding="8dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="شراء" android:textColor="#2E7D32" android:textSize="11sp" />
-                        <TextView android:id="@+id/tvPosBuyPrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#1B5E20" android:textSize="14sp" android:textStyle="bold" />
-                    </LinearLayout>
-                </LinearLayout>
 
                 <com.github.mikephil.charting.charts.LineChart
                     android:id="@+id/lineChartPosPriceMovement"
                     android:layout_width="match_parent"
-                    android:layout_height="180dp"
+                    android:layout_height="200dp"
                     android:layout_marginTop="12dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -264,8 +214,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:orientation="vertical"
-            android:paddingHorizontal="16dp">
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -285,6 +234,7 @@
                     android:id="@+id/tvPosViewAllActivity"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:padding="4dp"
                     android:text="عرض الكل"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="12sp"
