@@ -6,11 +6,15 @@ import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
-import com.example.uhf.fragment.*;
+import com.example.uhf.fragment.MiraInventoryDashboardFragment;
+import com.example.uhf.fragment.MiraPosFragment;
+import com.example.uhf.fragment.MiraProfileFragment;
+import com.example.uhf.fragment.MiraReportsProFragment;
+import com.example.uhf.fragment.MiraSalesHistoryFragment;
+import com.example.uhf.fragment.MiraScrapGoldBuyFragment;
 import com.example.uhf.navigation.NavigationManager;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -44,83 +48,133 @@ public class DashboardUIBuilder {
     }
 
     // =========================================================
-    //  1. إخفاء وإظهار الكروت الأساسية بناءً على الدور
+    //  1. إخفاء/إظهار الواجهات بناءً على الدور (عشرة أدوار)
     // =========================================================
     public void applyLayoutVisibility(View root, DashboardRoleController roleController) {
         if (root == null || permissions == null) return;
 
-        if (permissions.isPosOperator()) {
-            // واجهة الكاشير (POS)
-            setVisible(root, R.id.layoutPosGoldDashboard, true);
-            setVisible(root, R.id.cardShiftSummary, false);
-            setVisible(root, R.id.horizontalScrollCarousel, false);
-            setVisible(root, R.id.dotsIndicator, false);
-            
-            int[] idsToHide = {
-                R.id.alertsStrip, R.id.cardInventoryByKarat, R.id.cardScrapGold,
-                R.id.cardScrapAging, R.id.recentActivityHeader, R.id.llRecentActivity, R.id.cardCharts
-            };
-            for (int id : idsToHide) setVisible(root, id, false);
-            setVisible(root, R.id.hsvQuickActions, true);
+        hideAll(root);
 
+        if (permissions.isSystemAdmin() || permissions.isOrgAdmin() || permissions.isBranchManager()) {
+            showFullAdmin(root, roleController);
+        } else if (permissions.isFinanceManager() || permissions.isAccountant()) {
+            showFinanceDashboard(root, roleController);
+        } else if (permissions.isInventoryManager()) {
+            showInventoryDashboard(root, roleController);
+        } else if (permissions.isAuditor()) {
+            showAuditorDashboard(root, roleController);
+        } else if (permissions.isPosOperator()) {
+            showPosDashboard(root);
+        } else if (permissions.isGateUser()) {
+            showGateDashboard(root);
         } else {
-            // واجهة المدير (Admin / Manager)
-            setVisible(root, R.id.layoutPosGoldDashboard, false);
-            setVisible(root, R.id.cardShiftSummary, false);
-            setVisible(root, R.id.horizontalScrollCarousel, true);
-            setVisible(root, R.id.heroBalanceCard, true);
-            setVisible(root, R.id.dot1, true);
-            setVisible(root, R.id.dotsIndicator, true);
-            setVisible(root, R.id.cardCharts, true);
-            setVisible(root, R.id.hsvQuickActions, true);
-            
-            if (roleController != null) roleController.applyVisibility(root);
+            showFullAdmin(root, roleController);
         }
     }
 
+    private void hideAll(View root) {
+        int[] all = {
+            R.id.layoutPosGoldDashboard, R.id.cardShiftSummary,
+            R.id.horizontalScrollCarousel, R.id.dotsIndicator,
+            R.id.heroBalanceCard, R.id.cardGoldPrices, R.id.salesSummaryCard,
+            R.id.alertsStrip, R.id.cardInventoryByKarat, R.id.cardScrapGold,
+            R.id.cardScrapAging, R.id.llRecentActivity, R.id.recentActivityHeader,
+            R.id.cardCharts
+        };
+        for (int id : all) setVisible(root, id, false);
+    }
+
+    private void showFullAdmin(View root, DashboardRoleController roleController) {
+        setVisible(root, R.id.horizontalScrollCarousel, true);
+        setVisible(root, R.id.dotsIndicator, true);
+        setVisible(root, R.id.cardInventoryByKarat, true);
+        setVisible(root, R.id.cardScrapGold, true);
+        setVisible(root, R.id.cardScrapAging, true);
+        setVisible(root, R.id.cardCharts, true);
+        setVisible(root, R.id.llRecentActivity, true);
+        if (roleController != null) roleController.applyVisibility(root);
+    }
+
+    private void showFinanceDashboard(View root, DashboardRoleController roleController) {
+        setVisible(root, R.id.horizontalScrollCarousel, true);
+        setVisible(root, R.id.dotsIndicator, true);
+        setVisible(root, R.id.cardCharts, true);
+        setVisible(root, R.id.llRecentActivity, true);
+        if (roleController != null) roleController.applyVisibility(root);
+    }
+
+    private void showInventoryDashboard(View root, DashboardRoleController roleController) {
+        setVisible(root, R.id.horizontalScrollCarousel, true);
+        setVisible(root, R.id.dotsIndicator, true);
+        setVisible(root, R.id.cardInventoryByKarat, true);
+        setVisible(root, R.id.cardScrapGold, true);
+        setVisible(root, R.id.cardScrapAging, true);
+        setVisible(root, R.id.llRecentActivity, true);
+        if (roleController != null) roleController.applyVisibility(root);
+    }
+
+    private void showAuditorDashboard(View root, DashboardRoleController roleController) {
+        setVisible(root, R.id.horizontalScrollCarousel, true);
+        setVisible(root, R.id.dotsIndicator, true);
+        setVisible(root, R.id.cardInventoryByKarat, true);
+        setVisible(root, R.id.cardCharts, true);
+        setVisible(root, R.id.llRecentActivity, true);
+        if (roleController != null) roleController.applyVisibility(root);
+    }
+
+    private void showPosDashboard(View root) {
+        setVisible(root, R.id.layoutPosGoldDashboard, true);
+    }
+
+    private void showGateDashboard(View root) {
+        setVisible(root, R.id.alertsStrip, true);
+        setVisible(root, R.id.llRecentActivity, true);
+    }
+
     // =========================================================
-    //  2. بناء أزرار الإجراءات السريعة بناءً على الدور
+    //  2. أزرار الإجراءات السريعة (ديناميكية)
     // =========================================================
     public void setupQuickActionButtons(View root, OnNavigateListener listener) {
         GridLayout gridContainer = root.findViewById(R.id.gridPosQuickActions);
         if (gridContainer == null) return;
         gridContainer.removeAllViews();
 
-        if (permissions.isPosOperator()) {
-            // أزرار الكاشير
+        boolean isPos = permissions.isPosOperator();
+        boolean isGate = permissions.isGateUser();
+
+        if (isPos) {
             addButton(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS, listener);
             addButton(gridContainer, "مرتجع", R.drawable.ic_reports, new MiraPosFragment(), "Sales", listener);
             addButton(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY, listener);
             addButton(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS, listener);
             addButton(gridContainer, "سجل المبيعات", R.drawable.ic_reports, new MiraSalesHistoryFragment(), "SalesHistory", listener);
             addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
+
+        } else if (isGate) {
+            if (permissions.canViewRadar()) addButton(gridContainer, "الرادار", R.drawable.ic_radar, new MiraUHFReadTagFragment(), "Radar", listener);
+            if (permissions.canViewGates()) addButton(gridContainer, "بوابة الأمن", R.drawable.ic_gate, new MiraUHFReadTagFragment(), "SecureGate", listener);
+            addButton(gridContainer, "سجل العمليات", R.drawable.ic_reports, new MiraAllActivitiesFragment(), "AllActivities", listener);
+            addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
+
         } else {
-            // أزرار الإدارة والجرد
-            if (permissions.canViewInventory()) {
-                addButton(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard", listener);
-            }
-            if (permissions.canBuyScrapGold()) {
-                addButton(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY, listener);
-            }
-            if (permissions.canViewSalesHistory()) {
-                addButton(gridContainer, "سجل المبيعات", R.drawable.ic_reports, new MiraSalesHistoryFragment(), "SalesHistory", listener);
-            }
-            if (permissions.canViewReports()) {
-                addButton(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS, listener);
-            }
+            if (permissions.canUsePos()) addButton(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS, listener);
+            if (permissions.canBuyScrapGold()) addButton(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY, listener);
+            if (permissions.canViewInventory()) addButton(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard", listener);
+            if (permissions.canViewSalesHistory()) addButton(gridContainer, "سجل المبيعات", R.drawable.ic_reports, new MiraSalesHistoryFragment(), "SalesHistory", listener);
+            if (permissions.canViewReports()) addButton(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS, listener);
             addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
         }
     }
 
     // =========================================================
-    //  3. رسم المخططات البيانية (الرسوم)
+    //  3. رسم المخططات
     // =========================================================
     public void renderCharts(LineChart adminChart, LineChart posChart, PieChart pieChart, JSONObject data) {
         try {
-            JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
-            if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); 
+            JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days");
+            if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days");
             if (sales7Days == null) sales7Days = data.optJSONArray("sales");
-            
+
             if (sales7Days != null && sales7Days.length() > 0) {
                 List<Entry> entries = new ArrayList<>();
                 List<Entry> sellEntries = new ArrayList<>();
@@ -130,74 +184,67 @@ public class DashboardUIBuilder {
                 for (int i = 0; i < sales7Days.length(); i++) {
                     JSONObject day = sales7Days.getJSONObject(i);
                     double amount = day.optDouble("amount", 0);
-                    
                     entries.add(new Entry(i, (float) amount));
                     sellEntries.add(new Entry(i, (float) amount));
-                    buyEntries.add(new Entry(i, (float) (amount * 0.95))); 
-                    
+                    buyEntries.add(new Entry(i, (float) (amount * 0.95)));
                     String dateStr = day.optString("date", "");
                     if (dateStr.length() > 5) dateStr = dateStr.substring(5);
                     labels.add(dateStr);
                 }
 
-                // 1. مخطط المدير
                 if (adminChart != null) {
                     LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-                    dataSet.setColor(Color.parseColor("#D4AF37")); 
-                    dataSet.setCircleColor(Color.parseColor("#D4AF37")); 
+                    dataSet.setColor(Color.parseColor("#D4AF37"));
+                    dataSet.setCircleColor(Color.parseColor("#D4AF37"));
                     dataSet.setLineWidth(2.5f);
-                    dataSet.setCircleRadius(4f); 
-                    dataSet.setDrawValues(false); 
+                    dataSet.setCircleRadius(4f);
+                    dataSet.setDrawValues(false);
                     dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    
                     adminChart.setData(new LineData(dataSet));
                     XAxis xAxis = adminChart.getXAxis();
                     xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-                    xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); 
-                    xAxis.setGranularity(1f); 
+                    xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                    xAxis.setGranularity(1f);
                     xAxis.setDrawGridLines(false);
                     adminChart.getAxisRight().setEnabled(false);
                     adminChart.getDescription().setEnabled(false);
                     adminChart.getLegend().setEnabled(false);
-                    adminChart.animateX(1000); 
+                    adminChart.animateX(1000);
                     adminChart.invalidate();
                 }
 
-                // 2. مخطط الكاشير
                 if (posChart != null) {
                     LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
-                    sellDataSet.setColor(Color.parseColor("#D4AF37")); 
-                    sellDataSet.setLineWidth(3f); 
-                    sellDataSet.setDrawCircles(false); 
+                    sellDataSet.setColor(Color.parseColor("#D4AF37"));
+                    sellDataSet.setLineWidth(3f);
+                    sellDataSet.setDrawCircles(false);
                     sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    sellDataSet.setDrawFilled(true); 
+                    sellDataSet.setDrawFilled(true);
                     sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
 
                     LineDataSet buyDataSet = new LineDataSet(buyEntries, "تقديري");
-                    buyDataSet.setColor(Color.parseColor("#4ADE80")); 
-                    buyDataSet.setLineWidth(3f); 
-                    buyDataSet.setDrawCircles(false); 
+                    buyDataSet.setColor(Color.parseColor("#4ADE80"));
+                    buyDataSet.setLineWidth(3f);
+                    buyDataSet.setDrawCircles(false);
                     buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    buyDataSet.setDrawFilled(true); 
+                    buyDataSet.setDrawFilled(true);
                     buyDataSet.setFillColor(Color.parseColor("#334ADE80"));
 
                     posChart.setData(new LineData(sellDataSet, buyDataSet));
                     XAxis xAxis = posChart.getXAxis();
                     xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
                     xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-                    xAxis.setDrawGridLines(false); 
-                    xAxis.setDrawAxisLine(false); 
-                    
+                    xAxis.setDrawGridLines(false);
+                    xAxis.setDrawAxisLine(false);
                     posChart.getAxisRight().setEnabled(true);
                     posChart.getAxisLeft().setEnabled(false);
                     posChart.getDescription().setEnabled(false);
                     posChart.getLegend().setEnabled(false);
-                    posChart.animateX(1000); 
+                    posChart.animateX(1000);
                     posChart.invalidate();
                 }
             }
 
-            // 3. مخطط النسب (PieChart)
             JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
             if (salesByKarat != null && pieChart != null) {
                 List<PieEntry> entriesPie = new ArrayList<>();
@@ -214,8 +261,8 @@ public class DashboardUIBuilder {
                     pieChart.setData(new PieData(dataSet));
                     pieChart.getDescription().setEnabled(false);
                     pieChart.setUsePercentValues(true);
-                    pieChart.setHoleRadius(40f); 
-                    pieChart.animateY(1000); 
+                    pieChart.setHoleRadius(40f);
+                    pieChart.animateY(1000);
                     pieChart.invalidate();
                 }
             }
@@ -224,7 +271,6 @@ public class DashboardUIBuilder {
         }
     }
 
-    // Helpers
     private void addButton(GridLayout container, String title, int iconRes, Fragment target, String tag, OnNavigateListener listener) {
         View view = fragment.getLayoutInflater().inflate(R.layout.item_quick_action_grid, container, false);
         ImageView icon = view.findViewById(R.id.ivQuickIcon);
