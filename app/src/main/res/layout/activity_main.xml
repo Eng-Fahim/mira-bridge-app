@@ -88,6 +88,7 @@
         </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- ⬇️ الشريط السفلي والأزرار العائمة (يجب أن يكون مرة واحدة فقط) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -119,86 +120,37 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-<androidx.constraintlayout.widget.ConstraintLayout
-    android:id="@+id/bottomNavContainer"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_gravity="bottom"
-    android:layoutDirection="locale"
-    android:clipToPadding="false"
-    android:paddingHorizontal="16dp"
-    android:paddingBottom="24dp">
+        <!-- زر التقارير (مخفي افتراضياً) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabReports"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_reports"
+            android:visibility="gone"
+            app:fabSize="mini"
+            app:backgroundTint="?attr/colorSecondary"
+            app:tint="?attr/colorOnSecondary"
+            app:layout_constraintBottom_toTopOf="@id/fabActionCenter"
+            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
+            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
+            app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
 
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigationView"
-        android:layout_width="0dp"
-        android:layout_height="72dp"
-        android:layoutDirection="locale"
-        android:background="@drawable/bg_floating_bottom_nav_with_shadow"
-        app:elevation="0dp"
-        app:itemBackground="@null"
-        app:itemActiveIndicatorStyle="@style/CustomNavIndicator" 
-        app:itemIconSize="26dp"
-        app:itemIconTint="@color/nav_item_color_selector"
-        app:itemRippleColor="@color/nav_ripple_color"
-        app:itemTextAppearanceActive="@style/NavItemTextActive"
-        app:itemTextAppearanceInactive="@style/NavItemTextInactive"
-        app:itemTextColor="@color/nav_item_color_selector"
-        app:labelVisibilityMode="labeled"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:menu="@menu/bottom_nav_menu" />
+        <!-- زر الملف الشخصي (مخفي افتراضياً) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabProfile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_user_placeholder"
+            android:visibility="gone"
+            app:fabSize="mini"
+            app:backgroundTint="?attr/colorSecondary"
+            app:tint="?attr/colorOnSecondary"
+            app:layout_constraintBottom_toTopOf="@id/fabReports"
+            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
+            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
+            app:layout_constraintTop_toTopOf="@id/fabReports" />
 
-    <!-- ✅ زر FAB التقارير (مخفي افتراضياً) -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabReports"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_reports"
-        android:visibility="gone"
-        app:fabSize="mini"
-        app:backgroundTint="?attr/colorSecondary"
-        app:tint="?attr/colorOnSecondary"
-        app:layout_constraintBottom_toTopOf="@id/fabActionCenter"
-        app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
-        app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-        app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
-
-    <!-- ✅ زر FAB الملف الشخصي (مخفي افتراضياً) -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabProfile"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_user_placeholder"
-        android:visibility="gone"
-        app:fabSize="mini"
-        app:backgroundTint="?attr/colorSecondary"
-        app:tint="?attr/colorOnSecondary"
-        app:layout_constraintBottom_toTopOf="@id/fabReports"
-        app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
-        app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-        app:layout_constraintTop_toTopOf="@id/fabReports" />
-
-    <!-- الزر الرئيسي (الأصفر) -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabActionCenter"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:layout_marginBottom="36dp"
-        android:src="@drawable/ic_diamond"
-        app:backgroundTint="?attr/colorPrimary"
-        app:borderWidth="0dp"
-        app:elevation="8dp"
-        app:fabSize="normal"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigationView"
-        app:layout_constraintEnd_toEndOf="@id/bottomNavigationView"
-        app:layout_constraintStart_toStartOf="@id/bottomNavigationView"
-        app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
-        app:maxImageSize="24dp"
-        app:pressedTranslationZ="4dp"
-        app:tint="?attr/colorOnPrimary" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- الزر الرئيسي (الأصفر) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="60dp"
