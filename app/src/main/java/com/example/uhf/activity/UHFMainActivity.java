@@ -153,7 +153,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final long MIN_TRANSFER_REFRESH_INTERVAL = 3_000L;
     private static final String PREFS_TRANSFERS_BADGE = "transfers_badge_prefs";
     private static final String KEY_LAST_TRANSFERS_COUNT = "last_transfers_count";
-
+    
+    private boolean isFabMenuOpen = false;
     private int loadingCounter = 0;
 
     private NavigationManager navigationManager;
@@ -2161,33 +2162,87 @@ if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
     //  التنقل السريع
     // ═══════════════════════════════════════════════════════
 
-    private void setupQuickNav() {
+    // ⚠️ تأكد أن هذا المتغير معرّف في أعلى الكلاس (خارج الدوال)
+// private boolean isFabMenuOpen = false;
+
+private void setupQuickNav() {
     try {
         BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
         FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+        FloatingActionButton fabReports = findViewById(R.id.fabReports);
+        FloatingActionButton fabProfile = findViewById(R.id.fabProfile);
 
-        // ⭐ بناء القائمة حسب الصلاحيات (قبل إرفاق الـ listener)
+        // ⭐ بناء القائمة حسب الصلاحيات
         applyNavPermissions();
 
         if (fabActionCenter != null) {
             boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
             fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
             fabActionCenter.setEnabled(hasQuickActions);
-            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+            
+            // ✅ دمج المنطق (Speed Dial للموظف - القائمة القديمة للمدير)
+            fabActionCenter.setOnClickListener(v -> {
+                boolean isPos = permissionManager != null && permissionManager.isPosOperator();
+                
+                if (isPos && fabReports != null && fabProfile != null) {
+                    // --- منطق موظف المبيعات: Speed Dial ---
+                    if (!isFabMenuOpen) {
+                        fabReports.setVisibility(View.VISIBLE);
+                        fabProfile.setVisibility(View.VISIBLE);
+                        fabReports.animate().translationY(-150f).setDuration(300).start();
+                        fabProfile.animate().translationY(-300f).setDuration(300).start();
+                        fabActionCenter.animate().rotation(45f).setDuration(300).start();
+                        isFabMenuOpen = true;
+                    } else {
+                        closePosFabMenu(fabActionCenter, fabReports, fabProfile);
+                    }
+                } else {
+                    // --- منطق المدير: القائمة القديمة ---
+                    showQuickActionMenu();
+                }
+            });
+
+            // ✅ إغلاق القائمة تلقائياً عند الضغط على التقارير
+            if (fabReports != null) {
+                fabReports.setOnClickListener(v -> {
+                    loadFragment(new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+                    closePosFabMenu(fabActionCenter, fabReports, fabProfile);
+                });
+            }
+
+            // ✅ إغلاق القائمة تلقائياً عند الضغط على الملف الشخصي
+            if (fabProfile != null) {
+                fabProfile.setOnClickListener(v -> {
+                    loadFragment(new MiraProfileFragment(), "Profile"); // تأكد من اسم كلاس البروفايل
+                    closePosFabMenu(fabActionCenter, fabReports, fabProfile);
+                });
+            }
+
             fabActionCenter.setOnLongClickListener(v -> {
                 Toast.makeText(UHFMainActivity.this,
                         isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
                         Toast.LENGTH_SHORT).show();
                 return true;
             });
+            
             if (hasQuickActions) pulseFab(fabActionCenter);
         }
 
         if (quickNav != null) {
-    attachNavListener(quickNav);
-}
+            attachNavListener(quickNav);
+        }
     } catch (Exception e) {
         Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+    }
+}
+
+// ✅ دالة مساعدة لإغلاق القائمة (لتنظيف الكود)
+private void closePosFabMenu(FloatingActionButton fabActionCenter, FloatingActionButton fabReports, FloatingActionButton fabProfile) {
+    if (fabReports != null && fabProfile != null) {
+        fabReports.animate().translationY(0f).setDuration(300).withEndAction(() -> fabReports.setVisibility(View.GONE)).start();
+        fabProfile.animate().translationY(0f).setDuration(300).withEndAction(() -> fabProfile.setVisibility(View.GONE)).start();
+        fabActionCenter.animate().rotation(0f).setDuration(300).start();
+        isFabMenuOpen = false;
     }
 }
 
