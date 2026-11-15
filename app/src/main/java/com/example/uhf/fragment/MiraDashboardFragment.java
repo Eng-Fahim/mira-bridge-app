@@ -1708,4 +1708,4 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private boolean canManuallyRefreshGold() { return permissionManager != null && permissionManager.canRefreshGoldManually(); }
-}
+            }
