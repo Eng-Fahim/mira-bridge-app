@@ -1,556 +1,380 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface">
+    android:background="?attr/colorSurface"
+    android:fillViewport="true"
+    android:overScrollMode="never"
+    android:scrollbars="none">
 
-    <!-- 1. SHIMMER LOADING (Skeleton) -->
     <LinearLayout
-        android:id="@+id/shimmerLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
-        android:visibility="gone"
-        android:background="?attr/colorSurface">
+        android:paddingTop="16dp"
+        android:paddingBottom="32dp">
 
-        <View android:layout_width="match_parent" android:layout_height="16dp" android:layout_marginBottom="16dp" android:background="@drawable/shimmer_background" />
-        <View android:layout_width="match_parent" android:layout_height="240dp" android:layout_marginBottom="24dp" android:background="@drawable/shimmer_background" />
-        <View android:layout_width="match_parent" android:layout_height="120dp" android:layout_marginBottom="16dp" android:background="@drawable/shimmer_background" />
-        <View android:layout_width="match_parent" android:layout_height="120dp" android:background="@drawable/shimmer_background" />
-    </LinearLayout>
-
-    <!-- 2. LOADING OVERLAY -->
-    <LinearLayout
-        android:id="@+id/loadingOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:background="?attr/colorSurface"
-        android:visibility="gone"
-        android:clickable="true"
-        android:focusable="true"
-        android:alpha="0.95">
-
-        <com.google.android.material.progressindicator.CircularProgressIndicator
-            android:layout_width="wrap_content"
+        <!-- 1. SHIMMER LOADING -->
+        <LinearLayout
+            android:id="@+id/shimmerLayout"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:indeterminate="true"
-            app:indicatorColor="?attr/colorPrimary"
-            app:indicatorSize="48dp"
-            app:trackThickness="4dp" />
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+            <View android:layout_width="match_parent" android:layout_height="16dp" android:layout_marginBottom="16dp" android:background="@drawable/shimmer_background" />
+            <View android:layout_width="match_parent" android:layout_height="240dp" android:layout_marginBottom="24dp" android:background="@drawable/shimmer_background" />
+            <View android:layout_width="match_parent" android:layout_height="120dp" android:background="@drawable/shimmer_background" />
+        </LinearLayout>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="جاري تحميل البيانات..."
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginTop="16dp" />
-    </LinearLayout>
-
-    <!-- 3. MAIN CONTENT -->
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/nestedScroll"
+        <!-- 2. LOADING OVERLAY -->
+        <LinearLayout
+            android:id="@+id/loadingOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="?attr/colorSurface"
+            android:visibility="gone"
+            android:alpha="0.95">
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:indeterminate="true" app:indicatorColor="?attr/colorPrimary" app:indicatorSize="48dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="جاري تحميل البيانات..." android:textColor="?attr/colorOnSurfaceVariant" android:layout_marginTop="16dp" />
+        </LinearLayout>
+
+        <!-- ✅ 3. بطاقة ملخص الوردية (تظهر لموظفي المبيعات فقط) -->
+        <com.example.uhf.widget.ShiftSummaryCardView
+            android:id="@+id/cardShiftSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <!-- ✅ 4. CAROUSEL (البطاقات العلوية) -->
+        <HorizontalScrollView
+            android:id="@+id/horizontalScrollCarousel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:clipToPadding="false"
-            android:fillViewport="true"
-            android:overScrollMode="never"
-            android:paddingBottom="32dp">
+            android:paddingHorizontal="16dp"
+            android:scrollbars="none"
+            android:layoutDirection="locale">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:id="@+id/cardsContainer"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingTop="16dp">
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <!-- 3.1 بطاقة ملخص الوردية (تظهر لموظفي المبيعات فقط) -->
-                <com.example.uhf.widget.ShiftSummaryCardView
-                    android:id="@+id/cardShiftSummary"
-                    android:layout_width="match_parent"
+                <!-- 4.1 HERO BALANCE CARD -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/heroBalanceCard"
+                    android:layout_width="300dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="16dp"
-                    android:layout_marginBottom="16dp"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
-
-                <!-- 3.2 CAROUSEL (البطاقات العلوية) -->
-                <HorizontalScrollView
-                    android:id="@+id/horizontalScrollCarousel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:clipToPadding="false"
-                    android:paddingHorizontal="16dp"
-                    android:scrollbars="none"
-                    android:layoutDirection="locale">
-
-                    <LinearLayout
-                        android:id="@+id/cardsContainer"
-                        android:layout_width="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    app:cardBackgroundColor="@android:color/transparent"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="4dp"
+                    app:strokeColor="@color/gold_card_stroke"
+                    app:strokeWidth="1dp">
+                    <FrameLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <!-- 3.2.1 HERO BALANCE CARD -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/heroBalanceCard"
-                            android:layout_width="300dp"
+                        android:minHeight="220dp"
+                        android:background="@drawable/bg_hero_gold_gradient">
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="12dp"
-                            app:cardBackgroundColor="@android:color/transparent"
-                            app:cardCornerRadius="24dp"
-                            app:cardElevation="4dp"
-                            app:strokeColor="?attr/colorOutlineVariant"
-                            app:strokeWidth="1dp">
-
-                            <FrameLayout
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:minHeight="220dp"
-                                android:background="@drawable/bg_hero_gold_gradient">
-
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="vertical"
-                                    android:padding="20dp">
-
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:gravity="center_vertical"
-                                        android:orientation="horizontal">
-
-                                        <TextView
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:text="إجمالي قيمة المخزون"
-                                            android:textColor="@color/hero_text_primary"
-                                            android:textSize="16sp"
-                                            android:textStyle="bold" />
-
-                                        <ImageButton
-                                            android:id="@+id/btnToggleHeroVisibility"
-                                            android:layout_width="28dp"
-                                            android:layout_height="28dp"
-                                            android:background="?attr/selectableItemBackgroundBorderless"
-                                            android:src="@drawable/ic_eye_off"
-                                            app:tint="@color/hero_text_primary" />
-                                    </LinearLayout>
-
-                                    <TextView
-                                        android:id="@+id/tvHeroBalance"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="12dp"
-                                        android:text="••••••••"
-                                        android:textColor="@color/hero_text_primary"
-                                        android:textSize="32sp"
-                                        android:textStyle="bold" />
-
-                                    <!-- ✅ تمت إعادة هذا العنصر المفقود -->
-                                    <TextView
-                                        android:id="@+id/tvHeroTrend"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:textSize="12sp"
-                                        android:textColor="@color/hero_text_secondary"
-                                        android:visibility="gone"
-                                        tools:text="▲ 2.5%" />
-
-                                    <LinearLayout
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="20dp"
-                                        android:orientation="horizontal"
-                                        android:weightSum="2">
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="vertical">
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:text="الوزن الإجمالي"
-                                                android:textColor="@color/hero_text_secondary"
-                                                android:textSize="12sp" />
-                                            <TextView
-                                                android:id="@+id/tvHeroSubtitle"
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginTop="4dp"
-                                                android:text="••• g"
-                                                android:textColor="@color/hero_text_primary"
-                                                android:textSize="16sp"
-                                                android:textStyle="bold" />
-                                        </LinearLayout>
-
-                                        <LinearLayout
-                                            android:layout_width="0dp"
-                                            android:layout_height="wrap_content"
-                                            android:layout_weight="1"
-                                            android:orientation="vertical">
-                                            <TextView
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:text="عدد القطع"
-                                                android:textColor="@color/hero_text_secondary"
-                                                android:textSize="12sp" />
-                                            <TextView
-                                                android:id="@+id/tvHeroItemCount"
-                                                android:layout_width="wrap_content"
-                                                android:layout_height="wrap_content"
-                                                android:layout_marginTop="4dp"
-                                                android:text="•••"
-                                                android:textColor="@color/hero_text_primary"
-                                                android:textSize="16sp"
-                                                android:textStyle="bold" />
-                                        </LinearLayout>
-                                    </LinearLayout>
-                                    
-                                    <!-- ✅ تمت إعادة هذه العناصر المفقودة -->
-                                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="3">
-                                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="USD" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
-                                            <TextView android:id="@+id/tvHeroValueUSD" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" android:textStyle="bold" />
-                                        </LinearLayout>
-                                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SAR" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
-                                            <TextView android:id="@+id/tvHeroValueSAR" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" />
-                                        </LinearLayout>
-                                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="YER" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
-                                            <TextView android:id="@+id/tvHeroValueYER" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" />
-                                        </LinearLayout>
-                                    </LinearLayout>
-
-                                </LinearLayout>
-                            </FrameLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <!-- 3.2.2 LIVE GOLD PRICES CARD -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/cardGoldPrices"
-                            android:layout_width="300dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="12dp"
-                            app:cardBackgroundColor="@color/gold_card_bg"
-                            app:cardCornerRadius="24dp"
-                            app:cardElevation="2dp"
-                            app:strokeColor="@color/gold_card_stroke"
-                            app:strokeWidth="1dp">
-
+                            android:orientation="vertical"
+                            android:padding="20dp">
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:orientation="vertical"
-                                android:padding="20dp">
-
-                                <RelativeLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginBottom="16dp">
-
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_alignParentEnd="true"
-                                        android:layout_centerVertical="true"
-                                        android:text="أسعار الذهب العالمية"
-                                        android:textColor="?attr/colorOnSurface"
-                                        android:textSize="15sp"
-                                        android:textStyle="bold" />
-
-                                    <FrameLayout
-                                        android:layout_width="32dp"
-                                        android:layout_height="32dp"
-                                        android:layout_alignParentStart="true"
-                                        android:layout_centerVertical="true">
-                                        <ImageButton
-                                            android:id="@+id/btnRefreshGold"
-                                            android:layout_width="32dp"
-                                            android:layout_height="32dp"
-                                            android:background="?attr/selectableItemBackgroundBorderless"
-                                            android:src="@android:drawable/ic_popup_sync"
-                                            app:tint="@color/gold_text_accent" />
-                                        <com.google.android.material.progressindicator.CircularProgressIndicator
-                                            android:id="@+id/pbGoldLoading"
-                                            android:layout_width="wrap_content"
-                                            android:layout_height="wrap_content"
-                                            android:layout_gravity="center"
-                                            android:indeterminate="true"
-                                            android:visibility="gone"
-                                            app:indicatorColor="@color/gold_text_accent"
-                                            app:indicatorSize="16dp"
-                                            app:trackThickness="2dp" />
-                                    </FrameLayout>
-                                </RelativeLayout>
-
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:gravity="center"
-                                    android:orientation="vertical">
-                                    <TextView
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="سعر الأونصة العالمي"
-                                        android:textColor="?attr/colorOnSurfaceVariant"
-                                        android:textSize="13sp" />
-                                    <TextView
-                                        android:id="@+id/tvOuncePrice"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="4dp"
-                                        android:text="$0.00"
-                                        android:textColor="@color/gold_text_accent"
-                                        android:textSize="32sp"
-                                        android:textStyle="bold" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+                                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="إجمالي قيمة المخزون" android:textColor="@color/hero_text_primary" android:textSize="16sp" android:textStyle="bold" />
+                                <ImageButton android:id="@+id/btnToggleHeroVisibility" android:layout_width="28dp" android:layout_height="28dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="@color/hero_text_primary" />
+                            </LinearLayout>
+                            <TextView android:id="@+id/tvHeroBalance" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="••••••••" android:textColor="@color/hero_text_primary" android:textSize="32sp" android:textStyle="bold" />
+                            <TextView android:id="@+id/tvHeroTrend" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textSize="12sp" android:textColor="@color/hero_text_secondary" android:visibility="gone" tools:text="▲ 2.5%" />
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:orientation="horizontal" android:weightSum="2">
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن الإجمالي" android:textColor="@color/hero_text_secondary" android:textSize="12sp" />
+                                    <TextView android:id="@+id/tvHeroSubtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="••• g" android:textColor="@color/hero_text_primary" android:textSize="16sp" android:textStyle="bold" />
                                 </LinearLayout>
-
-                                <LinearLayout
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="16dp"
-                                    android:orientation="horizontal"
-                                    android:weightSum="3">
-                                    <TextView android:id="@+id/tvGoldPrice24" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textColor="@color/gold_text_accent" android:textSize="13sp" android:textStyle="bold" />
-                                    <TextView android:id="@+id/tvGoldPrice21" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="13sp" />
-                                    <TextView android:id="@+id/tvGoldPrice18" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="13sp" />
-                                </LinearLayout>
-
-                                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:gravity="center_vertical" android:orientation="horizontal">
-                                    <TextView android:id="@+id/tvGoldTrend" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:layout_marginEnd="4dp"/>
-                                    <TextView android:id="@+id/tvGoldChange" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:layout_marginEnd="12dp" />
-                                    <TextView android:id="@+id/tvPriceSource" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="end" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="11sp" />
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="عدد القطع" android:textColor="@color/hero_text_secondary" android:textSize="12sp" />
+                                    <TextView android:id="@+id/tvHeroItemCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="•••" android:textColor="@color/hero_text_primary" android:textSize="16sp" android:textStyle="bold" />
                                 </LinearLayout>
                             </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
-
-                        <!-- 3.2.3 SALES SUMMARY CARD -->
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/salesSummaryCard"
-                            android:layout_width="300dp"
-                            android:layout_height="wrap_content"
-                            app:cardBackgroundColor="@color/gold_card_bg"
-                            app:cardCornerRadius="24dp"
-                            app:cardElevation="2dp"
-                            app:strokeColor="@color/gold_card_stroke"
-                            app:strokeWidth="1dp">
-
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="220dp" android:orientation="vertical" android:padding="20dp">
-                                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="ملخص المبيعات" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:textStyle="bold" />
-                                    <ImageButton android:id="@+id/btnToggleSalesVisibility" android:layout_width="28dp" android:layout_height="28dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="@color/gold_text_accent" />
+                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="3">
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="USD" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
+                                    <TextView android:id="@+id/tvHeroValueUSD" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" android:textStyle="bold" />
                                 </LinearLayout>
-
-                                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:gravity="center_vertical" android:orientation="horizontal" android:weightSum="5">
-                                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.5" android:gravity="center" android:orientation="vertical">
-                                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="اليوم" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp" />
-                                        <TextView android:id="@+id/tvSalesToday" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="••••" android:textColor="@color/gold_text_accent" android:textSize="18sp" android:textStyle="bold" />
-                                    </LinearLayout>
-                                    <View android:layout_width="1dp" android:layout_height="40dp" android:background="?attr/colorOutlineVariant" android:alpha="0.5" />
-                                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.75" android:gravity="center" android:orientation="vertical">
-                                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الشهر" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp" />
-                                        <TextView android:id="@+id/tvSalesMonth" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="••••" android:textColor="@color/gold_text_accent" android:textSize="18sp" android:textStyle="bold" />
-                                    </LinearLayout>
-                                    <View android:layout_width="1dp" android:layout_height="40dp" android:background="?attr/colorOutlineVariant" android:alpha="0.5" />
-                                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.75" android:gravity="center" android:orientation="vertical">
-                                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="السنة" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp" />
-                                        <TextView android:id="@+id/tvSalesYear" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="••••" android:textColor="@color/gold_text_accent" android:textSize="18sp" android:textStyle="bold" />
-                                    </LinearLayout>
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SAR" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
+                                    <TextView android:id="@+id/tvHeroValueSAR" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" />
+                                </LinearLayout>
+                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="YER" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
+                                    <TextView android:id="@+id/tvHeroValueYER" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" />
                                 </LinearLayout>
                             </LinearLayout>
-                        </com.google.android.material.card.MaterialCardView>
+                        </LinearLayout>
+                    </FrameLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 4.2 LIVE GOLD PRICES CARD -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardGoldPrices"
+                    android:layout_width="300dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    app:cardBackgroundColor="@color/gold_card_bg"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="@color/gold_card_stroke"
+                    app:strokeWidth="1dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+                        <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:layout_centerVertical="true" android:text="أسعار الذهب العالمية" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:textStyle="bold" />
+                            <FrameLayout android:layout_width="32dp" android:layout_height="32dp" android:layout_alignParentStart="true" android:layout_centerVertical="true">
+                                <ImageButton android:id="@+id/btnRefreshGold" android:layout_width="32dp" android:layout_height="32dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@android:drawable/ic_popup_sync" app:tint="@color/gold_text_accent" />
+                                <com.google.android.material.progressindicator.CircularProgressIndicator android:id="@+id/pbGoldLoading" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:indeterminate="true" android:visibility="gone" app:indicatorColor="@color/gold_text_accent" app:indicatorSize="16dp" app:trackThickness="2dp" />
+                            </FrameLayout>
+                        </RelativeLayout>
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="سعر الأونصة العالمي" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="13sp" />
+                            <TextView android:id="@+id/tvOuncePrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="$0.00" android:textColor="@color/gold_text_accent" android:textSize="32sp" android:textStyle="bold" />
+                        </LinearLayout>
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="3">
+                            <TextView android:id="@+id/tvGoldPrice24" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textColor="@color/gold_text_accent" android:textSize="13sp" android:textStyle="bold" />
+                            <TextView android:id="@+id/tvGoldPrice21" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="13sp" />
+                            <TextView android:id="@+id/tvGoldPrice18" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="13sp" />
+                        </LinearLayout>
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:gravity="center_vertical" android:orientation="horizontal">
+                            <TextView android:id="@+id/tvGoldTrend" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:layout_marginEnd="4dp"/>
+                            <TextView android:id="@+id/tvGoldChange" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:layout_marginEnd="12dp" />
+                            <TextView android:id="@+id/tvPriceSource" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="end" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="11sp" />
+                        </LinearLayout>
                     </LinearLayout>
-                </HorizontalScrollView>
+                </com.google.android.material.card.MaterialCardView>
 
-                <!-- 3.3 Dots Indicator -->
-                <LinearLayout
-                    android:id="@+id/dotsIndicator"
-                    android:layout_width="wrap_content"
+                <!-- 4.3 SALES SUMMARY CARD -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/salesSummaryCard"
+                    android:layout_width="300dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="24dp"
-                    android:orientation="horizontal">
-                    <View android:id="@+id/dot1" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_active" />
-                    <View android:id="@+id/dot2" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
-                    <View android:id="@+id/dot3" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
-                </LinearLayout>
-
-                <!-- 3.4 QUICK ACTIONS (حاوية فارغة يتم بناؤها برمجياً) -->
-                <LinearLayout
-                    android:id="@+id/llQuickActionsContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:paddingHorizontal="16dp"
-                    android:layout_marginBottom="24dp" />
-
-                <!-- 3.5 ALERTS STRIP -->
-                <LinearLayout
-                    android:id="@+id/alertsStrip"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="16dp"
-                    android:layout_marginBottom="16dp"
-                    android:background="@drawable/bg_alert_strip"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="12dp"
-                    android:visibility="gone">
-                    <TextView android:id="@+id/tvAlertIcon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️" android:textSize="18sp" />
-                    <TextView android:id="@+id/tvAlertMessage" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:textColor="?attr/colorOnSurface" android:textSize="13sp" />
-                    <TextView android:id="@+id/tvAlertAction" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="عرض" android:textColor="?attr/colorPrimary" android:textStyle="bold" />
-                </LinearLayout>
-
-                <!-- 3.6 SECTIONS (المخزون، الكسر، الرسوم البيانية) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="16dp">
-
-                    <!-- 1. INVENTORY BY KARAT -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardInventoryByKarat"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                                <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_inventory_items" app:tint="?attr/colorPrimary" />
-                                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="المخزون حسب العيار" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
-                                <ImageButton android:id="@+id/btnToggleInventoryVisibility" android:layout_width="32dp" android:layout_height="32dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="?attr/colorOnSurfaceVariant" />
-                            </LinearLayout>
-                            <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:clipToPadding="false" android:scrollbars="none">
-                                <LinearLayout android:id="@+id/llInventoryByKarat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" />
-                            </HorizontalScrollView>
-                            <TextView android:id="@+id/tvKaratEmptyState" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:padding="16dp" android:text="لا توجد بيانات" android:textColor="?attr/colorOnSurfaceVariant" android:visibility="gone" />
+                    app:cardBackgroundColor="@color/gold_card_bg"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="2dp"
+                    app:strokeColor="@color/gold_card_stroke"
+                    app:strokeWidth="1dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="220dp" android:orientation="vertical" android:padding="20dp">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="ملخص المبيعات" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:textStyle="bold" />
+                            <ImageButton android:id="@+id/btnToggleSalesVisibility" android:layout_width="28dp" android:layout_height="28dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="@color/gold_text_accent" />
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- 2. SCRAP GOLD SUMMARY -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardScrapGold"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                                <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
-                                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="مخزون كسر الذهب" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
-                                <ImageButton android:id="@+id/btnToggleScrapVisibility" android:layout_width="32dp" android:layout_height="32dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="?attr/colorOnSurfaceVariant" />
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:gravity="center_vertical" android:orientation="horizontal" android:weightSum="5">
+                            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.5" android:gravity="center" android:orientation="vertical">
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="اليوم" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp" />
+                                <TextView android:id="@+id/tvSalesToday" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="••••" android:textColor="@color/gold_text_accent" android:textSize="18sp" android:textStyle="bold" />
                             </LinearLayout>
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="2">
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن الإجمالي" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                    <TextView android:id="@+id/tvScrapWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="••••••" android:textColor="?attr/colorPrimary" android:textSize="20sp" android:textStyle="bold"/>
-                                </LinearLayout>
-                                <View android:layout_width="1dp" android:layout_height="match_parent" android:background="?attr/colorOutlineVariant"/>
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="القيمة التقديرية" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                    <TextView android:id="@+id/tvScrapValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="••••••" android:textColor="?attr/colorOnSurface" android:textSize="20sp" android:textStyle="bold"/>
-                                </LinearLayout>
+                            <View android:layout_width="1dp" android:layout_height="40dp" android:background="?attr/colorOutlineVariant" android:alpha="0.5" />
+                            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.75" android:gravity="center" android:orientation="vertical">
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الشهر" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp" />
+                                <TextView android:id="@+id/tvSalesMonth" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="••••" android:textColor="@color/gold_text_accent" android:textSize="18sp" android:textStyle="bold" />
                             </LinearLayout>
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal">
-                                <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapBuy" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="شراء" android:textSize="12sp" />
-                                <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapHistory" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="السجل" android:textSize="12sp" />
-                                <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapBatches" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="الدفعات" android:textSize="12sp" />
+                            <View android:layout_width="1dp" android:layout_height="40dp" android:background="?attr/colorOutlineVariant" android:alpha="0.5" />
+                            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.75" android:gravity="center" android:orientation="vertical">
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="السنة" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp" />
+                                <TextView android:id="@+id/tvSalesYear" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="••••" android:textColor="@color/gold_text_accent" android:textSize="18sp" android:textStyle="bold" />
                             </LinearLayout>
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- 3. SCRAP AGING -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardScrapAging"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                                <TextView android:id="@+id/tvAgingStatusIcon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🟢" android:textSize="20sp" />
-                                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="حالة أعمار الكسر" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
-                                <TextView android:id="@+id/tvAgingStatusLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="سليم" android:textColor="#16A34A" android:textStyle="bold" android:textSize="12sp" />
-                            </LinearLayout>
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="2">
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن القديم" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                    <TextView android:id="@+id/tvAgingWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0.000 g" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
-                                </LinearLayout>
-                                <View android:layout_width="1dp" android:layout_height="match_parent" android:background="?attr/colorOutlineVariant"/>
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الفواتير المعلقة" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
-                                    <TextView android:id="@+id/tvAgingCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
-                                </LinearLayout>
-                            </LinearLayout>
-                            <LinearLayout android:id="@+id/llAgingAlert" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="#22DC2626" android:padding="12dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
-                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️" android:textSize="14sp" />
-                                <TextView android:id="@+id/tvAgingAlertText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:textColor="#DC2626" android:textSize="12sp" android:textStyle="bold" />
-                            </LinearLayout>
-                            <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenAgingReport" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="عرض تقرير الأعمار" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- 4. CHARTS -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardCharts"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
-                        app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                        app:cardCornerRadius="20dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="أداء المبيعات (7 أيام)" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
-                            <com.github.mikephil.charting.charts.LineChart android:id="@+id/lineChartSales" android:layout_width="match_parent" android:layout_height="200dp" android:layout_marginTop="12dp" />
-                            <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="16dp" android:background="?attr/colorOutlineVariant"/>
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المبيعات حسب العيار" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
-                            <com.github.mikephil.charting.charts.PieChart android:id="@+id/pieChartKarat" android:layout_width="match_parent" android:layout_height="200dp" android:layout_marginTop="12dp" />
-                        </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- 5. RECENT ACTIVITY -->
-                    <LinearLayout android:id="@+id/recentActivityHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:gravity="center_vertical" android:orientation="horizontal">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="النشاط الأخير" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="16sp" />
-                        <TextView android:id="@+id/tvViewAllActivity" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="8dp" android:text="عرض الكل" android:textColor="?attr/colorPrimary" android:textStyle="bold" />
                     </LinearLayout>
-                    <LinearLayout android:id="@+id/llRecentActivity" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp" android:orientation="vertical" />
-                </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-        </androidx.core.widget.NestedScrollView>
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+        </HorizontalScrollView>
+
+        <!-- 5. Dots Indicator -->
+        <LinearLayout
+            android:id="@+id/dotsIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="24dp"
+            android:orientation="horizontal">
+            <View android:id="@+id/dot1" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_active" />
+            <View android:id="@+id/dot2" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
+            <View android:id="@+id/dot3" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginHorizontal="4dp" android:background="@drawable/dot_inactive" />
+        </LinearLayout>
+
+        <!-- 6. QUICK ACTIONS (تُبنى برمجياً) -->
+        <LinearLayout
+            android:id="@+id/llQuickActionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingHorizontal="16dp"
+            android:layout_marginBottom="24dp" />
+
+        <!-- 7. ALERTS STRIP -->
+        <LinearLayout
+            android:id="@+id/alertsStrip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_alert_strip"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:visibility="gone">
+            <TextView android:id="@+id/tvAlertIcon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️" android:textSize="18sp" />
+            <TextView android:id="@+id/tvAlertMessage" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:textColor="?attr/colorOnSurface" android:textSize="13sp" />
+            <TextView android:id="@+id/tvAlertAction" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="عرض" android:textColor="?attr/colorPrimary" android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 8. DATA SECTIONS (المخزون، الكسر، الرسوم البيانية) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp">
+
+            <!-- 8.1 INVENTORY BY KARAT -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardInventoryByKarat"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_inventory_items" app:tint="?attr/colorPrimary" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="المخزون حسب العيار" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
+                        <ImageButton android:id="@+id/btnToggleInventoryVisibility" android:layout_width="32dp" android:layout_height="32dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                    <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:clipToPadding="false" android:scrollbars="none">
+                        <LinearLayout android:id="@+id/llInventoryByKarat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" />
+                    </HorizontalScrollView>
+                    <TextView android:id="@+id/tvKaratEmptyState" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:padding="16dp" android:text="لا توجد بيانات" android:textColor="?attr/colorOnSurfaceVariant" android:visibility="gone" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 8.2 SCRAP GOLD SUMMARY -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardScrapGold"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_gold_scrap" app:tint="?attr/colorPrimary" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="مخزون كسر الذهب" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
+                        <ImageButton android:id="@+id/btnToggleScrapVisibility" android:layout_width="32dp" android:layout_height="32dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="2">
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن الإجمالي" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
+                            <TextView android:id="@+id/tvScrapWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="••••••" android:textColor="?attr/colorPrimary" android:textSize="20sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="?attr/colorOutlineVariant"/>
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="القيمة التقديرية" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
+                            <TextView android:id="@+id/tvScrapValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="••••••" android:textColor="?attr/colorOnSurface" android:textSize="20sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal">
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapBuy" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="شراء" android:textSize="12sp" />
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapHistory" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="السجل" android:textSize="12sp" />
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenScrapBatches" style="@style/Widget.Material3.Button.TextButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="الدفعات" android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 8.3 SCRAP AGING -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardScrapAging"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                        <TextView android:id="@+id/tvAgingStatusIcon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🟢" android:textSize="20sp" />
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="حالة أعمار الكسر" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
+                        <TextView android:id="@+id/tvAgingStatusLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="سليم" android:textColor="#16A34A" android:textStyle="bold" android:textSize="12sp" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="2">
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن القديم" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
+                            <TextView android:id="@+id/tvAgingWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0.000 g" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="?attr/colorOutlineVariant"/>
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الفواتير المعلقة" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="12sp"/>
+                            <TextView android:id="@+id/tvAgingCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="0" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                    </LinearLayout>
+                    <LinearLayout android:id="@+id/llAgingAlert" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:background="#22DC2626" android:padding="12dp" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="gone">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️" android:textSize="14sp" />
+                        <TextView android:id="@+id/tvAgingAlertText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:textColor="#DC2626" android:textSize="12sp" android:textStyle="bold" />
+                    </LinearLayout>
+                    <com.google.android.material.button.MaterialButton android:id="@+id/btnOpenAgingReport" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="عرض تقرير الأعمار" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 8.4 CHARTS -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardCharts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="أداء المبيعات (7 أيام)" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
+                    <com.github.mikephil.charting.charts.LineChart android:id="@+id/lineChartSales" android:layout_width="match_parent" android:layout_height="200dp" android:layout_marginTop="12dp" />
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginVertical="16dp" android:background="?attr/colorOutlineVariant"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المبيعات حسب العيار" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="15sp" />
+                    <com.github.mikephil.charting.charts.PieChart android:id="@+id/pieChartKarat" android:layout_width="match_parent" android:layout_height="200dp" android:layout_marginTop="12dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 8.5 RECENT ACTIVITY -->
+            <LinearLayout android:id="@+id/recentActivityHeader" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:gravity="center_vertical" android:orientation="horizontal">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="النشاط الأخير" android:textColor="?attr/colorOnSurface" android:textStyle="bold" android:textSize="16sp" />
+                <TextView android:id="@+id/tvViewAllActivity" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="8dp" android:text="عرض الكل" android:textColor="?attr/colorPrimary" android:textStyle="bold" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/llRecentActivity" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp" android:orientation="vertical" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
