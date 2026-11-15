@@ -81,7 +81,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     private final List<MiraSaleItem> saleList = new ArrayList<>();
     private final List<MiraSaleItem> filteredList = new ArrayList<>();
 
-    private int currentPage = 0;
+    private int currentPage = 1;
     private boolean isLoading = false;
     private boolean isLastPage = false;
     private boolean hasMoreData = true;
@@ -383,21 +383,21 @@ public class MiraSalesHistoryFragment extends Fragment {
     private final Runnable searchRunnable = () -> filterSales(searchQuery);
 
     private void refreshSales(boolean showProgress) {
-        if (!isAdded()) return;
-        if (!permissionManager.canView("sales_history") &&
-            !permissionManager.isPosOperator() &&
-            !permissionManager.isManager()) {
-            return;
-        }
-
-        currentPage = 0;
-        isLastPage = false;
-        hasMoreData = true;
-        isLoading = false;
-
-        if (showProgress) showLoadingState();
-        loadSalesPage(0, true);
+    if (!isAdded()) return;
+    if (!permissionManager.canView("sales_history") &&
+        !permissionManager.isPosOperator() &&
+        !permissionManager.isManager()) {
+        return;
     }
+
+    currentPage = 1; // ✅ تبدأ من 1
+    isLastPage = false;
+    hasMoreData = true;
+    isLoading = false;
+
+    if (showProgress) showLoadingState();
+    loadSalesPage(1, true); // ✅ تطلب الصفحة 1
+}
 
     private void loadMoreSales() {
         if (isLoading || !hasMoreData || isLastPage) {
@@ -443,82 +443,98 @@ public class MiraSalesHistoryFragment extends Fragment {
                 }
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray sales = null;
-                    int totalCount = 0;
-                    boolean hasMore = false;
+    JSONArray sales = null;
+    int totalCount = 0;
+    boolean hasMore = false;
 
-                    if (response.data.has("sales")) {
-                        sales = response.data.optJSONArray("sales");
-                    } else if (response.data.has("data")) {
-                        Object dataObj = response.data.opt("data");
-                        if (dataObj instanceof JSONArray) {
-                            sales = (JSONArray) dataObj;
-                        } else if (dataObj instanceof JSONObject) {
-                            JSONObject dataJson = (JSONObject) dataObj;
-                            sales = dataJson.optJSONArray("sales");
-                            if (sales == null) sales = dataJson.optJSONArray("items");
-                            totalCount = dataJson.optInt("total", dataJson.optInt("total_count", 0));
-                            hasMore = dataJson.optBoolean("has_more", false);
-                        }
-                    }
+    // ✅ استخراج البيانات من هيكل Laravel Paginator
+    if (response.data.has("data")) {
+        Object dataObj = response.data.opt("data");
+        if (dataObj instanceof JSONObject) {
+            JSONObject dataJson = (JSONObject) dataObj;
+            
+            // 1. استخراج المصفوفة
+            sales = dataJson.optJSONArray("data"); // Laravel يضع المصفوفة هنا
+            if (sales == null) sales = dataJson.optJSONArray("sales");
+            if (sales == null) sales = dataJson.optJSONArray("items");
 
-                    if (totalCount == 0) totalCount = response.data.optInt("total", response.data.optInt("total_count", 0));
-                    if (!hasMore) hasMore = response.data.optBoolean("has_more", false);
+            // 2. استخراج بيانات الترقيم
+            totalCount = dataJson.optInt("total", 0);
+            int lastPage = dataJson.optInt("last_page", 1);
+            int currentP = dataJson.optInt("current_page", page);
+            
+            // ✅ إذا كنا في الصفحة الأخيرة، لا يوجد المزيد
+            hasMore = currentP < lastPage; 
+        } else if (dataObj instanceof JSONArray) {
+            sales = (JSONArray) dataObj;
+        }
+    } else if (response.data.has("sales")) {
+        sales = response.data.optJSONArray("sales");
+    }
 
-                    List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
+    if (totalCount == 0) totalCount = response.data.optInt("total", 0);
+    if (!hasMore) hasMore = response.data.optBoolean("has_more", false);
 
-                    if (selectedBranchId > 0) {
-                        List<MiraSaleItem> filteredByBranch = new ArrayList<>();
-                        for (MiraSaleItem item : items) {
-                            if (item.branchId == selectedBranchId) filteredByBranch.add(item);
-                        }
-                        items = filteredByBranch;
-                    }
+    List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
 
-                    final List<MiraSaleItem> finalItems = items;
-                    final int finalTotalCount = totalCount;
-                    final boolean finalHasMore = hasMore;
+    // الفلترة المحلية للفرع (احتياطية)
+    if (selectedBranchId > 0) {
+        List<MiraSaleItem> filteredByBranch = new ArrayList<>();
+        for (MiraSaleItem item : items) {
+            if (item.branchId == selectedBranchId) filteredByBranch.add(item);
+        }
+        items = filteredByBranch;
+    }
 
-                    if (sales != null && sales.length() > 0) saveSalesOffline(sales, page);
+    final List<MiraSaleItem> finalItems = items;
+    final int finalTotalCount = totalCount;
+    final boolean finalHasMore = hasMore;
 
-                    boolean isLast = finalItems.size() < PAGE_SIZE ||
-                                   (finalTotalCount > 0 && (page + 1) * PAGE_SIZE >= finalTotalCount) ||
-                                   !finalHasMore;
+    if (sales != null && sales.length() > 0) saveSalesOffline(sales, page);
 
-                    mainHandler.post(() -> {
-                        if (!isAdded()) return;
+    // ✅ تحديد هل هذه آخر صفحة؟
+    boolean isLast = !finalHasMore || finalItems.size() < PAGE_SIZE;
 
-                        isLoading = false;
-                        hideLoadingState();
-                        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
-                        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
+    mainHandler.post(() -> {
+        if (!isAdded()) return;
 
-                        if (isRefresh) {
-                            saleList.clear();
-                            saleList.addAll(finalItems);
-                            totalItems = finalTotalCount > 0 ? finalTotalCount : finalItems.size();
-                            currentPage = 0;
-                            hasMoreData = !isLast && finalItems.size() == PAGE_SIZE;
-                            isLastPage = isLast;
-                        } else {
-                            saleList.addAll(finalItems);
-                            currentPage = page;
-                            hasMoreData = !isLast && finalItems.size() == PAGE_SIZE;
-                            isLastPage = isLast;
-                        }
+        isLoading = false;
+        hideLoadingState();
+        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
+        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
 
-                        filterSales(searchQuery);
-                        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                        if (isLastPage && tvEndOfList != null) tvEndOfList.setVisibility(View.VISIBLE);
-                    });
-                } else {
-                    mainHandler.post(() -> {
-                        if (!isAdded()) return;
-                        hideLoadingState();
-                        isLoading = false;
-                        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                    });
-                }
+        if (isRefresh) {
+            saleList.clear();
+            saleList.addAll(finalItems);
+            totalItems = finalTotalCount > 0 ? finalTotalCount : finalItems.size();
+            currentPage = 1;
+            hasMoreData = !isLast;
+            isLastPage = isLast;
+        } else {
+            saleList.addAll(finalItems);
+            currentPage = page;
+            hasMoreData = !isLast;
+            isLastPage = isLast;
+        }
+
+        filterSales(searchQuery);
+        
+        if (saleList.isEmpty()) {
+            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+        }
+        
+        if (isLastPage && tvEndOfList != null && !saleList.isEmpty()) {
+            tvEndOfList.setVisibility(View.VISIBLE);
+        }
+    });
+} else {
+    mainHandler.post(() -> {
+        if (!isAdded()) return;
+        hideLoadingState();
+        isLoading = false;
+        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+    });
+}
             } catch (Exception e) {
                 Log.e(TAG, "Exception loading sales", e);
                 mainHandler.post(() -> {
