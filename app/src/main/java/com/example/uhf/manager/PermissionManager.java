@@ -588,10 +588,13 @@ public class PermissionManager {
     }
 
     public boolean canViewDashboardCharts() {
-        return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
-            || isBranchManager() || isAccountant() || isAuditor()
-            || canView(FEATURE_REPORTS);
-    }
+    return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
+        || isBranchManager() || isAccountant() || isAuditor()
+        || isPosOperator() // ✅ إضافة الكاشير ليتمكن من رؤية رسمه البياني
+        || canView(FEATURE_REPORTS);
+}
+
+
 
     public boolean canViewDashboardAlerts() {
         return isSystemAdmin() || isOrgAdmin()
@@ -600,8 +603,8 @@ public class PermissionManager {
     }
 
     public boolean canViewDashboardRecentActivity() {
-        return true;
-    }
+    return true; // ✅ السماح للجميع (بما فيهم الكاشير) برؤية العمليات الأخيرة
+}
 
     public boolean canRefreshGoldManually() {
         return isSystemAdmin() || isOrgAdmin() || isFinanceManager()
