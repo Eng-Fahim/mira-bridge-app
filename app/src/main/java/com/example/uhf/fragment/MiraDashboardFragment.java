@@ -585,102 +585,129 @@ public class MiraDashboardFragment extends Fragment {
             fetchDashboardCharts();
         } catch (Exception e) { Log.e(TAG, "fetchData", e); isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
     }
-
+    
     private void processData(JSONObject data) {
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            if (inv == null) inv = data.optJSONObject("inventory_data");
-            
-            if (inv != null) {
-                currentItemCount = inv.optInt("total_items", 0);
-                currentTotalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0));
-                currentInventoryValue = inv.optDouble("total_value", 0.0);
-                
-                JSONArray byKarat = inv.optJSONArray("by_karat");
-                if (byKarat == null) byKarat = inv.optJSONArray("karats"); 
-                
-                List<KaratInventory> karatItems = new ArrayList<>();
-                double calculatedWeight = 0;
-                double calculatedValue = 0;
+    try {
+        // ✅ معالجة خاصة لأمن البوابات (يخرج من الدالة مباشرة)
+        if (permissionManager != null && permissionManager.isGateUser()) {
+            JSONObject gates = data.optJSONObject("gates");
+            if (gates != null && alertsStrip != null) {
+                int scans = gates.optInt("scans_today", 0);
+                int allowed = gates.optInt("allowed_today", 0);
+                int denied = gates.optInt("denied_today", 0);
+                alertsStrip.setVisibility(View.VISIBLE);
+                if (tvAlertIcon != null) tvAlertIcon.setText("🛡️");
+                if (tvAlertMessage != null) {
+                    tvAlertMessage.setText(String.format(Locale.US,
+                        "المسح: %d | مسموح: %d | مرفوض: %d", scans, allowed, denied));
+                }
+                if (tvAlertAction != null) tvAlertAction.setVisibility(View.GONE);
+            }
+            return;
+        }
 
-                if (byKarat != null) {
-                    for (int i = 0; i < byKarat.length(); i++) {
-                        JSONObject k = byKarat.optJSONObject(i);
-                        if (k != null) { 
-                            int karat = k.optInt("karat", 0); 
-                            double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
-                            
-                            if (karat > 0) {
-                                karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight)); 
-                                calculatedWeight += weight;
-                                if (priceManager != null) {
-                                    double price = priceManager.getGoldPricePerGram(karat);
-                                    calculatedValue += (weight * price);
-                                }
+        // ═══════════════════════════════════════════════════════
+        //  باقي المنطق (مخزون + مبيعات + POS)
+        // ═══════════════════════════════════════════════════════
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv == null) inv = data.optJSONObject("inventory_data");
+
+        if (inv != null) {
+            currentItemCount = inv.optInt("total_items", 0);
+            currentTotalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0));
+            currentInventoryValue = inv.optDouble("total_value", 0.0);
+
+            JSONArray byKarat = inv.optJSONArray("by_karat");
+            if (byKarat == null) byKarat = inv.optJSONArray("karats");
+
+            List<KaratInventory> karatItems = new ArrayList<>();
+            double calculatedWeight = 0;
+            double calculatedValue = 0;
+
+            if (byKarat != null) {
+                for (int i = 0; i < byKarat.length(); i++) {
+                    JSONObject k = byKarat.optJSONObject(i);
+                    if (k != null) {
+                        int karat = k.optInt("karat", 0);
+                        double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
+                        if (karat > 0) {
+                            karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight));
+                            calculatedWeight += weight;
+                            if (priceManager != null) {
+                                double price = priceManager.getGoldPricePerGram(karat);
+                                calculatedValue += (weight * price);
                             }
                         }
                     }
                 }
-                
-                if (currentTotalWeight == 0 && calculatedWeight > 0) currentTotalWeight = calculatedWeight;
-                if (currentInventoryValue == 0 && calculatedValue > 0) currentInventoryValue = calculatedValue;
-
-                currentInventoryByKarat.clear(); 
-                currentInventoryByKarat.addAll(karatItems); 
-                renderInventoryByKarat(currentInventoryByKarat);
-            }
-            
-            JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) { lastSalesData = sales; applySalesData(sales); }
-
-            JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
-            if (sales7Days != null && lineChartSales != null) {
-                List<Entry> entries = new ArrayList<>();
-                final List<String> labels = new ArrayList<>();
-                for (int i = 0; i < sales7Days.length(); i++) {
-                    JSONObject day = sales7Days.optJSONObject(i);
-                    if (day != null) {
-                        entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
-                        labels.add(day.optString("date", ""));
-                    }
-                }
-                if (!entries.isEmpty()) {
-                    LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-                    dataSet.setColor(Color.parseColor("#D4AF37")); 
-                    dataSet.setLineWidth(2.5f); 
-                    dataSet.setCircleRadius(4f); 
-                    dataSet.setDrawValues(false); 
-                    dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    lineChartSales.setData(new LineData(dataSet));
-                    XAxis xAxis = lineChartSales.getXAxis();
-                    xAxis.setValueFormatter(new com.github.mikephil.charting.formatter.IndexAxisValueFormatter(labels));
-                    xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); xAxis.setGranularity(1f); xAxis.setDrawGridLines(false);
-                    lineChartSales.getAxisRight().setEnabled(false);
-                    lineChartSales.getAxisLeft().setDrawGridLines(true);
-                    lineChartSales.getDescription().setEnabled(false);
-                    lineChartSales.getLegend().setEnabled(false);
-                    lineChartSales.invalidate();
-                }
             }
 
-            if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
-                if (isPosDashboardHidden) {
-                    tvPosTotalWeight.setText("•••••");
-                    tvPosTotalValue.setText("•••••••");
-                    tvPosCashBalance.setText("•••••••");
-                } else {
-                    tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
-                    tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue)); 
-                    
-                    double cash = 0.0;
-                    if (data.optJSONObject("shift_summary") != null) cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
-                    else if (sales != null) cash = sales.optDouble("today", 0.0);
-                    tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+            if (currentTotalWeight == 0 && calculatedWeight > 0) currentTotalWeight = calculatedWeight;
+            if (currentInventoryValue == 0 && calculatedValue > 0) currentInventoryValue = calculatedValue;
+
+            currentInventoryByKarat.clear();
+            currentInventoryByKarat.addAll(karatItems);
+            renderInventoryByKarat(currentInventoryByKarat);
+        }
+
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) {
+            lastSalesData = sales;
+            applySalesData(sales);
+        }
+
+        JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
+        if (sales7Days != null && lineChartSales != null) {
+            List<Entry> entries = new ArrayList<>();
+            final List<String> labels = new ArrayList<>();
+            for (int i = 0; i < sales7Days.length(); i++) {
+                JSONObject day = sales7Days.optJSONObject(i);
+                if (day != null) {
+                    entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                    labels.add(day.optString("date", ""));
                 }
-                renderPosKaratCards(inv);
             }
-        } catch (Exception e) { Log.e(TAG, "processData", e); }
+            if (!entries.isEmpty()) {
+                LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+                dataSet.setColor(Color.parseColor("#D4AF37"));
+                dataSet.setLineWidth(2.5f);
+                dataSet.setCircleRadius(4f);
+                dataSet.setDrawValues(false);
+                dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                lineChartSales.setData(new LineData(dataSet));
+                XAxis xAxis = lineChartSales.getXAxis();
+                xAxis.setValueFormatter(new com.github.mikephil.charting.formatter.IndexAxisValueFormatter(labels));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setGranularity(1f);
+                xAxis.setDrawGridLines(false);
+                lineChartSales.getAxisRight().setEnabled(false);
+                lineChartSales.getAxisLeft().setDrawGridLines(true);
+                lineChartSales.getDescription().setEnabled(false);
+                lineChartSales.getLegend().setEnabled(false);
+                lineChartSales.invalidate();
+            }
+        }
+
+        if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
+            if (isPosDashboardHidden) {
+                tvPosTotalWeight.setText("•••••");
+                tvPosTotalValue.setText("•••••••");
+                tvPosCashBalance.setText("•••••••");
+            } else {
+                tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
+                tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue));
+                double cash = 0.0;
+                if (data.optJSONObject("shift_summary") != null) cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
+                else if (sales != null) cash = sales.optDouble("today", 0.0);
+                tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+            }
+            renderPosKaratCards(inv);
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "processData error", e);
     }
+}
 
     private void renderPosKaratCards(JSONObject inv) {
         if (llPosKaratContainer == null) return;
