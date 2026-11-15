@@ -641,6 +641,8 @@ public class MiraDashboardFragment extends Fragment {
         container.addView(view);
     }
 
+    
+
     private void fetchDashboardCharts() {
     if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
     
@@ -648,39 +650,32 @@ public class MiraDashboardFragment extends Fragment {
         try {
             MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
             if (response != null && response.isSuccess && response.data != null) {
-                // ✅ استخراج البيانات بأمان تام
-                JSONObject rootData = response.data;
-                if (response.data.has("data") && response.data.optJSONObject("data") != null) {
-                    rootData = response.data.optJSONObject("data");
-                }
+                // ✅ طباعة الرد كاملاً في الـ Logcat لنتأكد
+                Log.d(TAG, "📊 Charts Raw Response: " + response.data.toString());
                 
-                final JSONObject finalData = rootData;
-                mainHandler.post(() -> { 
-                    if (isAdded()) {
-                        Log.d(TAG, "Charts Data: " + finalData.toString());
-                        renderCharts(finalData); 
-                    }
-                });
+                JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
+                if (rootData != null) {
+                    mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
+                }
             } else {
-                Log.e(TAG, "❌ Charts API failed: " + (response != null ? response.error : "null"));
+                Log.e(TAG, "❌ Charts API Failed: " + (response != null ? response.error : "null"));
             }
         } catch (Exception e) { 
-            Log.e(TAG, "fetchDashboardCharts error", e); 
+            Log.e(TAG, "❌ fetchDashboardCharts Error", e); 
         }
     });
 }
 
-    private void renderCharts(JSONObject data) {
+private void renderCharts(JSONObject data) {
     try {
         applyChartTheme();
 
-        // محاولة قراءة المصفوفة من أي مفتاح محتمل
         JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
         if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); 
         if (sales7Days == null) sales7Days = data.optJSONArray("sales");
         
         if (sales7Days == null || sales7Days.length() == 0) {
-            Log.w(TAG, "No sales data found in charts response.");
+            Log.w(TAG, "⚠️ No sales7Days array found in response.");
             return;
         }
 
@@ -702,7 +697,7 @@ public class MiraDashboardFragment extends Fragment {
             labels.add(dateStr);
         }
 
-        // ✅ 1. رسم المخطط الخاص بالمدير (lineChartSales)
+        // 1. رسم مخطط المدير (lineChartSales)
         if (lineChartSales != null) {
             LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
             dataSet.setColor(Color.parseColor("#D4AF37")); 
@@ -719,14 +714,13 @@ public class MiraDashboardFragment extends Fragment {
             xAxis.setGranularity(1f); 
             xAxis.setDrawGridLines(false);
             lineChartSales.getAxisRight().setEnabled(false);
-            lineChartSales.getAxisLeft().setDrawGridLines(true);
             lineChartSales.getDescription().setEnabled(false);
             lineChartSales.getLegend().setEnabled(false);
             lineChartSales.animateX(1000); 
             lineChartSales.invalidate();
         }
 
-        // ✅ 2. رسم المخطط الخاص بالكاشير (lineChartPosPriceMovement)
+        // 2. رسم مخطط الكاشير (lineChartPosPriceMovement)
         if (lineChartPosPriceMovement != null) {
             LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
             sellDataSet.setColor(Color.parseColor("#D4AF37")); 
@@ -752,7 +746,6 @@ public class MiraDashboardFragment extends Fragment {
             xAxis.setDrawAxisLine(false); 
             
             lineChartPosPriceMovement.getAxisRight().setEnabled(true);
-            lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
             lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
             lineChartPosPriceMovement.getDescription().setEnabled(false);
             lineChartPosPriceMovement.getLegend().setEnabled(false);
@@ -760,7 +753,7 @@ public class MiraDashboardFragment extends Fragment {
             lineChartPosPriceMovement.invalidate();
         }
 
-        // ✅ 3. رسم مخطط النسب (pieChartKarat) إن وجد
+        // 3. رسم مخطط النسب (pieChartKarat)
         JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
         if (salesByKarat != null && pieChartKarat != null) {
             List<PieEntry> entriesPie = new ArrayList<>();
@@ -783,8 +776,40 @@ public class MiraDashboardFragment extends Fragment {
             }
         }
     } catch (Exception e) { 
-        Log.e(TAG, "renderCharts error", e); 
+        Log.e(TAG, "❌ renderCharts Error", e); 
     }
+}
+
+private void fetchRecentActivity() {
+    // ✅ السماح للموظف بجلب النشاطات (تم إزالة شرط منع الكاشير)
+    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+    
+    localExecutor.execute(() -> {
+        try {
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                Log.d(TAG, "📋 Activity Raw Response: " + response.data.toString());
+                JSONArray activities = extractActivitiesArray(response.data);
+                
+                if (activities != null && activities.length() > 0) {
+                    mainHandler.post(() -> {
+                        if (isAdded()) {
+                            updateRecentActivityUI(activities);
+                            updatePosRecentActivityUI(activities);
+                        }
+                    });
+                } else {
+                    Log.w(TAG, "⚠️ Activity array is empty or not found.");
+                }
+            } else {
+                Log.e(TAG, "❌ Activity API Failed: " + (response != null ? response.error : "null"));
+            }
+        } catch (Exception e) { 
+            Log.e(TAG, "❌ fetchRecentActivity Error", e); 
+        }
+    });
 }
 
     private void fetchData() {
@@ -1426,41 +1451,7 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) {}
     }
 
-    private void fetchRecentActivity() {
-        // ✅ إزالة قيود الصلاحيات لضمان جلب البيانات للمدير
-        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-        
-        localExecutor.execute(() -> {
-            try {
-                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-                MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
-                
-                mainHandler.post(() -> {
-                    if (!isAdded() || response == null) return;
-                    
-                    if (response.isSuccess && response.data != null) {
-                        try {
-                            JSONArray activities = extractActivitiesArray(response.data);
-                            if (activities != null && activities.length() > 0) {
-                                if (activityCache != null) activityCache.save(activities);
-                                updateRecentActivityUI(activities);
-                                updatePosRecentActivityUI(activities);
-                                Log.d(TAG, "✅ Recent activities loaded: " + activities.length());
-                            } else {
-                                Log.w(TAG, "⚠️ No recent activities found in response.");
-                            }
-                        } catch (Exception e) { 
-                            Log.e(TAG, "Error parsing recent activity", e); 
-                        }
-                    } else {
-                        Log.e(TAG, "❌ Activity API failed: " + (response != null ? response.error : "null"));
-                    }
-                });
-            } catch (Exception e) { 
-                Log.e(TAG, "fetchRecentActivity exception", e); 
-            }
-        });
-    }
+    
 
     private void updateRecentActivityUI(JSONArray activities) {
         if (activities == null || llRecentActivity == null) return;
@@ -1836,4 +1827,4 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private boolean canManuallyRefreshGold() { return permissionManager != null && permissionManager.canRefreshGoldManually(); }
-                                                                                                                                               }
+}
