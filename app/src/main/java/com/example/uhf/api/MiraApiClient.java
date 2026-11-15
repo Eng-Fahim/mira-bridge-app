@@ -1378,12 +1378,28 @@ public class MiraApiClient {
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
     }
+    
+    // ✅ تحديث مسار الداشبورد ليتطابق مع السيرفر
+public ApiResponse getDashboardFull(int branchId) {
+    String endpoint = "/dashboard/app"; // تم التعديل من /dashboard/full
+    if (branchId > 0) endpoint += "?branch_id=" + branchId;
+    return getWithAuth(endpoint);
+}
 
-    public ApiResponse getDashboardFull(int branchId) {
+// ✅ تحديث مسار الرسوم البيانية ليتطابق مع السيرفر
+public ApiResponse getDashboardCharts(int branchId) {
+    String endpoint = "/dashboard/app-charts"; // تم التعديل من /dashboard/charts
+    if (branchId > 0) endpoint += "?branch_id=" + branchId;
+    return getWithAuth(endpoint);
+}
+
+   /* public ApiResponse getDashboardFull(int branchId) {
         String endpoint = "/dashboard/full";
         if (branchId > 0) endpoint += "?branch_id=" + branchId;
         return getWithAuth(endpoint);
     }
+    */
+    
 
     public ApiResponse getDashboardFull() {
         return getDashboardFull(0);
@@ -2716,11 +2732,12 @@ public ApiResponse prepareCheckout(java.util.List<Integer> itemIds) {
         return getAccounting("/accounting/aging-report?as_of=" + asOfDate + "&type=" + type);
     }
 
-    public ApiResponse getDashboardCharts(int branchId) {
+   /* public ApiResponse getDashboardCharts(int branchId) {
         String endpoint = "/dashboard/charts";
         if (branchId > 0) endpoint += "?branch_id=" + branchId;
         return getWithAuth(endpoint);
     }
+*/
 
     public ApiResponse processGoldConversion(JSONObject payload) {
         return postAccounting("/accounting/gold-conversion", payload);
