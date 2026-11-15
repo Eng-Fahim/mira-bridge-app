@@ -2172,25 +2172,29 @@ private void setupQuickNav() {
         FloatingActionButton fabReports = findViewById(R.id.fabReports);
         FloatingActionButton fabProfile = findViewById(R.id.fabProfile);
 
-        applyNavPermissions();
+        // ✅ أولاً: قرر ظهور الزر الأصفر (قبل تطبيق الصلاحيات لتجنب تعارض التوقيت)
+        boolean hideFabForSecurity = permissionManager != null && permissionManager.isGateUser();
+        boolean hasQuickActions = !hideFabForSecurity
+            && permissionManager != null
+            && permissionManager.getAllowedQuickActions().size() > 0;
 
         if (fabActionCenter != null) {
-            // ✅ إخفاء الزر الأصفر لأدوار الأمن (لأنهم لا يحتاجون إجراءات سريعة)
-boolean hideFabForSecurity = permissionManager != null && permissionManager.isGateUser();
-boolean hasQuickActions = !hideFabForSecurity 
-    && permissionManager != null 
-    && permissionManager.getAllowedQuickActions().size() > 0;
             fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-            
+        }
+        if (fabReports != null) fabReports.setVisibility(View.GONE);
+        if (fabProfile != null) fabProfile.setVisibility(View.GONE);
+
+        // ✅ ثانياً: طبق صلاحيات القائمة السفلية
+        applyNavPermissions();
+
+        if (fabActionCenter != null && hasQuickActions) {
             fabActionCenter.setOnClickListener(v -> {
                 boolean isPos = permissionManager != null && permissionManager.isPosOperator();
-                
+
                 if (isPos && fabReports != null && fabProfile != null) {
                     if (!isFabMenuOpen) {
                         fabReports.setVisibility(View.VISIBLE);
                         fabProfile.setVisibility(View.VISIBLE);
-                        
-                        // ✅ حركة القوس: التقارير لليسار، البروفايل لليمين
                         fabReports.animate().translationX(-150f).translationY(-150f).setDuration(300).start();
                         fabProfile.animate().translationX(150f).translationY(-150f).setDuration(300).start();
                         fabActionCenter.animate().rotation(45f).setDuration(300).start();
@@ -2293,7 +2297,6 @@ private void attachNavListener(@NonNull BottomNavigationView nav) {
 // ═══════════════════════════════════════════════════════════
 //  ⭐ الفلترة + إعادة البناء + تكييف الفاب
 // ═══════════════════════════════════════════════════════════
-
 private void applyNavPermissions() {
     try {
         BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
@@ -2308,9 +2311,10 @@ private void applyNavPermissions() {
 
         int index = 0;
         int added = 0;
-        
+
+        // 2) أضف العناصر المسموحة
         for (NavItemCfg cfg : NAV_CONFIGS) {
-            if (!isNavItemAllowedForRole(cfg.itemId)) continue;
+            if (!isNavItemAllowedForRole(cfg)) continue;
 
             MenuItem item = nav.getMenu().add(Menu.NONE, cfg.itemId, index++, "");
             item.setIcon(cfg.iconRes);
@@ -2318,30 +2322,34 @@ private void applyNavPermissions() {
             added++;
         }
 
-        // 2) التحكم في الرؤية
+        // 3) التحكم في الرؤية
         String setupStatus = getCachedSetupStatus();
         boolean setupComplete = SETUP_COMPLETED.equals(setupStatus) || SETUP_LOCKED.equals(setupStatus);
 
         if (setupComplete) {
+            boolean isSecurity = permissionManager.isGateUser();
+
             if (added >= 2) {
                 nav.setVisibility(View.VISIBLE);
                 bottomContainer.setVisibility(View.VISIBLE);
                 if (fab != null) resetFabConstraintsToNav(fab);
+
             } else if (added == 1) {
                 nav.setVisibility(View.GONE);
-                boolean fabVisible = (fab != null && fab.getVisibility() == View.VISIBLE);
+                boolean fabVisible = !isSecurity && (fab != null && fab.getVisibility() == View.VISIBLE);
                 bottomContainer.setVisibility(fabVisible ? View.VISIBLE : View.GONE);
                 if (fab != null && fabVisible) anchorFabToContainerCenter(fab, bottomContainer);
+
             } else {
+                nav.setVisibility(View.GONE);
                 bottomContainer.setVisibility(View.GONE);
             }
         }
 
-        // 3) ضبط التحديد
+        // 4) ضبط التحديد على العنصر الحالي
         String currentTag = (navigationManager != null)
                 ? navigationManager.getCurrentFragmentTag()
                 : NavigationManager.TAG_DASHBOARD;
-
         if (currentTag == null) currentTag = NavigationManager.TAG_DASHBOARD;
 
         for (NavItemCfg cfg : NAV_CONFIGS) {
@@ -2352,76 +2360,75 @@ private void applyNavPermissions() {
             }
         }
 
+        // 5) أعِد إرفاق الـ listener
         attachNavListener(nav);
 
-        Log.i(TAG, "applyNavPermissions: role=" + permissionManager.getRoleString()
-                + ", added=" + added + ", currentTag=" + currentTag);
-
+        Log.i(TAG, "applyNavPermissions: added=" + added + ", currentTag=" + currentTag);
     } catch (Exception e) {
         Log.e(TAG, "applyNavPermissions error: " + e.getMessage(), e);
     }
 }
-
 /**
- * ✅ مصفوفة صريحة لكل دور — مصدر الحقيقة الوحيد لعناصر القائمة السفلية
+ * ✅ مصفوفة صريحة: ماذا يرى كل دور في القائمة السفلية؟
+ * تعتمد على R.id.* الفعلية الموجودة في NAV_CONFIGS
  */
-private boolean isNavItemAllowedForRole(int itemId) {
+private boolean isNavItemAllowedForRole(NavItemCfg cfg) {
+    if (cfg == null || permissionManager == null) return false;
+
+    // ✅ الرئيسية متاحة للجميع
+    if (cfg.alwaysAllowed) return true;
+
     PermissionManager pm = permissionManager;
-    if (pm == null) return false;
+    int id = cfg.itemId;
 
-    // ═══ 1. الإدارة العليا — ترى كل شيء ═══
-    if (pm.isSystemAdmin() || pm.isOrgAdmin()) {
-        return true;
-    }
+    // ═══ 1. الإدارة العليا — كل شيء ═══
+    if (pm.isSystemAdmin() || pm.isOrgAdmin()) return true;
 
-    // ═══ 2. مدير الفرع — كل شيء داخل فرعه ═══
+    // ═══ 2. مدير الفرع — كل شيء ═══
     if (pm.isBranchManager()) {
-        return itemId == R.id.nav_pos
-            || itemId == R.id.nav_home
-            || itemId == R.id.nav_inventory
-            || itemId == R.id.nav_accounting
-            || itemId == R.id.nav_scrap
-            || itemId == R.id.nav_reports;
+        return id == R.id.nav_home
+            || id == R.id.nav_accounting
+            || id == R.id.nav_inventory
+            || id == R.id.nav_sales
+            || id == R.id.nav_scrap;
     }
 
-    // ═══ 3. المدير المالي / المحاسب — المالية والتقارير فقط ═══
+    // ═══ 3. المدير المالي / المحاسب — الرئيسية + المالية ═══
     if (pm.isFinanceManager() || pm.isAccountant()) {
-        return itemId == R.id.nav_home
-            || itemId == R.id.nav_accounting
-            || itemId == R.id.nav_reports;
+        return id == R.id.nav_home
+            || id == R.id.nav_accounting;
     }
 
-    // ═══ 4. مدير المخزون — المخزون والكسر والتقارير ═══
+    // ═══ 4. مدير المخزون — الرئيسية + المخزون + كسر الذهب ═══
     if (pm.isInventoryManager()) {
-        return itemId == R.id.nav_home
-            || itemId == R.id.nav_inventory
-            || itemId == R.id.nav_scrap
-            || itemId == R.id.nav_reports;
+        return id == R.id.nav_home
+            || id == R.id.nav_inventory
+            || id == R.id.nav_scrap;
     }
 
-    // ═══ 5. المدقق — قراءة فقط ═══
+    // ═══ 5. المدقق — الرئيسية + المخزون + المالية ═══
     if (pm.isAuditor()) {
-        return itemId == R.id.nav_home
-            || itemId == R.id.nav_inventory
-            || itemId == R.id.nav_accounting
-            || itemId == R.id.nav_reports;
+        return id == R.id.nav_home
+            || id == R.id.nav_inventory
+            || id == R.id.nav_accounting;
     }
 
-    // ═══ 6. موظف المبيعات (POS) — نقطة البيع + كسر + تقاريره ═══
+    // ═══ 6. موظف المبيعات (POS) — الرئيسية + المبيعات + كسر الذهب ═══
     if (pm.isPosOperator()) {
-        return itemId == R.id.nav_pos
-            || itemId == R.id.nav_home
-            || itemId == R.id.nav_scrap
-            || itemId == R.id.nav_reports;
+        return id == R.id.nav_home
+            || id == R.id.nav_sales
+            || id == R.id.nav_scrap;
     }
 
-    // ═══ 7. أمن البوابات / أمن — لا قائمة سفلية (كل شيء في الداشبورد) ═══
+    // ═══ 7. أمن البوابات — الرئيسية فقط ═══
     if (pm.isGateUser()) {
-        return false; // سيُخفى الشريط بالكامل
+        return id == R.id.nav_home;
     }
 
+    // ═══ 8. احتياطي — لا شيء ═══
     return false;
 }
+
 private void resetFabConstraintsToNav(FloatingActionButton fab) {
     ViewGroup.LayoutParams lp = fab.getLayoutParams();
     if (!(lp instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)) return;
