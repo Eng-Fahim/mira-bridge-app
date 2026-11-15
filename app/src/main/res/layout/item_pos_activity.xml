@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="?attr/colorSurfaceVariant"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <!-- أيقونة العملية -->
+    <TextView
+        android:id="@+id/tvPosActIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:text="🛒"
+        android:textSize="20sp" />
+
+    <!-- تفاصيل العملية -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvPosActTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="فاتورة مبيعات"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvPosActTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="منذ 5 دقائق • بواسطة أحمد"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- المبلغ -->
+    <TextView
+        android:id="@+id/tvPosActAmount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:text="+ 150,000 YER"
+        android:textColor="#16A34A"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+</LinearLayout>
