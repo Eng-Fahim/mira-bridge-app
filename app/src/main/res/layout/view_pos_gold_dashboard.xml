@@ -6,7 +6,7 @@
     android:background="?attr/colorSurface"
     android:fillViewport="true"
     android:clipToPadding="false"
-    android:paddingBottom="140dp"> <!-- مسافة سفلية لتفادي الشريط العائم -->
+    android:paddingBottom="140dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,29 +15,46 @@
         android:paddingTop="16dp"
         android:paddingHorizontal="16dp">
 
-        <!-- 1. الترحيب -->
+        <!-- 1. الترحيب (تم تحسينه) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:paddingBottom="16dp">
-            <TextView
+            
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_user_placeholder"
+                app:tint="?attr/colorPrimary"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="8dp" />
+            
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="مساء الخير،"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="14sp" />
-            <TextView
-                android:id="@+id/tvPosUserName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="موظف المبيعات"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:layout_marginStart="12dp"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/tvPosGreeting"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="مساء الخير،"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="14sp" />
+                <TextView
+                    android:id="@+id/tvPosUserName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="جاري التحميل..."
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
 
-        <!-- 2. البطاقة الذهبية (بدون HorizontalScrollView لضمان عدم التقطيع) -->
+        <!-- 2. البطاقة الذهبية -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -102,18 +119,48 @@
                     android:layout_marginVertical="16dp"
                     android:background="#33FFFFFF" />
 
-                <!-- العيارات (هنا فقط نستخدم السحب الأفقي) -->
-                <HorizontalScrollView
+                <!-- العيارات مع الأسهم -->
+                <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:clipToPadding="false"
-                    android:scrollbars="none">
-                    <LinearLayout
-                        android:id="@+id/llPosKaratContainer"
-                        android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+                    
+                    <HorizontalScrollView
+                        android:id="@+id/hsvPosKarat"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal" />
-                </HorizontalScrollView>
+                        android:layout_marginHorizontal="24dp"
+                        android:clipToPadding="false"
+                        android:scrollbars="none">
+                        <LinearLayout
+                            android:id="@+id/llPosKaratContainer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
+
+                    <!-- سهم اليسار -->
+                    <ImageView
+                        android:id="@+id/ivKaratLeftArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:src="@drawable/ic_chevron_left"
+                        app:tint="#FFFFFF"
+                        android:visibility="gone"
+                        android:background="?attr/selectableItemBackgroundBorderless"/>
+
+                    <!-- سهم اليمين -->
+                    <ImageView
+                        android:id="@+id/ivKaratRightArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:src="@drawable/ic_chevron_right"
+                        app:tint="#FFFFFF"
+                        android:background="?attr/selectableItemBackgroundBorderless"/>
+                </RelativeLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -167,7 +214,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 3. شبكة الأزرار (Grid) -->
+        <!-- 3. شبكة الأزرار -->
         <GridLayout
             android:id="@+id/gridPosQuickActions"
             android:layout_width="match_parent"
