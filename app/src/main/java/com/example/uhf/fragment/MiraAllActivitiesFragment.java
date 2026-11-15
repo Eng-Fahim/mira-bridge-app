@@ -218,136 +218,131 @@ public class MiraAllActivitiesFragment extends Fragment {
      *              false = تحميل المزيد (pagination)
      */
     private void loadActivities(boolean reset) {
-        if (apiClient == null) {
-            showError(isArabic ? "العميل غير مهيأ" : "Client not initialized");
-            return;
-        }
-
-        // منع الطلبات المتوازية
-        if (!isRequestInFlight.compareAndSet(false, true)) {
-            Log.d(TAG, "loadActivities skipped — request already in flight");
-            if (swipeRefreshAll != null) swipeRefreshAll.setRefreshing(false);
-            return;
-        }
-
-        if (reset) {
-            currentPage = 1;
-            hasMorePages = true;
-            isLoadingMore = false;
-            totalOnServer = -1;
-            allActivities.clear();
-        }
-
-        showLoading(true);
-
-        final int pageToLoad = currentPage;
-        final int requestLimit = Math.min(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE);
-
-        executor.execute(() -> {
-            try {
-                int branchId = (branchesManager != null)
-                        ? branchesManager.getActiveBranchId() : 0;
-
-                Log.d(TAG, "→ loadActivities | branchId=" + branchId
-                        + " page=" + pageToLoad
-                        + " limit=" + requestLimit
-                        + " reset=" + reset);
-
-                MiraApiClient.ApiResponse response =
-                        apiClient.getUnifiedActivity(branchId, requestLimit);
-
-                postToMain(() -> handleResponse(response, reset, pageToLoad));
-
-            } catch (Throwable e) {
-                Log.e(TAG, "loadActivities exception", e);
-                postToMain(() -> {
-                    finishLoading();
-                    showError(e.getMessage());
-                });
-            } finally {
-                isRequestInFlight.set(false);
-            }
-        });
+    if (apiClient == null) {
+        showError(isArabic ? "العميل غير مهيأ" : "Client not initialized");
+        return;
     }
+
+    if (!isRequestInFlight.compareAndSet(false, true)) {
+        Log.d(TAG, "loadActivities skipped — request already in flight");
+        if (swipeRefreshAll != null) swipeRefreshAll.setRefreshing(false);
+        return;
+    }
+
+    if (reset) {
+        currentPage = 1;
+        hasMorePages = true;
+        isLoadingMore = false;
+        totalOnServer = -1;
+        allActivities.clear();
+    }
+
+    showLoading(true);
+
+    final int pageToLoad = currentPage;
+    final int requestLimit = Math.min(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE);
+
+    executor.execute(() -> {
+        try {
+            int branchId = (branchesManager != null)
+                    ? branchesManager.getActiveBranchId() : 0;
+
+            Log.d(TAG, "→ loadActivities | branchId=" + branchId
+                    + " page=" + pageToLoad
+                    + " limit=" + requestLimit
+                    + " reset=" + reset);
+
+            MiraApiClient.ApiResponse response =
+                    apiClient.getUnifiedActivity(branchId, requestLimit);
+
+            postToMain(() -> handleResponse(response, reset, pageToLoad, requestLimit));
+
+        } catch (Throwable e) {
+            Log.e(TAG, "loadActivities exception", e);
+            postToMain(() -> {
+                finishLoading();
+                showError(e.getMessage());
+            });
+        } finally {
+            isRequestInFlight.set(false);
+        }
+    });
+}
 
     private void handleResponse(MiraApiClient.ApiResponse response,
-                                boolean reset,
-                                int pageToLoad) {
-        if (isDestroyed) return;
+                            boolean reset,
+                            int pageToLoad,
+                            int requestLimit) {
+    if (isDestroyed) return;
 
-        finishLoading();
+    finishLoading();
 
-        // ── 1. null ─────────────────────────────────────────────
-        if (response == null) {
-            Log.e(TAG, "response == null");
-            showError(isArabic ? "فشل الاتصال بالخادم" : "Server connection failed");
-            return;
-        }
-
-        // ── 2. HTTP error ───────────────────────────────────────
-        if (!response.isSuccess) {
-            String err = (response.error != null && !response.error.isEmpty())
-                    ? response.error
-                    : ("HTTP " + response.code);
-            Log.e(TAG, "❌ API error | code=" + response.code + " err=" + err);
-            showError(err);
-            return;
-        }
-
-        // ── 3. data null ────────────────────────────────────────
-        if (response.data == null) {
-            Log.e(TAG, "response.data == null | body=" + safeBody(response));
-            showError(isArabic
-                    ? "استجابة غير صالحة من الخادم"
-                    : "Invalid server response");
-            return;
-        }
-
-        // ── 4. extract array ────────────────────────────────────
-        JSONArray activities = extractActivitiesArray(response.data);
-
-        if (activities == null) {
-            Log.e(TAG, "No activities array in response | body=" + safeBody(response));
-            showError(isArabic
-                    ? "بنية الاستجابة غير متوقعة"
-                    : "Unexpected response structure");
-            return;
-        }
-
-        // ── 5. parse items ──────────────────────────────────────
-        if (reset) {
-            allActivities.clear();
-        }
-        int parsed = 0, skipped = 0;
-        for (int i = 0; i < activities.length(); i++) {
-            try {
-                JSONObject act = activities.optJSONObject(i);
-                if (act != null) {
-                    allActivities.add(act);
-                    parsed++;
-                }
-            } catch (Throwable e) {
-                skipped++;
-                Log.w(TAG, "skip malformed activity at index " + i);
-            }
-        }
-
-        Log.d(TAG, "✅ Fetched " + parsed + " activities"
-                + (skipped > 0 ? " (skipped " + skipped + ")" : "")
-                + " | total_in_list=" + allActivities.size());
-
-        // ── 6. pagination state ─────────────────────────────────
-        int serverTotal = response.data.optInt("total", -1);
-        if (serverTotal >= 0) {
-            totalOnServer = serverTotal;
-            hasMorePages = allActivities.size() < serverTotal;
-        } else {
-            hasMorePages = activities.length() >= requestLimit;
-        }
-
-        // ── 7. apply filters + render ───────────────────────────
-        applyFilters();
+    if (response == null) {
+        Log.e(TAG, "response == null");
+        showError(isArabic ? "فشل الاتصال بالخادم" : "Server connection failed");
+        return;
     }
+
+    if (!response.isSuccess) {
+        String err = (response.error != null && !response.error.isEmpty())
+                ? response.error
+                : ("HTTP " + response.code);
+        Log.e(TAG, "❌ API error | code=" + response.code + " err=" + err);
+        showError(err);
+        return;
+    }
+
+    if (response.data == null) {
+        Log.e(TAG, "response.data == null | body=" + safeBody(response));
+        showError(isArabic
+                ? "استجابة غير صالحة من الخادم"
+                : "Invalid server response");
+        return;
+    }
+
+    JSONArray activities = extractActivitiesArray(response.data);
+
+    if (activities == null) {
+        Log.e(TAG, "No activities array in response | body=" + safeBody(response));
+        showError(isArabic
+                ? "بنية الاستجابة غير متوقعة"
+                : "Unexpected response structure");
+        return;
+    }
+
+    if (reset) {
+        allActivities.clear();
+    }
+
+    int parsed = 0, skipped = 0;
+    for (int i = 0; i < activities.length(); i++) {
+        try {
+            JSONObject act = activities.optJSONObject(i);
+            if (act != null) {
+                allActivities.add(act);
+                parsed++;
+            }
+        } catch (Throwable e) {
+            skipped++;
+            Log.w(TAG, "skip malformed activity at index " + i);
+        }
+    }
+
+    Log.d(TAG, "✅ Fetched " + parsed + " activities"
+            + (skipped > 0 ? " (skipped " + skipped + ")" : "")
+            + " | total_in_list=" + allActivities.size());
+
+    int serverTotal = response.data.optInt("total", -1);
+    if (serverTotal >= 0) {
+        totalOnServer = serverTotal;
+        hasMorePages = allActivities.size() < serverTotal;
+    } else {
+        hasMorePages = activities.length() >= requestLimit;
+        //                                   ⬆️ الآن يعمل — requestLimit مُمرَّر
+    }
+
+    applyFilters();
+}
 
     /**
      * يستخرج مصفوفة الأنشطة من الاستجابة بحسب بنيتها الفعلية.
