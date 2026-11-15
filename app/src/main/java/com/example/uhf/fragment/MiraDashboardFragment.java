@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -524,20 +525,33 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setupQuickActionButtons(View root) {
         if (root == null || permissionManager == null) return;
-        LinearLayout container = root.findViewById(R.id.llQuickActionsContainer);
-        if (container == null) return;
-        container.removeAllViews();
+        GridLayout gridContainer = root.findViewById(R.id.gridPosQuickActions);
+        if (gridContainer == null) return;
+        gridContainer.removeAllViews();
 
         if (permissionManager.isPosOperator()) {
-            addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
-            addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
-        } else {
-            if (permissionManager.canUsePos()) addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
-            if (permissionManager.canViewInventory()) addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
-            if (permissionManager.canBuyScrapGold()) addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
-            if (permissionManager.canViewReports()) addQuickAction(container, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
-            if (permissionManager.canViewAccounting()) addQuickAction(container, "المحاسبة", R.drawable.ic_accounting, new MiraAccountingFragment(), NavigationManager.TAG_ACCOUNTING);
+            addQuickActionGrid(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
+            addQuickActionGrid(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+            addQuickActionGrid(gridContainer, "مرتجع", R.drawable.ic_reports, new MiraPosFragment(), "Sales"); 
+            
+            // أزرار إضافية
+            addQuickActionGrid(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
+            addQuickActionGrid(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+            addQuickActionGrid(gridContainer, "الرئيسية", R.drawable.ic_home, new MiraDashboardFragment(), "Home"); // تعديل حسب الحاجة
         }
+    }
+
+    private void addQuickActionGrid(GridLayout container, String title, int iconRes, Fragment target, String tag) {
+        View view = getLayoutInflater().inflate(R.layout.item_quick_action_grid, container, false);
+        ImageView icon = view.findViewById(R.id.ivQuickIcon);
+        TextView text = view.findViewById(R.id.tvQuickText);
+        icon.setImageResource(iconRes);
+        text.setText(title);
+        view.setOnClickListener(v -> { 
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); 
+            navigateToFragment(target, tag); 
+        });
+        container.addView(view);
     }
 
     private void addQuickAction(LinearLayout container, String title, int iconRes, Fragment target, String tag) {
@@ -635,15 +649,27 @@ public class MiraDashboardFragment extends Fragment {
                         labels.add(dateStr);
                     }
 
+                    // ✅ تغيير لون الخط الأخضر ليكون أوضح في الوضع الليلي
+                    String buyColorHex = isNightMode() ? "#4ADE80" : "#2E7D32"; 
+                    String buyFillColorHex = isNightMode() ? "#334ADE80" : "#332E7D32";
+
                     LineDataSet sellDataSet = new LineDataSet(sellEntries, "بيع");
-                    sellDataSet.setColor(Color.parseColor("#D4AF37")); sellDataSet.setLineWidth(3f); 
-                    sellDataSet.setDrawCircles(false); sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    sellDataSet.setDrawFilled(true); sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
+                    sellDataSet.setColor(Color.parseColor("#D4AF37")); 
+                    sellDataSet.setLineWidth(3f); 
+                    sellDataSet.setDrawCircles(false); 
+                    sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                    sellDataSet.setDrawFilled(true); 
+                    sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
+                    sellDataSet.setDrawValues(false);
 
                     LineDataSet buyDataSet = new LineDataSet(buyEntries, "شراء");
-                    buyDataSet.setColor(Color.parseColor("#2E7D32")); buyDataSet.setLineWidth(3f); 
-                    buyDataSet.setDrawCircles(false); buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    buyDataSet.setDrawFilled(true); buyDataSet.setFillColor(Color.parseColor("#332E7D32"));
+                    buyDataSet.setColor(Color.parseColor(buyColorHex)); 
+                    buyDataSet.setLineWidth(3f); 
+                    buyDataSet.setDrawCircles(false); 
+                    buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                    buyDataSet.setDrawFilled(true); 
+                    buyDataSet.setFillColor(Color.parseColor(buyFillColorHex));
+                    buyDataSet.setDrawValues(false);
 
                     lineChartPosPriceMovement.setData(new LineData(sellDataSet, buyDataSet));
                     XAxis xAxis = lineChartPosPriceMovement.getXAxis();
@@ -669,7 +695,7 @@ public class MiraDashboardFragment extends Fragment {
                 } else {
                     lineChartPosPriceMovement.clear();
                     lineChartPosPriceMovement.setNoDataText("لا توجد مبيعات مسجلة لهذا الأسبوع");
-                    lineChartPosPriceMovement.setNoDataTextColor(Color.parseColor("#888888"));
+                    lineChartPosPriceMovement.setNoDataTextColor(ContextCompat.getColor(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant));
                     lineChartPosPriceMovement.invalidate();
                 }
             }
@@ -1299,7 +1325,7 @@ public class MiraDashboardFragment extends Fragment {
         if (activities == null || llPosRecentActivity == null) return;
         try {
             llPosRecentActivity.removeAllViews();
-            int max = Math.min(activities.length(), 5); // عرض آخر 5 عمليات فقط للكاشير
+            int max = Math.min(activities.length(), 5); 
             for (int i = 0; i < max; i++) {
                 JSONObject item = activities.getJSONObject(i);
                 View itemView = getLayoutInflater().inflate(R.layout.item_pos_activity, llPosRecentActivity, false);
@@ -1311,7 +1337,6 @@ public class MiraDashboardFragment extends Fragment {
 
                 String icon = item.optString("icon", "🛒");
                 String title = isArabic ? item.optString("title_ar", "") : item.optString("title_en", "");
-                String user = item.optString("user", "—"); 
                 String timestamp = item.optString("timestamp", "");
                 double amount = item.optDouble("amount", 0);
                 String currency = item.optString("currency", "YER");
@@ -1319,29 +1344,29 @@ public class MiraDashboardFragment extends Fragment {
 
                 if (tvIcon != null) tvIcon.setText(icon); 
                 if (tvTitle != null) tvTitle.setText(title);
-                if (tvTime != null) tvTime.setText(extractTime(timestamp) + " • " + user);
+                if (tvTime != null) tvTime.setText(extractTime(timestamp));
                 
                 if (tvAmount != null) {
                     if (isPosDashboardHidden) {
                         tvAmount.setText("•••••");
-                        tvAmount.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorOnSurfaceVariant));
+                        tvAmount.setTextColor(ContextCompat.getColor(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant));
                     } else {
-                        if (amount > 0) {
-                            // مبيعات (أخضر)
-                            tvAmount.setText(String.format(Locale.US, "+ %,.0f %s", amount, currency));
-                            tvAmount.setTextColor(Color.parseColor("#16A34A"));
-                        } else if (amount < 0 || "refund".equals(status)) {
-                            // مرتجعات (أحمر)
+                        // ✅ ألوان البنوك: السالب أحمر (مرتجع)، الموجب أخضر (بيع) - تدعم الثيم
+                        int redColor = isNightMode() ? Color.parseColor("#F87171") : Color.parseColor("#DC2626");
+                        int greenColor = isNightMode() ? Color.parseColor("#4ADE80") : Color.parseColor("#16A34A");
+                        
+                        if (amount < 0 || "refund".equals(status)) {
                             tvAmount.setText(String.format(Locale.US, "- %,.0f %s", Math.abs(amount), currency));
-                            tvAmount.setTextColor(Color.parseColor("#DC2626"));
+                            tvAmount.setTextColor(redColor); // أحمر
+                        } else if (amount > 0) {
+                            tvAmount.setText(String.format(Locale.US, "+ %,.0f %s", amount, currency));
+                            tvAmount.setTextColor(greenColor); // أخضر
                         } else {
-                            // عمليات أخرى (رمادي)
                             tvAmount.setText("—");
-                            tvAmount.setTextColor(Color.parseColor("#6B7280"));
+                            tvAmount.setTextColor(ContextCompat.getColor(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant));
                         }
                     }
                 }
-
                 itemView.setOnClickListener(v -> handleRecentActivityClick(item));
                 llPosRecentActivity.addView(itemView);
             }
