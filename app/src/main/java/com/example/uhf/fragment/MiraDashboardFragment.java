@@ -71,22 +71,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.widget.LinearLayout;
-import android.view.ViewGroup;
 
-/**
- * MiraDashboardFragment v3.3 — Full Integration (Original + ShiftCard + Countdown + Dynamic Quick Actions)
- */
 public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboardFragment";
-
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_u";
     private static final String PREFS_CACHE_OWNER = "mira_dashboard_cache_owner";
     private static final String KEY_CACHE_OWNER_USER_ID = "cache_owner_user_id";
     private static final String KEY_PREFIX_LAST_BRANCH = "last_branch_id_";
 
     private static final double OUNCE_TO_GRAM = 31.1035;
-    private static final long CACHE_VALIDITY_MS = 2 * 60 * 1000;
     private static final long GOLD_CACHE_VALIDITY_MS = 12 * 60 * 60 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final long SWIPE_REFRESH_TIMEOUT_MS = 15 * 1000;
@@ -99,8 +93,8 @@ public class MiraDashboardFragment extends Fragment {
     private boolean isInventoryHidden = true;
     private boolean isScrapHidden = true;
 
-    private HorizontalScrollView hsvCarousel;
-    private View dot1, dot2, dot3;
+    private HorizontalScrollView hsvCarousel, hsvQuickActions;
+    private View dot1, dot2, dot3, dotsIndicator;
     private LineChart lineChartSales;
     private PieChart pieChartKarat;
 
@@ -119,7 +113,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private ImageButton btnToggleHeroVisibility, btnToggleSalesVisibility, btnToggleInventoryVisibility;
 
-    private android.widget.LinearLayout llInventoryByKarat;
+    private LinearLayout llInventoryByKarat;
     private TextView tvKaratEmptyState;
     private final List<KaratInventory> currentInventoryByKarat = new ArrayList<>();
 
@@ -142,7 +136,7 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvLiveStatusText;
     private TextView tvHeroItemCount;
 
-    private android.widget.LinearLayout llRecentActivity;
+    private LinearLayout llRecentActivity;
     private TextView tvViewAllActivity;
 
     private MiraApiClient apiClient;
@@ -156,7 +150,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private ExecutorService localExecutor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private Future<?> dataFuture, goldPriceFuture, pingFuture;
+    private Future<?> dataFuture, goldPriceFuture;
     private Runnable swipeTimeoutRunnable;
 
     private boolean isArabic;
@@ -174,7 +168,6 @@ public class MiraDashboardFragment extends Fragment {
     private int currentItemCount = 0;
     private double currentTotalWeight = 0;
 
-    // ✅ عناصر الميزات الجديدة
     private ShiftSummaryCardView shiftSummaryCard;
 
     private static class KaratInventory {
@@ -256,16 +249,9 @@ public class MiraDashboardFragment extends Fragment {
             if (ownerUserId > 0 && ownerUserId != currentUserId) {
                 if (activityCache != null) activityCache.clear();
                 if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
-                int oldBranch = prefs.getInt(KEY_PREFIX_LAST_BRANCH + ownerUserId, -1);
-                if (oldBranch > 0) {
-                    try {
-                        String oldName = OFFLINE_PREFS_BASE + ownerUserId + "_b" + oldBranch;
-                        createSecurePrefs(ctx, oldName).edit().clear().apply();
-                    } catch (Exception ignored) {}
-                }
             }
             prefs.edit().putInt(KEY_CACHE_OWNER_USER_ID, currentUserId).apply();
-        } catch (Exception e) { logNonFatal("ensureCacheOwnerIsCurrentUser", e); }
+        } catch (Exception e) { Log.e(TAG, "ensureCacheOwnerIsCurrentUser", e); }
     }
 
     @Nullable
@@ -299,37 +285,13 @@ public class MiraDashboardFragment extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, 
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         try { 
-            View v = inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
-            Log.d("MIRA_DEBUG", "✅ Dashboard inflate SUCCESS");
-            return v;
-        }
-        catch (Exception e) { 
-            Log.e("MIRA_DEBUG", "❌ Dashboard inflate FAILED: " + e.getMessage(), e);
-            
-            android.widget.TextView errorView = new android.widget.TextView(
-                    container != null ? container.getContext() : requireContext());
-            
-            StringBuilder sb = new StringBuilder();
-            sb.append("🔴 Dashboard Inflate FAILED\n\n");
-            sb.append("Error: ").append(e.getMessage()).append("\n\n");
-            sb.append("Type: ").append(e.getClass().getSimpleName()).append("\n\n");
-            sb.append("Location:\n");
-            StackTraceElement[] stack = e.getStackTrace();
-            for (int i = 0; i < Math.min(5, stack.length); i++) {
-                sb.append("  ").append(stack[i].toString()).append("\n");
-            }
-            sb.append("\n\n📋 This usually means a resource (color/string/drawable/dimen) is MISSING in res/values/");
-            
-            errorView.setText(sb.toString());
-            errorView.setTextSize(11);
-            errorView.setPadding(40, 100, 40, 100);
-            errorView.setTextColor(0xFF000000);
-            errorView.setBackgroundColor(0xFFFFEBEE);
-            errorView.setTextIsSelectable(true);
-            
+            return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
+        } catch (Exception e) { 
+            Log.e(TAG, "Dashboard inflate FAILED", e);
+            android.widget.TextView errorView = new android.widget.TextView(container != null ? container.getContext() : requireContext());
+            errorView.setText("Error loading UI: " + e.getMessage());
             return errorView;
         }
     }
@@ -344,11 +306,9 @@ public class MiraDashboardFragment extends Fragment {
             setupBranchListener();
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
-            updateHeader();
             showShimmer(false);
             isViewInitialized = true;
             loadOfflineData();
-            syncOrgProfileFromServer(false);
             startAutoRefresh();
             lastDataFetchTime = 0;
 
@@ -357,15 +317,17 @@ public class MiraDashboardFragment extends Fragment {
             fetchRecentActivity();
             if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
 
-        } catch (Throwable e) { logNonFatal("onViewCreated", e); }
+        } catch (Throwable e) { Log.e(TAG, "onViewCreated", e); }
     }
 
     private void initViews(View v) {
         try {
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
+            hsvQuickActions = v.findViewById(R.id.hsvQuickActions);
             dot1 = v.findViewById(R.id.dot1);
             dot2 = v.findViewById(R.id.dot2);
             dot3 = v.findViewById(R.id.dot3);
+            dotsIndicator = v.findViewById(R.id.dotsIndicator);
 
             heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
@@ -428,12 +390,10 @@ public class MiraDashboardFragment extends Fragment {
             lineChartSales = v.findViewById(R.id.lineChartSales);
             pieChartKarat = v.findViewById(R.id.pieChartKarat);
 
-            // ✅ ربط بطاقة الوردية
             shiftSummaryCard = v.findViewById(R.id.cardShiftSummary);
 
             if (hsvCarousel != null) {
-                final android.widget.LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
-
+                final LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
                 hsvCarousel.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
                     if (!isAdded() || getContext() == null || cardsContainer == null) return;
 
@@ -508,15 +468,79 @@ public class MiraDashboardFragment extends Fragment {
             applySalesVisibility();
             updateScrapUI();
             
-            // ✅ بناء الأزرار الديناميكية
             setupQuickActionButtons(v);
-if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
-    shiftSummaryCard.setVisibility(View.VISIBLE);
-}
-        } catch (Exception e) { logNonFatal("initViews", e); }
+            updateLayoutVisibilityForRole(v); // ✅ تطبيق الواجهة الديناميكية
+
+        } catch (Exception e) { Log.e(TAG, "initViews", e); }
     }
 
-    // ✅ الدالة الجديدة لبناء الأزرار السريعة (تستبدل bindQuickButton)
+   /**
+ * ✅ التحكم الذكي في إظهار وإخفاء العناصر بناءً على الصلاحيات (نسخة POS المحسنة)
+ */
+private void updateLayoutVisibilityForRole(View v) {
+    if (v == null || permissionManager == null) return;
+
+    if (permissionManager.isPosOperator()) {
+        // ==========================================
+        // 1. واجهة موظف المبيعات (POS Operator)
+        // ==========================================
+        
+        // إظهار ملخص الوردية (البطل الرئيسي)
+        if (shiftSummaryCard != null) shiftSummaryCard.setVisibility(View.VISIBLE);
+        
+        // إخفاء بطاقة المخزون (Hero) فقط من الكاروسيل، وإبقاء أسعار الذهب وملخص المبيعات
+        if (heroBalanceCard != null) heroBalanceCard.setVisibility(View.GONE);
+        if (dot1 != null) dot1.setVisibility(View.GONE); // إخفاء النقطة الأولى لأن البطاقة الأولى اختفت
+        
+        // إبقاء الكاروسيل ظاهراً (سيحتوي على الذهب والمبيعات)
+        if (hsvCarousel != null) hsvCarousel.setVisibility(View.VISIBLE);
+        if (dotsIndicator != null) dotsIndicator.setVisibility(View.VISIBLE);
+        
+        // إخفاء أقسام الإدارة والمخزون والكسر (غير مفيدة للموظف)
+        int[] idsToHide = {
+            R.id.alertsStrip,
+            R.id.cardInventoryByKarat,
+            R.id.cardScrapGold,
+            R.id.cardScrapAging,
+            R.id.recentActivityHeader, 
+            R.id.llRecentActivity
+        };
+        for (int id : idsToHide) {
+            View view = v.findViewById(id);
+            if (view != null) view.setVisibility(View.GONE);
+        }
+
+        // ✅ إبقاء الرسوم البيانية (Charts) ظاهرة لأنها مفيدة جداً للموظف (تحفيز وأداء)
+        View chartsCard = v.findViewById(R.id.cardCharts);
+        if (chartsCard != null) chartsCard.setVisibility(View.VISIBLE);
+
+        // إظهار الأزرار السريعة
+        if (hsvQuickActions != null) hsvQuickActions.setVisibility(View.VISIBLE);
+
+    } else {
+        // ==========================================
+        // 2. واجهة المدير (Manager / Admin)
+        // ==========================================
+        
+        // إخفاء ملخص الوردية (خاص بالموظفين)
+        if (shiftSummaryCard != null) shiftSummaryCard.setVisibility(View.GONE);
+
+        // إظهار جميع عناصر الكاروسيل والرسوم البيانية
+        if (hsvCarousel != null) hsvCarousel.setVisibility(View.VISIBLE);
+        if (heroBalanceCard != null) heroBalanceCard.setVisibility(View.VISIBLE);
+        if (dot1 != null) dot1.setVisibility(View.VISIBLE);
+        if (dotsIndicator != null) dotsIndicator.setVisibility(View.VISIBLE);
+        
+        View chartsCard = v.findViewById(R.id.cardCharts);
+        if (chartsCard != null) chartsCard.setVisibility(View.VISIBLE);
+        
+        if (hsvQuickActions != null) hsvQuickActions.setVisibility(View.VISIBLE);
+        
+        // تطبيق صلاحيات الـ RoleController لإظهار باقي الأقسام (المخزون، الكسر..)
+        if (roleController != null) roleController.applyVisibility(v);
+    }
+}
+
     private void setupQuickActionButtons(View root) {
         if (root == null || permissionManager == null) return;
         
@@ -568,7 +592,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         mainHandler.post(() -> { if (isAdded()) renderCharts(data); });
                     }
                 }
-            } catch (Exception e) { logNonFatal("fetchDashboardCharts", e); }
+            } catch (Exception e) { Log.e(TAG, "fetchDashboardCharts", e); }
         });
     }
 
@@ -642,7 +666,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
 
             applyChartTheme();
 
-        } catch (Exception e) { logNonFatal("renderCharts", e); }
+        } catch (Exception e) { Log.e(TAG, "renderCharts", e); }
     }
 
     private void applyChartTheme() {
@@ -663,8 +687,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 surfaceColor     = isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF;
             }
 
-            int chartGrid;
-            int chartAxisText;
+            int chartGrid, chartAxisText;
             try { chartGrid = ContextCompat.getColor(ctx, R.color.chart_grid); }
             catch (Exception e) { chartGrid = isNightMode() ? 0x33FFFFFF : 0x33000000; }
 
@@ -700,12 +723,11 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 pieChartKarat.setNoDataTextColor(onSurfaceVariant);
                 pieChartKarat.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
             }
-        } catch (Exception e) { logNonFatal("applyChartTheme", e); }
+        } catch (Exception e) { Log.e(TAG, "applyChartTheme", e); }
     }
 
     private void applyCarouselLayout() {
-        if (!isAdded() || getContext() == null) return;
-        if (hsvCarousel == null) return;
+        if (!isAdded() || getContext() == null || hsvCarousel == null) return;
 
         View cardsContainer = hsvCarousel.findViewById(R.id.cardsContainer);
         if (cardsContainer == null || !(cardsContainer instanceof ViewGroup)) return;
@@ -714,9 +736,9 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
         float density = getResources().getDisplayMetrics().density;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
 
-        int cardWidthPx = (int) (screenWidth * 0.78f);
-        int minWidth = (int) (260 * density);
-        int maxWidth = (int) (340 * density);
+        int cardWidthPx = (int) (screenWidth * 0.82f); // زيادة طفيفة لتلائم التصميم الجديد
+        int minWidth = (int) (280 * density);
+        int maxWidth = (int) (360 * density);
         if (cardWidthPx < minWidth) cardWidthPx = minWidth;
         if (cardWidthPx > maxWidth) cardWidthPx = maxWidth;
 
@@ -756,8 +778,6 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
         } catch (Exception e) { return false; }
     }
 
-    private void updateHeader() {}
-
     private void renderInventoryByKarat(List<KaratInventory> items) {
         if (llInventoryByKarat == null) return;
         if (permissionManager != null && !permissionManager.canViewDashboardInventoryByKarat()) {
@@ -786,7 +806,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 if (tvWeight != null) tvWeight.setText(isInventoryHidden ? "•• g" : formatWeight(inv.weight));
                 llInventoryByKarat.addView(itemView);
             }
-        } catch (Exception e) { logNonFatal("renderInventoryByKarat", e); }
+        } catch (Exception e) { Log.e(TAG, "renderInventoryByKarat", e); }
     }
 
     private int getKaratColor(int karat) {
@@ -815,7 +835,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             if (tvHeroValueUSD != null) tvHeroValueUSD.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue));
             if (tvHeroValueSAR != null) tvHeroValueSAR.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue * 3.75));
             if (tvHeroValueYER != null) tvHeroValueYER.setText(isHeroHidden ? "••••" : String.format(Locale.US, "%,.0f", totalValue * 530.0));
-        } catch (Exception e) { logNonFatal("updateHeroBalance", e); }
+        } catch (Exception e) { Log.e(TAG, "updateHeroBalance", e); }
     }
 
     private void toggleHeroVisibility() {
@@ -873,7 +893,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         });
                     }
                 }
-            } catch (Exception e) { logNonFatal("fetchScrapSummary", e); }
+            } catch (Exception e) { Log.e(TAG, "fetchScrapSummary", e); }
         });
     }
 
@@ -893,7 +913,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         mainHandler.post(() -> { if (isAdded()) renderAgingData(totalItems, totalWeight, oldCount, oldWeight); });
                     }
                 }
-            } catch (Exception e) { logNonFatal("fetchScrapAging", e); }
+            } catch (Exception e) { Log.e(TAG, "fetchScrapAging", e); }
         });
     }
 
@@ -946,7 +966,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 if (tvAlertMessage != null) tvAlertMessage.setText(message);
                 if (tvAlertAction != null) tvAlertAction.setText(isArabic ? "عرض (" + count + ") →" : "View (" + count + ") →");
             } else { alertsStrip.setVisibility(View.GONE); }
-        } catch (Exception e) { logNonFatal("updateAlerts", e); }
+        } catch (Exception e) { Log.e(TAG, "updateAlerts", e); }
     }
 
     private void computeAndShowAlerts(JSONObject data) {
@@ -961,7 +981,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 if (itemsWithoutPrice > 0) { if (message.length() > 0) message.append(" • "); alertsCount += itemsWithoutPrice; message.append(isArabic ? itemsWithoutPrice + " قطعة بدون سعر" : itemsWithoutPrice + " items without price"); }
             }
             if (alertsCount > 0) updateAlerts(alertsCount, message.toString()); else updateAlerts(0, null);
-        } catch (Exception e) { logNonFatal("computeAndShowAlerts", e); }
+        } catch (Exception e) { Log.e(TAG, "computeAndShowAlerts", e); }
     }
 
     private void updateLiveStatusText(boolean isOnline) {
@@ -973,33 +993,33 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 tvLiveStatusText.setTextColor(isOnline ? ContextCompat.getColor(context, R.color.status_online_green) : ContextCompat.getColor(context, R.color.status_offline_red));
             }
             if (liveStatusDot != null) liveStatusDot.setBackgroundResource(isOnline ? R.drawable.bg_status_dot_green : R.drawable.bg_status_dot_red);
-        } catch (Exception e) { logNonFatal("updateLiveStatusText", e); }
+        } catch (Exception e) { Log.e(TAG, "updateLiveStatusText", e); }
     }
 
     private void setupProfileListener() {
         try {
             if (orgProfile == null) return;
-            profileListener = () -> mainHandler.post(() -> { if (isAdded() && isViewInitialized) updateHeader(); });
+            profileListener = () -> mainHandler.post(() -> { if (isAdded() && isViewInitialized) { /* updateHeader(); */ } });
             orgProfile.addListener(profileListener);
-        } catch (Exception e) { logNonFatal("setupProfileListener", e); }
+        } catch (Exception e) { Log.e(TAG, "setupProfileListener", e); }
     }
 
     private void setupBranchListener() {
         try {
             if (branchesManager == null) return;
-            branchListener = () -> { if (!isAdded()) return; mainHandler.post(() -> { if (isAdded() && isViewInitialized) updateHeader(); }); };
+            branchListener = () -> { if (!isAdded()) return; mainHandler.post(() -> { if (isAdded() && isViewInitialized) { /* updateHeader(); */ } }); };
             branchesManager.addListener(branchListener);
-        } catch (Exception e) { logNonFatal("setupBranchListener", e); }
+        } catch (Exception e) { Log.e(TAG, "setupBranchListener", e); }
     }
 
     private void syncOrgProfileFromServer(boolean force) {
         try {
             if (orgProfile == null || apiClient == null) return;
             orgProfile.syncFromServer(apiClient, force, new MiraOrgProfileManager.SyncCallback() {
-                @Override public void onSuccess() { mainHandler.post(() -> { if (isAdded() && isViewInitialized) updateHeader(); }); syncBranchesListFromServer(); }
+                @Override public void onSuccess() { mainHandler.post(() -> { if (isAdded() && isViewInitialized) { /* updateHeader(); */ } }); syncBranchesListFromServer(); }
                 @Override public void onError(String error) { Log.w(TAG, "Org sync failed: " + error); }
             });
-        } catch (Exception e) { logNonFatal("syncOrgProfileFromServer", e); }
+        } catch (Exception e) { Log.e(TAG, "syncOrgProfileFromServer", e); }
     }
 
     private void syncBranchesListFromServer() {
@@ -1009,7 +1029,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 @Override public void onSuccess() {}
                 @Override public void onError(String error) {}
             });
-        } catch (Exception e) { logNonFatal("syncBranchesListFromServer", e); }
+        } catch (Exception e) { Log.e(TAG, "syncBranchesListFromServer", e); }
     }
 
     private void fetchLiveGoldPrices(boolean forceRefresh) {
@@ -1056,11 +1076,11 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 } catch (Exception e) {
-                    logNonFatal("fetchLiveGoldPrices.thread", e);
+                    Log.e(TAG, "fetchLiveGoldPrices", e);
                     mainHandler.post(() -> { isGoldRefreshing.set(false); showGoldLoadingState(false); if (isAdded()) displayGoldPricesFromCache(); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
                 }
             });
-        } catch (Exception e) { logNonFatal("fetchLiveGoldPrices", e); isGoldRefreshing.set(false); showGoldLoadingState(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
+        } catch (Exception e) { Log.e(TAG, "fetchLiveGoldPrices", e); isGoldRefreshing.set(false); showGoldLoadingState(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
     }
 
     private void showGoldLoadingState(boolean loading) {
@@ -1068,7 +1088,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             if (btnRefreshGold == null) return;
             btnRefreshGold.setEnabled(!loading); btnRefreshGold.setAlpha(loading ? 0.4f : 1.0f);
             if (pbGoldLoading != null) pbGoldLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
-        } catch (Exception e) { logNonFatal("showGoldLoadingState", e); }
+        } catch (Exception e) { Log.e(TAG, "showGoldLoadingState", e); }
     }
 
     private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
@@ -1081,7 +1101,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             double ouncePrice = data.optDouble("price_per_ounce", price24 * OUNCE_TO_GRAM);
             String source = data.optString("source", "server");
             return new GoldPriceData(price24, price21, price18, ouncePrice, source);
-        } catch (Exception e) { logNonFatal("parseGoldPriceData", e); return null; }
+        } catch (Exception e) { Log.e(TAG, "parseGoldPriceData", e); return null; }
     }
 
     private void displayGoldPrices(GoldPriceData data) {
@@ -1091,7 +1111,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             if (tvPriceSource != null) tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
             if (tvLastUpdate != null) tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + getTimeFormatter().format(new Date()) : "⏰ Last update: " + getTimeFormatter().format(new Date()));
             calculateTrend(data.price24);
-        } catch (Exception e) { logNonFatal("displayGoldPrices", e); }
+        } catch (Exception e) { Log.e(TAG, "displayGoldPrices", e); }
     }
 
     private void displayGoldPricesFromCache() {
@@ -1112,7 +1132,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 if (lastUpdate > 0) tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + getTimeFormatter().format(new Date(lastUpdate)) : "⏰ Last update: " + getTimeFormatter().format(new Date(lastUpdate)));
             }
             updateHeroBalance();
-        } catch (Exception e) { logNonFatal("displayGoldPricesFromCache", e); }
+        } catch (Exception e) { Log.e(TAG, "displayGoldPricesFromCache", e); }
     }
 
     private void fetchApprovedGoldPricesFromServer() {
@@ -1133,7 +1153,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         }
                     }
                 }
-            } catch (Exception e) { logNonFatal("fetchApprovedGoldPricesFromServer", e); }
+            } catch (Exception e) { Log.e(TAG, "fetchApprovedGoldPricesFromServer", e); }
         });
     }
 
@@ -1154,7 +1174,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                     });
                 }
                 if (currentPrice > 0) offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
-            } catch (Exception e) { logNonFatal("calculateTrend", e); }
+            } catch (Exception e) { Log.e(TAG, "calculateTrend", e); }
         });
     }
 
@@ -1188,7 +1208,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                     else { setText(tvSalesToday, formatCurrency(salesToday)); setText(tvSalesMonth, formatCurrency(salesMonth)); setText(tvSalesYear,  formatCurrency(salesYear)); }
                     if (priceManager != null) displayGoldPricesFromCache();
                 });
-            } catch (Exception e) { logNonFatal("loadOfflineData", e); }
+            } catch (Exception e) { Log.e(TAG, "loadOfflineData", e); }
         });
     }
 
@@ -1208,9 +1228,9 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                             .putFloat("sales_year",  (float) (sales != null ? sales.optDouble("year",  0.0) : 0.0));
                     if (inv != null && inv.optJSONArray("by_karat") != null) editor.putString("inventory_by_karat", inv.optJSONArray("by_karat").toString());
                     editor.putLong("last_update", System.currentTimeMillis()).apply();
-                } catch (Exception e) { logNonFatal("saveOfflineData.inner", e); }
+                } catch (Exception e) { Log.e(TAG, "saveOfflineData.inner", e); }
             });
-        } catch (Exception e) { logNonFatal("saveOfflineData", e); }
+        } catch (Exception e) { Log.e(TAG, "saveOfflineData", e); }
     }
 
     private void fetchData() {
@@ -1249,12 +1269,12 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 } catch (Exception e) {
-                    logNonFatal("fetchData.thread", e);
+                    Log.e(TAG, "fetchData.thread", e);
                     mainHandler.post(() -> { isLoading.set(false); loadOfflineData(); showShimmer(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
                 }
             });
             fetchDashboardCharts();
-        } catch (Exception e) { logNonFatal("fetchData", e); isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
+        } catch (Exception e) { Log.e(TAG, "fetchData", e); isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
     }
 
     private void processData(JSONObject data) {
@@ -1278,8 +1298,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             JSONObject sales = data.optJSONObject("sales");
             if (sales != null) { lastSalesData = sales; applySalesData(sales); }
 
-            // ✅ تفعيل بطاقة الوردية لموظف المبيعات
-            if (permissionManager.isPosOperator() && shiftSummaryCard != null) {
+            if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
                 shiftSummaryCard.setVisibility(View.VISIBLE);
                 JSONObject shiftData = data.optJSONObject("shift_summary");
                 if (shiftData != null) {
@@ -1290,7 +1309,6 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         shiftData.optDouble("gold_weight", 0.0)
                     );
                 } else if (sales != null) {
-                    // Fallback in case shift_summary is missing
                     shiftSummaryCard.bindData(
                         sales.optDouble("today", 0.0),
                         sales.optInt("count_today", 0),
@@ -1298,11 +1316,9 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         0
                     );
                 }
-            } else if (shiftSummaryCard != null) {
-                shiftSummaryCard.setVisibility(View.GONE);
             }
 
-        } catch (Exception e) { logNonFatal("processData", e); }
+        } catch (Exception e) { Log.e(TAG, "processData", e); }
     }
 
     private void fetchRecentActivity() {
@@ -1324,10 +1340,10 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                         try {
                             JSONArray activities = response.data.optJSONArray("activities");
                             if (activities != null && activities.length() > 0) { if (activityCache != null) activityCache.save(activities); updateRecentActivityUI(activities); }
-                        } catch (Exception e) { logNonFatal("fetchRecentActivity.parse", e); }
+                        } catch (Exception e) { Log.e(TAG, "fetchRecentActivity.parse", e); }
                     }
                 });
-            } catch (Exception e) { logNonFatal("fetchRecentActivity", e); }
+            } catch (Exception e) { Log.e(TAG, "fetchRecentActivity", e); }
         });
     }
 
@@ -1343,7 +1359,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 itemView.setOnClickListener(v -> handleRecentActivityClick(item));
                 llRecentActivity.addView(itemView);
             }
-        } catch (Exception e) { logNonFatal("updateRecentActivityUI", e); }
+        } catch (Exception e) { Log.e(TAG, "updateRecentActivityUI", e); }
     }
 
     private void bindActivityToView(View v, JSONObject item) {
@@ -1373,13 +1389,11 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 else tvStatusChip.setVisibility(View.GONE);
             }
 
-            // ✅ تشغيل العد التنازلي
             CountdownTimerView countdown = v.findViewById(R.id.countdownTimer);
             if (countdown != null) {
                 String status = item.optString("status", "");
                 long expiresAt = item.optLong("expires_at", 0);
                 long createdAt = item.optLong("created_at", 0);
-                
                 if ("pending".equals(status) && expiresAt > 0) {
                     countdown.setVisibility(View.VISIBLE);
                     countdown.start(createdAt, expiresAt, () -> fetchData());
@@ -1421,7 +1435,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                 }
             });
             sheet.show(getParentFragmentManager(), "ActivityDetails");
-        } catch (Exception e) { logNonFatal("handleRecentActivityClick", e); }
+        } catch (Exception e) { Log.e(TAG, "handleRecentActivityClick", e); }
     }
 
     private void registerDataRefreshReceiver() {
@@ -1512,9 +1526,9 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             if (!isAdded()) return;
             int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             if (newBranchId != currentBranchId) {
-                currentBranchId = newBranchId; initBranchCache(currentBranchId); updateHeader();
+                currentBranchId = newBranchId; initBranchCache(currentBranchId);
                 if (roleController != null && getView() != null) roleController.applyVisibility(getView());
-                if (getView() != null) setupQuickActionButtons(getView());
+                if (getView() != null) { setupQuickActionButtons(getView()); updateLayoutVisibilityForRole(getView()); }
                 syncOrgProfileFromServer(true); loadOfflineData();
                 if (offlineCache == null || offlineCache.getInt("total_items", 0) == 0) showShimmer(true);
                 fetchData(); fetchRecentActivity();
@@ -1539,9 +1553,9 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             if (latestBranchId != currentBranchId) onBranchChanged();
             else if (isViewInitialized) {
-                updateHeader(); syncOrgProfileFromServer(false);
+                syncOrgProfileFromServer(false);
                 if (roleController != null && getView() != null) roleController.applyVisibility(getView());
-                if (getView() != null) setupQuickActionButtons(getView());
+                if (getView() != null) { setupQuickActionButtons(getView()); updateLayoutVisibilityForRole(getView()); }
 
                 long now = System.currentTimeMillis();
                 long timeSinceLastFetch = now - lastDataFetchTime; long timeSinceLastGoldFetch = now - lastGoldFetchTime;
@@ -1597,9 +1611,7 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
                     if (pieChartKarat != null) pieChartKarat.invalidate();
                 }
             });
-        } catch (Exception e) {
-            logNonFatal("onConfigurationChanged", e);
-        }
+        } catch (Exception e) { Log.e(TAG, "onConfigurationChanged", e); }
     }
 
     @Override
@@ -1611,15 +1623,13 @@ if (permissionManager != null && permissionManager.isPosOperator() && shiftSumma
             tvScrapWeight = null; tvScrapValue = null; btnToggleScrapVisibility = null;
             if (branchesManager != null && branchListener != null) { branchesManager.removeListener(branchListener); branchListener = null; }
             if (orgProfile != null && profileListener != null) { orgProfile.removeListener(profileListener); profileListener = null; }
-            cancelFuture(dataFuture); cancelFuture(goldPriceFuture); cancelFuture(pingFuture);
+            cancelFuture(dataFuture); cancelFuture(goldPriceFuture);
             if (mainHandler != null) { mainHandler.removeCallbacks(autoRefreshRunnable); if (swipeTimeoutRunnable != null) mainHandler.removeCallbacks(swipeTimeoutRunnable); }
             shutdownExecutor(); isViewInitialized = false;
         } catch (Exception e) {}
     }
 
     private void cancelFuture(Future<?> future) { try { if (future != null && !future.isDone()) future.cancel(true); } catch (Exception e) {} }
-
-    private void logNonFatal(String location, Throwable throwable) { try { Log.e(TAG, "Error at " + location + ": " + throwable.getMessage(), throwable); } catch (Exception e) {} }
 
     private void initializeManagers() {
         try {
