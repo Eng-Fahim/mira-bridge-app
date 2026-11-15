@@ -168,7 +168,12 @@ public class MiraDashboardFragment extends Fragment {
     private int currentItemCount = 0;
     private double currentTotalWeight = 0;
 
-    
+    private View layoutPosGoldDashboard;
+    private TextView tvPosTotalWeight, tvPosTotalValue, tvPosCashBalance, tvPosSellPrice, tvPosBuyPrice;
+    private LinearLayout llPosKaratContainer;
+    private LineChart lineChartPosPriceMovement;
+    private ImageButton btnTogglePosGoldVisibility;
+    private boolean isPosDashboardHidden = true;
     private ShiftSummaryCardView shiftSummaryCard;
     private boolean isShiftCardAnimated = false; // ✅ أضف هذا السطر هنا
 
@@ -465,6 +470,26 @@ public class MiraDashboardFragment extends Fragment {
 
             if (roleController != null) roleController.applyVisibility(v);
 
+
+
+// ✅ ربط التصميم الجديد لموظف المبيعات
+layoutPosGoldDashboard = v.findViewById(R.id.layoutPosGoldDashboard);
+tvPosTotalWeight = v.findViewById(R.id.tvPosTotalWeight);
+tvPosTotalValue = v.findViewById(R.id.tvPosTotalValue);
+tvPosCashBalance = v.findViewById(R.id.tvPosCashBalance);
+tvPosSellPrice = v.findViewById(R.id.tvPosSellPrice);
+tvPosBuyPrice = v.findViewById(R.id.tvPosBuyPrice);
+llPosKaratContainer = v.findViewById(R.id.llPosKaratContainer);
+lineChartPosPriceMovement = v.findViewById(R.id.lineChartPosPriceMovement);
+btnTogglePosGoldVisibility = v.findViewById(R.id.btnTogglePosGoldVisibility);
+
+if (btnTogglePosGoldVisibility != null) {
+    btnTogglePosGoldVisibility.setOnClickListener(v2 -> {
+        isPosDashboardHidden = !isPosDashboardHidden;
+        btnTogglePosGoldVisibility.setImageResource(isPosDashboardHidden ? R.drawable.ic_eye_off : R.drawable.ic_eye_on);
+        updatePosDashboardUI(); // دالة سننشئها
+    });
+}
         applyCarouselLayout();
         applyChartTheme();
         updateHeroBalance();
@@ -486,51 +511,31 @@ private void updateLayoutVisibilityForRole(View v) {
     if (v == null || permissionManager == null) return;
 
     if (permissionManager.isPosOperator()) {
-        // ==========================================
-        // 1. واجهة موظف المبيعات (POS Operator)
-        // ==========================================
+        // ✅ إظهار التصميم الجديد لموظف المبيعات
+        if (layoutPosGoldDashboard != null) layoutPosGoldDashboard.setVisibility(View.VISIBLE);
         
-        // إظهار ملخص الوردية (البطل الرئيسي)
-        if (shiftSummaryCard != null) shiftSummaryCard.setVisibility(View.VISIBLE);
+        // إخفاء التصميمات القديمة
+        if (shiftSummaryCard != null) shiftSummaryCard.setVisibility(View.GONE);
+        if (hsvCarousel != null) hsvCarousel.setVisibility(View.GONE);
+        if (dotsIndicator != null) dotsIndicator.setVisibility(View.GONE);
         
-        // إخفاء بطاقة المخزون (Hero) فقط من الكاروسيل، وإبقاء أسعار الذهب وملخص المبيعات
-        if (heroBalanceCard != null) heroBalanceCard.setVisibility(View.GONE);
-        if (dot1 != null) dot1.setVisibility(View.GONE); 
-        
-        // إبقاء الكاروسيل ظاهراً (سيحتوي على الذهب والمبيعات)
-        if (hsvCarousel != null) hsvCarousel.setVisibility(View.VISIBLE);
-        if (dotsIndicator != null) dotsIndicator.setVisibility(View.VISIBLE);
-        
-        // إخفاء أقسام الإدارة والمخزون والكسر (غير مفيدة للموظف)
+        // إخفاء الأقسام الإدارية والرسوم القديمة (لأننا وضعنا رسماً جديداً في layoutPosGoldDashboard)
         int[] idsToHide = {
-            R.id.alertsStrip,
-            R.id.cardInventoryByKarat,
-            R.id.cardScrapGold,
-            R.id.cardScrapAging,
-            R.id.recentActivityHeader, 
-            R.id.llRecentActivity
+            R.id.alertsStrip, R.id.cardInventoryByKarat, R.id.cardScrapGold,
+            R.id.cardScrapAging, R.id.recentActivityHeader, R.id.llRecentActivity, R.id.cardCharts
         };
         for (int id : idsToHide) {
             View view = v.findViewById(id);
             if (view != null) view.setVisibility(View.GONE);
         }
 
-        // ✅ إبقاء الرسوم البيانية (Charts) ظاهرة لأنها مفيدة جداً للموظف (تحفيز وأداء)
-        View chartsCard = v.findViewById(R.id.cardCharts);
-        if (chartsCard != null) chartsCard.setVisibility(View.VISIBLE);
-
-        // إظهار الأزرار السريعة
         if (hsvQuickActions != null) hsvQuickActions.setVisibility(View.VISIBLE);
 
     } else {
-        // ==========================================
-        // 2. واجهة المدير (Manager / Admin)
-        // ==========================================
+        // المدير: إخفاء تصميم الـ POS وإظهار التصميم القديم
+        if (layoutPosGoldDashboard != null) layoutPosGoldDashboard.setVisibility(View.GONE);
         
-        // إخفاء ملخص الوردية (خاص بالموظفين)
         if (shiftSummaryCard != null) shiftSummaryCard.setVisibility(View.GONE);
-
-        // إظهار جميع عناصر الكاروسيل والرسوم البيانية
         if (hsvCarousel != null) hsvCarousel.setVisibility(View.VISIBLE);
         if (heroBalanceCard != null) heroBalanceCard.setVisibility(View.VISIBLE);
         if (dot1 != null) dot1.setVisibility(View.VISIBLE);
@@ -541,10 +546,33 @@ private void updateLayoutVisibilityForRole(View v) {
         
         if (hsvQuickActions != null) hsvQuickActions.setVisibility(View.VISIBLE);
         
-        // تطبيق صلاحيات الـ RoleController لإظهار باقي الأقسام (المخزون، الكسر..)
         if (roleController != null) roleController.applyVisibility(v);
     }
 }
+
+// ✅ دالة تحديث واجهة الـ POS عند إخفاء/إظهار الأرقام
+private void updatePosDashboardUI() {
+    if (getView() == null) return;
+    
+    if (isPosDashboardHidden) {
+        tvPosTotalWeight.setText("•••••");
+        tvPosTotalValue.setText("•••••••");
+        tvPosCashBalance.setText("•••••••");
+        if (llPosKaratContainer != null) {
+            for (int i = 0; i < llPosKaratContainer.getChildCount(); i++) {
+                View card = llPosKaratContainer.getChildAt(i);
+                TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
+                TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
+                if (tvKaratWeight != null) tvKaratWeight.setText("••• جم");
+                if (tvKaratValue != null) tvKaratValue.setText("••••• YER");
+            }
+        }
+    } else {
+        // إعادة جلب البيانات لتحديث الأرقام
+        fetchData(); 
+    }
+}
+
 
     private void setupQuickActionButtons(View root) {
         if (root == null || permissionManager == null) return;
@@ -602,78 +630,119 @@ private void updateLayoutVisibilityForRole(View v) {
     }
 
     private void renderCharts(JSONObject data) {
-        try {
-            applyChartTheme();
+    try {
+        applyChartTheme();
 
-            JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
-            if (sales7Days != null && lineChartSales != null) {
-                List<Entry> entries = new ArrayList<>();
-                final List<String> labels = new ArrayList<>();
+        // ==========================================
+        // 1. الرسوم البيانية القديمة (للمدير)
+        // ==========================================
+        JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
+        if (sales7Days != null && lineChartSales != null) {
+            List<Entry> entries = new ArrayList<>();
+            final List<String> labels = new ArrayList<>();
+            for (int i = 0; i < sales7Days.length(); i++) {
+                JSONObject day = sales7Days.getJSONObject(i);
+                entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                labels.add(day.optString("date", ""));
+            }
+            int goldColor = Color.parseColor("#D4AF37");
+            LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+            dataSet.setColor(goldColor); dataSet.setCircleColor(goldColor); dataSet.setLineWidth(2.5f);
+            dataSet.setCircleRadius(4f); dataSet.setDrawValues(false); dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            lineChartSales.setData(new LineData(dataSet));
+            XAxis xAxis = lineChartSales.getXAxis();
+            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); xAxis.setGranularity(1f); xAxis.setDrawGridLines(false);
+            lineChartSales.getAxisRight().setEnabled(false);
+            lineChartSales.getAxisLeft().setDrawGridLines(true);
+            lineChartSales.getDescription().setEnabled(false);
+            lineChartSales.getLegend().setEnabled(false);
+            lineChartSales.animateX(1000); lineChartSales.invalidate();
+        }
+
+        JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
+        if (salesByKarat != null && pieChartKarat != null) {
+            List<PieEntry> entries = new ArrayList<>();
+            for (int i = 0; i < salesByKarat.length(); i++) {
+                JSONObject k = salesByKarat.getJSONObject(i);
+                entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
+            }
+            if (!entries.isEmpty()) {
+                PieDataSet dataSet = new PieDataSet(entries, "");
+                List<Integer> colors = new ArrayList<>();
+                colors.add(Color.parseColor("#D4AF37"));
+                colors.add(Color.parseColor("#E6B800"));
+                colors.add(Color.parseColor("#CD853F"));
+                colors.add(Color.parseColor("#A0522D"));
+                dataSet.setColors(colors);
+                dataSet.setValueTextSize(12f);
+
+                PieData pieData = new PieData(dataSet);
+                pieChartKarat.setData(pieData);
+                pieChartKarat.getDescription().setEnabled(false);
+                pieChartKarat.setUsePercentValues(true);
+                pieChartKarat.setHoleRadius(40f);
+                pieChartKarat.setTransparentCircleRadius(45f);
+                pieChartKarat.animateY(1000);
+                pieChartKarat.invalidate();
+            }
+        }
+
+        // ==========================================
+        // 2. الرسم البياني الجديد لموظف المبيعات (خطين: بيع وشراء)
+        // ==========================================
+        if (lineChartPosPriceMovement != null && permissionManager != null && permissionManager.isPosOperator()) {
+            List<Entry> sellEntries = new ArrayList<>();
+            List<Entry> buyEntries = new ArrayList<>();
+            final List<String> labels = new ArrayList<>();
+
+            if (sales7Days != null) {
                 for (int i = 0; i < sales7Days.length(); i++) {
                     JSONObject day = sales7Days.getJSONObject(i);
-                    entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                    // بيانات تجريبية للأسعار (يمكنك جلبها من API لاحقاً)
+                    sellEntries.add(new Entry(i, (float) (64000 + (Math.random() * 2000))));
+                    buyEntries.add(new Entry(i, (float) (63000 + (Math.random() * 1000))));
                     labels.add(day.optString("date", ""));
                 }
-
-                int goldColor = Color.parseColor("#D4AF37");
-                LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-                dataSet.setColor(goldColor);
-                dataSet.setCircleColor(goldColor);
-                dataSet.setLineWidth(2.5f);
-                dataSet.setCircleRadius(4f);
-                dataSet.setDrawValues(false);
-                dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-
-                LineData lineData = new LineData(dataSet);
-                lineChartSales.setData(lineData);
-
-                XAxis xAxis = lineChartSales.getXAxis();
-                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-                xAxis.setGranularity(1f);
-                xAxis.setDrawGridLines(false);
-
-                lineChartSales.getAxisRight().setEnabled(false);
-                lineChartSales.getAxisLeft().setDrawGridLines(true);
-                lineChartSales.getDescription().setEnabled(false);
-                lineChartSales.getLegend().setEnabled(false);
-                lineChartSales.animateX(1000);
-                lineChartSales.invalidate();
             }
 
-            JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
-            if (salesByKarat != null && pieChartKarat != null) {
-                List<PieEntry> entries = new ArrayList<>();
-                for (int i = 0; i < salesByKarat.length(); i++) {
-                    JSONObject k = salesByKarat.getJSONObject(i);
-                    entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
-                }
-                if (!entries.isEmpty()) {
-                    PieDataSet dataSet = new PieDataSet(entries, "");
-                    List<Integer> colors = new ArrayList<>();
-                    colors.add(Color.parseColor("#D4AF37"));
-                    colors.add(Color.parseColor("#E6B800"));
-                    colors.add(Color.parseColor("#CD853F"));
-                    colors.add(Color.parseColor("#A0522D"));
-                    dataSet.setColors(colors);
-                    dataSet.setValueTextSize(12f);
+            LineDataSet sellDataSet = new LineDataSet(sellEntries, "بيع");
+            sellDataSet.setColor(Color.parseColor("#D4AF37"));
+            sellDataSet.setLineWidth(3f); sellDataSet.setDrawCircles(false);
+            sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            sellDataSet.setDrawFilled(true); sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
 
-                    PieData pieData = new PieData(dataSet);
-                    pieChartKarat.setData(pieData);
-                    pieChartKarat.getDescription().setEnabled(false);
-                    pieChartKarat.setUsePercentValues(true);
-                    pieChartKarat.setHoleRadius(40f);
-                    pieChartKarat.setTransparentCircleRadius(45f);
-                    pieChartKarat.animateY(1000);
-                    pieChartKarat.invalidate();
-                }
-            }
+            LineDataSet buyDataSet = new LineDataSet(buyEntries, "شراء");
+            buyDataSet.setColor(Color.parseColor("#2E7D32"));
+            buyDataSet.setLineWidth(3f); buyDataSet.setDrawCircles(false);
+            buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            buyDataSet.setDrawFilled(true); buyDataSet.setFillColor(Color.parseColor("#332E7D32"));
 
-            applyChartTheme();
+            LineData lineData = new LineData(sellDataSet, buyDataSet);
+            lineChartPosPriceMovement.setData(lineData);
 
-        } catch (Exception e) { Log.e(TAG, "renderCharts", e); }
-    }
+            XAxis xAxis = lineChartPosPriceMovement.getXAxis();
+            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+            xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false);
 
+            lineChartPosPriceMovement.getAxisRight().setEnabled(true);
+            lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
+            lineChartPosPriceMovement.getAxisRight().setGridColor(Color.parseColor("#22CCCCCC"));
+            lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
+            lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
+
+            lineChartPosPriceMovement.getDescription().setEnabled(false);
+            lineChartPosPriceMovement.getLegend().setEnabled(false);
+            lineChartPosPriceMovement.setTouchEnabled(true);
+            lineChartPosPriceMovement.setDragEnabled(true);
+            lineChartPosPriceMovement.setScaleEnabled(false);
+            lineChartPosPriceMovement.animateX(1000);
+            lineChartPosPriceMovement.invalidate();
+        }
+
+    } catch (Exception e) { Log.e(TAG, "renderCharts", e); }
+}
     private void applyChartTheme() {
         if (!isAdded() || getContext() == null) return;
         View anchor = getView();
@@ -1307,44 +1376,108 @@ private void updateLayoutVisibilityForRole(View v) {
             applySalesData(sales); 
         }
 
-        // ✅ معالجة بطاقة ملخص الوردية (البيانات الحقيقية + الخطة البديلة)
+        // ✅ 1. معالجة بطاقة ملخص الوردية (البيانات الحقيقية + الخطة البديلة)
         if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
-            shiftSummaryCard.setVisibility(View.VISIBLE);
+            
+            // إظهار البطاقة القديمة فقط إذا كان التصميم الجديد مخفياً (لتفادي التعارض)
+            if (layoutPosGoldDashboard == null || layoutPosGoldDashboard.getVisibility() != View.VISIBLE) {
+                shiftSummaryCard.setVisibility(View.VISIBLE);
+            } else {
+                shiftSummaryCard.setVisibility(View.GONE);
+            }
 
             JSONObject shiftData = data.optJSONObject("shift_summary");
-            
-            double totalCash = 0.0;
-            int invoiceCount = 0;
-            int returnsCount = 0;
-            double goldWeight = 0.0;
+            double totalCash = 0.0; int invoiceCount = 0; int returnsCount = 0; double goldWeight = 0.0;
 
             if (shiftData != null && shiftData.length() > 0) {
-                // ✅ السيناريو الأول: السيرفر أرسل بيانات ملخص الوردية
                 totalCash = shiftData.optDouble("total_cash", 0.0);
                 invoiceCount = shiftData.optInt("invoice_count", 0);
                 returnsCount = shiftData.optInt("returns", 0);
                 goldWeight = shiftData.optDouble("gold_weight", 0.0);
             } else if (sales != null) {
-                // 🛡️ السيناريو الثاني (الخطة البديلة): السيرفر لم يرسل ملخص وردية، نأخذ من ملخص المبيعات
                 totalCash = sales.optDouble("today", 0.0);
                 invoiceCount = sales.optInt("count_today", 0);
-                returnsCount = 0; 
-                goldWeight = 0.0; 
             }
 
-            // ربط البيانات بالبطاقة
             shiftSummaryCard.bindData(totalCash, invoiceCount, returnsCount, goldWeight);
 
-            // ✅ إضافة حركة (Animation) عند الظهور لأول مرة
             if (!isShiftCardAnimated) {
                 animateShiftCard(shiftSummaryCard);
                 isShiftCardAnimated = true;
             }
         }
 
+        // ✅ 2. تحديث التصميم الجديد لموظف المبيعات (POS Dashboard)
+        if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
+            
+            if (isPosDashboardHidden) {
+                tvPosTotalWeight.setText("•••••");
+                tvPosTotalValue.setText("•••••••");
+                tvPosCashBalance.setText("•••••••");
+            } else {
+                tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
+                tvPosTotalValue.setText(String.format(Locale.US, "%,.2f YER", currentInventoryValue * 530.0)); 
+                
+                double cash = 0.0;
+                if (data.optJSONObject("shift_summary") != null) {
+                    cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
+                } else if (sales != null) {
+                    cash = sales.optDouble("today", 0.0);
+                }
+                tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+            }
+            
+            renderPosKaratCards(inv);
+            
+            if (priceManager != null && !isPosDashboardHidden) {
+                double sellPrice = priceManager.getGoldPricePerGram(24) * 530.0;
+                double buyPrice = priceManager.getGoldPricePerGram(21) * 530.0;
+                tvPosSellPrice.setText(String.format(Locale.US, "%,.0f", sellPrice));
+                tvPosBuyPrice.setText(String.format(Locale.US, "%,.0f", buyPrice));
+            }
+        }
+
     } catch (Exception e) { Log.e(TAG, "processData", e); }
 }
     
+    
+    // ✅ دالة بناء بطاقات العيارات للتصميم الجديد
+private void renderPosKaratCards(JSONObject inv) {
+    if (llPosKaratContainer == null) return;
+    llPosKaratContainer.removeAllViews();
+    if (inv == null || inv.optJSONArray("by_karat") == null) return;
+
+    JSONArray byKarat = inv.optJSONArray("by_karat");
+    try {
+        for (int i = 0; i < byKarat.length(); i++) {
+            JSONObject k = byKarat.getJSONObject(i);
+            int karat = k.optInt("karat", 0);
+            double weight = k.optDouble("weight", 0.0);
+            if (karat == 0 || weight == 0) continue;
+
+            // رفع التصميم الخاص بالبطاقة الصغيرة
+            View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
+            
+            TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
+            TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
+            TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
+
+            tvKaratTitle.setText("عيار " + karat);
+            
+            if (isPosDashboardHidden) {
+                tvKaratWeight.setText("••• جم");
+                tvKaratValue.setText("••••• YER");
+            } else {
+                tvKaratWeight.setText(String.format(Locale.US, "%,.2f جم", weight));
+                double price = priceManager != null ? priceManager.getGoldPricePerGram(karat) : 0;
+                tvKaratValue.setText(String.format(Locale.US, "%,.2f YER", weight * price * 530.0));
+            }
+
+            llPosKaratContainer.addView(card);
+        }
+    } catch (Exception e) { Log.e(TAG, "renderPosKaratCards", e); }
+}
+
     /**
  * ✅ دالة تحريك بطاقة الوردية عند ظهورها لأول مرة (Fade-in + Slide-up)
  */
