@@ -16,52 +16,43 @@ public class DashboardRoleController {
     public void applyVisibility(View root) {
         if (root == null || permissions == null) return;
 
-        // 1. البطاقات العلوية (Carousel)
         setVisible(root, R.id.heroBalanceCard, permissions.canViewDashboardHero());
         setVisible(root, R.id.cardGoldPrices, permissions.canViewDashboardGoldPrices());
         setVisible(root, R.id.salesSummaryCard, permissions.canViewDashboardSales());
-        
-        // 2. موظف المبيعات لا يرى المخزون ولا كسر الذهب
+
         boolean isPos = permissions.isPosOperator();
-        
-        setVisible(root, R.id.cardInventoryByKarat, permissions.canViewDashboardInventoryByKarat() && !isPos);
-        setVisible(root, R.id.cardScrapGold, permissions.canViewDashboardScrap() && !isPos);
-        setVisible(root, R.id.cardScrapAging, permissions.canViewDashboardScrapAging() && !isPos);
+        boolean isGate = permissions.isGateUser();
 
-        // 3. الرسوم البيانية (للإدارة)
-        setVisible(root, R.id.cardCharts, permissions.canViewDashboardCharts() && !isPos);
+        setVisible(root, R.id.cardInventoryByKarat, permissions.canViewDashboardInventoryByKarat() && !isPos && !isGate);
+        setVisible(root, R.id.cardScrapGold, permissions.canViewDashboardScrap() && !isPos && !isGate);
+        setVisible(root, R.id.cardScrapAging, permissions.canViewDashboardScrapAging() && !isPos && !isGate);
+        setVisible(root, R.id.cardCharts, permissions.canViewDashboardCharts() && !isPos && !isGate);
 
-        // 4. التنبيهات
-        if (!permissions.canViewDashboardAlerts()) {
-            setVisible(root, R.id.alertsStrip, false);
-        }
+        if (!permissions.canViewDashboardAlerts()) setVisible(root, R.id.alertsStrip, false);
     }
 
-    // Guards: منع أو السماح بطلب البيانات من السيرفر
     public boolean canFetchFullDashboard() {
-        return permissions.isPosOperator() || permissions.canViewDashboardHero() || permissions.canViewDashboardSales();
+        return permissions.isPosOperator() || permissions.isGateUser()
+            || permissions.canViewDashboardHero() || permissions.canViewDashboardSales();
     }
-    
-    // ✅ السماح للكاشير بجلب الرسوم البيانية (الخاصة به)
-    public boolean canFetchCharts() { 
-        return permissions.isPosOperator() || permissions.canViewDashboardCharts(); 
+
+    public boolean canFetchCharts() {
+        return permissions.isPosOperator() || permissions.canViewDashboardCharts();
     }
-    
-    public boolean canFetchScrap() { 
-        return permissions.canViewDashboardScrap() && !permissions.isPosOperator(); 
+
+    public boolean canFetchScrap() {
+        return permissions.canViewDashboardScrap() && !permissions.isPosOperator() && !permissions.isGateUser();
     }
-    
-    public boolean canFetchScrapAging() { 
-        return permissions.canViewDashboardScrapAging() && !permissions.isPosOperator(); 
+
+    public boolean canFetchScrapAging() {
+        return permissions.canViewDashboardScrapAging() && !permissions.isPosOperator() && !permissions.isGateUser();
     }
-    
-    public boolean canFetchGoldPrices() { 
-        return permissions.canViewDashboardGoldPrices(); 
-    }
-    
-    // ✅ السماح للكاشير بجلب العمليات الأخيرة
-    public boolean canFetchRecentActivity() { 
-        return permissions.isPosOperator() || permissions.canViewDashboardRecentActivity(); 
+
+    public boolean canFetchGoldPrices() { return permissions.canViewDashboardGoldPrices(); }
+
+    public boolean canFetchRecentActivity() {
+        return permissions.isPosOperator() || permissions.isGateUser()
+            || permissions.canViewDashboardRecentActivity();
     }
 
     private void setVisible(View root, int id, boolean visible) {
