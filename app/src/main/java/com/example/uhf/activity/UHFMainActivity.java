@@ -488,9 +488,24 @@ private static final NavItemCfg[] NAV_CONFIGS = {
             boolean setupIsComplete = SETUP_COMPLETED.equals(cachedSetupStatus)
                     || SETUP_LOCKED.equals(cachedSetupStatus);
 
-            // ✅ اختبار مؤقت: تجاوز فحص الإعداد تماماً
-Log.d(TAG, "🧪 TESTING: Forcing navigateByRole without setup check");
-navigateByRole();
+            if (setupIsComplete) {
+                if (savedInstanceState == null) {
+                    navigateByRole();
+                } else {
+                    String savedTag = savedInstanceState.getString(
+                            "current_fragment", NavigationManager.TAG_DASHBOARD);
+                    Fragment savedFragment = navigationManager.createFragmentByTag(savedTag);
+                    if (savedFragment != null) {
+                        enableNavigationAfterSetup();
+                        loadFragmentDirectly(savedFragment, savedTag);
+                    } else {
+                        navigateByRole();
+                    }
+                }
+            } else {
+                Log.d(TAG, "🔒 Setup pending → ignoring savedInstanceState");
+                checkSetupStatusAndNavigate();
+            }
 
             try {
                 if (sessionManager != null) {
@@ -601,51 +616,40 @@ navigateByRole();
     }
 
     private void fetchSetupStatusAndNavigate() {
-    showSetupLoadingScreen();
+        showSetupLoadingScreen();
 
-    // ✅ 1. مؤقت أمان: يخفي الغطاء بعد 8 ثوانٍ قسرياً
-    final Runnable safetyTimeout = () -> {
-        Log.w(TAG, "⚠️ Setup status fetch timed out - hiding overlay");
-        hideSetupLoadingScreen();
-        if (isActivityAlive()) {
-            cacheSetupStatus(SETUP_COMPLETED);
-            enableNavigationAfterSetup();
-            navigateByRole();
-        }
-    };
-    mainHandler.postDelayed(safetyTimeout, 8_000);
+        new Thread(() -> {
+            String status = SETUP_PENDING;
+            String stamp  = null;
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
 
-    new Thread(() -> {
-        String status = SETUP_PENDING;
-        String stamp = null;
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
-
-            if (response != null && response.isSuccess && response.data != null) {
-                status = response.data.optString("status", SETUP_PENDING);
-                stamp = response.data.optString("setup_stamp", null);
-                Log.d(TAG, "✅ Setup status from API: " + status);
-            } else {
-                Log.w(TAG, "⚠️ API response null/failed - using fallback");
+                if (response != null && response.isSuccess && response.data != null) {
+                    status = response.data.optString("status", SETUP_PENDING);
+                    stamp  = response.data.optString("setup_stamp", null);
+                    Log.d(TAG, "✅ Setup status from API: " + status
+                            + " | stamp: " + (stamp != null
+                                    ? stamp.substring(0, Math.min(8, stamp.length())) + "..."
+                                    : "null"));
+                } else {
+                    Log.w(TAG, "⚠️ Failed to fetch setup status → assuming pending");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
-        }
 
-        final String finalStatus = status;
-        final String finalStamp = stamp;
-        runOnUiThread(() -> {
-            // ✅ 2. إلغاء المؤقت لأننا وصلنا
-            mainHandler.removeCallbacks(safetyTimeout);
-            hideSetupLoadingScreen();
-            if (isActivityAlive()) {
-                cacheSetupStatus(finalStatus, finalStamp);
-                navigateBySetupStatus(finalStatus);
-            }
-        });
-    }).start();
-}
+            final String finalStatus = status;
+            final String finalStamp  = stamp;
+            runOnUiThread(() -> {
+                hideSetupLoadingScreen();
+                if (isActivityAlive()) {
+                    cacheSetupStatus(finalStatus, finalStamp);
+                    navigateBySetupStatus(finalStatus);
+                }
+            });
+        }).start();
+    }
 
     private void refreshSetupStatusInBackground() {
         if (isWithinSetupGracePeriod()) {
@@ -1527,14 +1531,11 @@ navigateByRole();
     // ═══════════════════════════════════════════════════════
     //  دورة الحياة
     // ═══════════════════════════════════════════════════════
-@Override
-public void onResume() {
-    super.onResume();
-    
-    // ✅ حماية دائمة: أغلق أي غطاء تحميل قديم عالق
-    hideSetupLoadingScreen();
-    loadingCounter = 0;
-    forceHideLoadingImmediate();
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
         // ⚡ MIRA License Heartbeat
         try {
             com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
