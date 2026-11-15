@@ -510,7 +510,9 @@ public class MiraDashboardFragment extends Fragment {
             
             // ✅ بناء الأزرار الديناميكية
             setupQuickActionButtons(v);
-
+if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
+    shiftSummaryCard.setVisibility(View.VISIBLE);
+}
         } catch (Exception e) { logNonFatal("initViews", e); }
     }
 
