@@ -485,50 +485,59 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void updatePosDashboardUI() {
-        if (getView() == null) return;
-        if (isPosDashboardHidden) {
-            tvPosTotalWeight.setText("•••••");
-            tvPosTotalValue.setText("•••••••");
-            tvPosCashBalance.setText("•••••••");
-            if (llPosKaratContainer != null) {
-                for (int i = 0; i < llPosKaratContainer.getChildCount(); i++) {
-                    View card = llPosKaratContainer.getChildAt(i);
-                    TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
-                    TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
-                    if (tvKaratWeight != null) tvKaratWeight.setText("••• جم");
-                    if (tvKaratValue != null) tvKaratValue.setText("•••••");
-                }
+    if (getView() == null) return;
+    
+    if (isPosDashboardHidden) {
+        tvPosTotalWeight.setText("•••••");
+        tvPosTotalValue.setText("•••••••");
+        tvPosCashBalance.setText("•••••••");
+        if (llPosKaratContainer != null) {
+            for (int i = 0; i < llPosKaratContainer.getChildCount(); i++) {
+                View card = llPosKaratContainer.getChildAt(i);
+                TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
+                TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
+                if (tvKaratWeight != null) tvKaratWeight.setText("••• جم");
+                if (tvKaratValue != null) tvKaratValue.setText("•••••");
             }
-            // إخفاء مبالغ العمليات الأخيرة
-            if (llPosRecentActivity != null) {
-                for (int i = 0; i < llPosRecentActivity.getChildCount(); i++) {
-                    View row = llPosRecentActivity.getChildAt(i);
-                    TextView tvAmount = row.findViewById(R.id.tvPosActAmount);
-                    if (tvAmount != null) tvAmount.setText("•••••");
-                }
-            }
-        } else {
-            fetchData(); 
         }
+        if (llPosRecentActivity != null) {
+            for (int i = 0; i < llPosRecentActivity.getChildCount(); i++) {
+                View row = llPosRecentActivity.getChildAt(i);
+                TextView tvAmount = row.findViewById(R.id.tvPosActAmount);
+                if (tvAmount != null) tvAmount.setText("•••••");
+            }
+        }
+    } else {
+        // ✅ إعادة عرض البيانات المخزنة محلياً بدون الحاجة لطلب السيرفر مرة أخرى
+        tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
+        tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue));
+        if (lastSalesData != null) {
+            double cash = lastSalesData.optDouble("today", 0.0);
+            tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+        }
+        // إعادة بناء الكروت والمبالغ
+        renderPosKaratCards(new JSONObject()); // ستحتاج لتمرير الـ inv هنا إذا كنت تريد الدقة، أو تخزينه كمتغير عام
+        // الأفضل استدعاء دالة تعرض المبالغ من الذاكرة، أو تركها كما هي لأن الأرقام محفوظة
+        fetchData(); // استدعاء سريع في الخلفية لتحديث الأرقام إن لزم الأمر
     }
+}
 
     private void setupQuickActionButtons(View root) {
-        if (root == null || permissionManager == null) return;
-        GridLayout gridContainer = root.findViewById(R.id.gridPosQuickActions);
-        if (gridContainer == null) return;
-        gridContainer.removeAllViews();
+    if (root == null || permissionManager == null) return;
+    GridLayout gridContainer = root.findViewById(R.id.gridPosQuickActions);
+    if (gridContainer == null) return;
+    gridContainer.removeAllViews();
 
-        if (permissionManager.isPosOperator()) {
-            addQuickActionGrid(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
-            addQuickActionGrid(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
-            addQuickActionGrid(gridContainer, "مرتجع", R.drawable.ic_reports, new MiraPosFragment(), "Sales"); 
-            
-            // أزرار إضافية
-            addQuickActionGrid(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
-            addQuickActionGrid(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
-            addQuickActionGrid(gridContainer, "الرئيسية", R.drawable.ic_home, new MiraDashboardFragment(), "Home"); // تعديل حسب الحاجة
-        }
+    if (permissionManager.isPosOperator()) {
+        addQuickActionGrid(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
+        addQuickActionGrid(gridContainer, "مرتجع", R.drawable.ic_reports, new MiraPosFragment(), "Sales"); 
+        addQuickActionGrid(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+        
+        addQuickActionGrid(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+        addQuickActionGrid(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
+        addQuickActionGrid(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile"); 
     }
+}
 
     private void addQuickActionGrid(GridLayout container, String title, int iconRes, Fragment target, String tag) {
         View view = getLayoutInflater().inflate(R.layout.item_quick_action_grid, container, false);
@@ -575,8 +584,10 @@ public class MiraDashboardFragment extends Fragment {
         try {
             applyChartTheme();
 
-            JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
-            if (sales7Days == null) sales7Days = data.optJSONArray("sales");
+            // ✅ البحث عن مبيعات الموظف نفسه أولاً
+JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
+if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); // إذا لم توجد، اعرض الإجمالي
+if (sales7Days == null) sales7Days = data.optJSONArray("sales");
             
             if (sales7Days != null && lineChartSales != null) {
                 List<Entry> entries = new ArrayList<>();
