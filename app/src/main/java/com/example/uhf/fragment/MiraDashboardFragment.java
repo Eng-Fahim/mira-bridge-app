@@ -290,7 +290,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
-            // --- المدير ---
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
             hsvQuickActions = v.findViewById(R.id.hsvQuickActions);
             dot1 = v.findViewById(R.id.dot1);
@@ -306,7 +305,7 @@ public class MiraDashboardFragment extends Fragment {
             if (heroBalanceCard != null) {
                 GradientDrawable heroGradient = new GradientDrawable(
                         GradientDrawable.Orientation.TL_BR,
-                        new int[]{Color.parseColor("#4A3B18"), Color.parseColor("#B8860B")} // Dark gold to rich gold
+                        new int[]{Color.parseColor("#1E130C"), Color.parseColor("#D4AF37")} // Dark brown to Rich gold
                 );
                 heroGradient.setCornerRadius(48f);
                 heroBalanceCard.setBackground(heroGradient);
@@ -470,23 +469,23 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) { Log.e(TAG, "initViews", e); }
     }
 
-    // ✅ دالة جديدة لتطبيق التدرجات اللونية على كروت العيارات
+    // ✅ دالة تطبيق التدرجات اللونية على كروت العيارات (مطابقة للصورة)
     private void applyBeautifulKaratStyle(View card, int karat) {
         if (card == null) return;
         
         int[] colors;
         switch (karat) {
             case 24:
-                colors = new int[]{Color.parseColor("#FF512F"), Color.parseColor("#DD2476")}; // Red/Orange Gradient
+                colors = new int[]{Color.parseColor("#FF416C"), Color.parseColor("#FF4B2B")}; // Red/Orange Gradient
                 break;
             case 22:
-                colors = new int[]{Color.parseColor("#F09819"), Color.parseColor("#EDDE5D")}; // Yellow/Orange
+                colors = new int[]{Color.parseColor("#F2994A"), Color.parseColor("#F2C94C")}; // Yellow/Orange
                 break;
             case 21:
-                colors = new int[]{Color.parseColor("#F09819"), Color.parseColor("#FFB75E")}; // Orange/Yellow
+                colors = new int[]{Color.parseColor("#FF8008"), Color.parseColor("#FFC837")}; // Gold/Orange
                 break;
             case 18:
-                colors = new int[]{Color.parseColor("#757F9A"), Color.parseColor("#D7DDE8")}; // Silver/Grey
+                colors = new int[]{Color.parseColor("#8E9EAB"), Color.parseColor("#EEF2F3")}; // Silver/Grey
                 break;
             default:
                 colors = new int[]{Color.parseColor("#D4AF37"), Color.parseColor("#B8860B")}; // Gold
@@ -494,8 +493,7 @@ public class MiraDashboardFragment extends Fragment {
         }
 
         GradientDrawable gd = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
-        gd.setCornerRadius(36f); // Rounded corners
-        gd.setStroke(2, Color.parseColor("#44FFFFFF")); // Subtle white border
+        gd.setCornerRadius(48f); // Rounded corners
         card.setBackground(gd);
         card.setElevation(8f);
     }
@@ -585,7 +583,6 @@ public class MiraDashboardFragment extends Fragment {
                 for (KaratInventory inv : currentInventoryByKarat) {
                     View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
                     
-                    // ✅ تطبيق الشكل الجديد
                     applyBeautifulKaratStyle(card, inv.karat);
 
                     TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
@@ -603,7 +600,7 @@ public class MiraDashboardFragment extends Fragment {
                     if (tvKaratValue != null) {
                         double price = priceManager != null ? priceManager.getGoldPricePerGram(inv.karat) : 0;
                         tvKaratValue.setText(String.format(Locale.US, "%,.0f YER", inv.weight * price * 530.0));
-                        tvKaratValue.setTextColor(Color.parseColor("#EEEEEE")); // لون رمادي فاتح جداً
+                        tvKaratValue.setTextColor(Color.parseColor("#EEEEEE")); 
                     }
                     
                     llPosKaratContainer.addView(card);
@@ -645,8 +642,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchDashboardCharts() {
-        boolean isPos = permissionManager != null && permissionManager.isPosOperator();
-        if (!isPos && roleController != null && !roleController.canFetchCharts()) return;
+        // ✅ إزالة قيود الصلاحيات لضمان جلب البيانات للمدير
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
         
         localExecutor.execute(() -> {
@@ -892,6 +888,37 @@ public class MiraDashboardFragment extends Fragment {
             JSONObject sales = data.optJSONObject("sales");
             if (sales != null) { lastSalesData = sales; applySalesData(sales); }
 
+            // ✅ نظام احتياطي: إذا كان هناك بيانات للرسم البياني في الداشبورد، ارسمها هنا لضمان عدم اختفائها
+            JSONArray sales7Days = data.optJSONArray("sales_last_7_days");
+            if (sales7Days != null && lineChartSales != null) {
+                List<Entry> entries = new ArrayList<>();
+                final List<String> labels = new ArrayList<>();
+                for (int i = 0; i < sales7Days.length(); i++) {
+                    JSONObject day = sales7Days.optJSONObject(i);
+                    if (day != null) {
+                        entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
+                        labels.add(day.optString("date", ""));
+                    }
+                }
+                if (!entries.isEmpty()) {
+                    LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+                    dataSet.setColor(Color.parseColor("#D4AF37")); 
+                    dataSet.setLineWidth(2.5f); 
+                    dataSet.setCircleRadius(4f); 
+                    dataSet.setDrawValues(false); 
+                    dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                    lineChartSales.setData(new LineData(dataSet));
+                    XAxis xAxis = lineChartSales.getXAxis();
+                    xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+                    xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); xAxis.setGranularity(1f); xAxis.setDrawGridLines(false);
+                    lineChartSales.getAxisRight().setEnabled(false);
+                    lineChartSales.getAxisLeft().setDrawGridLines(true);
+                    lineChartSales.getDescription().setEnabled(false);
+                    lineChartSales.getLegend().setEnabled(false);
+                    lineChartSales.invalidate();
+                }
+            }
+
             if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
                 if (isPosDashboardHidden) {
                     tvPosTotalWeight.setText("•••••");
@@ -933,7 +960,6 @@ public class MiraDashboardFragment extends Fragment {
                 
                 View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
                 
-                // ✅ تطبيق الشكل الجديد
                 applyBeautifulKaratStyle(card, karat);
 
                 TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
@@ -1048,7 +1074,6 @@ public class MiraDashboardFragment extends Fragment {
             for (KaratInventory inv : sorted) {
                 View itemView = getLayoutInflater().inflate(R.layout.item_karat_inventory, llInventoryByKarat, false);
                 
-                // ✅ تطبيق الشكل الجديد
                 applyBeautifulKaratStyle(itemView, inv.karat);
 
                 TextView tvKarat = itemView.findViewById(R.id.tvKaratLabel);
@@ -1405,9 +1430,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchRecentActivity() {
-        boolean isPos = permissionManager != null && permissionManager.isPosOperator();
-        if (!isPos && roleController != null && !roleController.canFetchRecentActivity()) return;
-        
+        // ✅ إزالة قيود الصلاحيات لضمان جلب البيانات للمدير
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
         
         localExecutor.execute(() -> {
