@@ -115,22 +115,41 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- ✅✅✅ الإصلاح الحاسم: الغطاء أصبح أسود شبه شفاف مع نص واضح -->
         <FrameLayout
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:alpha="0.5"
-            android:background="?attr/colorOnSurface"
+            android:alpha="0.85"
+            android:background="#CC000000"
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
 
-            <com.google.android.material.progressindicator.CircularProgressIndicator
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:indeterminate="true"
-                app:indicatorColor="?attr/colorPrimary" />
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    app:indicatorColor="#FFFFFF"
+                    app:indicatorSize="56dp"
+                    app:trackThickness="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="جاري التحميل..."
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
