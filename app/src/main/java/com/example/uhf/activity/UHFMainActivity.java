@@ -2172,37 +2172,33 @@ private void setupQuickNav() {
         FloatingActionButton fabReports = findViewById(R.id.fabReports);
         FloatingActionButton fabProfile = findViewById(R.id.fabProfile);
 
-        // ⭐ بناء القائمة حسب الصلاحيات
         applyNavPermissions();
 
         if (fabActionCenter != null) {
-            boolean hasQuickActions = permissionManager.getAllowedQuickActions().size() > 0;
+            boolean hasQuickActions = permissionManager != null && permissionManager.getAllowedQuickActions().size() > 0;
             fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-            fabActionCenter.setEnabled(hasQuickActions);
             
-            // ✅ دمج المنطق (Speed Dial للموظف - القائمة القديمة للمدير)
             fabActionCenter.setOnClickListener(v -> {
                 boolean isPos = permissionManager != null && permissionManager.isPosOperator();
                 
                 if (isPos && fabReports != null && fabProfile != null) {
-                    // --- منطق موظف المبيعات: Speed Dial ---
                     if (!isFabMenuOpen) {
                         fabReports.setVisibility(View.VISIBLE);
                         fabProfile.setVisibility(View.VISIBLE);
-                        fabReports.animate().translationY(-150f).setDuration(300).start();
-                        fabProfile.animate().translationY(-300f).setDuration(300).start();
+                        
+                        // ✅ حركة القوس: التقارير لليسار، البروفايل لليمين
+                        fabReports.animate().translationX(-150f).translationY(-150f).setDuration(300).start();
+                        fabProfile.animate().translationX(150f).translationY(-150f).setDuration(300).start();
                         fabActionCenter.animate().rotation(45f).setDuration(300).start();
                         isFabMenuOpen = true;
                     } else {
                         closePosFabMenu(fabActionCenter, fabReports, fabProfile);
                     }
                 } else {
-                    // --- منطق المدير: القائمة القديمة ---
                     showQuickActionMenu();
                 }
             });
 
-            // ✅ إغلاق القائمة تلقائياً عند الضغط على التقارير
             if (fabReports != null) {
                 fabReports.setOnClickListener(v -> {
                     loadFragment(new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
@@ -2210,22 +2206,12 @@ private void setupQuickNav() {
                 });
             }
 
-            // ✅ إغلاق القائمة تلقائياً عند الضغط على الملف الشخصي
             if (fabProfile != null) {
                 fabProfile.setOnClickListener(v -> {
-                    loadFragment(new MiraProfileFragment(), "Profile"); // تأكد من اسم كلاس البروفايل
+                    loadFragment(new MiraProfileFragment(), "Profile");
                     closePosFabMenu(fabActionCenter, fabReports, fabProfile);
                 });
             }
-
-            fabActionCenter.setOnLongClickListener(v -> {
-                Toast.makeText(UHFMainActivity.this,
-                        isArabic ? "⚡ الوصول السريع" : "⚡ Quick Access",
-                        Toast.LENGTH_SHORT).show();
-                return true;
-            });
-            
-            if (hasQuickActions) pulseFab(fabActionCenter);
         }
 
         if (quickNav != null) {
@@ -2236,11 +2222,10 @@ private void setupQuickNav() {
     }
 }
 
-// ✅ دالة مساعدة لإغلاق القائمة (لتنظيف الكود)
 private void closePosFabMenu(FloatingActionButton fabActionCenter, FloatingActionButton fabReports, FloatingActionButton fabProfile) {
     if (fabReports != null && fabProfile != null) {
-        fabReports.animate().translationY(0f).setDuration(300).withEndAction(() -> fabReports.setVisibility(View.GONE)).start();
-        fabProfile.animate().translationY(0f).setDuration(300).withEndAction(() -> fabProfile.setVisibility(View.GONE)).start();
+        fabReports.animate().translationX(0f).translationY(0f).setDuration(300).withEndAction(() -> fabReports.setVisibility(View.GONE)).start();
+        fabProfile.animate().translationX(0f).translationY(0f).setDuration(300).withEndAction(() -> fabProfile.setVisibility(View.GONE)).start();
         fabActionCenter.animate().rotation(0f).setDuration(300).start();
         isFabMenuOpen = false;
     }
