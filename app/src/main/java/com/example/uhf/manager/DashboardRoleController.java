@@ -16,33 +16,28 @@ public class DashboardRoleController {
     public void applyVisibility(View root) {
         if (root == null || permissions == null) return;
 
-        // ✅ إخفاء/إظهار البطاقات العلوية
+        // 1. البطاقات العلوية (Carousel)
+        setVisible(root, R.id.heroBalanceCard, permissions.canViewDashboardHero());
         setVisible(root, R.id.cardGoldPrices, permissions.canViewDashboardGoldPrices());
         setVisible(root, R.id.salesSummaryCard, permissions.canViewDashboardSales());
         
-        // ✅ موظف المبيعات لا يرى المخزون ولا كسر الذهب
+        // 2. موظف المبيعات لا يرى المخزون ولا كسر الذهب
         boolean isPos = permissions.isPosOperator();
         
         setVisible(root, R.id.cardInventoryByKarat, permissions.canViewDashboardInventoryByKarat() && !isPos);
         setVisible(root, R.id.cardScrapGold, permissions.canViewDashboardScrap() && !isPos);
         setVisible(root, R.id.cardScrapAging, permissions.canViewDashboardScrapAging() && !isPos);
 
-        // ✅ الرسوم البيانية تظهر للمدير والمحاسب
+        // 3. الرسوم البيانية
         setVisible(root, R.id.cardCharts, permissions.canViewDashboardCharts());
 
-        // ✅ أزرار كشف القيم
-        boolean canReveal = permissions.canRevealSensitiveValues();
-        setVisible(root, R.id.btnToggleHeroVisibility, canReveal);
-        setVisible(root, R.id.btnToggleSalesVisibility, canReveal);
-        setVisible(root, R.id.btnToggleInventoryVisibility, canReveal);
-        setVisible(root, R.id.btnToggleScrapVisibility, canReveal);
-
-        // ✅ التنبيهات
+        // 4. التنبيهات
         if (!permissions.canViewDashboardAlerts()) {
             setVisible(root, R.id.alertsStrip, false);
         }
     }
 
+    // Guards: منع طلب البيانات من السيرفر
     public boolean canFetchFullDashboard() {
         return permissions.canViewDashboardHero() || permissions.canViewDashboardSales();
     }
