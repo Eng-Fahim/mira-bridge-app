@@ -521,7 +521,7 @@
 <!-- ═══════════════════════════════════════════════════
      بطاقة ملخص الوردية (تم إضافة الـ Constraints)
      ═══════════════════════════════════════════════════ -->
-<com.example.uhf.widget.ShiftSummaryCardView
+<!--<com.example.uhf.widget.ShiftSummaryCardView
     android:id="@+id/cardShiftSummary"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -531,7 +531,7 @@
     app:layout_constraintTop_toBottomOf="@id/dotsIndicator"
     app:layout_constraintStart_toStartOf="parent"
     app:layout_constraintEnd_toEndOf="parent" />
-
+-->
 <!-- ═══════════════════════════════════════════════════
      QUICK ACTIONS (تم تعديل القيد ليكون أسفل البطاقة الجديدة)
      ═══════════════════════════════════════════════════ -->
