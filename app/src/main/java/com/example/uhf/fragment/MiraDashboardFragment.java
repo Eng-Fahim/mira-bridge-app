@@ -15,7 +15,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,8 +38,6 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.navigation.NavigationManager;
 import com.example.uhf.tools.RecentActivityCache;
-import com.example.uhf.widget.ShiftSummaryCardView;
-import com.example.uhf.widget.CountdownTimerView;
 import com.example.uhf.tools.SessionManager;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -173,8 +170,6 @@ public class MiraDashboardFragment extends Fragment {
     private double currentInventoryValue = 0;
     private int currentItemCount = 0;
     private double currentTotalWeight = 0;
-    
-    private ShiftSummaryCardView shiftSummaryCard;
 
     private static class KaratInventory {
         final int karat; final int itemCount; final double weight;
@@ -295,12 +290,13 @@ public class MiraDashboardFragment extends Fragment {
             return (android.content.SharedPreferences) create.invoke(null, ctx, name, masterKey, keyEnc, valEnc);
         } catch (Throwable t) { return null; }
     }
-@Nullable
-@Override
-public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-    // ✅ بدون try-catch — نريد أن نرى الخطأ الحقيقي!
-    return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
-}
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        try { return inflater.inflate(R.layout.fragment_mira_dashboard, container, false); }
+        catch (Exception e) { logNonFatal("onCreateView", e); return null; }
+    }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -474,97 +470,28 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             updateScrapUI();
             setupQuickActionButtons(v);
 
-        
-        
-    setupDynamicFabAndCarouselState(v);
-    //shiftSummaryCard = v.findViewById(R.id.cardShiftSummary);
-    } catch (Exception e) { logNonFatal("initViews", e); }
-}
-private void purgeCacheCompletely() {
-    try {
-        if (offlineCache != null) offlineCache.edit().clear().apply();
-        if (goldCachePrefs != null) goldCachePrefs.edit().clear().apply();
-        if (activityCache != null) activityCache.clear();
-        Log.d(TAG, "🔒 Dashboard Cache Purged successfully");
-    } catch (Exception e) {
-        logNonFatal("purgeCacheCompletely", e);
+        } catch (Exception e) { logNonFatal("initViews", e); }
     }
-}
-
-private void setupDynamicFabAndCarouselState(View root) {
-    if (root == null || permissionManager == null) return;
-
-    // 1. إخفاء الـ Dots إذا كانت البطاقات الظاهرة أقل من 2
-    int visibleCards = 0;
-    if (permissionManager.canViewDashboardHero()) visibleCards++;
-    if (permissionManager.canViewDashboardGoldPrices()) visibleCards++;
-    if (permissionManager.canViewDashboardSales()) visibleCards++;
-
-    View dots = root.findViewById(R.id.dotsIndicator);
-    if (dots != null) {
-        dots.setVisibility(visibleCards > 1 ? View.VISIBLE : View.GONE);
-    }
-
-    // 2. زر عائم ذكي (FAB) - يحتاج إضافته لملف XML أولاً (انظر الخطوة 4)
-    com.google.android.material.floatingactionbutton.FloatingActionButton fab = root.findViewById(R.id.smartFab);
-    if (fab == null) return;
-
-    if (permissionManager.canUsePos()) {
-        fab.setImageResource(R.drawable.ic_pos);
-        fab.setOnClickListener(v -> navigateToFragment(new MiraPosFragment(), NavigationManager.TAG_POS));
-        fab.show();
-    } else if (permissionManager.canBuyScrapGold()) {
-        fab.setImageResource(R.drawable.ic_gold_scrap);
-        fab.setOnClickListener(v -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
-        fab.show();
-    } else if (permissionManager.canViewReports()) {
-        fab.setImageResource(R.drawable.ic_reports);
-        fab.setOnClickListener(v -> navigateToFragment(new MiraReportsProFragment(), NavigationManager.TAG_REPORTS));
-        fab.show();
-    } else {
-        fab.hide();
-    }
-}
 
     private void setupQuickActionButtons(View root) {
-    if (root == null || permissionManager == null) return;
-    
-    LinearLayout container = root.findViewById(R.id.llQuickActionsContainer);
-    if (container == null) return;
-    container.removeAllViews();
+        if (root == null || permissionManager == null) return;
 
-    // بناء الأزرار بناءً على الصلاحيات
-    if (permissionManager.canUsePos()) {
-        addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
-    }
-    if (permissionManager.canViewInventory()) {
-        addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryProFragment(), NavigationManager.TAG_INVENTORY);
-    }
-    if (permissionManager.canBuyScrapGold()) {
-        addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
-    }
-    if (permissionManager.canViewReports()) {
-        addQuickAction(container, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
-    }
-    if (permissionManager.canViewAccounting()) {
-        addQuickAction(container, "المحاسبة", R.drawable.ic_accounting, new MiraAccountingFragment(), NavigationManager.TAG_ACCOUNTING);
-    }
-}
+        bindQuickButton(root, R.id.btnQuickPos,
+                permissionManager.canUsePos(),
+                new MiraPosFragment(), NavigationManager.TAG_POS);
 
-private void addQuickAction(LinearLayout container, String title, int iconRes, Fragment target, String tag) {
-    View view = getLayoutInflater().inflate(R.layout.item_quick_action, container, false);
-    ImageView icon = view.findViewById(R.id.ivQuickIcon);
-    TextView text = view.findViewById(R.id.tvQuickText);
+        bindQuickButton(root, R.id.btnQuickInventory,
+                permissionManager.canViewInventory(),
+                new MiraInventoryProFragment(), NavigationManager.TAG_INVENTORY);
 
-    icon.setImageResource(iconRes);
-    text.setText(title);
+        bindQuickButton(root, R.id.btnQuickScrap,
+                permissionManager.canBuyScrapGold(),
+                new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
 
-    view.setOnClickListener(v -> {
-        v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
-        navigateToFragment(target, tag);
-    });
-    container.addView(view);
-}
+        bindQuickButton(root, R.id.btnQuickReports,
+                permissionManager.canViewReports(),
+                new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+    }
 
     private void bindQuickButton(@Nullable View root,
                                  int buttonId,
@@ -1249,97 +1176,72 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
     }
 
     private void saveOfflineData(JSONObject data) {
-    try {
-        if (offlineCache == null || !isSessionValid() || !ensureExecutor()) return;
-        localExecutor.execute(() -> {
-            try {
-                android.content.SharedPreferences.Editor editor = offlineCache.edit();
-
-                if (permissionManager.canViewDashboardInventoryByKarat()) {
-                    JSONObject inv = data.optJSONObject("inventory");
-                    editor.putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
-                          .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
-                          .putFloat("inventory_value", (float) (inv != null ? inv.optDouble("total_value", 0.0) : 0.0));
-                    if (inv != null && inv.optJSONArray("by_karat") != null) {
-                        editor.putString("inventory_by_karat", inv.optJSONArray("by_karat").toString());
-                    }
-                }
-
-                if (permissionManager.canViewDashboardSales()) {
-                    JSONObject sales = data.optJSONObject("sales");
-                    editor.putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
-                          .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
-                          .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
-                          .putFloat("sales_year",  (float) (sales != null ? sales.optDouble("year",  0.0) : 0.0));
-                }
-
-                editor.putLong("last_update", System.currentTimeMillis()).apply();
-            } catch (Exception e) { logNonFatal("saveOfflineData.inner", e); }
-        });
-    } catch (Exception e) { logNonFatal("saveOfflineData", e); }
-}
+        try {
+            if (offlineCache == null || !isSessionValid() || !ensureExecutor()) return;
+            localExecutor.execute(() -> {
+                try {
+                    JSONObject inv   = data.optJSONObject("inventory"); JSONObject sales = data.optJSONObject("sales");
+                    android.content.SharedPreferences.Editor editor = offlineCache.edit()
+                            .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                            .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
+                            .putFloat("inventory_value", (float) (inv != null ? inv.optDouble("total_value", 0.0) : 0.0))
+                            .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                            .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                            .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                            .putFloat("sales_year",  (float) (sales != null ? sales.optDouble("year",  0.0) : 0.0));
+                    if (inv != null && inv.optJSONArray("by_karat") != null) editor.putString("inventory_by_karat", inv.optJSONArray("by_karat").toString());
+                    editor.putLong("last_update", System.currentTimeMillis()).apply();
+                } catch (Exception e) { logNonFatal("saveOfflineData.inner", e); }
+            });
+        } catch (Exception e) { logNonFatal("saveOfflineData", e); }
+    }
 
     private void fetchData() {
-    if (roleController != null && !roleController.canFetchFullDashboard()) {
-        isLoading.set(false);
-        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-        return;
-    }
-    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-    if (!isLoading.compareAndSet(false, true)) return;
-
-    // تحديد معرف الفرع
-    int finalBranchId;
-    boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
-    if (isGlobalAdmin) {
-        finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
-    } else {
-        int fromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
-        int fromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-        finalBranchId = fromSession > 0 ? fromSession : (fromManager > 0 ? fromManager : 1);
-    }
-
-    cancelFuture(dataFuture);
-    dataFuture = localExecutor.submit(() -> {
         try {
-            // ⚡ الأمان: طلب البيانات حسب الصلاحيات
-            // يمكنك تعديل هذه الدالة في MiraApiClient لتقبل بارامترات تحدد ما تريده
-            MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
-            
-            mainHandler.post(() -> {
-                isLoading.set(false); 
-                lastDataFetchTime = System.currentTimeMillis();
-                if (!isAdded()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
-
-                if (response != null && response.isSuccess && response.data != null) {
-                    saveOfflineData(response.data); 
-                    processData(response.data); 
-                    computeAndShowAlerts(response.data);
-                    isDataLoaded = true; 
-                    updateLiveStatusText(true); 
-                    showShimmer(false);
-                } else {
-                    updateLiveStatusText(false); 
-                    loadOfflineData(); 
-                    showShimmer(false);
-                }
+            if (roleController != null && !roleController.canFetchFullDashboard()) {
+                isLoading.set(false);
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                return;
+            }
+            if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
+            if (!isLoading.compareAndSet(false, true)) return;
+
+            boolean isGlobalAdmin = sessionManager != null && sessionManager.isAnyAdmin();
+            final int finalBranchId;
+            if (isGlobalAdmin) finalBranchId = (currentBranchId > 0) ? currentBranchId : 0;
+            else {
+                int fromSession = sessionManager != null ? sessionManager.getBranchId() : 0;
+                int fromManager = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                finalBranchId = fromSession > 0 ? fromSession : (fromManager > 0 ? fromManager : 1);
+            }
+            if (finalBranchId <= 0 && !isGlobalAdmin) { isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
+
+            cancelFuture(dataFuture);
+            dataFuture = localExecutor.submit(() -> {
+                try {
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(finalBranchId);
+                    mainHandler.post(() -> {
+                        isLoading.set(false); lastDataFetchTime = System.currentTimeMillis();
+                        if (!isAdded()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
+                        if (response != null && response.isSuccess && response.data != null) {
+                            saveOfflineData(response.data); processData(response.data); computeAndShowAlerts(response.data);
+                            isDataLoaded = true; updateLiveStatusText(true); showShimmer(false);
+                        } else {
+                            updateLiveStatusText(false); loadOfflineData(); showShimmer(false);
+                        }
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
+                } catch (Exception e) {
+                    logNonFatal("fetchData.thread", e);
+                    mainHandler.post(() -> { isLoading.set(false); loadOfflineData(); showShimmer(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
+                }
             });
-        } catch (Exception e) {
-            logNonFatal("fetchData.thread", e);
-            mainHandler.post(() -> { isLoading.set(false); loadOfflineData(); showShimmer(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
-        }
-    });
-    
-    if (roleController.canFetchCharts()) fetchDashboardCharts();
-    if (roleController.canFetchScrap()) fetchScrapSummary(finalBranchId);
-    if (roleController.canFetchScrapAging()) fetchScrapAging(finalBranchId);
-}
+            fetchDashboardCharts();
+        } catch (Exception e) { logNonFatal("fetchData", e); isLoading.set(false); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); }
+    }
 
     private void processData(JSONObject data) {
-    try {
-        // معالجة المخزون فقط إذا كان مسموحاً
-        if (permissionManager.canViewDashboardInventoryByKarat()) {
+        try {
             JSONObject inv = data.optJSONObject("inventory");
             if (inv != null) {
                 currentItemCount = inv.optInt("total_items", 0);
@@ -1351,45 +1253,15 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
                 if (byKarat != null) {
                     for (int i = 0; i < byKarat.length(); i++) {
                         JSONObject k = byKarat.optJSONObject(i);
-                        if (k != null) { 
-                            int karat = k.optInt("karat", 0); 
-                            if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); 
-                        }
+                        if (k != null) { int karat = k.optInt("karat", 0); if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); }
                     }
                 }
-                currentInventoryByKarat.clear(); 
-                currentInventoryByKarat.addAll(karatItems); 
-                renderInventoryByKarat(currentInventoryByKarat);
+                currentInventoryByKarat.clear(); currentInventoryByKarat.addAll(karatItems); renderInventoryByKarat(currentInventoryByKarat);
             }
-        }
-
-        // معالجة المبيعات فقط إذا كان مسموحاً
-        if (permissionManager.canViewDashboardSales()) {
             JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) { 
-                lastSalesData = sales; 
-                applySalesData(sales); 
-            }
-        }
-    
-    
-    // ✅ تفعيل بطاقة الوردية لموظف المبيعات
-    if (permissionManager.isPosOperator() && shiftSummaryCard != null) {
-        shiftSummaryCard.setVisibility(View.VISIBLE);
-        
-        // افترض أن السيرفر يرسل هذه البيانات (أو استخدم البيانات المتاحة حالياً)
-        JSONObject shiftData = data.optJSONObject("shift_summary");
-        if (shiftData != null) {
-            shiftSummaryCard.bindData(
-                shiftData.optDouble("total_cash", 0.0),
-                shiftData.optInt("invoice_count", 0),
-                shiftData.optInt("returns", 0),
-                shiftData.optDouble("gold_weight", 0.0)
-            );
-        }
+            if (sales != null) { lastSalesData = sales; applySalesData(sales); }
+        } catch (Exception e) { logNonFatal("processData", e); }
     }
-    } catch (Exception e) { logNonFatal("processData", e); }
-}
 
     private void fetchRecentActivity() {
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
@@ -1458,24 +1330,8 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
                 else if ("warning".equals(status)) { tvStatusChip.setVisibility(View.VISIBLE); tvStatusChip.setText(isArabic ? "⚠️ تحذير" : "⚠️ Warning"); tvStatusChip.setTextColor(0xFFF59E0B); }
                 else tvStatusChip.setVisibility(View.GONE);
             }
-        CountdownTimerView countdown = v.findViewById(R.id.countdownTimer);
-        if (countdown != null) {
-            String status = item.optString("status", "");
-            long expiresAt = item.optLong("expires_at", 0);
-            long createdAt = item.optLong("created_at", 0);
-            
-            if ("pending".equals(status) && expiresAt > 0) {
-                countdown.setVisibility(View.VISIBLE);
-                countdown.start(createdAt, expiresAt, () -> fetchData());
-            } else {
-                countdown.cancel();
-                countdown.setVisibility(View.GONE);
-            }
-        }
-    } catch (Exception e) { 
-        Log.e(TAG, "bindActivityToView error", e); 
+        } catch (Exception e) { Log.e(TAG, "bindActivityToView error", e); }
     }
-}
 
     private String extractTime(String dateStr) {
         if (dateStr == null || dateStr.isEmpty()) return "";
@@ -1602,7 +1458,6 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
             if (!isAdded()) return;
             int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             if (newBranchId != currentBranchId) {
-                purgeCacheCompletely();
                 currentBranchId = newBranchId; initBranchCache(currentBranchId); updateHeader();
                 if (roleController != null && getView() != null) roleController.applyVisibility(getView());
 
@@ -1662,21 +1517,12 @@ private void addQuickAction(LinearLayout container, String title, int iconRes, F
             });
         } catch (Exception e) {}
     }
-    
-    @Override
-public void onPause() {
-    super.onPause();
-    try { 
-        unregisterDataRefreshReceiver(); 
-        stopAutoRefresh(); 
-        hideSensitiveValuesOnExit();
-        
-        if (shiftSummaryCard != null) {
-            shiftSummaryCard.hideSensitiveValues();
-        }
-    } catch (Exception e) {}
-}
 
+    @Override
+    public void onPause() {
+        super.onPause();
+        try { unregisterDataRefreshReceiver(); stopAutoRefresh(); hideSensitiveValuesOnExit(); } catch (Exception e) {}
+    }
 
     private void hideSensitiveValuesOnExit() {
         try {
@@ -1720,7 +1566,6 @@ public void onPause() {
             cancelFuture(dataFuture); cancelFuture(goldPriceFuture); cancelFuture(pingFuture);
             if (mainHandler != null) { mainHandler.removeCallbacks(autoRefreshRunnable); if (swipeTimeoutRunnable != null) mainHandler.removeCallbacks(swipeTimeoutRunnable); }
             shutdownExecutor(); isViewInitialized = false;
-             purgeCacheCompletely();
         } catch (Exception e) {}
     }
 
