@@ -642,153 +642,150 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchDashboardCharts() {
-        // ✅ إزالة قيود الصلاحيات لضمان جلب البيانات للمدير
-        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-        
-        localExecutor.execute(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
-                    if (rootData != null) {
-                        mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
-                    }
-                } else {
-                    Log.e(TAG, "❌ Charts API failed: " + (response != null ? response.error : "null"));
+    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+    
+    localExecutor.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
+            if (response != null && response.isSuccess && response.data != null) {
+                // ✅ استخراج البيانات بأمان تام
+                JSONObject rootData = response.data;
+                if (response.data.has("data") && response.data.optJSONObject("data") != null) {
+                    rootData = response.data.optJSONObject("data");
                 }
-            } catch (Exception e) { Log.e(TAG, "fetchDashboardCharts", e); }
-        });
-    }
+                
+                final JSONObject finalData = rootData;
+                mainHandler.post(() -> { 
+                    if (isAdded()) {
+                        Log.d(TAG, "Charts Data: " + finalData.toString());
+                        renderCharts(finalData); 
+                    }
+                });
+            } else {
+                Log.e(TAG, "❌ Charts API failed: " + (response != null ? response.error : "null"));
+            }
+        } catch (Exception e) { 
+            Log.e(TAG, "fetchDashboardCharts error", e); 
+        }
+    });
+}
 
     private void renderCharts(JSONObject data) {
-        try {
-            applyChartTheme();
+    try {
+        applyChartTheme();
 
-            JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
-            if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); 
-            if (sales7Days == null) sales7Days = data.optJSONArray("sales");
+        // محاولة قراءة المصفوفة من أي مفتاح محتمل
+        JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
+        if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); 
+        if (sales7Days == null) sales7Days = data.optJSONArray("sales");
+        
+        if (sales7Days == null || sales7Days.length() == 0) {
+            Log.w(TAG, "No sales data found in charts response.");
+            return;
+        }
+
+        List<Entry> entries = new ArrayList<>();
+        List<Entry> sellEntries = new ArrayList<>();
+        List<Entry> buyEntries = new ArrayList<>();
+        final List<String> labels = new ArrayList<>();
+
+        for (int i = 0; i < sales7Days.length(); i++) {
+            JSONObject day = sales7Days.getJSONObject(i);
+            double amount = day.optDouble("amount", 0);
             
-            if (sales7Days != null && lineChartSales != null) {
-                List<Entry> entries = new ArrayList<>();
-                final List<String> labels = new ArrayList<>();
-                for (int i = 0; i < sales7Days.length(); i++) {
-                    JSONObject day = sales7Days.getJSONObject(i);
-                    entries.add(new Entry(i, (float) day.optDouble("amount", 0)));
-                    labels.add(day.optString("date", ""));
-                }
-                int goldColor = Color.parseColor("#D4AF37");
-                LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-                dataSet.setColor(goldColor); dataSet.setCircleColor(goldColor); dataSet.setLineWidth(2.5f);
-                dataSet.setCircleRadius(4f); dataSet.setDrawValues(false); dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                lineChartSales.setData(new LineData(dataSet));
-                XAxis xAxis = lineChartSales.getXAxis();
-                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); xAxis.setGranularity(1f); xAxis.setDrawGridLines(false);
-                lineChartSales.getAxisRight().setEnabled(false);
-                lineChartSales.getAxisLeft().setDrawGridLines(true);
-                lineChartSales.getDescription().setEnabled(false);
-                lineChartSales.getLegend().setEnabled(false);
-                lineChartSales.animateX(1000); lineChartSales.invalidate();
+            entries.add(new Entry(i, (float) amount));
+            sellEntries.add(new Entry(i, (float) amount));
+            buyEntries.add(new Entry(i, (float) (amount * 0.95))); 
+            
+            String dateStr = day.optString("date", "");
+            if (dateStr.length() > 5) dateStr = dateStr.substring(5);
+            labels.add(dateStr);
+        }
+
+        // ✅ 1. رسم المخطط الخاص بالمدير (lineChartSales)
+        if (lineChartSales != null) {
+            LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+            dataSet.setColor(Color.parseColor("#D4AF37")); 
+            dataSet.setCircleColor(Color.parseColor("#D4AF37")); 
+            dataSet.setLineWidth(2.5f);
+            dataSet.setCircleRadius(4f); 
+            dataSet.setDrawValues(false); 
+            dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            
+            lineChartSales.setData(new LineData(dataSet));
+            XAxis xAxis = lineChartSales.getXAxis();
+            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); 
+            xAxis.setGranularity(1f); 
+            xAxis.setDrawGridLines(false);
+            lineChartSales.getAxisRight().setEnabled(false);
+            lineChartSales.getAxisLeft().setDrawGridLines(true);
+            lineChartSales.getDescription().setEnabled(false);
+            lineChartSales.getLegend().setEnabled(false);
+            lineChartSales.animateX(1000); 
+            lineChartSales.invalidate();
+        }
+
+        // ✅ 2. رسم المخطط الخاص بالكاشير (lineChartPosPriceMovement)
+        if (lineChartPosPriceMovement != null) {
+            LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
+            sellDataSet.setColor(Color.parseColor("#D4AF37")); 
+            sellDataSet.setLineWidth(3f); 
+            sellDataSet.setDrawCircles(false); 
+            sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            sellDataSet.setDrawFilled(true); 
+            sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
+
+            LineDataSet buyDataSet = new LineDataSet(buyEntries, "تقديري");
+            buyDataSet.setColor(Color.parseColor("#4ADE80")); 
+            buyDataSet.setLineWidth(3f); 
+            buyDataSet.setDrawCircles(false); 
+            buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+            buyDataSet.setDrawFilled(true); 
+            buyDataSet.setFillColor(Color.parseColor("#334ADE80"));
+
+            lineChartPosPriceMovement.setData(new LineData(sellDataSet, buyDataSet));
+            XAxis xAxis = lineChartPosPriceMovement.getXAxis();
+            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+            xAxis.setDrawGridLines(false); 
+            xAxis.setDrawAxisLine(false); 
+            
+            lineChartPosPriceMovement.getAxisRight().setEnabled(true);
+            lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
+            lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
+            lineChartPosPriceMovement.getDescription().setEnabled(false);
+            lineChartPosPriceMovement.getLegend().setEnabled(false);
+            lineChartPosPriceMovement.animateX(1000); 
+            lineChartPosPriceMovement.invalidate();
+        }
+
+        // ✅ 3. رسم مخطط النسب (pieChartKarat) إن وجد
+        JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
+        if (salesByKarat != null && pieChartKarat != null) {
+            List<PieEntry> entriesPie = new ArrayList<>();
+            for (int i = 0; i < salesByKarat.length(); i++) {
+                JSONObject k = salesByKarat.getJSONObject(i);
+                entriesPie.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
             }
-
-            JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
-            if (salesByKarat != null && pieChartKarat != null) {
-                List<PieEntry> entries = new ArrayList<>();
-                for (int i = 0; i < salesByKarat.length(); i++) {
-                    JSONObject k = salesByKarat.getJSONObject(i);
-                    entries.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
-                }
-                if (!entries.isEmpty()) {
-                    PieDataSet dataSet = new PieDataSet(entries, "");
-                    List<Integer> colors = new ArrayList<>();
-                    colors.add(Color.parseColor("#D4AF37")); colors.add(Color.parseColor("#E6B800"));
-                    colors.add(Color.parseColor("#CD853F")); colors.add(Color.parseColor("#A0522D"));
-                    dataSet.setColors(colors); dataSet.setValueTextSize(12f);
-                    pieChartKarat.setData(new PieData(dataSet));
-                    pieChartKarat.getDescription().setEnabled(false);
-                    pieChartKarat.setUsePercentValues(true);
-                    pieChartKarat.setHoleRadius(40f); pieChartKarat.setTransparentCircleRadius(45f);
-                    pieChartKarat.animateY(1000); pieChartKarat.invalidate();
-                }
+            if (!entriesPie.isEmpty()) {
+                PieDataSet dataSet = new PieDataSet(entriesPie, "");
+                dataSet.setColors(new int[]{
+                    Color.parseColor("#D4AF37"), Color.parseColor("#E6B800"),
+                    Color.parseColor("#CD853F"), Color.parseColor("#A0522D")
+                });
+                pieChartKarat.setData(new PieData(dataSet));
+                pieChartKarat.getDescription().setEnabled(false);
+                pieChartKarat.setUsePercentValues(true);
+                pieChartKarat.setHoleRadius(40f); 
+                pieChartKarat.animateY(1000); 
+                pieChartKarat.invalidate();
             }
-
-            if (lineChartPosPriceMovement != null && permissionManager != null && permissionManager.isPosOperator()) {
-                List<Entry> sellEntries = new ArrayList<>();
-                List<Entry> buyEntries = new ArrayList<>();
-                final List<String> labels = new ArrayList<>();
-
-                if (sales7Days != null && sales7Days.length() > 0) {
-                    for (int i = 0; i < sales7Days.length(); i++) {
-                        JSONObject day = sales7Days.getJSONObject(i);
-                        double amount = day.optDouble("amount", 0); 
-                        sellEntries.add(new Entry(i, (float) amount));
-                        buyEntries.add(new Entry(i, (float) (amount * 0.95))); 
-                        String dateStr = day.optString("date", "");
-                        if (dateStr.length() > 5) dateStr = dateStr.substring(5);
-                        labels.add(dateStr);
-                    }
-
-                    String buyColorHex = isNightMode() ? "#4ADE80" : "#2E7D32"; 
-                    String buyFillColorHex = isNightMode() ? "#334ADE80" : "#332E7D32";
-
-                    LineDataSet sellDataSet = new LineDataSet(sellEntries, "بيع");
-                    sellDataSet.setColor(Color.parseColor("#D4AF37")); 
-                    sellDataSet.setLineWidth(3f); 
-                    sellDataSet.setDrawCircles(false); 
-                    sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    sellDataSet.setDrawFilled(true); 
-                    sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
-                    sellDataSet.setDrawValues(true);
-                    sellDataSet.setValueTextColor(ContextCompat.getColor(requireContext(), com.google.android.material.R.attr.colorOnSurface));
-                    sellDataSet.setValueTextSize(10f);
-                    sellDataSet.setValueFormatter(new ValueFormatter() {
-                        @Override
-                        public String getFormattedValue(float value) {
-                            if (value >= 1000000) return String.format(Locale.US, "%.1fM", value / 1000000);
-                            if (value >= 1000) return String.format(Locale.US, "%.0fK", value / 1000);
-                            return String.format(Locale.US, "%.0f", value);
-                        }
-                    });
-
-                    LineDataSet buyDataSet = new LineDataSet(buyEntries, "شراء");
-                    buyDataSet.setColor(Color.parseColor(buyColorHex)); 
-                    buyDataSet.setLineWidth(3f); 
-                    buyDataSet.setDrawCircles(false); 
-                    buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                    buyDataSet.setDrawFilled(true); 
-                    buyDataSet.setFillColor(Color.parseColor(buyFillColorHex));
-                    buyDataSet.setDrawValues(false);
-
-                    lineChartPosPriceMovement.setData(new LineData(sellDataSet, buyDataSet));
-                    XAxis xAxis = lineChartPosPriceMovement.getXAxis();
-                    xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-                    xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-                    xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false); 
-                    
-                    lineChartPosPriceMovement.getAxisRight().setEnabled(true);
-                    lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
-                    lineChartPosPriceMovement.getAxisRight().setValueFormatter(new ValueFormatter() {
-                        @Override
-                        public String getFormattedValue(float value) {
-                            if (value >= 1000000) return String.format(Locale.US, "%.1fM", value / 1000000);
-                            if (value >= 1000) return String.format(Locale.US, "%.1fK", value / 1000);
-                            return String.format(Locale.US, "%.0f", value);
-                        }
-                    });
-                    lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
-                    lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
-                    lineChartPosPriceMovement.getDescription().setEnabled(false);
-                    lineChartPosPriceMovement.getLegend().setEnabled(false);
-                    lineChartPosPriceMovement.animateX(1000); lineChartPosPriceMovement.invalidate();
-                } else {
-                    lineChartPosPriceMovement.clear();
-                    lineChartPosPriceMovement.setNoDataText("لا توجد مبيعات مسجلة لهذا الأسبوع");
-                    lineChartPosPriceMovement.setNoDataTextColor(ContextCompat.getColor(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant));
-                    lineChartPosPriceMovement.invalidate();
-                }
-            }
-        } catch (Exception e) { Log.e(TAG, "renderCharts", e); }
+        }
+    } catch (Exception e) { 
+        Log.e(TAG, "renderCharts error", e); 
     }
+}
 
     private void fetchData() {
         try {
@@ -1839,4 +1836,4 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private boolean canManuallyRefreshGold() { return permissionManager != null && permissionManager.canRefreshGoldManually(); }
-}
+                                                                                                                                               }
