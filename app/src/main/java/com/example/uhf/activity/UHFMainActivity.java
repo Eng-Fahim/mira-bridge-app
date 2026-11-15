@@ -610,40 +610,50 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     }
 
     private void fetchSetupStatusAndNavigate() {
-        showSetupLoadingScreen();
+    showSetupLoadingScreen();
 
-        new Thread(() -> {
-            String status = SETUP_PENDING;
-            String stamp  = null;
-            try {
-                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+    // ✅ Safety Timeout: إخفاء الغطاء بعد 8 ثوانٍ مهما كان الوضع
+    final Runnable safetyTimeout = () -> {
+        Log.w(TAG, "⚠️ Setup status fetch timed out after 8s — navigating to dashboard");
+        hideSetupLoadingScreen();
+        if (isActivityAlive()) {
+            cacheSetupStatus(SETUP_COMPLETED);
+            enableNavigationAfterSetup();
+            navigateByRole();
+        }
+    };
+    mainHandler.postDelayed(safetyTimeout, 8000);
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    status = response.data.optString("status", SETUP_PENDING);
-                    stamp  = response.data.optString("setup_stamp", null);
-                    Log.d(TAG, "✅ Setup status from API: " + status
-                            + " | stamp: " + (stamp != null
-                                    ? stamp.substring(0, Math.min(8, stamp.length())) + "..."
-                                    : "null"));
-                } else {
-                    Log.w(TAG, "⚠️ Failed to fetch setup status → assuming pending");
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
+    new Thread(() -> {
+        String status = SETUP_PENDING;
+        String stamp  = null;
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+            if (response != null && response.isSuccess && response.data != null) {
+                status = response.data.optString("status", SETUP_PENDING);
+                stamp  = response.data.optString("setup_stamp", null);
+                Log.d(TAG, "✅ Setup status from API: " + status);
+            } else {
+                Log.w(TAG, "⚠️ API returned no data — using fallback");
             }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
+        }
 
-            final String finalStatus = status;
-            final String finalStamp  = stamp;
-            runOnUiThread(() -> {
-                hideSetupLoadingScreen();
-                if (isActivityAlive()) {
-                    cacheSetupStatus(finalStatus, finalStamp);
-                    navigateBySetupStatus(finalStatus);
-                }
-            });
-        }).start();
-    }
+        final String finalStatus = status;
+        final String finalStamp  = stamp;
+        runOnUiThread(() -> {
+            mainHandler.removeCallbacks(safetyTimeout);
+            hideSetupLoadingScreen();
+            if (isActivityAlive()) {
+                cacheSetupStatus(finalStatus, finalStamp);
+                navigateBySetupStatus(finalStatus);
+            }
+        });
+    }).start();
+}
 
     private void refreshSetupStatusInBackground() {
         if (isWithinSetupGracePeriod()) {
@@ -1523,11 +1533,17 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     // ═══════════════════════════════════════════════════════
     //  دورة الحياة
     // ═══════════════════════════════════════════════════════
-
+    
     @Override
-    public void onResume() {
-        super.onResume();
-
+public void onResume() {
+    super.onResume();
+    
+    // ✅ حماية دائمة: أغلق أي غطاء تحميل عالق
+    View overlay = findViewById(R.id.successOverlayMain);
+    if (overlay != null && overlay.getVisibility() == View.VISIBLE) {
+        overlay.setVisibility(View.GONE);
+        Log.w(TAG, "⚠️ Force-hid stuck loading overlay in onResume");
+    }
         // ⚡ MIRA License Heartbeat
         try {
             com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
