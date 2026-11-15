@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -290,6 +289,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private void initViews(View v) {
         try {
+            // --- المدير ---
             hsvCarousel = v.findViewById(R.id.horizontalScrollCarousel);
             hsvQuickActions = v.findViewById(R.id.hsvQuickActions);
             dot1 = v.findViewById(R.id.dot1);
@@ -300,16 +300,6 @@ public class MiraDashboardFragment extends Fragment {
             heroBalanceCard = v.findViewById(R.id.heroBalanceCard);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
             View salesSummaryCard = v.findViewById(R.id.salesSummaryCard);
-
-            // ✅ تخصيص شكل كرت الهيرو ليكون فخم
-            if (heroBalanceCard != null) {
-                GradientDrawable heroGradient = new GradientDrawable(
-                        GradientDrawable.Orientation.TL_BR,
-                        new int[]{Color.parseColor("#1E130C"), Color.parseColor("#D4AF37")} // Dark brown to Rich gold
-                );
-                heroGradient.setCornerRadius(48f);
-                heroBalanceCard.setBackground(heroGradient);
-            }
 
             tvHeroBalance   = v.findViewById(R.id.tvHeroBalance);
             tvHeroTrend     = v.findViewById(R.id.tvHeroTrend);
@@ -469,35 +459,6 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) { Log.e(TAG, "initViews", e); }
     }
 
-    // ✅ دالة تطبيق التدرجات اللونية على كروت العيارات (مطابقة للصورة)
-    private void applyBeautifulKaratStyle(View card, int karat) {
-        if (card == null) return;
-        
-        int[] colors;
-        switch (karat) {
-            case 24:
-                colors = new int[]{Color.parseColor("#FF416C"), Color.parseColor("#FF4B2B")}; // Red/Orange Gradient
-                break;
-            case 22:
-                colors = new int[]{Color.parseColor("#F2994A"), Color.parseColor("#F2C94C")}; // Yellow/Orange
-                break;
-            case 21:
-                colors = new int[]{Color.parseColor("#FF8008"), Color.parseColor("#FFC837")}; // Gold/Orange
-                break;
-            case 18:
-                colors = new int[]{Color.parseColor("#8E9EAB"), Color.parseColor("#EEF2F3")}; // Silver/Grey
-                break;
-            default:
-                colors = new int[]{Color.parseColor("#D4AF37"), Color.parseColor("#B8860B")}; // Gold
-                break;
-        }
-
-        GradientDrawable gd = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
-        gd.setCornerRadius(48f); // Rounded corners
-        card.setBackground(gd);
-        card.setElevation(8f);
-    }
-
     private void setupKaratScrollArrows(View root) {
         if (hsvPosKarat == null || ivKaratLeftArrow == null || ivKaratRightArrow == null) return;
 
@@ -583,24 +544,19 @@ public class MiraDashboardFragment extends Fragment {
                 for (KaratInventory inv : currentInventoryByKarat) {
                     View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
                     
-                    applyBeautifulKaratStyle(card, inv.karat);
-
                     TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
                     TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
                     TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
                     
                     if (tvKaratTitle != null) {
                         tvKaratTitle.setText(inv.karat + "K");
-                        tvKaratTitle.setTextColor(Color.WHITE);
                     }
                     if (tvKaratWeight != null) {
                         tvKaratWeight.setText(String.format(Locale.US, "%,.2f", inv.weight));
-                        tvKaratWeight.setTextColor(Color.WHITE);
                     }
                     if (tvKaratValue != null) {
                         double price = priceManager != null ? priceManager.getGoldPricePerGram(inv.karat) : 0;
                         tvKaratValue.setText(String.format(Locale.US, "%,.0f YER", inv.weight * price * 530.0));
-                        tvKaratValue.setTextColor(Color.parseColor("#EEEEEE")); 
                     }
                     
                     llPosKaratContainer.addView(card);
@@ -641,176 +597,141 @@ public class MiraDashboardFragment extends Fragment {
         container.addView(view);
     }
 
-    
-
     private void fetchDashboardCharts() {
-    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-    
-    localExecutor.execute(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
-            if (response != null && response.isSuccess && response.data != null) {
-                // ✅ طباعة الرد كاملاً في الـ Logcat لنتأكد
-                Log.d(TAG, "📊 Charts Raw Response: " + response.data.toString());
-                
-                JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
-                if (rootData != null) {
-                    mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
-                }
-            } else {
-                Log.e(TAG, "❌ Charts API Failed: " + (response != null ? response.error : "null"));
-            }
-        } catch (Exception e) { 
-            Log.e(TAG, "❌ fetchDashboardCharts Error", e); 
-        }
-    });
-}
-
-private void renderCharts(JSONObject data) {
-    try {
-        applyChartTheme();
-
-        JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
-        if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); 
-        if (sales7Days == null) sales7Days = data.optJSONArray("sales");
+        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
         
-        if (sales7Days == null || sales7Days.length() == 0) {
-            Log.w(TAG, "⚠️ No sales7Days array found in response.");
-            return;
-        }
-
-        List<Entry> entries = new ArrayList<>();
-        List<Entry> sellEntries = new ArrayList<>();
-        List<Entry> buyEntries = new ArrayList<>();
-        final List<String> labels = new ArrayList<>();
-
-        for (int i = 0; i < sales7Days.length(); i++) {
-            JSONObject day = sales7Days.getJSONObject(i);
-            double amount = day.optDouble("amount", 0);
-            
-            entries.add(new Entry(i, (float) amount));
-            sellEntries.add(new Entry(i, (float) amount));
-            buyEntries.add(new Entry(i, (float) (amount * 0.95))); 
-            
-            String dateStr = day.optString("date", "");
-            if (dateStr.length() > 5) dateStr = dateStr.substring(5);
-            labels.add(dateStr);
-        }
-
-        // 1. رسم مخطط المدير (lineChartSales)
-        if (lineChartSales != null) {
-            LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
-            dataSet.setColor(Color.parseColor("#D4AF37")); 
-            dataSet.setCircleColor(Color.parseColor("#D4AF37")); 
-            dataSet.setLineWidth(2.5f);
-            dataSet.setCircleRadius(4f); 
-            dataSet.setDrawValues(false); 
-            dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-            
-            lineChartSales.setData(new LineData(dataSet));
-            XAxis xAxis = lineChartSales.getXAxis();
-            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); 
-            xAxis.setGranularity(1f); 
-            xAxis.setDrawGridLines(false);
-            lineChartSales.getAxisRight().setEnabled(false);
-            lineChartSales.getDescription().setEnabled(false);
-            lineChartSales.getLegend().setEnabled(false);
-            lineChartSales.animateX(1000); 
-            lineChartSales.invalidate();
-        }
-
-        // 2. رسم مخطط الكاشير (lineChartPosPriceMovement)
-        if (lineChartPosPriceMovement != null) {
-            LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
-            sellDataSet.setColor(Color.parseColor("#D4AF37")); 
-            sellDataSet.setLineWidth(3f); 
-            sellDataSet.setDrawCircles(false); 
-            sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-            sellDataSet.setDrawFilled(true); 
-            sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
-
-            LineDataSet buyDataSet = new LineDataSet(buyEntries, "تقديري");
-            buyDataSet.setColor(Color.parseColor("#4ADE80")); 
-            buyDataSet.setLineWidth(3f); 
-            buyDataSet.setDrawCircles(false); 
-            buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-            buyDataSet.setDrawFilled(true); 
-            buyDataSet.setFillColor(Color.parseColor("#334ADE80"));
-
-            lineChartPosPriceMovement.setData(new LineData(sellDataSet, buyDataSet));
-            XAxis xAxis = lineChartPosPriceMovement.getXAxis();
-            xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-            xAxis.setDrawGridLines(false); 
-            xAxis.setDrawAxisLine(false); 
-            
-            lineChartPosPriceMovement.getAxisRight().setEnabled(true);
-            lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
-            lineChartPosPriceMovement.getDescription().setEnabled(false);
-            lineChartPosPriceMovement.getLegend().setEnabled(false);
-            lineChartPosPriceMovement.animateX(1000); 
-            lineChartPosPriceMovement.invalidate();
-        }
-
-        // 3. رسم مخطط النسب (pieChartKarat)
-        JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
-        if (salesByKarat != null && pieChartKarat != null) {
-            List<PieEntry> entriesPie = new ArrayList<>();
-            for (int i = 0; i < salesByKarat.length(); i++) {
-                JSONObject k = salesByKarat.getJSONObject(i);
-                entriesPie.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
-            }
-            if (!entriesPie.isEmpty()) {
-                PieDataSet dataSet = new PieDataSet(entriesPie, "");
-                dataSet.setColors(new int[]{
-                    Color.parseColor("#D4AF37"), Color.parseColor("#E6B800"),
-                    Color.parseColor("#CD853F"), Color.parseColor("#A0522D")
-                });
-                pieChartKarat.setData(new PieData(dataSet));
-                pieChartKarat.getDescription().setEnabled(false);
-                pieChartKarat.setUsePercentValues(true);
-                pieChartKarat.setHoleRadius(40f); 
-                pieChartKarat.animateY(1000); 
-                pieChartKarat.invalidate();
-            }
-        }
-    } catch (Exception e) { 
-        Log.e(TAG, "❌ renderCharts Error", e); 
-    }
-}
-
-private void fetchRecentActivity() {
-    // ✅ السماح للموظف بجلب النشاطات (تم إزالة شرط منع الكاشير)
-    if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
-    
-    localExecutor.execute(() -> {
-        try {
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                Log.d(TAG, "📋 Activity Raw Response: " + response.data.toString());
-                JSONArray activities = extractActivitiesArray(response.data);
-                
-                if (activities != null && activities.length() > 0) {
-                    mainHandler.post(() -> {
-                        if (isAdded()) {
-                            updateRecentActivityUI(activities);
-                            updatePosRecentActivityUI(activities);
-                        }
-                    });
+        localExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
+                if (response != null && response.isSuccess && response.data != null) {
+                    Log.d(TAG, "📊 Charts Raw Response: " + response.data.toString());
+                    
+                    JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
+                    if (rootData != null) {
+                        mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
+                    }
                 } else {
-                    Log.w(TAG, "⚠️ Activity array is empty or not found.");
+                    Log.e(TAG, "❌ Charts API Failed: " + (response != null ? response.error : "null"));
                 }
-            } else {
-                Log.e(TAG, "❌ Activity API Failed: " + (response != null ? response.error : "null"));
+            } catch (Exception e) { 
+                Log.e(TAG, "❌ fetchDashboardCharts Error", e); 
+            }
+        });
+    }
+
+    private void renderCharts(JSONObject data) {
+        try {
+            applyChartTheme();
+
+            JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days"); 
+            if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days"); 
+            if (sales7Days == null) sales7Days = data.optJSONArray("sales");
+            
+            if (sales7Days == null || sales7Days.length() == 0) {
+                Log.w(TAG, "⚠️ No sales7Days array found in response.");
+                return;
+            }
+
+            List<Entry> entries = new ArrayList<>();
+            List<Entry> sellEntries = new ArrayList<>();
+            List<Entry> buyEntries = new ArrayList<>();
+            final List<String> labels = new ArrayList<>();
+
+            for (int i = 0; i < sales7Days.length(); i++) {
+                JSONObject day = sales7Days.getJSONObject(i);
+                double amount = day.optDouble("amount", 0);
+                
+                entries.add(new Entry(i, (float) amount));
+                sellEntries.add(new Entry(i, (float) amount));
+                buyEntries.add(new Entry(i, (float) (amount * 0.95))); 
+                
+                String dateStr = day.optString("date", "");
+                if (dateStr.length() > 5) dateStr = dateStr.substring(5);
+                labels.add(dateStr);
+            }
+
+            // 1. رسم مخطط المدير (lineChartSales)
+            if (lineChartSales != null) {
+                LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
+                dataSet.setColor(Color.parseColor("#D4AF37")); 
+                dataSet.setCircleColor(Color.parseColor("#D4AF37")); 
+                dataSet.setLineWidth(2.5f);
+                dataSet.setCircleRadius(4f); 
+                dataSet.setDrawValues(false); 
+                dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                
+                lineChartSales.setData(new LineData(dataSet));
+                XAxis xAxis = lineChartSales.getXAxis();
+                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM); 
+                xAxis.setGranularity(1f); 
+                xAxis.setDrawGridLines(false);
+                lineChartSales.getAxisRight().setEnabled(false);
+                lineChartSales.getDescription().setEnabled(false);
+                lineChartSales.getLegend().setEnabled(false);
+                lineChartSales.animateX(1000); 
+                lineChartSales.invalidate();
+            }
+
+            // 2. رسم مخطط الكاشير (lineChartPosPriceMovement)
+            if (lineChartPosPriceMovement != null) {
+                LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
+                sellDataSet.setColor(Color.parseColor("#D4AF37")); 
+                sellDataSet.setLineWidth(3f); 
+                sellDataSet.setDrawCircles(false); 
+                sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                sellDataSet.setDrawFilled(true); 
+                sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
+
+                LineDataSet buyDataSet = new LineDataSet(buyEntries, "تقديري");
+                buyDataSet.setColor(Color.parseColor("#4ADE80")); 
+                buyDataSet.setLineWidth(3f); 
+                buyDataSet.setDrawCircles(false); 
+                buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                buyDataSet.setDrawFilled(true); 
+                buyDataSet.setFillColor(Color.parseColor("#334ADE80"));
+
+                lineChartPosPriceMovement.setData(new LineData(sellDataSet, buyDataSet));
+                XAxis xAxis = lineChartPosPriceMovement.getXAxis();
+                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setDrawGridLines(false); 
+                xAxis.setDrawAxisLine(false); 
+                
+                lineChartPosPriceMovement.getAxisRight().setEnabled(true);
+                lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
+                lineChartPosPriceMovement.getDescription().setEnabled(false);
+                lineChartPosPriceMovement.getLegend().setEnabled(false);
+                lineChartPosPriceMovement.animateX(1000); 
+                lineChartPosPriceMovement.invalidate();
+            }
+
+            // 3. رسم مخطط النسب (pieChartKarat)
+            JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
+            if (salesByKarat != null && pieChartKarat != null) {
+                List<PieEntry> entriesPie = new ArrayList<>();
+                for (int i = 0; i < salesByKarat.length(); i++) {
+                    JSONObject k = salesByKarat.getJSONObject(i);
+                    entriesPie.add(new PieEntry((float) k.optDouble("amount", 0), k.optString("karat", "")));
+                }
+                if (!entriesPie.isEmpty()) {
+                    PieDataSet dataSet = new PieDataSet(entriesPie, "");
+                    dataSet.setColors(new int[]{
+                        Color.parseColor("#D4AF37"), Color.parseColor("#E6B800"),
+                        Color.parseColor("#CD853F"), Color.parseColor("#A0522D")
+                    });
+                    pieChartKarat.setData(new PieData(dataSet));
+                    pieChartKarat.getDescription().setEnabled(false);
+                    pieChartKarat.setUsePercentValues(true);
+                    pieChartKarat.setHoleRadius(40f); 
+                    pieChartKarat.animateY(1000); 
+                    pieChartKarat.invalidate();
+                }
             }
         } catch (Exception e) { 
-            Log.e(TAG, "❌ fetchRecentActivity Error", e); 
+            Log.e(TAG, "❌ renderCharts Error", e); 
         }
-    });
-}
+    }
 
     private void fetchData() {
         try {
@@ -969,7 +890,7 @@ private void fetchRecentActivity() {
             if (byKarat == null || byKarat.length() == 0) {
                 TextView tvEmpty = new TextView(getContext());
                 tvEmpty.setText("لا توجد تفاصيل للعيارات");
-                tvEmpty.setTextColor(Color.parseColor("#CCFFFFFF"));
+                tvEmpty.setTextColor(ContextCompat.getColor(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant));
                 tvEmpty.setTextSize(12); tvEmpty.setPadding(16, 16, 16, 16);
                 llPosKaratContainer.addView(tvEmpty);
                 return;
@@ -981,8 +902,6 @@ private void fetchRecentActivity() {
                 if (karat == 0 || weight == 0) continue; 
                 
                 View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
-                
-                applyBeautifulKaratStyle(card, karat);
 
                 TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
                 TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
@@ -990,7 +909,6 @@ private void fetchRecentActivity() {
                 
                 if (tvKaratTitle != null) {
                     tvKaratTitle.setText(karat + "K");
-                    tvKaratTitle.setTextColor(Color.WHITE);
                 }
                 
                 if (isPosDashboardHidden) {
@@ -999,12 +917,10 @@ private void fetchRecentActivity() {
                 } else {
                     if (tvKaratWeight != null) {
                         tvKaratWeight.setText(String.format(Locale.US, "%,.2f", weight));
-                        tvKaratWeight.setTextColor(Color.WHITE);
                     }
                     if (tvKaratValue != null) {
                         double price = priceManager != null ? priceManager.getGoldPricePerGram(karat) : 0;
                         tvKaratValue.setText(String.format(Locale.US, "%,.0f YER", weight * price * 530.0));
-                        tvKaratValue.setTextColor(Color.parseColor("#EEEEEE"));
                     }
                 }
                 llPosKaratContainer.addView(card);
@@ -1096,23 +1012,19 @@ private void fetchRecentActivity() {
             for (KaratInventory inv : sorted) {
                 View itemView = getLayoutInflater().inflate(R.layout.item_karat_inventory, llInventoryByKarat, false);
                 
-                applyBeautifulKaratStyle(itemView, inv.karat);
-
                 TextView tvKarat = itemView.findViewById(R.id.tvKaratLabel);
                 TextView tvCount = itemView.findViewById(R.id.tvKaratCount);
                 TextView tvWeight = itemView.findViewById(R.id.tvKaratWeight);
                 
                 if (tvKarat != null) { 
                     tvKarat.setText(inv.karat + "K"); 
-                    tvKarat.setTextColor(Color.WHITE); 
+                    tvKarat.setTextColor(getKaratColor(inv.karat)); 
                 }
                 if (tvCount != null) { 
                     tvCount.setText(isInventoryHidden ? "••" : String.valueOf(inv.itemCount)); 
-                    tvCount.setTextColor(Color.WHITE); 
                 }
                 if (tvWeight != null) { 
                     tvWeight.setText(isInventoryHidden ? "•• g" : formatWeight(inv.weight)); 
-                    tvWeight.setTextColor(Color.WHITE); 
                 }
                 llInventoryByKarat.addView(itemView);
             }
@@ -1451,7 +1363,36 @@ private void fetchRecentActivity() {
         } catch (Exception e) {}
     }
 
-    
+    private void fetchRecentActivity() {
+        if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
+        
+        localExecutor.execute(() -> {
+            try {
+                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    Log.d(TAG, "📋 Activity Raw Response: " + response.data.toString());
+                    JSONArray activities = extractActivitiesArray(response.data);
+                    
+                    if (activities != null && activities.length() > 0) {
+                        mainHandler.post(() -> {
+                            if (isAdded()) {
+                                updateRecentActivityUI(activities);
+                                updatePosRecentActivityUI(activities);
+                            }
+                        });
+                    } else {
+                        Log.w(TAG, "⚠️ Activity array is empty or not found.");
+                    }
+                } else {
+                    Log.e(TAG, "❌ Activity API Failed: " + (response != null ? response.error : "null"));
+                }
+            } catch (Exception e) { 
+                Log.e(TAG, "❌ fetchRecentActivity Error", e); 
+            }
+        });
+    }
 
     private void updateRecentActivityUI(JSONArray activities) {
         if (activities == null || llRecentActivity == null) return;
