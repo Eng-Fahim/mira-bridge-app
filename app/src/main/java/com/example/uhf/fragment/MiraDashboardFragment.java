@@ -295,13 +295,12 @@ public class MiraDashboardFragment extends Fragment {
             return (android.content.SharedPreferences) create.invoke(null, ctx, name, masterKey, keyEnc, valEnc);
         } catch (Throwable t) { return null; }
     }
-
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        try { return inflater.inflate(R.layout.fragment_mira_dashboard, container, false); }
-        catch (Exception e) { logNonFatal("onCreateView", e); return null; }
-    }
+@Nullable
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    // ✅ بدون try-catch — نريد أن نرى الخطأ الحقيقي!
+    return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
+}
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
