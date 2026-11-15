@@ -337,7 +337,7 @@ public class MiraAllActivitiesFragment extends Fragment {
         totalOnServer = serverTotal;
         hasMorePages = allActivities.size() < serverTotal;
     } else {
-        hasMorePages = activities.length() >= requestLimit;
+        hasMorePages = activities.length() >= Math.min(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE);
         //                                   ⬆️ الآن يعمل — requestLimit مُمرَّر
     }
 
