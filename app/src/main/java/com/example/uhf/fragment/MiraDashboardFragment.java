@@ -491,6 +491,7 @@ public class MiraDashboardFragment extends Fragment {
         tvPosTotalWeight.setText("•••••");
         tvPosTotalValue.setText("•••••••");
         tvPosCashBalance.setText("•••••••");
+        
         if (llPosKaratContainer != null) {
             for (int i = 0; i < llPosKaratContainer.getChildCount(); i++) {
                 View card = llPosKaratContainer.getChildAt(i);
@@ -508,17 +509,30 @@ public class MiraDashboardFragment extends Fragment {
             }
         }
     } else {
-        // ✅ إعادة عرض البيانات المخزنة محلياً بدون الحاجة لطلب السيرفر مرة أخرى
+        // ✅ عرض البيانات من الذاكرة مباشرة (بدون طلب السيرفر)
         tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
         tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue));
-        if (lastSalesData != null) {
-            double cash = lastSalesData.optDouble("today", 0.0);
-            tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+        
+        double cash = 0.0;
+        if (lastSalesData != null) cash = lastSalesData.optDouble("today", 0.0);
+        tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+        
+        // إعادة رسم العيارات من المصفوفة المحفوظة
+        llPosKaratContainer.removeAllViews();
+        for (KaratInventory inv : currentInventoryByKarat) {
+            View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
+            TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
+            TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
+            TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
+            tvKaratTitle.setText("عيار " + inv.karat);
+            tvKaratWeight.setText(String.format(Locale.US, "%,.2f جم", inv.weight));
+            double price = priceManager != null ? priceManager.getGoldPricePerGram(inv.karat) : 0;
+            tvKaratValue.setText(String.format(Locale.US, "$%,.2f", inv.weight * price));
+            llPosKaratContainer.addView(card);
         }
-        // إعادة بناء الكروت والمبالغ
-        renderPosKaratCards(new JSONObject()); // ستحتاج لتمرير الـ inv هنا إذا كنت تريد الدقة، أو تخزينه كمتغير عام
-        // الأفضل استدعاء دالة تعرض المبالغ من الذاكرة، أو تركها كما هي لأن الأرقام محفوظة
-        fetchData(); // استدعاء سريع في الخلفية لتحديث الأرقام إن لزم الأمر
+        
+        // إعادة جلب العمليات بصمت في الخلفية لتحديث المبالغ
+        fetchRecentActivity();
     }
 }
 
