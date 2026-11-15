@@ -945,8 +945,9 @@ public class MiraDashboardFragment extends Fragment {
             } else { alertsStrip.setVisibility(View.GONE); }
         } catch (Exception e) { Log.e(TAG, "updateAlerts", e); }
     }
-
-    private void computeAndShowAlerts(JSONObject data) {
+private void computeAndShowAlerts(JSONObject data) {
+    // ✅ تخطي هذا لأمن البوابات (شريطهم مخصص للإحصائيات)
+    if (permissionManager != null && permissionManager.isGateUser()) return;
         try {
             if (data == null) { updateAlerts(0, null); return; }
             int alertsCount = 0; StringBuilder message = new StringBuilder();
