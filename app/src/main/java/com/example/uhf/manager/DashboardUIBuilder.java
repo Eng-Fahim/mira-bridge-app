@@ -12,6 +12,8 @@ import com.example.uhf.R;
 import com.example.uhf.fragment.MiraInventoryDashboardFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
+import com.example.uhf.fragment.MiraUHFReadTagFragment;
+import com.example.uhf.fragment.MiraAllActivitiesFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraScrapGoldBuyFragment;
