@@ -362,8 +362,7 @@ public class MiraDashboardFragment extends Fragment {
 
             // --- موظف المبيعات (POS) ---
             layoutPosGoldDashboard = v.findViewById(R.id.layoutPosGoldDashboard);
-            tvPosGreeting = v.findViewById(R.id.tvPosGreeting);
-            tvPosUserName = v.findViewById(R.id.tvPosUserName);
+            
             
             tvPosTotalWeight = v.findViewById(R.id.tvPosTotalWeight);
             tvPosTotalValue = v.findViewById(R.id.tvPosTotalValue);
@@ -380,12 +379,6 @@ public class MiraDashboardFragment extends Fragment {
             llPosRecentActivity = v.findViewById(R.id.llPosRecentActivity);
             tvPosViewAllActivity = v.findViewById(R.id.tvPosViewAllActivity);
 
-            // عرض اسم المستخدم الحقيقي في الترحيب
-            if (tvPosUserName != null && sessionManager != null) {
-                String realName = sessionManager.getDisplayName();
-                if (realName == null || realName.isEmpty()) realName = sessionManager.getUsername();
-                tvPosUserName.setText(realName != null ? realName : "موظف المبيعات");
-            }
 
             if (btnTogglePosGoldVisibility != null) {
                 btnTogglePosGoldVisibility.setOnClickListener(v2 -> {
@@ -517,46 +510,43 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void updatePosDashboardUI() {
-        if (getView() == null) return;
+    if (getView() == null) return;
+    
+    if (isPosDashboardHidden) {
+        tvPosTotalWeight.setText("•••••");
+        tvPosTotalValue.setText("•••••••");
+        tvPosCashBalance.setText("•••••••");
         
-        if (isPosDashboardHidden) {
-            tvPosTotalWeight.setText("•••••");
-            tvPosTotalValue.setText("•••••••");
-            tvPosCashBalance.setText("•••••••");
-            
-            if (llPosKaratContainer != null) {
-                for (int i = 0; i < llPosKaratContainer.getChildCount(); i++) {
-                    View card = llPosKaratContainer.getChildAt(i);
-                    TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
-                    TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
-                    if (tvKaratWeight != null) tvKaratWeight.setText("•••");
-                    if (tvKaratValue != null) tvKaratValue.setText("•••••");
-                }
+        if (llPosKaratContainer != null) {
+            for (int i = 0; i < llPosKaratContainer.getChildCount(); i++) {
+                View card = llPosKaratContainer.getChildAt(i);
+                TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
+                TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
+                if (tvKaratWeight != null) tvKaratWeight.setText("•••");
+                if (tvKaratValue != null) tvKaratValue.setText("•••••");
             }
-            if (llPosRecentActivity != null) {
-                for (int i = 0; i < llPosRecentActivity.getChildCount(); i++) {
-                    View row = llPosRecentActivity.getChildAt(i);
-                    TextView tvAmount = row.findViewById(R.id.tvPosActAmount);
-                    if (tvAmount != null) tvAmount.setText("•••••");
-                }
+        }
+        if (llPosRecentActivity != null) {
+            for (int i = 0; i < llPosRecentActivity.getChildCount(); i++) {
+                View row = llPosRecentActivity.getChildAt(i);
+                TextView tvAmount = row.findViewById(R.id.tvPosActAmount);
+                if (tvAmount != null) tvAmount.setText("•••••");
             }
-        } else {
-            // إعادة عرض البيانات من الذاكرة بدون طلب السيرفر (سلس جداً)
-            tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
-            tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue));
-            
-            double cash = 0.0;
-            if (lastSalesData != null) cash = lastSalesData.optDouble("today", 0.0);
-            tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
-            
-            // إعادة رسم العيارات من المصفوفة المحفوظة
+        }
+    } else {
+        tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
+        tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue));
+        
+        double cash = 0.0;
+        if (lastSalesData != null) cash = lastSalesData.optDouble("today", 0.0);
+        tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+        
+        // إعادة بناء البطاقات
+        if (llPosKaratContainer != null) {
             llPosKaratContainer.removeAllViews();
             for (KaratInventory inv : currentInventoryByKarat) {
                 View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
-                LinearLayout background = card.findViewById(R.id.karatBackground);
-                if (inv.karat >= 24) background.setBackgroundResource(R.drawable.bg_karat_gradient_red);
-                else background.setBackgroundResource(R.drawable.bg_karat_gradient_orange);
-
+                
                 TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
                 TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
                 TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
@@ -568,9 +558,10 @@ public class MiraDashboardFragment extends Fragment {
                 llPosKaratContainer.addView(card);
             }
             setupKaratScrollArrows(getView());
-            fetchRecentActivity();
         }
+        fetchRecentActivity();
     }
+}
 
     private void setupQuickActionButtons(View root) {
         if (root == null || permissionManager == null) return;
@@ -869,54 +860,52 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void renderPosKaratCards(JSONObject inv) {
-        if (llPosKaratContainer == null) return;
-        llPosKaratContainer.removeAllViews();
-        try {
-            JSONArray byKarat = (inv != null) ? inv.optJSONArray("by_karat") : null;
-            if (byKarat == null || byKarat.length() == 0) {
-                TextView tvEmpty = new TextView(getContext());
-                tvEmpty.setText("لا توجد تفاصيل للعيارات");
-                tvEmpty.setTextColor(Color.parseColor("#CCFFFFFF"));
-                tvEmpty.setTextSize(12); tvEmpty.setPadding(16, 16, 16, 16);
-                llPosKaratContainer.addView(tvEmpty);
-                return;
-            }
-            for (int i = 0; i < byKarat.length(); i++) {
-                JSONObject k = byKarat.getJSONObject(i);
-                int karat = k.optInt("karat", 0);
-                double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
-                if (karat == 0 || weight == 0) continue; 
-                
-                View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
-                
-                LinearLayout background = card.findViewById(R.id.karatBackground);
-                if (karat >= 24) background.setBackgroundResource(R.drawable.bg_karat_gradient_red);
-                else background.setBackgroundResource(R.drawable.bg_karat_gradient_orange);
-
-                TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
-                TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
-                TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
-                
-                tvKaratTitle.setText(karat + "K");
-                
-                if (isPosDashboardHidden) {
-                    tvKaratWeight.setText("•••"); 
-                    tvKaratValue.setText("•••••");
-                } else {
-                    tvKaratWeight.setText(String.format(Locale.US, "%,.2f", weight));
-                    double price = priceManager != null ? priceManager.getGoldPricePerGram(karat) : 0;
-                    tvKaratValue.setText(String.format(Locale.US, "%,.0f YER", weight * price * 530.0));
-                }
-                llPosKaratContainer.addView(card);
-            }
+    if (llPosKaratContainer == null) return;
+    llPosKaratContainer.removeAllViews();
+    try {
+        JSONArray byKarat = (inv != null) ? inv.optJSONArray("by_karat") : null;
+        if (byKarat == null || byKarat.length() == 0) {
+            TextView tvEmpty = new TextView(getContext());
+            tvEmpty.setText("لا توجد تفاصيل للعيارات");
+            tvEmpty.setTextColor(Color.parseColor("#CCFFFFFF"));
+            tvEmpty.setTextSize(12); tvEmpty.setPadding(16, 16, 16, 16);
+            llPosKaratContainer.addView(tvEmpty);
+            return;
+        }
+        for (int i = 0; i < byKarat.length(); i++) {
+            JSONObject k = byKarat.getJSONObject(i);
+            int karat = k.optInt("karat", 0);
+            double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
+            if (karat == 0 || weight == 0) continue; 
             
-            llPosKaratContainer.post(() -> {
-                View root = getView();
-                if (root != null) setupKaratScrollArrows(root);
-            });
+            View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
+            
+            // ✅ تم إزالة التلوين الأحمر واستخدام الشفافية من الـ XML
+            
+            TextView tvKaratTitle = card.findViewById(R.id.tvChipKaratTitle);
+            TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
+            TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
+            
+            tvKaratTitle.setText(karat + "K");
+            
+            if (isPosDashboardHidden) {
+                tvKaratWeight.setText("•••"); 
+                tvKaratValue.setText("•••••");
+            } else {
+                tvKaratWeight.setText(String.format(Locale.US, "%,.2f", weight));
+                double price = priceManager != null ? priceManager.getGoldPricePerGram(karat) : 0;
+                tvKaratValue.setText(String.format(Locale.US, "%,.0f YER", weight * price * 530.0));
+            }
+            llPosKaratContainer.addView(card);
+        }
+        
+        llPosKaratContainer.post(() -> {
+            View root = getView();
+            if (root != null) setupKaratScrollArrows(root);
+        });
 
-        } catch (Exception e) { Log.e(TAG, "renderPosKaratCards", e); }
-    }
+    } catch (Exception e) { Log.e(TAG, "renderPosKaratCards", e); }
+}
 
     private void applyChartTheme() {
         if (!isAdded() || getContext() == null || getView() == null) return;
