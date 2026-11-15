@@ -52,6 +52,7 @@ import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.google.android.material.color.MaterialColors;
 
 import org.json.JSONArray;
@@ -136,8 +137,8 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvLiveStatusText;
     private TextView tvHeroItemCount;
 
-    private LinearLayout llRecentActivity;
-    private TextView tvViewAllActivity;
+    private LinearLayout llRecentActivity, llPosRecentActivity;
+    private TextView tvViewAllActivity, tvPosViewAllActivity;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -363,6 +364,10 @@ public class MiraDashboardFragment extends Fragment {
             llPosKaratContainer = v.findViewById(R.id.llPosKaratContainer);
             lineChartPosPriceMovement = v.findViewById(R.id.lineChartPosPriceMovement);
             btnTogglePosGoldVisibility = v.findViewById(R.id.btnTogglePosGoldVisibility);
+            
+            // ✅ ربط قسم العمليات الأخيرة للكاشير
+            llPosRecentActivity = v.findViewById(R.id.llPosRecentActivity);
+            tvPosViewAllActivity = v.findViewById(R.id.tvPosViewAllActivity);
 
             if (btnTogglePosGoldVisibility != null) {
                 btnTogglePosGoldVisibility.setOnClickListener(v2 -> {
@@ -371,6 +376,23 @@ public class MiraDashboardFragment extends Fragment {
                     updatePosDashboardUI();
                 });
             }
+            
+            if (tvPosViewAllActivity != null) {
+                tvPosViewAllActivity.setOnClickListener(v2 -> navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities"));
+            }
+
+            View btnPosSell = v.findViewById(R.id.btnPosActionSell);
+            View btnPosBuyScrap = v.findViewById(R.id.btnPosActionBuyScrap);
+            View btnPosReturn = v.findViewById(R.id.btnPosActionReturn);
+
+            if (btnPosSell != null) btnPosSell.setOnClickListener(v2 -> navigateToFragment(new MiraPosFragment(), NavigationManager.TAG_POS));
+            if (btnPosBuyScrap != null) btnPosBuyScrap.setOnClickListener(v2 -> navigateToFragment(new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY));
+            if (btnPosReturn != null) btnPosReturn.setOnClickListener(v2 -> {
+                Fragment salesFragment = new MiraPosFragment();
+                Bundle bundle = new Bundle(); bundle.putBoolean("auto_open_refund", true);
+                salesFragment.setArguments(bundle);
+                navigateToFragment(salesFragment, "Sales");
+            });
 
             if (hsvCarousel != null) {
                 final LinearLayout cardsContainer = v.findViewById(R.id.cardsContainer);
@@ -484,7 +506,15 @@ public class MiraDashboardFragment extends Fragment {
                     TextView tvKaratWeight = card.findViewById(R.id.tvChipKaratWeight);
                     TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
                     if (tvKaratWeight != null) tvKaratWeight.setText("••• جم");
-                    if (tvKaratValue != null) tvKaratValue.setText("••••• YER");
+                    if (tvKaratValue != null) tvKaratValue.setText("•••••");
+                }
+            }
+            // إخفاء مبالغ العمليات الأخيرة
+            if (llPosRecentActivity != null) {
+                for (int i = 0; i < llPosRecentActivity.getChildCount(); i++) {
+                    View row = llPosRecentActivity.getChildAt(i);
+                    TextView tvAmount = row.findViewById(R.id.tvPosActAmount);
+                    if (tvAmount != null) tvAmount.setText("•••••");
                 }
             }
         } else {
@@ -498,11 +528,16 @@ public class MiraDashboardFragment extends Fragment {
         if (container == null) return;
         container.removeAllViews();
 
-        if (permissionManager.canUsePos()) addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
-        if (permissionManager.canViewInventory()) addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
-        if (permissionManager.canBuyScrapGold()) addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
-        if (permissionManager.canViewReports()) addQuickAction(container, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
-        if (permissionManager.canViewAccounting()) addQuickAction(container, "المحاسبة", R.drawable.ic_accounting, new MiraAccountingFragment(), NavigationManager.TAG_ACCOUNTING);
+        if (permissionManager.isPosOperator()) {
+            addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
+            addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+        } else {
+            if (permissionManager.canUsePos()) addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
+            if (permissionManager.canViewInventory()) addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
+            if (permissionManager.canBuyScrapGold()) addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
+            if (permissionManager.canViewReports()) addQuickAction(container, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
+            if (permissionManager.canViewAccounting()) addQuickAction(container, "المحاسبة", R.drawable.ic_accounting, new MiraAccountingFragment(), NavigationManager.TAG_ACCOUNTING);
+        }
     }
 
     private void addQuickAction(LinearLayout container, String title, int iconRes, Fragment target, String tag) {
@@ -614,12 +649,19 @@ public class MiraDashboardFragment extends Fragment {
                     XAxis xAxis = lineChartPosPriceMovement.getXAxis();
                     xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
                     xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-                    xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false); xAxis.setTextColor(Color.GRAY);
+                    xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false); 
+                    
                     lineChartPosPriceMovement.getAxisRight().setEnabled(true);
                     lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
-                    lineChartPosPriceMovement.getAxisRight().setGridColor(Color.parseColor("#22CCCCCC"));
+                    lineChartPosPriceMovement.getAxisRight().setValueFormatter(new ValueFormatter() {
+                        @Override
+                        public String getFormattedValue(float value) {
+                            if (value >= 1000000) return String.format(Locale.US, "%.1fM", value / 1000000);
+                            if (value >= 1000) return String.format(Locale.US, "%.1fK", value / 1000);
+                            return String.format(Locale.US, "%.0f", value);
+                        }
+                    });
                     lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
-                    lineChartPosPriceMovement.getAxisRight().setTextColor(Color.GRAY);
                     lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
                     lineChartPosPriceMovement.getDescription().setEnabled(false);
                     lineChartPosPriceMovement.getLegend().setEnabled(false);
@@ -686,88 +728,76 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void processData(JSONObject data) {
-    try {
-        JSONObject inv = data.optJSONObject("inventory");
-        if (inv == null) inv = data.optJSONObject("inventory_data");
-        
-        if (inv != null) {
-            currentItemCount = inv.optInt("total_items", 0);
-            currentTotalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0));
-            currentInventoryValue = inv.optDouble("total_value", 0.0);
+        try {
+            JSONObject inv = data.optJSONObject("inventory");
+            if (inv == null) inv = data.optJSONObject("inventory_data");
             
-            // ✅ قراءة العيارات
-            JSONArray byKarat = inv.optJSONArray("by_karat");
-            if (byKarat == null) byKarat = inv.optJSONArray("karats"); 
-            
-            List<KaratInventory> karatItems = new ArrayList<>();
-            double calculatedWeight = 0;
-            double calculatedValue = 0;
+            if (inv != null) {
+                currentItemCount = inv.optInt("total_items", 0);
+                currentTotalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0));
+                currentInventoryValue = inv.optDouble("total_value", 0.0);
+                
+                JSONArray byKarat = inv.optJSONArray("by_karat");
+                if (byKarat == null) byKarat = inv.optJSONArray("karats"); 
+                
+                List<KaratInventory> karatItems = new ArrayList<>();
+                double calculatedWeight = 0;
+                double calculatedValue = 0;
 
-            if (byKarat != null) {
-                for (int i = 0; i < byKarat.length(); i++) {
-                    JSONObject k = byKarat.optJSONObject(i);
-                    if (k != null) { 
-                        int karat = k.optInt("karat", 0); 
-                        double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
-                        
-                        if (karat > 0) {
-                            karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight)); 
-                            calculatedWeight += weight; // جمع الأوزان
+                if (byKarat != null) {
+                    for (int i = 0; i < byKarat.length(); i++) {
+                        JSONObject k = byKarat.optJSONObject(i);
+                        if (k != null) { 
+                            int karat = k.optInt("karat", 0); 
+                            double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
                             
-                            // حساب القيمة إذا لم تكن قادمة من السيرفر
-                            if (priceManager != null) {
-                                double price = priceManager.getGoldPricePerGram(karat);
-                                calculatedValue += (weight * price);
+                            if (karat > 0) {
+                                karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight)); 
+                                calculatedWeight += weight;
+                                if (priceManager != null) {
+                                    double price = priceManager.getGoldPricePerGram(karat);
+                                    calculatedValue += (weight * price);
+                                }
                             }
                         }
                     }
                 }
-            }
-            
-            // ✅ الخطة البديلة: إذا كان الإجمالي صفر، استخدم المجموع المحسوب من العيارات
-            if (currentTotalWeight == 0 && calculatedWeight > 0) {
-                currentTotalWeight = calculatedWeight;
-            }
-            if (currentInventoryValue == 0 && calculatedValue > 0) {
-                currentInventoryValue = calculatedValue;
-            }
-
-            currentInventoryByKarat.clear(); 
-            currentInventoryByKarat.addAll(karatItems); 
-            renderInventoryByKarat(currentInventoryByKarat);
-        }
-        
-        JSONObject sales = data.optJSONObject("sales");
-        if (sales != null) { lastSalesData = sales; applySalesData(sales); }
-
-        if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
-            if (isPosDashboardHidden) {
-                tvPosTotalWeight.setText("•••••");
-                tvPosTotalValue.setText("•••••••");
-                tvPosCashBalance.setText("•••••••");
-            } else {
-                // عرض الوزن الإجمالي (الذي تم إصلاحه)
-                tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
                 
-                // عرض القيمة بالدولار (لأن البطاقات تعرض الدولار) بدلاً من ضربها في 530
-                tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue)); 
+                if (currentTotalWeight == 0 && calculatedWeight > 0) currentTotalWeight = calculatedWeight;
+                if (currentInventoryValue == 0 && calculatedValue > 0) currentInventoryValue = calculatedValue;
+
+                currentInventoryByKarat.clear(); 
+                currentInventoryByKarat.addAll(karatItems); 
+                renderInventoryByKarat(currentInventoryByKarat);
+            }
+            
+            JSONObject sales = data.optJSONObject("sales");
+            if (sales != null) { lastSalesData = sales; applySalesData(sales); }
+
+            if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
+                if (isPosDashboardHidden) {
+                    tvPosTotalWeight.setText("•••••");
+                    tvPosTotalValue.setText("•••••••");
+                    tvPosCashBalance.setText("•••••••");
+                } else {
+                    tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
+                    tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue)); 
+                    
+                    double cash = 0.0;
+                    if (data.optJSONObject("shift_summary") != null) cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
+                    else if (sales != null) cash = sales.optDouble("today", 0.0);
+                    tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+                }
                 
-                double cash = 0.0;
-                if (data.optJSONObject("shift_summary") != null) cash = data.optJSONObject("shift_summary").optDouble("total_cash", 0.0);
-                else if (sales != null) cash = sales.optDouble("today", 0.0);
-                tvPosCashBalance.setText(String.format(Locale.US, "%,.2f YER", cash));
+                renderPosKaratCards(inv);
+                
+                if (priceManager != null && !isPosDashboardHidden) {
+                    tvPosSellPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(24)));
+                    tvPosBuyPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(21)));
+                }
             }
-            
-            renderPosKaratCards(inv);
-            
-            // تحديث أسعار البيع والشراء في الشارات
-            if (priceManager != null && !isPosDashboardHidden) {
-                tvPosSellPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(24)));
-                tvPosBuyPrice.setText(String.format(Locale.US, "%,.0f", priceManager.getGoldPricePerGram(21)));
-            }
-        }
-    } catch (Exception e) { Log.e(TAG, "processData", e); }
-}
+        } catch (Exception e) { Log.e(TAG, "processData", e); }
+    }
 
     private void renderPosKaratCards(JSONObject inv) {
         if (llPosKaratContainer == null) return;
@@ -793,7 +823,7 @@ public class MiraDashboardFragment extends Fragment {
                 TextView tvKaratValue = card.findViewById(R.id.tvChipKaratValue);
                 tvKaratTitle.setText("عيار " + karat);
                 if (isPosDashboardHidden) {
-                    tvKaratWeight.setText("••• جم"); tvKaratValue.setText("••••• YER");
+                    tvKaratWeight.setText("••• جم"); tvKaratValue.setText("•••••");
                 } else {
                     tvKaratWeight.setText(String.format(Locale.US, "%,.2f جم", weight));
                     double price = priceManager != null ? priceManager.getGoldPricePerGram(karat) : 0;
@@ -806,22 +836,29 @@ public class MiraDashboardFragment extends Fragment {
 
     private void applyChartTheme() {
         if (!isAdded() || getContext() == null || getView() == null) return;
-        Context ctx = requireContext();
         try {
-            int onSurface = isNightMode() ? 0xFFFFFFFF : 0xFF212121;
+            int onSurface = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorOnSurface, isNightMode() ? 0xFFFFFFFF : 0xFF212121);
+            int onSurfaceVariant = MaterialColors.getColor(requireView(), com.google.android.material.R.attr.colorOnSurfaceVariant, isNightMode() ? 0xFFBBBBBB : 0xFF666666);
             int chartGrid = isNightMode() ? 0x33FFFFFF : 0x33000000;
-            int chartAxisText = isNightMode() ? 0xFFBBBBBB : 0xFF666666;
 
             if (lineChartSales != null) {
                 XAxis x = lineChartSales.getXAxis();
-                x.setTextColor(chartAxisText); x.setAxisLineColor(chartGrid); x.setTextSize(10f);
-                lineChartSales.getAxisLeft().setTextColor(chartAxisText); lineChartSales.getAxisLeft().setGridColor(chartGrid);
-                lineChartSales.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
+                x.setTextColor(onSurfaceVariant); x.setAxisLineColor(chartGrid);
+                lineChartSales.getAxisLeft().setTextColor(onSurfaceVariant); lineChartSales.getAxisLeft().setGridColor(chartGrid);
+                lineChartSales.setNoDataTextColor(onSurfaceVariant);
             }
             if (pieChartKarat != null) {
                 pieChartKarat.setEntryLabelColor(onSurface);
                 pieChartKarat.setHoleColor(isNightMode() ? 0xFF1E1E1E : 0xFFFFFFFF);
-                pieChartKarat.setNoDataText(isArabic ? "لا توجد بيانات" : "No data");
+                pieChartKarat.setNoDataTextColor(onSurfaceVariant);
+            }
+            if (lineChartPosPriceMovement != null) {
+                XAxis x = lineChartPosPriceMovement.getXAxis();
+                x.setTextColor(onSurfaceVariant); x.setAxisLineColor(chartGrid);
+                lineChartPosPriceMovement.getAxisRight().setTextColor(onSurfaceVariant);
+                lineChartPosPriceMovement.getAxisRight().setGridColor(chartGrid);
+                lineChartPosPriceMovement.getLegend().setTextColor(onSurface);
+                lineChartPosPriceMovement.setNoDataTextColor(onSurfaceVariant);
             }
         } catch (Exception e) { Log.e(TAG, "applyChartTheme", e); }
     }
@@ -1219,7 +1256,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private void fetchRecentActivity() {
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor() || (roleController != null && !roleController.canFetchRecentActivity())) return;
-        if (activityCache != null) { JSONArray cached = activityCache.load(); if (cached != null && cached.length() > 0) updateRecentActivityUI(cached); }
+        if (activityCache != null) { JSONArray cached = activityCache.load(); if (cached != null && cached.length() > 0) { updateRecentActivityUI(cached); updatePosRecentActivityUI(cached); } }
         if (activityCache != null && activityCache.isValid()) return;
         localExecutor.execute(() -> {
             try {
@@ -1230,7 +1267,11 @@ public class MiraDashboardFragment extends Fragment {
                     if (response.isSuccess && response.data != null) {
                         try {
                             JSONArray activities = response.data.optJSONArray("activities");
-                            if (activities != null && activities.length() > 0) { if (activityCache != null) activityCache.save(activities); updateRecentActivityUI(activities); }
+                            if (activities != null && activities.length() > 0) { 
+                                if (activityCache != null) activityCache.save(activities); 
+                                updateRecentActivityUI(activities); 
+                                updatePosRecentActivityUI(activities);
+                            }
                         } catch (Exception e) {}
                     }
                 });
@@ -1251,6 +1292,60 @@ public class MiraDashboardFragment extends Fragment {
                 llRecentActivity.addView(itemView);
             }
         } catch (Exception e) {}
+    }
+    
+    // ✅ دالة عرض العمليات الأخيرة للكاشير (مصممة خصيصاً لواجهة الـ POS)
+    private void updatePosRecentActivityUI(JSONArray activities) {
+        if (activities == null || llPosRecentActivity == null) return;
+        try {
+            llPosRecentActivity.removeAllViews();
+            int max = Math.min(activities.length(), 5); // عرض آخر 5 عمليات فقط للكاشير
+            for (int i = 0; i < max; i++) {
+                JSONObject item = activities.getJSONObject(i);
+                View itemView = getLayoutInflater().inflate(R.layout.item_pos_activity, llPosRecentActivity, false);
+                
+                TextView tvIcon = itemView.findViewById(R.id.tvPosActIcon);
+                TextView tvTitle = itemView.findViewById(R.id.tvPosActTitle);
+                TextView tvTime = itemView.findViewById(R.id.tvPosActTime);
+                TextView tvAmount = itemView.findViewById(R.id.tvPosActAmount);
+
+                String icon = item.optString("icon", "🛒");
+                String title = isArabic ? item.optString("title_ar", "") : item.optString("title_en", "");
+                String user = item.optString("user", "—"); 
+                String timestamp = item.optString("timestamp", "");
+                double amount = item.optDouble("amount", 0);
+                String currency = item.optString("currency", "YER");
+                String status = item.optString("status", "success");
+
+                if (tvIcon != null) tvIcon.setText(icon); 
+                if (tvTitle != null) tvTitle.setText(title);
+                if (tvTime != null) tvTime.setText(extractTime(timestamp) + " • " + user);
+                
+                if (tvAmount != null) {
+                    if (isPosDashboardHidden) {
+                        tvAmount.setText("•••••");
+                        tvAmount.setTextColor(ContextCompat.getColor(requireContext(), R.color.colorOnSurfaceVariant));
+                    } else {
+                        if (amount > 0) {
+                            // مبيعات (أخضر)
+                            tvAmount.setText(String.format(Locale.US, "+ %,.0f %s", amount, currency));
+                            tvAmount.setTextColor(Color.parseColor("#16A34A"));
+                        } else if (amount < 0 || "refund".equals(status)) {
+                            // مرتجعات (أحمر)
+                            tvAmount.setText(String.format(Locale.US, "- %,.0f %s", Math.abs(amount), currency));
+                            tvAmount.setTextColor(Color.parseColor("#DC2626"));
+                        } else {
+                            // عمليات أخرى (رمادي)
+                            tvAmount.setText("—");
+                            tvAmount.setTextColor(Color.parseColor("#6B7280"));
+                        }
+                    }
+                }
+
+                itemView.setOnClickListener(v -> handleRecentActivityClick(item));
+                llPosRecentActivity.addView(itemView);
+            }
+        } catch (Exception e) { Log.e(TAG, "updatePosRecentActivityUI", e); }
     }
 
     private void bindActivityToView(View v, JSONObject item) {
@@ -1491,7 +1586,7 @@ public class MiraDashboardFragment extends Fragment {
         try {
             isArabic = newConfig.getLocales().get(0).getLanguage().equals("ar");
             mainHandler.post(() -> {
-                if (isAdded() && isViewInitialized) { applyCarouselLayout(); applyChartTheme(); if (lineChartSales != null) lineChartSales.invalidate(); if (pieChartKarat != null) pieChartKarat.invalidate(); }
+                if (isAdded() && isViewInitialized) { applyCarouselLayout(); applyChartTheme(); if (lineChartSales != null) lineChartSales.invalidate(); if (pieChartKarat != null) pieChartKarat.invalidate(); if (lineChartPosPriceMovement != null) lineChartPosPriceMovement.invalidate(); }
             });
         } catch (Exception e) {}
     }
