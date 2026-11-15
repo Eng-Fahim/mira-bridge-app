@@ -367,7 +367,36 @@ private static final NavItemCfg[] NAV_CONFIGS = {
                 return;
             }
 
-            setContentView(R.layout.activity_main);
+            // ⚡ اختبار قاطع: عرض الخطأ على الشاشة بدلاً من الفشل الصامت
+try {
+    setContentView(R.layout.activity_main);
+    Log.d(TAG, "✅ activity_main loaded successfully");
+} catch (Throwable t) {
+    Log.e(TAG, "❌❌❌ setContentView FAILED ❌❌❌", t);
+    
+    android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+    android.widget.TextView errorTv = new android.widget.TextView(this);
+    
+    StringBuilder sb = new StringBuilder();
+    sb.append("🔴🔴🔴 ACTIVITY_MAIN FAILED 🔴🔴🔴\n\n");
+    sb.append("Type: ").append(t.getClass().getSimpleName()).append("\n\n");
+    sb.append("Message:\n").append(t.getMessage()).append("\n\n");
+    sb.append("═══════════════════\n\n");
+    sb.append("Stack Trace:\n");
+    sb.append(android.util.Log.getStackTraceString(t));
+    
+    errorTv.setText(sb.toString());
+    errorTv.setTextSize(11);
+    errorTv.setTextColor(0xFF000000);
+    errorTv.setBackgroundColor(0xFFFFEBEE);
+    errorTv.setPadding(30, 80, 30, 80);
+    errorTv.setTextIsSelectable(true);
+    
+    scrollView.addView(errorTv);
+    scrollView.setBackgroundColor(0xFFFFEBEE);
+    setContentView(scrollView);
+    return; // ← لا تكمل
+}
 
             // ═══ MIRA License Banner ═══
             try {
