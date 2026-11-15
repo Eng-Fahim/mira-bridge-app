@@ -1342,7 +1342,7 @@ private void updateLayoutVisibilityForRole(View v) {
             }
         }
 
-    } catch (Exception e) { logNonFatal("processData", e); }
+    } catch (Exception e) { Log.e(TAG, "processData", e); }
 }
     
     /**
