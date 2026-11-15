@@ -585,8 +585,12 @@ private void updatePosDashboardUI() {
             addQuickAction(container, "نقطة بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS);
         }
         if (permissionManager.canViewInventory()) {
+    addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard");
+}
+        /*if (permissionManager.canViewInventory()) {
             addQuickAction(container, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryProFragment(), NavigationManager.TAG_INVENTORY);
-        }
+        }*/
+        
         if (permissionManager.canBuyScrapGold()) {
             addQuickAction(container, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY);
         }
