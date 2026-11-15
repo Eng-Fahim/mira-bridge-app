@@ -88,7 +88,7 @@
         </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ⬇️ الشريط السفلي والأزرار العائمة (يجب أن يكون مرة واحدة فقط) -->
+    <!-- ⬇️ الشريط السفلي والأزرار العائمة -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -120,7 +120,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- زر التقارير (مخفي افتراضياً) -->
+        <!-- ✅ زر التقارير (متمركز فوق الزر الأصفر - تنطلق منه حركة القوس) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabReports"
             android:layout_width="wrap_content"
@@ -130,12 +130,12 @@
             app:fabSize="mini"
             app:backgroundTint="?attr/colorSecondary"
             app:tint="?attr/colorOnSecondary"
-            app:layout_constraintBottom_toTopOf="@id/fabActionCenter"
+            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
             app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
             app:layout_constraintStart_toStartOf="@id/fabActionCenter"
             app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
 
-        <!-- زر الملف الشخصي (مخفي افتراضياً) -->
+        <!-- ✅ زر الملف الشخصي (متمركز فوق الزر الأصفر - تنطلق منه حركة القوس) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabProfile"
             android:layout_width="wrap_content"
@@ -145,10 +145,10 @@
             app:fabSize="mini"
             app:backgroundTint="?attr/colorSecondary"
             app:tint="?attr/colorOnSecondary"
-            app:layout_constraintBottom_toTopOf="@id/fabReports"
+            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
             app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
             app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-            app:layout_constraintTop_toTopOf="@id/fabReports" />
+            app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
 
         <!-- الزر الرئيسي (الأصفر) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
