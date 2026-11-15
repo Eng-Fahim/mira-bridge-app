@@ -620,10 +620,11 @@ private void updatePosDashboardUI() {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getDashboardCharts(currentBranchId);
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject data = response.data.optJSONObject("data");
-                    if (data != null) {
-                        mainHandler.post(() -> { if (isAdded()) renderCharts(data); });
-                    }
+                // ✅ فك التغليف بذكاء
+JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
+if (rootData != null) {
+    mainHandler.post(() -> { if (isAdded()) renderCharts(rootData); });
+}
                 }
             } catch (Exception e) { Log.e(TAG, "fetchDashboardCharts", e); }
         });
@@ -692,66 +693,71 @@ private void updatePosDashboardUI() {
         // 2. الرسم البياني الجديد لموظف المبيعات (خطين: بيع وشراء)
         // ==========================================
         if (lineChartPosPriceMovement != null && permissionManager != null && permissionManager.isPosOperator()) {
-            List<Entry> sellEntries = new ArrayList<>();
-            List<Entry> buyEntries = new ArrayList<>();
-            final List<String> labels = new ArrayList<>();
+    List<Entry> sellEntries = new ArrayList<>();
+    List<Entry> buyEntries = new ArrayList<>();
+    final List<String> labels = new ArrayList<>();
 
-            // التحقق من وجود بيانات حقيقية من السيرفر
-            if (sales7Days != null && sales7Days.length() > 0) {
-                for (int i = 0; i < sales7Days.length(); i++) {
-                    JSONObject day = sales7Days.getJSONObject(i);
-                    
-                    double amount = day.optDouble("amount", 0);
-                    
-                    sellEntries.add(new Entry(i, (float) amount));
-                    // ملاحظة: يمكنك إضافة خط الشراء إذا كان السيرفر يرسله (مثلاً day.optDouble("buy_amount"))
-                    buyEntries.add(new Entry(i, (float) (amount * 0.9))); 
-                    
-                    labels.add(day.optString("date", ""));
-                }
+    JSONArray chartData = data.optJSONArray("sales_last_7_days");
+    
+    if (chartData != null && chartData.length() > 0) {
+        for (int i = 0; i < chartData.length(); i++) {
+            JSONObject day = chartData.getJSONObject(i);
+            
+            // في السيرفر المبالغ قد تكون YER كما هو موضح في واجهة الويب
+            double amount = day.optDouble("amount", 0); 
+            
+            sellEntries.add(new Entry(i, (float) amount));
+            buyEntries.add(new Entry(i, (float) (amount * 0.95))); 
+            
+            // جلب التاريخ
+            String dateStr = day.optString("date", "");
+            if (dateStr.length() > 5) dateStr = dateStr.substring(5); // اختصار التاريخ (11-09)
+            labels.add(dateStr);
+        }
 
-                LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
-                sellDataSet.setColor(Color.parseColor("#D4AF37"));
-                sellDataSet.setLineWidth(3f); 
-                sellDataSet.setDrawCircles(false);
-                sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                sellDataSet.setDrawFilled(true); 
-                sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
+        LineDataSet sellDataSet = new LineDataSet(sellEntries, "بيع");
+        sellDataSet.setColor(Color.parseColor("#D4AF37"));
+        sellDataSet.setLineWidth(3f); 
+        sellDataSet.setDrawCircles(false);
+        sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+        sellDataSet.setDrawFilled(true); 
+        sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
 
-                LineDataSet buyDataSet = new LineDataSet(buyEntries, "مشتريات");
-                buyDataSet.setColor(Color.parseColor("#2E7D32"));
-                buyDataSet.setLineWidth(3f); 
-                buyDataSet.setDrawCircles(false);
-                buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-                buyDataSet.setDrawFilled(true); 
-                buyDataSet.setFillColor(Color.parseColor("#332E7D32"));
+        LineDataSet buyDataSet = new LineDataSet(buyEntries, "شراء");
+        buyDataSet.setColor(Color.parseColor("#2E7D32"));
+        buyDataSet.setLineWidth(3f); 
+        buyDataSet.setDrawCircles(false);
+        buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+        buyDataSet.setDrawFilled(true); 
+        buyDataSet.setFillColor(Color.parseColor("#332E7D32"));
 
-                LineData lineData = new LineData(sellDataSet, buyDataSet);
-                lineChartPosPriceMovement.setData(lineData);
+        LineData lineData = new LineData(sellDataSet, buyDataSet);
+        lineChartPosPriceMovement.setData(lineData);
 
-                XAxis xAxis = lineChartPosPriceMovement.getXAxis();
-                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-                xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false);
+        XAxis xAxis = lineChartPosPriceMovement.getXAxis();
+        xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false);
+        xAxis.setTextColor(Color.GRAY);
 
-                lineChartPosPriceMovement.getAxisRight().setEnabled(true);
-                lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
-                lineChartPosPriceMovement.getAxisRight().setGridColor(Color.parseColor("#22CCCCCC"));
-                lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
-                lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
+        lineChartPosPriceMovement.getAxisRight().setEnabled(true);
+        lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
+        lineChartPosPriceMovement.getAxisRight().setGridColor(Color.parseColor("#22CCCCCC"));
+        lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
+        lineChartPosPriceMovement.getAxisRight().setTextColor(Color.GRAY);
+        lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
 
-                lineChartPosPriceMovement.getDescription().setEnabled(false);
-                lineChartPosPriceMovement.getLegend().setEnabled(false);
-                lineChartPosPriceMovement.animateX(1000);
-                lineChartPosPriceMovement.invalidate();
-            } else {
-                // ❌ لا توجد بيانات (Empty State)
-                lineChartPosPriceMovement.clear();
-                lineChartPosPriceMovement.setNoDataText("لا توجد مبيعات مسجلة لهذا الأسبوع");
-                lineChartPosPriceMovement.setNoDataTextColor(Color.parseColor("#888888"));
-                lineChartPosPriceMovement.invalidate();
-            }
-        } // ✅ هذا هو القوس الذي كان ناقصاً في كودك
+        lineChartPosPriceMovement.getDescription().setEnabled(false);
+        lineChartPosPriceMovement.getLegend().setEnabled(false);
+        lineChartPosPriceMovement.animateX(1000);
+        lineChartPosPriceMovement.invalidate();
+    } else {
+        lineChartPosPriceMovement.clear();
+        lineChartPosPriceMovement.setNoDataText("لا توجد مبيعات مسجلة لهذا الأسبوع");
+        lineChartPosPriceMovement.setNoDataTextColor(Color.parseColor("#888888"));
+        lineChartPosPriceMovement.invalidate();
+    }
+}
 
     } catch (Exception e) { 
         Log.e(TAG, "renderCharts", e); 
@@ -1349,11 +1355,18 @@ private void updatePosDashboardUI() {
                         isLoading.set(false); lastDataFetchTime = System.currentTimeMillis();
                         if (!isAdded()) { if (swipeRefresh != null) swipeRefresh.setRefreshing(false); return; }
                         if (response != null && response.isSuccess && response.data != null) {
-                            saveOfflineData(response.data); processData(response.data); computeAndShowAlerts(response.data);
-                            isDataLoaded = true; updateLiveStatusText(true); showShimmer(false);
-                        } else {
-                            updateLiveStatusText(false); loadOfflineData(); showShimmer(false);
-                        }
+    // ✅ فك تغليف البيانات: إذا كانت داخل data، نأخذها، وإلا نأخذ الجذر
+    JSONObject rootData = response.data.has("data") ? response.data.optJSONObject("data") : response.data;
+    
+    if (rootData != null) {
+        saveOfflineData(rootData); 
+        processData(rootData); 
+        computeAndShowAlerts(rootData);
+    }
+    isDataLoaded = true; updateLiveStatusText(true); showShimmer(false);
+} else {
+    updateLiveStatusText(false); loadOfflineData(); showShimmer(false);
+}
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
                 } catch (Exception e) {
@@ -1373,15 +1386,23 @@ private void updatePosDashboardUI() {
             currentTotalWeight = inv.optDouble("total_weight", 0.0);
             currentInventoryValue = inv.optDouble("total_value", 0.0);
             updateHeroBalance();
+            
             JSONArray byKarat = inv.optJSONArray("by_karat");
             List<KaratInventory> karatItems = new ArrayList<>();
             if (byKarat != null) {
                 for (int i = 0; i < byKarat.length(); i++) {
                     JSONObject k = byKarat.optJSONObject(i);
-                    if (k != null) { int karat = k.optInt("karat", 0); if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0))); }
+                    if (k != null) { 
+                        int karat = k.optInt("karat", 0); 
+                        // البحث عن الوزن سواء باسم weight أو total_weight
+                        double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
+                        if (karat > 0) karatItems.add(new KaratInventory(karat, k.optInt("count", 0), weight)); 
+                    }
                 }
             }
-            currentInventoryByKarat.clear(); currentInventoryByKarat.addAll(karatItems); renderInventoryByKarat(currentInventoryByKarat);
+            currentInventoryByKarat.clear(); 
+            currentInventoryByKarat.addAll(karatItems); 
+            renderInventoryByKarat(currentInventoryByKarat);
         }
         
         JSONObject sales = data.optJSONObject("sales");
@@ -1390,47 +1411,17 @@ private void updatePosDashboardUI() {
             applySalesData(sales); 
         }
 
-        // ✅ 1. معالجة بطاقة ملخص الوردية (البيانات الحقيقية + الخطة البديلة)
-        if (permissionManager != null && permissionManager.isPosOperator() && shiftSummaryCard != null) {
-            
-            // إظهار البطاقة القديمة فقط إذا كان التصميم الجديد مخفياً (لتفادي التعارض)
-            if (layoutPosGoldDashboard == null || layoutPosGoldDashboard.getVisibility() != View.VISIBLE) {
-                shiftSummaryCard.setVisibility(View.VISIBLE);
-            } else {
-                shiftSummaryCard.setVisibility(View.GONE);
-            }
-
-            JSONObject shiftData = data.optJSONObject("shift_summary");
-            double totalCash = 0.0; int invoiceCount = 0; int returnsCount = 0; double goldWeight = 0.0;
-
-            if (shiftData != null && shiftData.length() > 0) {
-                totalCash = shiftData.optDouble("total_cash", 0.0);
-                invoiceCount = shiftData.optInt("invoice_count", 0);
-                returnsCount = shiftData.optInt("returns", 0);
-                goldWeight = shiftData.optDouble("gold_weight", 0.0);
-            } else if (sales != null) {
-                totalCash = sales.optDouble("today", 0.0);
-                invoiceCount = sales.optInt("count_today", 0);
-            }
-
-            shiftSummaryCard.bindData(totalCash, invoiceCount, returnsCount, goldWeight);
-
-            if (!isShiftCardAnimated) {
-                animateShiftCard(shiftSummaryCard);
-                isShiftCardAnimated = true;
-            }
-        }
-
-        // ✅ 2. تحديث التصميم الجديد لموظف المبيعات (POS Dashboard)
+        // ✅ تحديث التصميم الجديد لموظف المبيعات
         if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
-            
             if (isPosDashboardHidden) {
                 tvPosTotalWeight.setText("•••••");
                 tvPosTotalValue.setText("•••••••");
                 tvPosCashBalance.setText("•••••••");
             } else {
                 tvPosTotalWeight.setText(String.format(Locale.US, "%,.2f", currentTotalWeight));
-                tvPosTotalValue.setText(String.format(Locale.US, "%,.2f YER", currentInventoryValue * 530.0)); 
+                
+                // ✅ عرض القيمة كما هي من السيرفر (دولار) لأن واجهة الويب تؤكد ذلك
+                tvPosTotalValue.setText(String.format(Locale.US, "$%,.2f", currentInventoryValue)); 
                 
                 double cash = 0.0;
                 if (data.optJSONObject("shift_summary") != null) {
@@ -1444,8 +1435,8 @@ private void updatePosDashboardUI() {
             renderPosKaratCards(inv);
             
             if (priceManager != null && !isPosDashboardHidden) {
-                double sellPrice = priceManager.getGoldPricePerGram(24) * 530.0;
-                double buyPrice = priceManager.getGoldPricePerGram(21) * 530.0;
+                double sellPrice = priceManager.getGoldPricePerGram(24);
+                double buyPrice = priceManager.getGoldPricePerGram(21);
                 tvPosSellPrice.setText(String.format(Locale.US, "%,.0f", sellPrice));
                 tvPosBuyPrice.setText(String.format(Locale.US, "%,.0f", buyPrice));
             }
@@ -1464,11 +1455,10 @@ private void renderPosKaratCards(JSONObject inv) {
     try {
         JSONArray byKarat = (inv != null) ? inv.optJSONArray("by_karat") : null;
         
-        // ❌ لا توجد بيانات عيارات (Empty State)
         if (byKarat == null || byKarat.length() == 0) {
             TextView tvEmpty = new TextView(getContext());
-            tvEmpty.setText("لا توجد أوزان مسجلة لهذا المخزون");
-            tvEmpty.setTextColor(Color.parseColor("#CCFFFFFF")); // لون أبيض شفاف
+            tvEmpty.setText("لا توجد تفاصيل للعيارات");
+            tvEmpty.setTextColor(Color.parseColor("#CCFFFFFF"));
             tvEmpty.setTextSize(12);
             tvEmpty.setPadding(16, 16, 16, 16);
             llPosKaratContainer.addView(tvEmpty);
@@ -1478,8 +1468,9 @@ private void renderPosKaratCards(JSONObject inv) {
         for (int i = 0; i < byKarat.length(); i++) {
             JSONObject k = byKarat.getJSONObject(i);
             int karat = k.optInt("karat", 0);
-            double weight = k.optDouble("weight", 0.0);
-            if (karat == 0 || weight == 0) continue; // تخطي العيارات الفارغة
+            double weight = k.optDouble("weight", k.optDouble("total_weight", 0.0));
+            
+            if (karat == 0 || weight == 0) continue; 
 
             View card = getLayoutInflater().inflate(R.layout.item_pos_karat_chip, llPosKaratContainer, false);
             
@@ -1494,8 +1485,9 @@ private void renderPosKaratCards(JSONObject inv) {
                 tvKaratValue.setText("••••• YER");
             } else {
                 tvKaratWeight.setText(String.format(Locale.US, "%,.2f جم", weight));
+                // عرض القيمة بناءً على سعر الجرام
                 double price = priceManager != null ? priceManager.getGoldPricePerGram(karat) : 0;
-                tvKaratValue.setText(String.format(Locale.US, "%,.2f YER", weight * price * 530.0));
+                tvKaratValue.setText(String.format(Locale.US, "$%,.2f", weight * price));
             }
 
             llPosKaratContainer.addView(card);
