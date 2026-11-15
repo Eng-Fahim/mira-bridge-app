@@ -688,70 +688,74 @@ private void updatePosDashboardUI() {
             }
         }
 
-        // ✅ 2. الرسم البياني الجديد لموظف المبيعات (خطين: بيع وشراء)
-if (lineChartPosPriceMovement != null && permissionManager != null && permissionManager.isPosOperator()) {
-    List<Entry> sellEntries = new ArrayList<>();
-    List<Entry> buyEntries = new ArrayList<>();
-    final List<String> labels = new ArrayList<>();
+        // ==========================================
+        // 2. الرسم البياني الجديد لموظف المبيعات (خطين: بيع وشراء)
+        // ==========================================
+        if (lineChartPosPriceMovement != null && permissionManager != null && permissionManager.isPosOperator()) {
+            List<Entry> sellEntries = new ArrayList<>();
+            List<Entry> buyEntries = new ArrayList<>();
+            final List<String> labels = new ArrayList<>();
 
-    // التحقق من وجود بيانات حقيقية من السيرفر
-    if (sales7Days != null && sales7Days.length() > 0) {
-        for (int i = 0; i < sales7Days.length(); i++) {
-            JSONObject day = sales7Days.getJSONObject(i);
-            
-            // ملاحظة: إذا كان السيرفر يرسل أسعار البيع والشراء، استخدمها هنا.
-            // إذا كان يرسل المبيعات فقط، سنستخدم المبيعات كقيمة للرسم.
-            double amount = day.optDouble("amount", 0);
-            
-            sellEntries.add(new Entry(i, (float) amount));
-            // يمكنك إضافة خط الشراء إذا كان السيرفر يرسله (مثلاً day.optDouble("buy_amount"))
-            buyEntries.add(new Entry(i, (float) (amount * 0.9))); // مجرد مثال
-            
-            labels.add(day.optString("date", ""));
-        }
+            // التحقق من وجود بيانات حقيقية من السيرفر
+            if (sales7Days != null && sales7Days.length() > 0) {
+                for (int i = 0; i < sales7Days.length(); i++) {
+                    JSONObject day = sales7Days.getJSONObject(i);
+                    
+                    double amount = day.optDouble("amount", 0);
+                    
+                    sellEntries.add(new Entry(i, (float) amount));
+                    // ملاحظة: يمكنك إضافة خط الشراء إذا كان السيرفر يرسله (مثلاً day.optDouble("buy_amount"))
+                    buyEntries.add(new Entry(i, (float) (amount * 0.9))); 
+                    
+                    labels.add(day.optString("date", ""));
+                }
 
-        LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
-        sellDataSet.setColor(Color.parseColor("#D4AF37"));
-        sellDataSet.setLineWidth(3f); 
-        sellDataSet.setDrawCircles(false);
-        sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-        sellDataSet.setDrawFilled(true); 
-        sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
+                LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
+                sellDataSet.setColor(Color.parseColor("#D4AF37"));
+                sellDataSet.setLineWidth(3f); 
+                sellDataSet.setDrawCircles(false);
+                sellDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                sellDataSet.setDrawFilled(true); 
+                sellDataSet.setFillColor(Color.parseColor("#33D4AF37"));
 
-        LineDataSet buyDataSet = new LineDataSet(buyEntries, "مشتريات");
-        buyDataSet.setColor(Color.parseColor("#2E7D32"));
-        buyDataSet.setLineWidth(3f); 
-        buyDataSet.setDrawCircles(false);
-        buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-        buyDataSet.setDrawFilled(true); 
-        buyDataSet.setFillColor(Color.parseColor("#332E7D32"));
+                LineDataSet buyDataSet = new LineDataSet(buyEntries, "مشتريات");
+                buyDataSet.setColor(Color.parseColor("#2E7D32"));
+                buyDataSet.setLineWidth(3f); 
+                buyDataSet.setDrawCircles(false);
+                buyDataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+                buyDataSet.setDrawFilled(true); 
+                buyDataSet.setFillColor(Color.parseColor("#332E7D32"));
 
-        LineData lineData = new LineData(sellDataSet, buyDataSet);
-        lineChartPosPriceMovement.setData(lineData);
+                LineData lineData = new LineData(sellDataSet, buyDataSet);
+                lineChartPosPriceMovement.setData(lineData);
 
-        XAxis xAxis = lineChartPosPriceMovement.getXAxis();
-        xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
-        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false);
+                XAxis xAxis = lineChartPosPriceMovement.getXAxis();
+                xAxis.setValueFormatter(new IndexAxisValueFormatter(labels));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setDrawGridLines(false); xAxis.setDrawAxisLine(false);
 
-        lineChartPosPriceMovement.getAxisRight().setEnabled(true);
-        lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
-        lineChartPosPriceMovement.getAxisRight().setGridColor(Color.parseColor("#22CCCCCC"));
-        lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
-        lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
+                lineChartPosPriceMovement.getAxisRight().setEnabled(true);
+                lineChartPosPriceMovement.getAxisRight().setDrawGridLines(true);
+                lineChartPosPriceMovement.getAxisRight().setGridColor(Color.parseColor("#22CCCCCC"));
+                lineChartPosPriceMovement.getAxisRight().setDrawAxisLine(false);
+                lineChartPosPriceMovement.getAxisLeft().setEnabled(false);
 
-        lineChartPosPriceMovement.getDescription().setEnabled(false);
-        lineChartPosPriceMovement.getLegend().setEnabled(false);
-        lineChartPosPriceMovement.animateX(1000);
-        lineChartPosPriceMovement.invalidate();
-    } else {
-        // ❌ لا توجد بيانات (Empty State)
-        lineChartPosPriceMovement.clear();
-        lineChartPosPriceMovement.setNoDataText("لا توجد مبيعات مسجلة لهذا الأسبوع");
-        lineChartPosPriceMovement.setNoDataTextColor(Color.parseColor("#888888"));
-        lineChartPosPriceMovement.invalidate();
+                lineChartPosPriceMovement.getDescription().setEnabled(false);
+                lineChartPosPriceMovement.getLegend().setEnabled(false);
+                lineChartPosPriceMovement.animateX(1000);
+                lineChartPosPriceMovement.invalidate();
+            } else {
+                // ❌ لا توجد بيانات (Empty State)
+                lineChartPosPriceMovement.clear();
+                lineChartPosPriceMovement.setNoDataText("لا توجد مبيعات مسجلة لهذا الأسبوع");
+                lineChartPosPriceMovement.setNoDataTextColor(Color.parseColor("#888888"));
+                lineChartPosPriceMovement.invalidate();
+            }
+        } // ✅ هذا هو القوس الذي كان ناقصاً في كودك
+
+    } catch (Exception e) { 
+        Log.e(TAG, "renderCharts", e); 
     }
-} catch (Exception e) { Log.e(TAG, "renderCharts", e); }
 }
     private void applyChartTheme() {
         if (!isAdded() || getContext() == null) return;
