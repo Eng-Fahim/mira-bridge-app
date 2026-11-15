@@ -1,37 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="160dp"
-    android:layout_height="140dp"
-    android:layout_marginEnd="12dp"
-    android:id="@+id/karatCardRoot">
+    android:layout_width="140dp"
+    android:layout_height="130dp"
+    android:layout_marginEnd="12dp">
 
     <LinearLayout
         android:id="@+id/karatBackground"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="#33FFFFFF" 
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="12dp">
+        <!-- ملاحظة: لقد استخدمنا #33FFFFFF (أبيض شفاف بنسبة 20%) بدلاً من التدرجات الحمراء ليتناسب مع البطاقة الذهبية في كل الأوضاع -->
 
-        <!-- الشارة (24K / 21K) -->
         <TextView
             android:id="@+id/tvChipKaratTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
             android:background="@drawable/bg_badge_karat"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="4dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
             android:text="24K"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
 
-        <!-- الوزن -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
             <TextView
@@ -40,7 +39,7 @@
                 android:layout_height="wrap_content"
                 android:text="450.00"
                 android:textColor="#FFFFFF"
-                android:textSize="26sp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
             <TextView
                 android:layout_width="wrap_content"
@@ -48,19 +47,18 @@
                 android:layout_marginStart="4dp"
                 android:text="جم"
                 android:textColor="#E0FFFFFF"
-                android:textSize="14sp" />
+                android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- القيمة الإجمالية -->
         <TextView
             android:id="@+id/tvChipKaratValue"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|start"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:text="29,025,000.00 YER"
             android:textColor="#FFFFFF"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:alpha="0.9" />
     </LinearLayout>
 </FrameLayout>
