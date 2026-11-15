@@ -292,11 +292,42 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        try { return inflater.inflate(R.layout.fragment_mira_dashboard, container, false); }
-        catch (Exception e) { logNonFatal("onCreateView", e); return null; }
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, 
+                         @Nullable Bundle savedInstanceState) {
+    try { 
+        View v = inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
+        Log.d("MIRA_DEBUG", "✅ Dashboard inflate SUCCESS");
+        return v;
     }
+    catch (Exception e) { 
+        Log.e("MIRA_DEBUG", "❌ Dashboard inflate FAILED: " + e.getMessage(), e);
+        
+        // ✅ اعرض الخطأ على الشاشة بدلاً من إرجاع null
+        android.widget.TextView errorView = new android.widget.TextView(
+                container != null ? container.getContext() : requireContext());
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("🔴 Dashboard Inflate FAILED\n\n");
+        sb.append("Error: ").append(e.getMessage()).append("\n\n");
+        sb.append("Type: ").append(e.getClass().getSimpleName()).append("\n\n");
+        sb.append("Location:\n");
+        StackTraceElement[] stack = e.getStackTrace();
+        for (int i = 0; i < Math.min(5, stack.length); i++) {
+            sb.append("  ").append(stack[i].toString()).append("\n");
+        }
+        sb.append("\n\n📋 This usually means a resource (color/string/drawable/dimen) is MISSING in res/values/");
+        
+        errorView.setText(sb.toString());
+        errorView.setTextSize(11);
+        errorView.setPadding(40, 100, 40, 100);
+        errorView.setTextColor(0xFF000000);
+        errorView.setBackgroundColor(0xFFFFEBEE);
+        errorView.setTextIsSelectable(true);
+        
+        return errorView;
+    }
+}
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
