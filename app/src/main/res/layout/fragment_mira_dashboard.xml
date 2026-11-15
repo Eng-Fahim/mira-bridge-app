@@ -55,6 +55,15 @@
             android:layout_marginBottom="16dp"
             android:visibility="gone"
             tools:visibility="visible" />
+            
+        <!-- ✅ 3.5 التصميم الجديد لموظف المبيعات (POS) -->
+<include
+    android:id="@+id/layoutPosGoldDashboard"
+    layout="@layout/view_pos_gold_dashboard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp" 
+    android:visibility="gone" />
 
         <!-- ✅ 4. CAROUSEL (البطاقات العلوية المتسلسلة) -->
         <HorizontalScrollView
