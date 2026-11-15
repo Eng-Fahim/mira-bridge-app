@@ -144,7 +144,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. بطاقة حركة السعر (Price Movement Chart) -->
+    <!-- 2. بطاقة حركة السعر والعمليات (Price Movement & Recent Activity) -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -238,7 +238,7 @@
                 android:layout_height="200dp"
                 android:layout_marginTop="16dp" />
                 
-            <!-- ✅ إضافة أزرار الإجراءات السريعة أسفل الرسم البياني لتسهيل العملية -->
+            <!-- أزرار الإجراءات السريعة -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -276,6 +276,56 @@
                     android:text="مرتجع"
                     android:textSize="12sp" />
             </LinearLayout>
+
+            <!-- فاصل -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="?attr/colorOutlineVariant" />
+
+            <!-- 3. قسم آخر العمليات (Recent POS Activity) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- رأس القسم -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="آخر العمليات"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvPosViewAllActivity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="4dp"
+                        android:text="عرض الكل"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- حاوية العمليات -->
+                <LinearLayout
+                    android:id="@+id/llPosRecentActivity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </LinearLayout>
