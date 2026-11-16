@@ -26,7 +26,7 @@ public class FragmentFactory {
             case "ServerConfig": return new MiraServerConfigFragment();
             case "GoldRates": return new MiraGoldCurrencyFragment();
             case "Profile": return new MiraProfileFragment();
-            case "UsersManagement": return new UsersManagementFragment();
+            //case "UsersManagement": return new UsersManagementFragment();
             case "RFIDWrite": return new MiraUHFReadWriteFragment();
             case "ReaderSetup": return new MiraReaderSetupFragment();
             case "GateSettings": return new MiraGateSettingsFragment();
