@@ -1,11 +1,4 @@
-            // 👥 المستخدمين — [REMOVED-TO-WEB] نُقلت للوحة التحكم
-// bindCard(view, R.id.cardAdminUsers,
-//         "UsersManagement",
-//         NavigationManager.TAG_USERS_MANAGEMENT,
-//         permissionManager.canManageUsers());
-
-// 👤 الملف الشخصي
-bindCard(view, R.id.cardAdminProfile,package com.example.uhf.fragment;
+package com.example.uhf.fragment;
 
 import android.os.Bundle;
 import android.util.Log;
