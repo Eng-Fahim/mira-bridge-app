@@ -4,18 +4,10 @@ import android.content.Context;
 import android.util.Log;
 
 /**
- * SessionManager - كلاس التوافق الوسيط
- *
- * ✅ v2.1 — إصلاح جذري لمشكلة تكرار شاشة البصمة:
- *   - invalidateCache() يُبطل التخزين المؤقت في الطبقتين
- *   - restoreBiometricSession() لاستعادة الجلسة بعد البصمة
- *   - فصل حقول Cache الخاصة بـ isLoggedIn و getUsername
- *   - logoutUser() يُبطل التخزين المؤقت
- *
- * يحافظ على الواجهة القديمة لجميع الاستدعاءات في التطبيق،
- * لكنه يوجهها داخليًا إلى SecureSessionManager الآمن.
- *
- * @deprecated استخدم SecureSessionManager مباشرة في الكود الجديد
+ * SessionManager - كلاس التوافق الوسيط (نسخة مجردة وآمنة)
+ * 
+ * - لا يحتوي على أي أدوار محلية (Roles Enum) لتجنب كشف هيكلة النظام.
+ * - يمرر البيانات والطلبات مباشرة إلى SecureSessionManager الآمن.
  */
 @Deprecated
 public class SessionManager {
@@ -25,7 +17,6 @@ public class SessionManager {
     private final SecureSessionManager secureManager;
     private final Context context;
 
-    // ✅ تخزين مؤقت منفصل لكل قيمة (لمنع التداخل بينها)
     private String  cachedUsername     = null;
     private long    usernameCheckTime  = 0;
     private Boolean cachedLoggedIn     = null;
@@ -38,14 +29,6 @@ public class SessionManager {
         Log.d(TAG, "SessionManager created (using Singleton)");
     }
 
-    // ═══════════════════════════════════════════════════════
-    // ✅ إبطال التخزين المؤقت
-    // ═══════════════════════════════════════════════════════
-
-    /**
-     * يُبطل التخزين المؤقت في الطبقتين (Wrapper + Secure).
-     * استدعِها بعد أي عملية تغيّر حالة الجلسة.
-     */
     public void invalidateCache() {
         this.cachedLoggedIn    = null;
         this.cachedUsername    = null;
@@ -54,16 +37,6 @@ public class SessionManager {
         secureManager.invalidateCache();
     }
 
-    // ═══════════════════════════════════════════════════════
-    // ✅ استعادة الجلسة بعد البصمة
-    // ═══════════════════════════════════════════════════════
-
-    /**
-     * استعادة الجلسة الكاملة بعد نجاح المصادقة البيومترية.
-     * تُبطل الـCache في الطبقتين ثم تُعيد النتيجة.
-     *
-     * @return true إذا نجحت الاستعادة
-     */
     public boolean restoreBiometricSession() {
         boolean ok = secureManager.restoreBiometricSession();
         if (ok) {
@@ -72,10 +45,6 @@ public class SessionManager {
         }
         return ok;
     }
-
-    // ═══════════════════════════════════════════════════════
-    // حالة الجلسة
-    // ═══════════════════════════════════════════════════════
 
     public boolean isLoggedIn() {
         long now = System.currentTimeMillis();
@@ -121,11 +90,11 @@ public class SessionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    // الأدوار
+    // الأدوار (تُعامل كنصوص مجردة قادمة من السيرفر فقط)
     // ═══════════════════════════════════════════════════════
 
-    public SecureSessionManager.Role getUserRole() {
-        return secureManager.getUserRole();
+    public String getUserRole() {
+        return secureManager.getRoleString();
     }
 
     public String getRoleString() {
@@ -138,61 +107,6 @@ public class SessionManager {
 
     public void setRole(String role) {
         secureManager.setRole(role);
-    }
-
-    public boolean isSystemAdmin() {
-        return secureManager.isSystemAdmin();
-    }
-    public boolean isOrgAdmin() {
-    return secureManager.isOrgAdmin();
-}
-
-    public boolean isAnyAdmin() {
-        return secureManager.isAnyAdmin();
-    }
-
-    public boolean isAdmin() {
-        return secureManager.isAnyAdmin();
-    }
-
-    public boolean isAccountant() {
-        return secureManager.isAccountant();
-    }
-
-    public boolean isFinanceManager() {
-        return secureManager.isFinanceManager();
-    }
-
-    public boolean canPerformAccountingSetup() {
-        return secureManager.canPerformAccountingSetup();
-    }
-
-    public boolean isBranchManager() {
-        return secureManager.isBranchManager();
-    }
-
-    public boolean isInventoryManager() {
-        return secureManager.isInventoryManager();
-    }
-
-    public boolean isPosOperator() {
-        return secureManager.isPosOperator();
-    }
-
-    public boolean isSecurity() {
-        return secureManager.isSecurity();
-    }
-
-    public boolean isGateSecurity() {
-        return secureManager.isGateSecurity();
-    }
-
-    public boolean isAuditor() {
-        return secureManager.isAuditor();
-    }
-
-    public boolean isManager() {
-        return secureManager.isManager();
     }
 
     // ═══════════════════════════════════════════════════════
@@ -269,18 +183,6 @@ public class SessionManager {
 
     public void clearApiKey() {
         secureManager.clearApiKey();
-    }
-
-    public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
-        secureManager.saveApiKeyInfo(apiKey, keyId, keyPrefix, createdAt);
-    }
-
-    public String getApiKeyId() {
-        return secureManager.getApiKeyId();
-    }
-
-    public String getApiKeyPrefix() {
-        return secureManager.getApiKeyPrefix();
     }
 
     // ═══════════════════════════════════════════════════════
@@ -420,7 +322,7 @@ public class SessionManager {
 
     public void logoutUser() {
         secureManager.logoutUser();
-        invalidateCache();   // ✅ حرج
+        invalidateCache();
         Log.d(TAG, "User logged out successfully");
     }
 
@@ -482,9 +384,8 @@ public class SessionManager {
     public void createLoginSession(String username, String role, String token,
                                    String serverUrl, long expiresInSeconds) {
         secureManager.createLoginSession(username, role, token, serverUrl, expiresInSeconds);
-        invalidateCache();   // ✅ حرج
-        Log.d(TAG, "Login session created for user: " + username
-                + " (expires in " + expiresInSeconds + "s)");
+        invalidateCache();
+        Log.d(TAG, "Login session created for user: " + username);
     }
 
     public void unlockSession() {
@@ -497,65 +398,66 @@ public class SessionManager {
 
     public void createLoginSession(String username, String role, String token, String serverUrl) {
         secureManager.createLoginSession(username, role, token, serverUrl);
-        invalidateCache();   // ✅ حرج
+        invalidateCache();
         Log.d(TAG, "Login session created for user: " + username);
     }
+
     // ═══════════════════════════════════════════════════════
-// ✅ License (MIRA License Center) — تمرير للطبقة الآمنة
-// ═══════════════════════════════════════════════════════
+    // License (MIRA License Center)
+    // ═══════════════════════════════════════════════════════
 
-public void saveActivationToken(String token) {
-    secureManager.saveActivationToken(token);
-}
+    public void saveActivationToken(String token) {
+        secureManager.saveActivationToken(token);
+    }
 
-public String getActivationToken() {
-    return secureManager.getActivationToken();
-}
+    public String getActivationToken() {
+        return secureManager.getActivationToken();
+    }
 
-public boolean hasActivationToken() {
-    return secureManager.hasActivationToken();
-}
+    public boolean hasActivationToken() {
+        return secureManager.hasActivationToken();
+    }
 
-public void saveDeviceUuid(String uuid) {
-    secureManager.saveDeviceUuid(uuid);
-}
+    public void saveDeviceUuid(String uuid) {
+        secureManager.saveDeviceUuid(uuid);
+    }
 
-public String getDeviceUuid() {
-    return secureManager.getDeviceUuid();
-}
+    public String getDeviceUuid() {
+        return secureManager.getDeviceUuid();
+    }
 
-public void saveLicenseInfo(String type, String validFrom, String validUntil,
-                            int maxDevices, int maxUsers) {
-    secureManager.saveLicenseInfo(type, validFrom, validUntil, maxDevices, maxUsers);
-}
+    public void saveLicenseInfo(String type, String validFrom, String validUntil,
+                                int maxDevices, int maxUsers) {
+        secureManager.saveLicenseInfo(type, validFrom, validUntil, maxDevices, maxUsers);
+    }
 
-public String getLicenseType() { return secureManager.getLicenseType(); }
-public String getLicenseValidFrom() { return secureManager.getLicenseValidFrom(); }
-public String getLicenseValidUntil() { return secureManager.getLicenseValidUntil(); }
-public int getLicenseMaxDevices() { return secureManager.getLicenseMaxDevices(); }
-public int getLicenseMaxUsers() { return secureManager.getLicenseMaxUsers(); }
+    public String getLicenseType() { return secureManager.getLicenseType(); }
+    public String getLicenseValidFrom() { return secureManager.getLicenseValidFrom(); }
+    public String getLicenseValidUntil() { return secureManager.getLicenseValidUntil(); }
+    public int getLicenseMaxDevices() { return secureManager.getLicenseMaxDevices(); }
+    public int getLicenseMaxUsers() { return secureManager.getLicenseMaxUsers(); }
 
-public void saveLastHeartbeat(long timestampMs) {
-    secureManager.saveLastHeartbeat(timestampMs);
-}
+    public void saveLastHeartbeat(long timestampMs) {
+        secureManager.saveLastHeartbeat(timestampMs);
+    }
 
-public long getLastHeartbeat() {
-    return secureManager.getLastHeartbeat();
-}
+    public long getLastHeartbeat() {
+        return secureManager.getLastHeartbeat();
+    }
 
-public void saveOfflineSettings(int graceDays, int warnDay, int restrictDay) {
-    secureManager.saveOfflineSettings(graceDays, warnDay, restrictDay);
-}
+    public void saveOfflineSettings(int graceDays, int warnDay, int restrictDay) {
+        secureManager.saveOfflineSettings(graceDays, warnDay, restrictDay);
+    }
 
-public int getOfflineGraceDays()   { return secureManager.getOfflineGraceDays(); }
-public int getOfflineWarningDay()  { return secureManager.getOfflineWarningDay(); }
-public int getOfflineRestrictDay() { return secureManager.getOfflineRestrictDay(); }
-public int getDaysSinceLastHeartbeat() { return secureManager.getDaysSinceLastHeartbeat(); }
-public String getOfflineStatus() { return secureManager.getOfflineStatus(); }
-public long getActivationTimestamp() { return secureManager.getActivationTimestamp(); }
+    public int getOfflineGraceDays()   { return secureManager.getOfflineGraceDays(); }
+    public int getOfflineWarningDay()  { return secureManager.getOfflineWarningDay(); }
+    public int getOfflineRestrictDay() { return secureManager.getOfflineRestrictDay(); }
+    public int getDaysSinceLastHeartbeat() { return secureManager.getDaysSinceLastHeartbeat(); }
+    public String getOfflineStatus() { return secureManager.getOfflineStatus(); }
+    public long getActivationTimestamp() { return secureManager.getActivationTimestamp(); }
 
-public void clearLicense() {
-    secureManager.clearLicense();
-    invalidateCache();
-}
+    public void clearLicense() {
+        secureManager.clearLicense();
+        invalidateCache();
+    }
 }
