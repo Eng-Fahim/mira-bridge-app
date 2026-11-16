@@ -66,11 +66,11 @@ public class CertificatePinningManager {
     //      نفس الأمر مع n==4 (أو n==5 حسب سلسلة السيرفر)
     //
     private static final String[] EXPECTED_PINS = {
-        // ✅ Let's Encrypt YE1 Intermediate
-        "SHA256:6ebcefb4210b088654a38b03fea3d7d1c711b4fb1",
-
-        // ✅ ISRG Root X1 (احتياطي — لا يتغير)
-        "SHA256:E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA49"
+    // ✅ YE1 Intermediate (لا يتغير كل 90 يوماً)
+    "SHA256:6EBCEFB4210B088654A38B03FEA3D7D1C711B4FB1DDC363A45F9B1A4E53DA01E",
+    
+    // ✅ ISRG Root YE (احتياطي)
+    "SHA256:B0292AE545978E0FBB98ABBD94C861605E5B18BB32ED523F50D5B7B5C71D47BC"
     };
 
     // ═══════════════════════════════════════════════════════
