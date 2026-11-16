@@ -237,11 +237,12 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private void setupBranchFilter() {
-        SecureSessionManager.Role userRole = sessionManager.getUserRole();
+        String role = sessionManager != null ? sessionManager.getRoleString() : "";
         int userBranchId = branchesManager.getActiveBranchId();
 
-        boolean canViewAllBranches = userRole == SecureSessionManager.Role.SYSTEM_ADMIN ||
-                                     userRole == SecureSessionManager.Role.ORG_ADMIN;
+        boolean canViewAllBranches = "SYSTEM_ADMIN".equalsIgnoreCase(role) ||
+                                     "ORG_ADMIN".equalsIgnoreCase(role) ||
+                                     "ADMIN".equalsIgnoreCase(role);
 
         if (canViewAllBranches) {
             selectedBranchId = 0;
@@ -383,21 +384,21 @@ public class MiraSalesHistoryFragment extends Fragment {
     private final Runnable searchRunnable = () -> filterSales(searchQuery);
 
     private void refreshSales(boolean showProgress) {
-    if (!isAdded()) return;
-    if (!permissionManager.canView("sales_history") &&
-        !permissionManager.isPosOperator() &&
-        !permissionManager.isManager()) {
-        return;
+        if (!isAdded()) return;
+        if (!permissionManager.canView("sales_history") &&
+            !permissionManager.isPosOperator() &&
+            !permissionManager.isManager()) {
+            return;
+        }
+
+        currentPage = 1;
+        isLastPage = false;
+        hasMoreData = true;
+        isLoading = false;
+
+        if (showProgress) showLoadingState();
+        loadSalesPage(1, true);
     }
-
-    currentPage = 1; // ✅ تبدأ من 1
-    isLastPage = false;
-    hasMoreData = true;
-    isLoading = false;
-
-    if (showProgress) showLoadingState();
-    loadSalesPage(1, true); // ✅ تطلب الصفحة 1
-}
 
     private void loadMoreSales() {
         if (isLoading || !hasMoreData || isLastPage) {
@@ -443,98 +444,90 @@ public class MiraSalesHistoryFragment extends Fragment {
                 }
 
                 if (response != null && response.isSuccess && response.data != null) {
-    JSONArray sales = null;
-    int totalCount = 0;
-    boolean hasMore = false;
+                    JSONArray sales = null;
+                    int totalCount = 0;
+                    boolean hasMore = false;
 
-    // ✅ استخراج البيانات من هيكل Laravel Paginator
-    if (response.data.has("data")) {
-        Object dataObj = response.data.opt("data");
-        if (dataObj instanceof JSONObject) {
-            JSONObject dataJson = (JSONObject) dataObj;
-            
-            // 1. استخراج المصفوفة
-            sales = dataJson.optJSONArray("data"); // Laravel يضع المصفوفة هنا
-            if (sales == null) sales = dataJson.optJSONArray("sales");
-            if (sales == null) sales = dataJson.optJSONArray("items");
+                    if (response.data.has("data")) {
+                        Object dataObj = response.data.opt("data");
+                        if (dataObj instanceof JSONObject) {
+                            JSONObject dataJson = (JSONObject) dataObj;
+                            sales = dataJson.optJSONArray("data");
+                            if (sales == null) sales = dataJson.optJSONArray("sales");
+                            if (sales == null) sales = dataJson.optJSONArray("items");
 
-            // 2. استخراج بيانات الترقيم
-            totalCount = dataJson.optInt("total", 0);
-            int lastPage = dataJson.optInt("last_page", 1);
-            int currentP = dataJson.optInt("current_page", page);
-            
-            // ✅ إذا كنا في الصفحة الأخيرة، لا يوجد المزيد
-            hasMore = currentP < lastPage; 
-        } else if (dataObj instanceof JSONArray) {
-            sales = (JSONArray) dataObj;
-        }
-    } else if (response.data.has("sales")) {
-        sales = response.data.optJSONArray("sales");
-    }
+                            totalCount = dataJson.optInt("total", 0);
+                            int lastPage = dataJson.optInt("last_page", 1);
+                            int currentP = dataJson.optInt("current_page", page);
+                            hasMore = currentP < lastPage; 
+                        } else if (dataObj instanceof JSONArray) {
+                            sales = (JSONArray) dataObj;
+                        }
+                    } else if (response.data.has("sales")) {
+                        sales = response.data.optJSONArray("sales");
+                    }
 
-    if (totalCount == 0) totalCount = response.data.optInt("total", 0);
-    if (!hasMore) hasMore = response.data.optBoolean("has_more", false);
+                    if (totalCount == 0) totalCount = response.data.optInt("total", 0);
+                    if (!hasMore) hasMore = response.data.optBoolean("has_more", false);
 
-    List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
+                    List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
 
-    // الفلترة المحلية للفرع (احتياطية)
-    if (selectedBranchId > 0) {
-        List<MiraSaleItem> filteredByBranch = new ArrayList<>();
-        for (MiraSaleItem item : items) {
-            if (item.branchId == selectedBranchId) filteredByBranch.add(item);
-        }
-        items = filteredByBranch;
-    }
+                    if (selectedBranchId > 0) {
+                        List<MiraSaleItem> filteredByBranch = new ArrayList<>();
+                        for (MiraSaleItem item : items) {
+                            if (item.branchId == selectedBranchId) filteredByBranch.add(item);
+                        }
+                        items = filteredByBranch;
+                    }
 
-    final List<MiraSaleItem> finalItems = items;
-    final int finalTotalCount = totalCount;
-    final boolean finalHasMore = hasMore;
+                    final List<MiraSaleItem> finalItems = items;
+                    final int finalTotalCount = totalCount;
+                    final boolean finalHasMore = hasMore;
 
-    if (sales != null && sales.length() > 0) saveSalesOffline(sales, page);
+                    if (sales != null && sales.length() > 0) saveSalesOffline(sales, page);
 
-    // ✅ تحديد هل هذه آخر صفحة؟
-    boolean isLast = !finalHasMore || finalItems.size() < PAGE_SIZE;
+                    boolean isLast = !finalHasMore || finalItems.size() < PAGE_SIZE;
 
-    mainHandler.post(() -> {
-        if (!isAdded()) return;
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
 
-        isLoading = false;
-        hideLoadingState();
-        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
-        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
+                        isLoading = false;
+                        hideLoadingState();
+                        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
+                        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
 
-        if (isRefresh) {
-            saleList.clear();
-            saleList.addAll(finalItems);
-            totalItems = finalTotalCount > 0 ? finalTotalCount : finalItems.size();
-            currentPage = 1;
-            hasMoreData = !isLast;
-            isLastPage = isLast;
-        } else {
-            saleList.addAll(finalItems);
-            currentPage = page;
-            hasMoreData = !isLast;
-            isLastPage = isLast;
-        }
+                        if (isRefresh) {
+                            saleList.clear();
+                            saleList.addAll(finalItems);
+                            totalItems = finalTotalCount > 0 ? finalTotalCount : finalItems.size();
+                            currentPage = 1;
+                            hasMoreData = !isLast;
+                            isLastPage = isLast;
+                        } else {
+                            saleList.addAll(finalItems);
+                            currentPage = page;
+                            hasMoreData = !isLast;
+                            isLastPage = isLast;
+                        }
 
-        filterSales(searchQuery);
-        
-        if (saleList.isEmpty()) {
-            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-        }
-        
-        if (isLastPage && tvEndOfList != null && !saleList.isEmpty()) {
-            tvEndOfList.setVisibility(View.VISIBLE);
-        }
-    });
-} else {
-    mainHandler.post(() -> {
-        if (!isAdded()) return;
-        hideLoadingState();
-        isLoading = false;
-        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-    });
-}
+                        filterSales(searchQuery);
+                        
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                        }
+                        
+                        if (isLastPage && tvEndOfList != null && !saleList.isEmpty()) {
+                            tvEndOfList.setVisibility(View.VISIBLE);
+                        }
+                    });
+                } else {
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
+                        hideLoadingState();
+                        isLoading = false;
+                        if (saleList.isEmpty()) showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                    });
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Exception loading sales", e);
                 mainHandler.post(() -> {
@@ -548,62 +541,52 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
-    List<MiraSaleItem> items = new ArrayList<>();
-    for (int i = 0; i < sales.length(); i++) {
-        JSONObject sale = sales.optJSONObject(i);
-        if (sale == null) continue;
+        List<MiraSaleItem> items = new ArrayList<>();
+        for (int i = 0; i < sales.length(); i++) {
+            JSONObject sale = sales.optJSONObject(i);
+            if (sale == null) continue;
 
-        MiraSaleItem item = new MiraSaleItem();
-        item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
-        item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
-        
-        // ✅ اقرأ العملة
-        item.currency = sale.optString("currency", sale.optString("currency_code", "USD"));
-        
-        // ✅ اقرأ السعر بالدولار أولاً
-        double amountUsd = sale.optDouble("final_amount_usd", 
-                            sale.optDouble("total_amount_usd", 0));
-        
-        // ✅ اقرأ السعر المحلي
-        double amountLocal = sale.optDouble("final_amount", 
-                              sale.optDouble("total_amount", 
-                                sale.optDouble("amount", 0)));
-        
-        // ✅ إذا كان USD موجوداً، استخدمه
-        if (amountUsd > 0) {
-            item.amountUSD = amountUsd;
-            item.amount = amountUsd;  // للتوافق
-        } else {
-            // ✅ حوّل من المحلي إلى USD
-            String currency = item.currency != null ? item.currency.toUpperCase() : "USD";
-            if ("USD".equals(currency)) {
-                item.amountUSD = amountLocal;
-            } else if ("YER".equals(currency)) {
-                double rate = (priceManager != null) ? priceManager.getExchangeRate("YER") : 530.0;
-                if (rate <= 0) rate = 530.0;
-                item.amountUSD = amountLocal / rate;
-            } else if ("SAR".equals(currency)) {
-                double rate = (priceManager != null) ? priceManager.getExchangeRate("SAR") : 3.75;
-                if (rate <= 0) rate = 3.75;
-                item.amountUSD = amountLocal / rate;
+            MiraSaleItem item = new MiraSaleItem();
+            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
+            item.currency = sale.optString("currency", sale.optString("currency_code", "USD"));
+            
+            double amountUsd = sale.optDouble("final_amount_usd", sale.optDouble("total_amount_usd", 0));
+            double amountLocal = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
+            
+            if (amountUsd > 0) {
+                item.amountUSD = amountUsd;
+                item.amount = amountUsd;
             } else {
-                item.amountUSD = amountLocal;
+                String currency = item.currency != null ? item.currency.toUpperCase() : "USD";
+                if ("USD".equals(currency)) {
+                    item.amountUSD = amountLocal;
+                } else if ("YER".equals(currency)) {
+                    double rate = (priceManager != null) ? priceManager.getExchangeRate("YER") : 530.0;
+                    if (rate <= 0) rate = 530.0;
+                    item.amountUSD = amountLocal / rate;
+                } else if ("SAR".equals(currency)) {
+                    double rate = (priceManager != null) ? priceManager.getExchangeRate("SAR") : 3.75;
+                    if (rate <= 0) rate = 3.75;
+                    item.amountUSD = amountLocal / rate;
+                } else {
+                    item.amountUSD = amountLocal;
+                }
+                item.amount = item.amountUSD;
             }
-            item.amount = item.amountUSD;
+            
+            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+            item.date = sale.optString("created_at", sale.optString("date", ""));
+            item.branchId = sale.optInt("branch_id", 0);
+            item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
+            item.refundReason = sale.optString("refund_reason", "");
+            item.refundedAt = sale.optString("refunded_at", "");
+            item.rawJson = sale.toString();
+            items.add(item);
         }
-        
-        item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
-        item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
-        item.date = sale.optString("created_at", sale.optString("date", ""));
-        item.branchId = sale.optInt("branch_id", 0);
-        item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
-        item.refundReason = sale.optString("refund_reason", "");
-        item.refundedAt = sale.optString("refunded_at", "");
-        item.rawJson = sale.toString();
-        items.add(item);
+        return items;
     }
-    return items;
-}
 
     private void saveSalesOffline(JSONArray sales, int page) {
         try {
@@ -646,23 +629,21 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private void updateSummaryCards(List<MiraSaleItem> list) {
-    double totalRevenueUSD = 0;
-    for (MiraSaleItem item : list) {
-        // ✅ استخدم القيمة بالدولار
-        totalRevenueUSD += item.amountUSD;
-    }
+        double totalRevenueUSD = 0;
+        for (MiraSaleItem item : list) {
+            totalRevenueUSD += item.amountUSD;
+        }
 
-    if (tvTotalRevenue != null) {
-        // ✅ formatPriceDefault يتوقع USD ويحوّل → نعرض بالسعر الحالي
-        tvTotalRevenue.setText(priceManager.formatPriceDefault(totalRevenueUSD));
+        if (tvTotalRevenue != null) {
+            tvTotalRevenue.setText(priceManager.formatPriceDefault(totalRevenueUSD));
+        }
+        if (tvInvoicesCount != null) {
+            tvInvoicesCount.setText(String.format(Locale.US, "%,d", totalItems > 0 ? totalItems : list.size()));
+        }
+        if (tvShowingCount != null) {
+            tvShowingCount.setText(String.format(Locale.US, "%,d", list.size()));
+        }
     }
-    if (tvInvoicesCount != null) {
-        tvInvoicesCount.setText(String.format(Locale.US, "%,d", totalItems > 0 ? totalItems : list.size()));
-    }
-    if (tvShowingCount != null) {
-        tvShowingCount.setText(String.format(Locale.US, "%,d", list.size()));
-    }
-}
 
     private void showLoadingState() {
         if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
@@ -734,8 +715,8 @@ public class MiraSalesHistoryFragment extends Fragment {
     static class MiraSaleItem {
         String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
-        double amountUSD;        // ✅ جديد: القيمة بالدولار
-        String currency;         // ✅ جديد: عملة الفاتورة
+        double amountUSD;
+        String currency;
         int itemCount;
         int branchId;
         String refundStatus;
@@ -811,20 +792,20 @@ public class MiraSalesHistoryFragment extends Fragment {
         public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
             return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_mira_sale, p, false));
         }
-@Override
-public void onBindViewHolder(@NonNull VH h, int pos) {
-    MiraSaleItem s = items.get(pos);
 
-    if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
-    if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
-    
-    // ✅ استخدم amountUSD (بالدولار) — CartAdapter يحوّل عند العرض
-    if (h.tvAmount != null) {
-        double amountToShow = s.amountUSD > 0 ? s.amountUSD : s.amount;
-        h.tvAmount.setText(priceManager.formatPriceDefault(amountToShow));
-    }
-    
-    if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            MiraSaleItem s = items.get(pos);
+
+            if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
+            if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
+            
+            if (h.tvAmount != null) {
+                double amountToShow = s.amountUSD > 0 ? s.amountUSD : s.amount;
+                h.tvAmount.setText(priceManager.formatPriceDefault(amountToShow));
+            }
+            
+            if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
 
             if (h.tvStatus != null) {
                 String status = s.refundStatus != null ? s.refundStatus : "completed";
@@ -862,7 +843,7 @@ public void onBindViewHolder(@NonNull VH h, int pos) {
         }
 
         @Override
-        public int getItemCount() { return items.size(); }
+        int getItemCount() { return items.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
             TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvDate, tvStatus;
