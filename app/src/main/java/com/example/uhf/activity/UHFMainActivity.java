@@ -2599,9 +2599,10 @@ setMenuVisible(menu, R.id.action_license_status,
         } else if (id == R.id.action_toggle_language) {
             toggleLanguage();
             return true;
-        } else if (id == R.id.action_branches) {
-            loadFragment(new MiraBranchesManagementFragment(), "Branches");
-            return true;
+        // [REMOVED-TO-WEB] } else if (id == R.id.action_branches) {
+//     loadFragment(new MiraBranchesManagementFragment(), "Branches");
+//     return true;
+// }
         } else if (id == R.id.action_export_data) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;

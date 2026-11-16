@@ -1,4 +1,11 @@
-package com.example.uhf.fragment;
+            // 👥 المستخدمين — [REMOVED-TO-WEB] نُقلت للوحة التحكم
+// bindCard(view, R.id.cardAdminUsers,
+//         "UsersManagement",
+//         NavigationManager.TAG_USERS_MANAGEMENT,
+//         permissionManager.canManageUsers());
+
+// 👤 الملف الشخصي
+bindCard(view, R.id.cardAdminProfile,package com.example.uhf.fragment;
 
 import android.os.Bundle;
 import android.util.Log;
@@ -72,24 +79,23 @@ public class MiraAdminHubFragment extends Fragment {
             // ═══════════════════════════════════════════════════
             //  Section 2 — إدارة المنظومة الحاكمة
             // ═══════════════════════════════════════════════════
+// 🏢 الفروع — [REMOVED-TO-WEB]
+// bindCard(view, R.id.cardAdminBranches,
+//         "Branches",
+//         NavigationManager.TAG_BRANCHES,
+//         permissionManager.canViewBranches());
 
-            // 🏢 الفروع
-            bindCard(view, R.id.cardAdminBranches,
-                    "Branches",
-                    NavigationManager.TAG_BRANCHES,
-                    permissionManager.canViewBranches());
+            // 👥 المستخدمين — [REMOVED-TO-WEB] نُقلت للوحة التحكم
+// bindCard(view, R.id.cardAdminUsers,
+//         "UsersManagement",
+//         NavigationManager.TAG_USERS_MANAGEMENT,
+//         permissionManager.canManageUsers());
 
-            // 👥 المستخدمين
-            bindCard(view, R.id.cardAdminUsers,
-                    "UsersManagement",
-            // [REMOVED-TO-WEB]                     NavigationManager.TAG_USERS_MANAGEMENT,
-            // [REMOVED-TO-WEB]                     permissionManager.canManageUsers());
-            // [REMOVED-TO-WEB] 
-            // [REMOVED-TO-WEB]             // 👤 الملف الشخصي
-            // [REMOVED-TO-WEB]             bindCard(view, R.id.cardAdminProfile,
-                    "Profile",
-                    NavigationManager.TAG_PROFILE,
-                    true);
+// 👤 الملف الشخصي
+bindCard(view, R.id.cardAdminProfile,
+        "Profile",
+        NavigationManager.TAG_PROFILE,
+        true);
 
             // 📝 السندات المالية (قبض / صرف) - ✅ هنا في القسم الثاني
             bindCard(view, R.id.cardAdminVouchers,
