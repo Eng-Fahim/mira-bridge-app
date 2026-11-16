@@ -10,9 +10,7 @@ import androidx.security.crypto.MasterKey;
 import java.security.KeyStore;
 
 /**
- * SecureSessionManager - إدارة الجلسات الآمنة (نسخة متوافقة وشاملة)
- * - لا توجد أدوار ثابتة (Hardcoded Roles) لتجنب التلاعب المحلي.
- * - دعم كامل لجميع الدوال والمثودات المطلوبة لربط SessionManager بسلامة تامة.
+ * SecureSessionManager - إدارة الجلسات الآمنة (نسخة متوافقة 100% مع SessionManager و UHFMainActivity)
  */
 public class SecureSessionManager {
 
@@ -28,8 +26,6 @@ public class SecureSessionManager {
     private static final String KEY_AUTH_TOKEN            = "auth_token";
     private static final String KEY_TOKEN_EXPIRY          = "token_expiry";
     private static final String KEY_API_KEY               = "api_key";
-    private static final String KEY_API_KEY_ID            = "api_key_id";
-    private static final String KEY_API_KEY_PREFIX        = "api_key_prefix";
     private static final String KEY_LAST_BIOMETRIC_TOKEN  = "last_biometric_token";
 
     // مفاتيح التخزين العادي
@@ -52,7 +48,6 @@ public class SecureSessionManager {
     private static final String KEY_LAST_BIOMETRIC_BRANCH_ID        = "last_biometric_branch_id";
     private static final String KEY_LAST_BIOMETRIC_BRANCH_NAME      = "last_biometric_branch_name";
     private static final String KEY_BRANCH_ID                       = "branch_id";
-    private static final String KEY_BRANCH_NAME                     = "branch_name";
     private static final String KEY_LAST_ACTIVE_TIME                = "last_app_active_time";
     private static final String KEY_SESSION_LOCKED                  = "session_locked";
 
@@ -64,7 +59,6 @@ public class SecureSessionManager {
     private final SharedPreferences userPrefs;
     private KeyStore keyStore;
 
-    // تخزين مؤقت خفيف
     private String  cachedAuthToken   = null;
     private long    tokenCacheTime    = 0;
     private Boolean cachedLoggedIn    = null;
@@ -187,6 +181,11 @@ public class SecureSessionManager {
         }
     }
 
+    // ✅ دعم Overload لـ saveAuthToken باستقبال تمرير Token فقط
+    public void saveAuthToken(String token) {
+        saveAuthToken(token, DEFAULT_TOKEN_DAYS * 24 * 60 * 60);
+    }
+
     public String getAuthToken() {
         long now = System.currentTimeMillis();
         if (cachedAuthToken != null && !cachedAuthToken.isEmpty()
@@ -214,11 +213,10 @@ public class SecureSessionManager {
     }
 
     // =========================================================================
-    // 🛠️ الدوال الإضافية التي يحتاجها SessionManager لمنع أخطاء الـ Build
+    // 🛠️ جميع الدوال المفقودة التي يطلبها SessionManager
     // =========================================================================
 
     public boolean restoreBiometricSession() {
-        // إذا كان هناك مستخدم سابق تم حفظ بياناته بيومترياً واسترجعت بنجاح
         String lastUser = getLastUsername();
         if (lastUser != null && !lastUser.isEmpty()) {
             userPrefs.edit().putBoolean(KEY_IS_LOGGED_IN, true).apply();
@@ -231,7 +229,6 @@ public class SecureSessionManager {
         try {
             long expiryTime = securePrefs.getLong(KEY_TOKEN_EXPIRY, 0L);
             if (expiryTime == 0L) return false;
-            // إذا بقي أقل من ساعة على انتهاء التوكن
             long timeLeft = expiryTime - System.currentTimeMillis();
             return timeLeft > 0 && timeLeft < (60 * 60 * 1000L);
         } catch (Exception e) {
@@ -302,6 +299,23 @@ public class SecureSessionManager {
         securePrefs.edit().remove(KEY_API_KEY).apply();
     }
 
+    public void clearAuthToken() {
+        securePrefs.edit().remove(KEY_AUTH_TOKEN).remove(KEY_TOKEN_EXPIRY).apply();
+        cachedAuthToken = null;
+    }
+
+    public void clearSessionCompletely() {
+        clearAll();
+    }
+
+    public void unlockSession() {
+        setSessionLocked(false);
+    }
+
+    public void resetAutoLock() {
+        setLastAppActiveTime(System.currentTimeMillis());
+    }
+
     public void saveGateId(String gateId) {
         if (gateId != null) {
             userPrefs.edit().putString(KEY_GATE_ID, gateId).apply();
@@ -326,8 +340,40 @@ public class SecureSessionManager {
         userPrefs.edit().remove(KEY_LAST_USERNAME).apply();
     }
 
+    // دوال البصمة والبيومتري المفقودة
     public boolean isBiometricEnabled() {
         return userPrefs.getBoolean(KEY_BIOMETRIC_ENABLED, false);
+    }
+
+    public void setBiometricEnabled(boolean enabled) {
+        userPrefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply();
+    }
+
+    public void setBiometricConfirmEnabled(boolean enabled) {
+        userPrefs.edit().putBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, enabled).apply();
+    }
+
+    public boolean isBiometricConfirmEnabled() {
+        return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
+    }
+
+    public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
+        userPrefs.edit()
+                .putString(KEY_LAST_BIOMETRIC_USER, username)
+                .putString(KEY_LAST_BIOMETRIC_ROLE, role)
+                .putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, displayName)
+                .putInt(KEY_LAST_BIOMETRIC_USER_ID, userId)
+                .apply();
+        if (token != null) {
+            securePrefs.edit().putString(KEY_LAST_BIOMETRIC_TOKEN, token).apply();
+        }
+    }
+
+    public void saveBiometricBranch(int branchId, String branchName) {
+        userPrefs.edit()
+                .putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, branchId)
+                .putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, branchName)
+                .apply();
     }
 
     public String getLastBiometricUser() {
@@ -548,7 +594,7 @@ public class SecureSessionManager {
     }
 
     public void saveOfflineSettings(int graceDays, int warnDay, int restrictDay) {
-        userPrefs.edit().putInt(KEY_OFFLINE_GRACE_DAYS, graceDays).putInt(KEY_OFFLINE_WARNING_Day, warnDay)
+        userPrefs.edit().putInt(KEY_OFFLINE_GRACE_DAYS, graceDays).putInt(KEY_OFFLINE_WARNING_DAY, warnDay)
                 .putInt(KEY_OFFLINE_RESTRICT_DAY, restrictDay).apply();
     }
 
