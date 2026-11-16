@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import com.example.uhf.tools.SessionManager;
+
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -17,24 +19,37 @@ public class PermissionManager {
     private static final String KEY_PERMISSIONS_JSON = "permissions_json";
 
     private static volatile PermissionManager instance;
-    private final SharedPreferences prefs;
+    private final Context context;
+    private final SessionManager sessionManager;
     private JSONObject permissions;
+    private final SharedPreferences prefs;
+
+    // الأدوار كقيم نصية للمقارنة الآمنة
+    public static final String ROLE_SYSTEM_ADMIN    = "SYSTEM_ADMIN";
+    public static final String ROLE_ORG_ADMIN       = "ORG_ADMIN";
+    public static final String ROLE_FINANCE_MANAGER = "FINANCE_MANAGER";
+    public static final String ROLE_INVENTORY_MGR   = "INVENTORY_MGR";
+    public static final String ROLE_BRANCH_MANAGER  = "BRANCH_MANAGER";
+    public static final String ROLE_ACCOUNTANT      = "ACCOUNTANT";
+    public static final String ROLE_AUDITOR         = "AUDITOR";
+    public static final String ROLE_POS_OPERATOR    = "POS_OPERATOR";
+    public static final String ROLE_GATE_SECURITY   = "GATE_SECURITY";
+    public static final String ROLE_SECURITY        = "SECURITY";
+    public static final String ROLE_ADMIN           = "ADMIN";
 
     private PermissionManager(Context context) {
-        this.prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.context = context.getApplicationContext();
+        this.sessionManager = new SessionManager(this.context);
+        this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         loadPermissions();
     }
 
-    public static synchronized void resetInstance() { 
-        instance = null; 
-    }
+    public static synchronized void resetInstance() { instance = null; }
 
     public static PermissionManager getInstance(Context context) {
         if (instance == null) {
             synchronized (PermissionManager.class) {
-                if (instance == null) {
-                    instance = new PermissionManager(context);
-                }
+                if (instance == null) instance = new PermissionManager(context);
             }
         }
         return instance;
@@ -50,15 +65,12 @@ public class PermissionManager {
         }
     }
 
-    // تُستدعى مباشرة بعد نجاح عملية الـ Login وحفظ الـ JSON القادم من السيرفر
     public void savePermissions(String permissionsJson) {
         if (permissionsJson == null || permissionsJson.trim().isEmpty()) return;
         try {
             permissions = new JSONObject(permissionsJson);
             prefs.edit().putString(KEY_PERMISSIONS_JSON, permissionsJson).apply();
-        } catch (Exception e) { 
-            Log.e(TAG, "Error saving permissions: " + e.getMessage()); 
-        }
+        } catch (Exception e) { Log.e(TAG, "Error saving permissions: " + e.getMessage()); }
     }
 
     public void clearPermissions() {
@@ -66,42 +78,80 @@ public class PermissionManager {
         prefs.edit().remove(KEY_PERMISSIONS_JSON).apply();
     }
 
-    /**
-     * الفحص الأساسي والديناميكي المستمد بالكامل من السيرفر
-     */
+    private String role() { 
+        return sessionManager != null ? sessionManager.getRoleString() : ""; 
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ✅ دورات الفحص المطلوبة لمنع أخطاء البناء في UHFMainActivity
+    // ══════════════════════════════════════════════════════════════
+    public boolean isSystemAdmin()    { return ROLE_SYSTEM_ADMIN.equalsIgnoreCase(role()); }
+    public boolean isOrgAdmin()       { return ROLE_ORG_ADMIN.equalsIgnoreCase(role()); }
+    public boolean isFinanceManager() { return ROLE_FINANCE_MANAGER.equalsIgnoreCase(role()); }
+    public boolean isInventoryManager(){ return ROLE_INVENTORY_MGR.equalsIgnoreCase(role()); }
+    public boolean isBranchManager()  { return ROLE_BRANCH_MANAGER.equalsIgnoreCase(role()); }
+    public boolean isAccountant()     { return ROLE_ACCOUNTANT.equalsIgnoreCase(role()); }
+    public boolean isAuditor()        { return ROLE_AUDITOR.equalsIgnoreCase(role()); }
+    public boolean isPosOperator()    { return ROLE_POS_OPERATOR.equalsIgnoreCase(role()); }
+    public boolean isSecurity()       { return ROLE_SECURITY.equalsIgnoreCase(role()); }
+    public boolean isGateSecurity()   { return ROLE_GATE_SECURITY.equalsIgnoreCase(role()); }
+
+    public boolean isAdmin() {
+        String r = role();
+        if (r == null) return false;
+        return ROLE_ADMIN.equalsIgnoreCase(r) || isSystemAdmin() || isOrgAdmin() || isFinanceManager();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // ✅ فحص الصلاحيات الديناميكي (المستمد من السيرفر)
+    // ══════════════════════════════════════════════════════════════
     public boolean hasPermission(String feature, String action) {
+        if (isSystemAdmin()) return true;
         if (permissions == null) return false;
         try {
-            // إذا كان النظام يعتبره المشرف العام (ولكن الأفضل الاعتماد على ما يرسله السيرفر)
             JSONObject featureObj = permissions.optJSONObject(feature);
-            if (featureObj != null) {
-                return featureObj.optBoolean(action, false);
-            }
-        } catch (Exception e) { 
-            Log.e(TAG, "Error checking permission: " + e.getMessage()); 
-        }
+            if (featureObj != null) return featureObj.optBoolean(action, false);
+        } catch (Exception e) { Log.e(TAG, "Error checking permission: " + e.getMessage()); }
         return false;
     }
 
     public boolean canView(String feature) {
+        if (isSystemAdmin()) return true;
         return hasPermission(feature, "view") || hasPermission(feature, "edit") || hasPermission(feature, "delete");
     }
 
     public boolean canEdit(String feature) {
+        if (isSystemAdmin()) return true;
         return hasPermission(feature, "edit") || hasPermission(feature, "delete");
     }
 
     public boolean canDelete(String feature) {
+        if (isSystemAdmin()) return true;
         return hasPermission(feature, "delete");
     }
 
     public boolean canExport(String feature) {
+        if (isSystemAdmin()) return true;
         return hasPermission(feature, "export") || canView(feature);
     }
 
-    /**
-     * إرجاع كافة الميزات المتاحة ديناميكياً لتعبئة القوائم أو الـ Quick Actions في الواجهة
-     */
+    // ══════════════════════════════════════════════════════════════
+    // ✅ دالة canAccessFragment المطلوبة لـ MiraReportsProFragment
+    // ══════════════════════════════════════════════════════════════
+    public boolean canAccessFragment(String fragmentTag) {
+        if (fragmentTag == null || fragmentTag.trim().isEmpty()) return false;
+        if (isSystemAdmin()) return true;
+        
+        // السماح العام بالشاشات الأساسية
+        final String tag = fragmentTag.trim().toLowerCase();
+        if (tag.equals("dashboard") || tag.equals("home") || tag.equals("profile") || tag.equals("reports")) {
+            return true;
+        }
+
+        // الفحص العام بناءً على الـ permissions القادمة من السيرفر
+        return canView(tag) || canEdit(tag) || isAdmin();
+    }
+
     public List<String> getAllowedQuickActions() {
         List<String> allowed = new ArrayList<>();
         if (permissions == null) return allowed;
