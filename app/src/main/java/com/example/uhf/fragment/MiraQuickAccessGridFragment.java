@@ -182,9 +182,10 @@ public class MiraQuickAccessGridFragment extends Fragment {
                 case "gold_rates":
                     activity.loadFragment(new MiraGoldCurrencyFragment(), "GoldRates");
                     break;
-                case "users":
+                /*case "users":
                     activity.loadFragment(new UsersManagementFragment(), "UsersManagement");
-                    break;
+                    break;*/
+                    
                 case "branches":
                     // فتح إدارة الفروع
                     Toast.makeText(getContext(), 
