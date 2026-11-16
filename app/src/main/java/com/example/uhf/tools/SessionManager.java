@@ -2,6 +2,7 @@ package com.example.uhf.tools;
 
 import android.content.Context;
 import android.util.Log;
+
 /**
  * SessionManager - كلاس التوافق الوسيط (نسخة مجردة وآمنة)
  * 
@@ -459,9 +460,4 @@ public class SessionManager {
         secureManager.clearLicense();
         invalidateCache();
     }
-        public boolean isAnyAdmin() {
-        String role = getRoleString().toUpperCase();
-        return role.contains("ADMIN") || role.contains("SUPER") || role.contains("OWNER") || role.contains("SYSTEM_ADMIN");
-    }
-
 }
