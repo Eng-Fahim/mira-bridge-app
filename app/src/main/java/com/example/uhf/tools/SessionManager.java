@@ -459,4 +459,9 @@ public class SessionManager {
         secureManager.clearLicense();
         invalidateCache();
     }
+        public boolean isAnyAdmin() {
+        String role = getRoleString().toUpperCase();
+        return role.contains("ADMIN") || role.contains("SUPER") || role.contains("OWNER") || role.contains("SYSTEM_ADMIN");
+    }
+
 }
