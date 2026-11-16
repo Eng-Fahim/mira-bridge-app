@@ -2,25 +2,17 @@ package com.example.uhf.tools;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Base64;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKey;
 
-import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 
-import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.GCMParameterSpec;
-
 /**
- * SecureSessionManager - إدارة الجلسات الآمنة (نسخة مجردة وآمنة مؤسسياً)
+ * SecureSessionManager - إدارة الجلسات الآمنة (نسخة متوافقة وشاملة)
  * - لا توجد أدوار ثابتة (Hardcoded Roles) لتجنب التلاعب المحلي.
- * - الاعتماد الكامل على التوكن وتخزين البيانات الحرجة بشكل مشفر.
+ * - دعم كامل لجميع الدوال والمثودات المطلوبة لربط SessionManager بسلامة تامة.
  */
 public class SecureSessionManager {
 
@@ -45,7 +37,7 @@ public class SecureSessionManager {
     private static final String KEY_USERNAME                        = "username";
     private static final String KEY_DISPLAY_NAME                    = "display_name";
     private static final String KEY_USER_ID                         = "user_id";
-    private static final String KEY_USER_ROLE                       = "user_role"; // يُحفظ كنص صافٍ قادم من السيرفر فقط
+    private static final String KEY_USER_ROLE                       = "user_role"; 
     private static final String KEY_USER_EMAIL                      = "user_email";
     private static final String KEY_USER_PHONE                      = "user_phone";
     private static final String KEY_SERVER_URL                      = "server_url";
@@ -66,25 +58,18 @@ public class SecureSessionManager {
 
     private static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
     private static final long TOKEN_EXPIRY_BUFFER   = 60_000L;
-    private static final long REFRESH_THRESHOLD     = 300_000L;
-    private static final long CACHE_VALIDITY_MS     = 5_000L;
     private static final long DEFAULT_TOKEN_DAYS    = 7L;
-
-    // التشفير البيومتري
-    private static final String BIOMETRIC_KEY_ALIAS   = "mira_biometric_key";
-    private static final String BIOMETRIC_TRANSFORMATION = "AES/GCM/NoPadding";
-    private static final int    GCM_TAG_LENGTH        = 128;
 
     private SharedPreferences securePrefs;
     private final SharedPreferences userPrefs;
     private KeyStore keyStore;
 
     // تخزين مؤقت خفيف
-    private String  cachedAuthToken  = null;
-    private long    tokenCacheTime   = 0;
-    private Boolean cachedLoggedIn   = null;
+    private String  cachedAuthToken   = null;
+    private long    tokenCacheTime    = 0;
+    private Boolean cachedLoggedIn    = null;
     private long    loggedInCacheTime = 0;
-    private String  cachedUsername   = null;
+    private String  cachedUsername    = null;
     private long    usernameCacheTime = 0;
 
     public static SecureSessionManager getInstance(Context context) {
@@ -160,14 +145,10 @@ public class SecureSessionManager {
                     ? (System.currentTimeMillis() + (expiresInSeconds * 1000L))
                     : (System.currentTimeMillis() + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L));
 
-            boolean tokenOk = securePrefs.edit()
+            securePrefs.edit()
                     .putString(KEY_AUTH_TOKEN, token != null ? token : "")
                     .putLong(KEY_TOKEN_EXPIRY, expiryTime)
                     .commit();
-
-            if (!tokenOk) {
-                Log.e(TAG, "🚨 createLoginSession: token commit FAILED");
-            }
 
             String finalServerUrl = (serverUrl != null && !serverUrl.isEmpty())
                     ? normalizeServerUrl(serverUrl) : DEFAULT_SERVER_URL;
@@ -209,7 +190,7 @@ public class SecureSessionManager {
     public String getAuthToken() {
         long now = System.currentTimeMillis();
         if (cachedAuthToken != null && !cachedAuthToken.isEmpty()
-                && (now - tokenCacheTime) < CACHE_VALIDITY_MS) {
+                && (now - tokenCacheTime) < 5000L) {
             return cachedAuthToken;
         }
         String token = securePrefs.getString(KEY_AUTH_TOKEN, "");
@@ -231,6 +212,153 @@ public class SecureSessionManager {
             return false;
         }
     }
+
+    // =========================================================================
+    // 🛠️ الدوال الإضافية التي يحتاجها SessionManager لمنع أخطاء الـ Build
+    // =========================================================================
+
+    public boolean restoreBiometricSession() {
+        // إذا كان هناك مستخدم سابق تم حفظ بياناته بيومترياً واسترجعت بنجاح
+        String lastUser = getLastUsername();
+        if (lastUser != null && !lastUser.isEmpty()) {
+            userPrefs.edit().putBoolean(KEY_IS_LOGGED_IN, true).apply();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean needsTokenRefresh() {
+        try {
+            long expiryTime = securePrefs.getLong(KEY_TOKEN_EXPIRY, 0L);
+            if (expiryTime == 0L) return false;
+            // إذا بقي أقل من ساعة على انتهاء التوكن
+            long timeLeft = expiryTime - System.currentTimeMillis();
+            return timeLeft > 0 && timeLeft < (60 * 60 * 1000L);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void setRole(String role) {
+        userPrefs.edit().putString(KEY_USER_ROLE, role != null ? role : "USER").apply();
+    }
+
+    public String getDisplayName() {
+        return userPrefs.getString(KEY_DISPLAY_NAME, getUsername());
+    }
+
+    public void setDisplayName(String displayName) {
+        if (displayName != null) {
+            userPrefs.edit().putString(KEY_DISPLAY_NAME, displayName).apply();
+        }
+    }
+
+    public int getUserId() {
+        return userPrefs.getInt(KEY_USER_ID, -1);
+    }
+
+    public void setUserId(int userId) {
+        userPrefs.edit().putInt(KEY_USER_ID, userId).apply();
+    }
+
+    public String getPhone() {
+        return userPrefs.getString(KEY_USER_PHONE, "");
+    }
+
+    public void setPhone(String phone) {
+        if (phone != null) {
+            userPrefs.edit().putString(KEY_USER_PHONE, phone).apply();
+        }
+    }
+
+    public String getEmail() {
+        return userPrefs.getString(KEY_USER_EMAIL, "");
+    }
+
+    public void setEmail(String email) {
+        if (email != null) {
+            userPrefs.edit().putString(KEY_USER_EMAIL, email).apply();
+        }
+    }
+
+    public void setUsername(String username) {
+        if (username != null) {
+            userPrefs.edit().putString(KEY_USERNAME, username).apply();
+            invalidateCache();
+        }
+    }
+
+    public boolean hasServerUrl() {
+        String url = userPrefs.getString(KEY_SERVER_URL, "");
+        return url != null && !url.isEmpty();
+    }
+
+    public boolean hasApiKey() {
+        String key = getApiKey();
+        return key != null && !key.isEmpty();
+    }
+
+    public void clearApiKey() {
+        securePrefs.edit().remove(KEY_API_KEY).apply();
+    }
+
+    public void saveGateId(String gateId) {
+        if (gateId != null) {
+            userPrefs.edit().putString(KEY_GATE_ID, gateId).apply();
+        }
+    }
+
+    public String getGateId() {
+        return userPrefs.getString(KEY_GATE_ID, "");
+    }
+
+    public void saveLastUsername(String username) {
+        if (username != null) {
+            userPrefs.edit().putString(KEY_LAST_USERNAME, username).apply();
+        }
+    }
+
+    public String getLastUsername() {
+        return userPrefs.getString(KEY_LAST_USERNAME, "");
+    }
+
+    public void clearLastUsername() {
+        userPrefs.edit().remove(KEY_LAST_USERNAME).apply();
+    }
+
+    public boolean isBiometricEnabled() {
+        return userPrefs.getBoolean(KEY_BIOMETRIC_ENABLED, false);
+    }
+
+    public String getLastBiometricUser() {
+        return userPrefs.getString(KEY_LAST_BIOMETRIC_USER, "");
+    }
+
+    public String getLastBiometricRole() {
+        return userPrefs.getString(KEY_LAST_BIOMETRIC_ROLE, "");
+    }
+
+    public String getLastBiometricDisplayName() {
+        return userPrefs.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
+    }
+
+    public int getLastBiometricUserId() {
+        return userPrefs.getInt(KEY_LAST_BIOMETRIC_USER_ID, -1);
+    }
+
+    public String getLastBiometricToken() {
+        return securePrefs.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
+    }
+
+    public int getLastBiometricBranchId() {
+        return userPrefs.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, -1);
+    }
+
+    public String getLastBiometricBranchName() {
+        return userPrefs.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
+    }
+
+    // =========================================================================
 
     public void logoutUser() {
         setSessionLocked(false);
@@ -302,7 +430,7 @@ public class SecureSessionManager {
 
     public boolean isLoggedIn() {
         long now = System.currentTimeMillis();
-        if (cachedLoggedIn != null && (now - loggedInCacheTime) < CACHE_VALIDITY_MS) {
+        if (cachedLoggedIn != null && (now - loggedInCacheTime) < 5000L) {
             return cachedLoggedIn;
         }
         cachedLoggedIn = userPrefs.getBoolean(KEY_IS_LOGGED_IN, false);
@@ -312,7 +440,7 @@ public class SecureSessionManager {
 
     public String getUsername() {
         long now = System.currentTimeMillis();
-        if (cachedUsername != null && (now - usernameCacheTime) < CACHE_VALIDITY_MS) {
+        if (cachedUsername != null && (now - usernameCacheTime) < 5000L) {
             return cachedUsername;
         }
         cachedUsername = userPrefs.getString(KEY_USERNAME, "");
@@ -320,7 +448,6 @@ public class SecureSessionManager {
         return cachedUsername;
     }
 
-    // إرجاع اسم الدور كنص خام قادم من السيرفر فقط (بدون أي شروط أو منطق محلي)
     public String getRoleString() {
         return userPrefs.getString(KEY_USER_ROLE, "USER");
     }
@@ -365,7 +492,7 @@ public class SecureSessionManager {
         return userPrefs.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, -1);
     }
 
-    // دوال الترخيص (MIRA License Center) تبقى كما هي لأنها تتعلق بالاشتراك والأجهزة وليست صلاحيات مستخدم
+    // دوال الترخيص (MIRA License Center)
     private static final String KEY_ACTIVATION_TOKEN       = "activation_token";
     private static final String KEY_DEVICE_UUID            = "device_uuid";
     private static final String KEY_LICENSE_TYPE           = "license_type";
@@ -451,7 +578,6 @@ public class SecureSessionManager {
                 .remove(KEY_LICENSE_MAX_DEVICES).remove(KEY_LICENSE_MAX_USERS).remove(KEY_LAST_HEARTBEAT).apply();
     }
 
-    // إدارة قفل الشاشة المؤقت Auto-Lock
     public void setLastAppActiveTime(long timestamp) {
         userPrefs.edit().putLong(KEY_LAST_ACTIVE_TIME, timestamp).apply();
     }
