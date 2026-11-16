@@ -97,7 +97,6 @@
 # ==================== 🔴 SessionManager Protection ====================
 -keep class com.example.uhf.tools.SessionManager { *; }
 -keep class com.example.uhf.tools.SecureSessionManager { *; }
--keep class com.example.uhf.tools.SecureSessionManager$Role { *; }
 -keep class com.example.uhf.tools.MemoryManager { *; }
 -keep class com.example.uhf.tools.UIHelper { *; }
 -keep class com.example.uhf.tools.CertificatePinningManager { *; }
@@ -105,6 +104,7 @@
 -keep class com.example.uhf.tools.DeviceDetector { *; }
 -keep class com.example.uhf.tools.MiraLanguageHelper { *; }
 -keep class com.example.uhf.tools.ToastUtil { *; }
+
 
 # ==================== 🔴 MiraApiClient Protection ====================
 -keep class com.example.uhf.api.MiraApiClient { *; }
