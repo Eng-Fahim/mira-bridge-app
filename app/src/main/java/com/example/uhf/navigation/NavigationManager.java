@@ -76,7 +76,7 @@ public class NavigationManager {
     public static final String TAG_SERVER_CONFIG     = "ServerConfig";
     public static final String TAG_GOLD_RATES        = "GoldRates";
     public static final String TAG_PROFILE           = "Profile";
-    public static final String TAG_USERS_MANAGEMENT  = "UsersManagement";
+   // public static final String TAG_USERS_MANAGEMENT  = "UsersManagement";
     public static final String TAG_CASH_RECONCILIATION = "CashReconciliation";
     public static final String TAG_RFID_WRITE        = "RFIDWrite";
     public static final String TAG_READER_SETUP      = "ReaderSetup";
@@ -435,7 +435,7 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_SERVER_CONFIG:     return new MiraServerConfigFragment();
         case TAG_GOLD_RATES:        return new MiraGoldCurrencyFragment();
         case TAG_PROFILE:           return new MiraProfileFragment();
-        case TAG_USERS_MANAGEMENT:  return new UsersManagementFragment();
+       // case TAG_USERS_MANAGEMENT:  return new UsersManagementFragment();
         case TAG_RFID_WRITE:        return new MiraUHFReadWriteFragment();
         case TAG_READER_SETUP:      return new MiraReaderSetupFragment();
         case TAG_GATE_SETTINGS:     return new MiraGateSettingsFragment();
