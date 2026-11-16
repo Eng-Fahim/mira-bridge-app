@@ -174,6 +174,8 @@ public class MiraSalesHistoryFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    android.util.Log.d("CAPS_DEBUG", "fragments: " + 
+    PermissionManager.getInstance(requireContext()).canViewAllBranches());
         return inflater.inflate(R.layout.fragment_mira_sales_history, container, false);
     }
 
