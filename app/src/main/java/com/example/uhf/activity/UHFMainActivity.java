@@ -803,21 +803,20 @@ private static final NavItemCfg[] NAV_CONFIGS = {
         Fragment targetFragment;
         String targetTag;
 
-        if (permissionManager.isPosOperator()) {
+        String role = sessionManager != null ? sessionManager.getRoleString().toUpperCase() : "USER";
+
+        if (role.contains("POS") || role.contains("CASHIER")) {
             targetFragment = new MiraPosFragment();
             targetTag = NavigationManager.TAG_POS;
-        } else if (permissionManager.isInventoryManager()) {
+        } else if (role.contains("INVENTORY") || role.contains("WAREHOUSE")) {
             targetFragment = new MiraInventoryProFragment();
             targetTag = NavigationManager.TAG_INVENTORY;
-        } else if (permissionManager.isSecurity() || permissionManager.isGateSecurity()) {
+        } else if (role.contains("GATE") || role.contains("SECURITY")) {
             targetFragment = new MiraSecureGateFragment();
             targetTag = NavigationManager.TAG_GATES;
-            
-        // ✅ [جديد] توجيه المحاسب والمدير المالي مباشرة لصفحة المالية
-        } else if (permissionManager.isAccountant() || permissionManager.isFinanceManager()) {
+        } else if (role.contains("ACCOUNTANT") || role.contains("FINANCE")) {
             targetFragment = new MiraAccountingFragment();
             targetTag = NavigationManager.TAG_ACCOUNTING;
-            
         } else {
             targetFragment = new MiraDashboardFragment();
             targetTag = NavigationManager.TAG_DASHBOARD;
@@ -829,10 +828,10 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     } catch (Exception e) {
         Log.e(TAG, "navigateByRole error: " + e.getMessage());
         enableNavigationAfterSetup();
-        loadFragmentDirectly(new MiraDashboardFragment(),
-                NavigationManager.TAG_DASHBOARD);
+        loadFragmentDirectly(new MiraDashboardFragment(), NavigationManager.TAG_DASHBOARD);
     }
 }
+
 
     private void showSetupBlockedScreen() {
         if (isFinishing() || isDestroyed()) return;
@@ -2373,19 +2372,17 @@ private void applyNavPermissions() {
  * تعتمد على R.id.* الفعلية الموجودة في NAV_CONFIGS
  */
 private boolean isNavItemAllowedForRole(NavItemCfg cfg) {
-    if (cfg == null || permissionManager == null) return false;
-
-    // ✅ الرئيسية متاحة للجميع
+    if (cfg == null) return false;
     if (cfg.alwaysAllowed) return true;
 
-    PermissionManager pm = permissionManager;
+    String role = sessionManager != null ? sessionManager.getRoleString().toUpperCase() : "USER";
     int id = cfg.itemId;
 
-    // ═══ 1. الإدارة العليا — كل شيء ═══
-    if (pm.isSystemAdmin() || pm.isOrgAdmin()) return true;
+    // الإدارة العليا ومدير النظام
+    if (role.contains("ADMIN") || role.contains("SUPER") || role.contains("OWNER")) return true;
 
-    // ═══ 2. مدير الفرع — كل شيء ═══
-    if (pm.isBranchManager()) {
+    // مدير الفرع
+    if (role.contains("BRANCH_MANAGER") || role.contains("MANAGER")) {
         return id == R.id.nav_home
             || id == R.id.nav_accounting
             || id == R.id.nav_inventory
@@ -2393,41 +2390,34 @@ private boolean isNavItemAllowedForRole(NavItemCfg cfg) {
             || id == R.id.nav_scrap;
     }
 
-    // ═══ 3. المدير المالي / المحاسب — الرئيسية + المالية ═══
-    if (pm.isFinanceManager() || pm.isAccountant()) {
+    // المحاسب والمدير المالي
+    if (role.contains("ACCOUNTANT") || role.contains("FINANCE")) {
         return id == R.id.nav_home
             || id == R.id.nav_accounting;
     }
 
-    // ═══ 4. مدير المخزون — الرئيسية + المخزون + كسر الذهب ═══
-    if (pm.isInventoryManager()) {
+    // مدير المخزون
+    if (role.contains("INVENTORY") || role.contains("WAREHOUSE")) {
         return id == R.id.nav_home
             || id == R.id.nav_inventory
             || id == R.id.nav_scrap;
     }
 
-    // ═══ 5. المدقق — الرئيسية + المخزون + المالية ═══
-    if (pm.isAuditor()) {
-        return id == R.id.nav_home
-            || id == R.id.nav_inventory
-            || id == R.id.nav_accounting;
-    }
-
-    // ═══ 6. موظف المبيعات (POS) — الرئيسية + المبيعات + كسر الذهب ═══
-    if (pm.isPosOperator()) {
+    // موظف المبيعات
+    if (role.contains("POS") || role.contains("CASHIER") || role.contains("SALES")) {
         return id == R.id.nav_home
             || id == R.id.nav_sales
             || id == R.id.nav_scrap;
     }
 
-    // ═══ 7. أمن البوابات — الرئيسية فقط ═══
-    if (pm.isGateUser()) {
+    // الأمن والبوابات
+    if (role.contains("GATE") || role.contains("SECURITY")) {
         return id == R.id.nav_home;
     }
 
-    // ═══ 8. احتياطي — لا شيء ═══
     return false;
 }
+
 
 private void resetFabConstraintsToNav(FloatingActionButton fab) {
     ViewGroup.LayoutParams lp = fab.getLayoutParams();
