@@ -237,5 +237,60 @@ public class PermissionManager {
     public boolean canPerformAccountingSetup() {
         return isSystemAdmin() || isOrgAdmin() || isFinanceManager() || isAccountant();
     }
+    // ══════════════════════════════════════════════════════════════
+    // ✅ دوال DashboardUIBuilder و DashboardRoleController المفقودة
+    // ══════════════════════════════════════════════════════════════
+
+    public boolean canViewGates() {
+        return isGateSecurity() || isSecurity() || isManager() || isAdmin();
+    }
+
+    public boolean canBuyScrapGold() {
+        return isPosOperator() || isInventoryManager() || isManager() || isAdmin();
+    }
+
+    public boolean canViewSalesHistory() {
+        return isPosOperator() || isManager() || isAdmin() || canView("sales");
+    }
+
+    public boolean canViewReports() {
+        return isManager() || isAdmin() || canView("reports");
+    }
+
+    public boolean canViewDashboardHero() {
+        return !isGateUser() || isSystemAdmin();
+    }
+
+    public boolean canViewDashboardGoldPrices() {
+        return true; // متاح للجميع
+    }
+
+    public boolean canViewDashboardSales() {
+        return isPosOperator() || isManager() || isAdmin();
+    }
+
+    public boolean canViewDashboardInventoryByKarat() {
+        return isInventoryManager() || isManager() || isAdmin();
+    }
+
+    public boolean canViewDashboardScrap() {
+        return isInventoryManager() || isPosOperator() || isManager() || isAdmin();
+    }
+
+    public boolean canViewDashboardScrapAging() {
+        return isManager() || isAdmin();
+    }
+
+    public boolean canViewDashboardCharts() {
+        return isManager() || isAdmin() || isSystemAdmin();
+    }
+
+    public boolean canViewDashboardAlerts() {
+        return true;
+    }
+
+    public boolean canViewDashboardRecentActivity() {
+        return !isGateUser();
+    }
 
 }
