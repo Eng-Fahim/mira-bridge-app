@@ -82,11 +82,11 @@ public class MiraAdminHubFragment extends Fragment {
             // 👥 المستخدمين
             bindCard(view, R.id.cardAdminUsers,
                     "UsersManagement",
-                    NavigationManager.TAG_USERS_MANAGEMENT,
-                    permissionManager.canManageUsers());
-
-            // 👤 الملف الشخصي
-            bindCard(view, R.id.cardAdminProfile,
+            // [REMOVED-TO-WEB]                     NavigationManager.TAG_USERS_MANAGEMENT,
+            // [REMOVED-TO-WEB]                     permissionManager.canManageUsers());
+            // [REMOVED-TO-WEB] 
+            // [REMOVED-TO-WEB]             // 👤 الملف الشخصي
+            // [REMOVED-TO-WEB]             bindCard(view, R.id.cardAdminProfile,
                     "Profile",
                     NavigationManager.TAG_PROFILE,
                     true);
