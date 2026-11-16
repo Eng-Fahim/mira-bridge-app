@@ -165,4 +165,77 @@ public class PermissionManager {
         }
         return allowed;
     }
+
+        // ══════════════════════════════════════════════════════════════
+    // ✅ إضافات تكميلية لضمان توافق PermissionManager مع UHFMainActivity
+    // ══════════════════════════════════════════════════════════════
+
+    public boolean isManager() {
+        return isAdmin() || isBranchManager() || isFinanceManager() || isInventoryManager();
+    }
+
+    public boolean isGateUser() {
+        return isGateSecurity() || isSecurity();
+    }
+
+    public boolean canViewServerConfig() {
+        return isSystemAdmin() || isOrgAdmin() || isAdmin();
+    }
+
+    public boolean canViewProfile() {
+        return true; // متاح لجميع المستخدمين المسجلين
+    }
+
+    public boolean canViewSoundSettings() {
+        return true;
+    }
+
+    public boolean canViewGoldRates() {
+        return canView("gold_rates") || true;
+    }
+
+    public boolean canManageQuickAccess() {
+        return isAdmin() || isBranchManager() || isSystemAdmin();
+    }
+
+    public boolean canViewBranches() {
+        return canView("branches") || isManager() || isAdmin();
+    }
+
+    public boolean canViewInventory() {
+        return canView("inventory") || isInventoryManager() || isBranchManager() || isAdmin();
+    }
+
+    public boolean canEditInventory() {
+        return canEdit("inventory") || isInventoryManager() || isBranchManager() || isSystemAdmin();
+    }
+
+    public boolean canUsePos() {
+        return isPosOperator() || isBranchManager() || isAdmin();
+    }
+
+    public boolean canViewTransfers() {
+        return canView("transfers") || isManager() || isAdmin();
+    }
+
+    public boolean canExportReports() {
+        return canExport("reports") || isManager() || isAdmin();
+    }
+
+    public boolean canCreateTransfer() {
+        return canEdit("transfers") || isPosOperator() || isInventoryManager() || isBranchManager();
+    }
+
+    public boolean canViewRadar() {
+        return canView("radar") || isInventoryManager() || isBranchManager() || isAdmin();
+    }
+
+    public boolean canViewAccounting() {
+        return canView("accounting") || isAccountant() || isFinanceManager() || isManager() || isAdmin();
+    }
+
+    public boolean canPerformAccountingSetup() {
+        return isSystemAdmin() || isOrgAdmin() || isFinanceManager() || isAccountant();
+    }
+
 }
