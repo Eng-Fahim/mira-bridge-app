@@ -4,6 +4,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKey;
+
 import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
@@ -14,23 +17,19 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v4.0 — Server-Driven Capabilities (No Local Logic)
+ *  PermissionManager v4.1 — Server-Driven, Zero Local Decisions
  * ═══════════════════════════════════════════════════════════════════
+ *
+ *  التغييرات عن v4.0:
+ *    ✅ حذف role() نهائياً — لا قراءة من sessionManager.getRoleString()
+ *    ✅ كل isX() تقرأ من الوثيقة (moduleEnabled)
+ *    ✅ تشفير MIRA_PERMISSIONS عبر EncryptedSharedPreferences
+ *    ✅ isSystemAdmin() = moduleEnabled("admin") — ليس قراراً محلياً
  *
  *  المبدأ:
  *    ✅ التطبيق لا يتخذ أي قرار إداري.
- *    ✅ كل القرارات تأتي من السيرفر عبر:
- *         GET /api/v1/mobile/capabilities
- *       التي تُرجع { data: {modules:...}, legacy_permissions: {...} }
- *
+ *    ✅ كل القرارات تأتي من السيرفر.
  *    ✅ كل الدوال القديمة محفوظة (توافق خلفي كامل).
- *    ✅ دوال canX() تقرأ من legacy_permissions.
- *    ✅ canAccessFragment() تقرأ من fragments (أو تُشتق من modules).
- *    ✅ لا مصفوفة أدوار، لا isSystemAdmin() كقرار محلي.
- *       (isSystemAdmin() تبقى موجودة لكنها تعرض فقط — لا تُستخدم كـ bypass)
- *
- *  Contract مع السيرفر:
- *    server -> saveCapabilities(json) -> { data, legacy_permissions }
  */
 public class PermissionManager {
 
@@ -45,12 +44,13 @@ public class PermissionManager {
     private final SessionManager sessionManager;
     private final SharedPreferences prefs;
 
-    private JSONObject capabilities;         // data من السيرفر
-    private JSONObject legacyPermissions;    // legacy_permissions من السيرفر
-    private JSONObject fragments;            // fragments (اختياري، مشتق)
+    private JSONObject capabilities;
+    private JSONObject legacyPermissions;
+    private JSONObject fragments;
 
     // ═══════════════════════════════════════════════════════
-    //  الأدوار — تبقى كـ constants للعرض فقط
+    //  الأدوار — constants فقط (للعرض عبر getRoleForDisplay)
+    //  لا تُستخدم لاتخاذ قرار
     // ═══════════════════════════════════════════════════════
     public static final String ROLE_SYSTEM_ADMIN    = "SYSTEM_ADMIN";
     public static final String ROLE_ORG_ADMIN       = "ORG_ADMIN";
@@ -64,7 +64,7 @@ public class PermissionManager {
     public static final String ROLE_SECURITY        = "SECURITY";
     public static final String ROLE_ADMIN           = "ADMIN";
 
-    // Features (constants — للعرض فقط)
+    // Features constants
     public static final String FEATURE_DASHBOARD      = "dashboard";
     public static final String FEATURE_INVENTORY      = "inventory";
     public static final String FEATURE_POS            = "pos";
@@ -94,8 +94,41 @@ public class PermissionManager {
     private PermissionManager(Context context) {
         this.context = context.getApplicationContext();
         this.sessionManager = new SessionManager(this.context);
-        this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.prefs = createEncryptedPrefs(this.context);
         loadFromPrefs();
+    }
+
+    private static SharedPreferences createEncryptedPrefs(Context context) {
+        try {
+            MasterKey masterKey = new MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build();
+
+            return EncryptedSharedPreferences.create(
+                    context,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "EncryptedSharedPreferences failed, falling back", e);
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    context.deleteSharedPreferences(PREFS_NAME);
+                }
+                MasterKey masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+                return EncryptedSharedPreferences.create(
+                        context, PREFS_NAME, masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+            } catch (Exception ex) {
+                return context.getSharedPreferences(PREFS_NAME + "_fallback", Context.MODE_PRIVATE);
+            }
+        }
     }
 
     public static synchronized void resetInstance() { instance = null; }
@@ -110,7 +143,7 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Storage — يُستدعى فقط من طبقة الشبكة عند نجاح الطلب
+    //  Storage
     // ═══════════════════════════════════════════════════════
     private void loadFromPrefs() {
         try {
@@ -128,31 +161,22 @@ public class PermissionManager {
         }
     }
 
-    /**
-     * يُستدعى من طبقة الشبكة بعد GET /api/v1/mobile/capabilities
-     * أو من within /api/v1/mobile/me (حقل mobile_capabilities + permissions).
-     *
-     * @param fullResponseJson الـ JSON الكامل للاستجابة (سواء capabilities أو me)
-     */
     public void saveFromServer(JSONObject fullResponseJson) {
         if (fullResponseJson == null) return;
         try {
             JSONObject data = fullResponseJson.optJSONObject("data");
             JSONObject legacy = fullResponseJson.optJSONObject("legacy_permissions");
 
-            // حالة /me: data.user + data.mobile_capabilities + data.permissions
             if (data != null && data.has("mobile_capabilities")) {
                 JSONObject caps = data.optJSONObject("mobile_capabilities");
                 if (caps != null) capabilities = caps;
                 JSONObject perms = data.optJSONObject("permissions");
                 if (perms != null) legacyPermissions = perms;
             } else if (data != null) {
-                // حالة /capabilities: data = capabilities نفسه
                 capabilities = data;
                 if (legacy != null) legacyPermissions = legacy;
             }
 
-            // اشتقاق fragments من capabilities.modules (إن لم تكن مرسلة صراحة)
             fragments = deriveFragments(capabilities);
 
             prefs.edit()
@@ -165,21 +189,18 @@ public class PermissionManager {
         }
     }
 
-    /** توافق خلفي مع الاسم القديم */
     @Deprecated
     public void savePermissions(String permissionsJson) {
         if (permissionsJson == null || permissionsJson.trim().isEmpty()) return;
         try {
             JSONObject root = new JSONObject(permissionsJson);
             saveFromServer(root.has("success") || root.has("data")
-                ? root
-                : wrapLegacyOnly(root));
+                ? root : wrapLegacyOnly(root));
         } catch (Exception e) {
             Log.e(TAG, "savePermissions error: " + e.getMessage());
         }
     }
 
-    /** توافق خلفي */
     @Deprecated
     public void savePermissions(JSONObject permissionsJson) {
         if (permissionsJson != null) savePermissions(permissionsJson.toString());
@@ -198,15 +219,14 @@ public class PermissionManager {
     private JSONObject wrapLegacyOnly(JSONObject legacy) {
         try {
             JSONObject root = new JSONObject();
-            JSONObject data = new JSONObject();
-            root.put("data", data);
+            root.put("data", new JSONObject());
             root.put("legacy_permissions", legacy);
             return root;
         } catch (Exception e) { return new JSONObject(); }
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Fragments — مشتقة من modules (السيرفر هو من يحدد)
+    //  Fragments — مشتقة من modules
     // ═══════════════════════════════════════════════════════
     private JSONObject deriveFragments(JSONObject caps) {
         JSONObject out = new JSONObject();
@@ -214,7 +234,6 @@ public class PermissionManager {
         JSONObject modules = caps.optJSONObject("modules");
         if (modules == null) return out;
 
-        // كل fragment له علاقة بوحدة. لا قرار — مجرد تمرير.
         String[][] map = {
             {"Accounting", "accounting"}, {"FiscalYears", "accounting"},
             {"OpeningBalances", "accounting"}, {"FinancialReports", "accounting"},
@@ -267,7 +286,6 @@ public class PermissionManager {
             }
         }
 
-        // ثوابت مسموحة للجميع (يطابق السيرفر: profile/dashboard)
         try {
             out.put("Dashboard", true);
             out.put("Home", true);
@@ -282,7 +300,7 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Low-level — تقرأ من legacy_permissions القادم من السيرفر
+    //  Low-level
     // ═══════════════════════════════════════════════════════
     public boolean hasPermission(String feature, String action) {
         if (legacyPermissions == null) return false;
@@ -300,7 +318,7 @@ public class PermissionManager {
     public boolean canExport(String feature) { return hasPermission(feature,"export") || canView(feature); }
 
     // ═══════════════════════════════════════════════════════
-    //  Module-scope helper (من capabilities)
+    //  Module helper
     // ═══════════════════════════════════════════════════════
     private JSONObject module(String name) {
         if (capabilities == null) return null;
@@ -311,41 +329,49 @@ public class PermissionManager {
         JSONObject m = module(name);
         return m != null && m.optBoolean("enabled", false);
     }
-    private String moduleScope(String name) {
-        JSONObject m = module(name);
-        return m == null ? null : m.optString("scope", null);
+
+    private boolean fragmentEnabled(String key) {
+        return fragments != null && fragments.optBoolean(key, false);
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Role display-only (لا bypass محلي)
+    //  ✅ Role checks — كلها من الوثيقة (لا role() محلي)
+    //  ملاحظة: هذه aliases للتوافق الخلفي فقط.
+    //  لا تُستخدم لاتخاذ قرار جديد — استخدم canX() مباشرة.
     // ═══════════════════════════════════════════════════════
-    private String role() { return sessionManager.getRoleString(); }
 
-    public boolean isSystemAdmin()    { return ROLE_SYSTEM_ADMIN.equalsIgnoreCase(role()); }
-    public boolean isOrgAdmin()       { return ROLE_ORG_ADMIN.equalsIgnoreCase(role()); }
-    public boolean isFinanceManager() { return ROLE_FINANCE_MANAGER.equalsIgnoreCase(role()); }
-    public boolean isInventoryManager(){ return ROLE_INVENTORY_MGR.equalsIgnoreCase(role()); }
-    public boolean isBranchManager()  { return ROLE_BRANCH_MANAGER.equalsIgnoreCase(role()); }
-    public boolean isAccountant()     { return ROLE_ACCOUNTANT.equalsIgnoreCase(role()); }
-    public boolean isAuditor()        { return ROLE_AUDITOR.equalsIgnoreCase(role()); }
-    public boolean isPosOperator()    { return ROLE_POS_OPERATOR.equalsIgnoreCase(role()); }
-    public boolean isSecurity()       { return ROLE_SECURITY.equalsIgnoreCase(role()); }
-    public boolean isGateSecurity()   { return ROLE_GATE_SECURITY.equalsIgnoreCase(role()); }
+    /** للعرض فقط — يُرجع اسم الدور من الجلسة (ليس قراراً) */
+    public String getRoleForDisplay() {
+        return sessionManager.getRoleString();
+    }
+
+    /** إداري إذا كان السيرفر أعطاه module admin */
+    public boolean isSystemAdmin()    { return moduleEnabled("admin"); }
+    public boolean isOrgAdmin()       { return moduleEnabled("admin"); }
+    public boolean isFinanceManager() { return moduleEnabled("accounting"); }
+    public boolean isInventoryManager(){ return moduleEnabled("inventory"); }
+    public boolean isBranchManager()  { return moduleEnabled("branches"); }
+    public boolean isAccountant()     { return moduleEnabled("accounting"); }
+    public boolean isAuditor()        { return moduleEnabled("audit"); }
+    public boolean isPosOperator()    { return moduleEnabled("pos"); }
+    public boolean isSecurity()       { return moduleEnabled("gate"); }
+    public boolean isGateSecurity()   { return moduleEnabled("gate"); }
 
     public boolean isAdmin() {
-        String r = role(); if (r == null) return false;
-        return ROLE_ADMIN.equalsIgnoreCase(r) || isSystemAdmin() || isOrgAdmin() || isFinanceManager();
+        return moduleEnabled("admin");
     }
     public boolean isManager() {
-        return isAdmin() || isBranchManager() || isInventoryManager();
+        return moduleEnabled("admin") || moduleEnabled("branches") || moduleEnabled("inventory");
     }
     public boolean isAccountingUser() {
-        return isAccountant() || isFinanceManager() || isAuditor();
+        return moduleEnabled("accounting") || moduleEnabled("audit");
     }
-    public boolean isGateUser() { return isGateSecurity() || isSecurity(); }
+    public boolean isGateUser() {
+        return moduleEnabled("gate");
+    }
 
     // ═══════════════════════════════════════════════════════
-    //  كل دوال canX() — تقرأ من الوثيقة (Server-Decided)
+    //  canX() — من الوثيقة
     // ═══════════════════════════════════════════════════════
     public boolean canPerformAccountingSetup()     { return moduleEnabled("accounting"); }
     public boolean canManageUsersAdvanced()        { return moduleEnabled("users"); }
@@ -390,6 +416,9 @@ public class PermissionManager {
     public boolean canViewSalesHistory()           { return moduleEnabled("sales_history"); }
     public boolean canManageQuickAccess()          { return canEdit(FEATURE_QUICK_ACCESS); }
 
+    /** ✅ جديد: فلتر كل الفروع في sales history */
+    public boolean canViewAllBranches()            { return fragmentEnabled("SalesHistoryAllBranches"); }
+
     public boolean canWriteRfid()                  { return moduleEnabled("rfid"); }
     public boolean canViewRfidBindings()           { return moduleEnabled("rfid"); }
     public boolean canViewReaderSetup()            { return moduleEnabled("reader_setup") || moduleEnabled("rfid"); }
@@ -414,7 +443,7 @@ public class PermissionManager {
     public boolean canAccessTransfers()      { return canViewTransfers(); }
 
     // ═══════════════════════════════════════════════════════
-    //  Quick Actions — من الوثيقة
+    //  Quick Actions
     // ═══════════════════════════════════════════════════════
     public List<String> getAllowedQuickActions() {
         List<String> allowed = new ArrayList<>();
@@ -427,7 +456,6 @@ public class PermissionManager {
             }
             if (!allowed.isEmpty()) return allowed;
         }
-        // fallback مشتق من fragments
         if (canAccessFragment("IdentityStudio"))  allowed.add("identity");
         if (canAccessFragment("Radar"))           allowed.add("radar");
         if (canAccessFragment("SecureGate"))      allowed.add("gate");
@@ -446,7 +474,7 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Dashboard widgets — من الوثيقة
+    //  Dashboard widgets
     // ═══════════════════════════════════════════════════════
     private boolean widget(String key) {
         if (capabilities == null) return false;
@@ -466,22 +494,19 @@ public class PermissionManager {
     public boolean canRevealSensitiveValues()      { return widget("sensitive"); }
 
     // ═══════════════════════════════════════════════════════
-    //  Master Gate — canAccessFragment (No Local Logic)
+    //  Master Gate
     // ═══════════════════════════════════════════════════════
     public boolean canAccessFragment(String fragmentTag) {
         if (fragmentTag == null || fragmentTag.trim().isEmpty()) return false;
         final String tag = fragmentTag.trim();
 
-        // 1) ما يقوله السيرفر صراحة
         if (fragments != null && fragments.has(tag)) {
             return fragments.optBoolean(tag, false);
         }
 
-        // 2) اشتقاق من modules (لا مصفوفة أدوار — فقط module match)
         String mod = moduleForFragment(tag);
         if (mod != null) return moduleEnabled(mod);
 
-        // 3) افتراضي: لا
         Log.w(TAG, "🚫 Unknown fragment denied (server-driven): " + tag);
         return false;
     }
@@ -491,7 +516,7 @@ public class PermissionManager {
             case "dashboard": case "home": case "homefragment":
             case "profile": case "soundsettings": case "notifications":
             case "receipt": case "goldconversion":
-                return null; // مسموح دائماً (أدناه)
+                return null;
             case "serverconfig": return "settings";
             case "accountingsetup": return "accounting";
             case "readercontrol": case "readersetup": case "uhfset": return "reader_setup";
@@ -530,7 +555,6 @@ public class PermissionManager {
             case "snapshots": return "inventory";
             case "nxpsecurity": return "admin";
             default:
-                // ثوابت مسموحة
                 return null;
         }
     }
