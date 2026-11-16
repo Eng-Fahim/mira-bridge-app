@@ -2,7 +2,6 @@ package com.example.uhf.tools;
 
 import android.content.Context;
 import android.util.Log;
-
 /**
  * SessionManager - كلاس التوافق الوسيط (نسخة مجردة وآمنة)
  * 
