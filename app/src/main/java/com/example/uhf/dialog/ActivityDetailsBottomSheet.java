@@ -527,7 +527,7 @@ public class ActivityDetailsBottomSheet extends BottomSheetDialogFragment {
                         "🔍 " + (isArabic ? "فتح إدارة الشرائح" : "Open Bindings"),
                         v -> {
                             dismiss();
-                            navigateTo(new MiraRfidBindingsFragment(), "RfidBindings");
+                            // [REMOVED-TO-WEB] navigateTo(new MiraRfidBindingsFragment(), "RfidBindings");
                         });
                 break;
 

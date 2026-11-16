@@ -441,7 +441,7 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_GATE_SETTINGS:     return new MiraGateSettingsFragment();
         case TAG_QUICK_ACCESS:      return new MiraQuickAccessSettingsFragment();
         // [REMOVED-TO-WEB] case TAG_BRANCHES:          return new MiraBranchesManagementFragment();
-        case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
+        // [REMOVED-TO-WEB] case TAG_RFID_BINDINGS:     return new MiraRfidBindingsFragment();
         case TAG_SOUND_SETTINGS:    return new MiraSoundSettingsFragment();
         case TAG_SNAPSHOTS:         return new MiraSnapshotsFragment();
         

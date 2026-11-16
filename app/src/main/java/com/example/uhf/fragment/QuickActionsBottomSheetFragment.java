@@ -72,7 +72,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     private static final ActionCard[] CARD_CONFIGS = {
         new ActionCard(R.id.cardRfidWrite,            "rfid_write",         NavigationManager.TAG_RFID_WRITE),
         new ActionCard(R.id.cardRadarLocation,        "radar",              NavigationManager.TAG_RADAR),
-        new ActionCard(R.id.cardRfidBindings,         "rfid",               NavigationManager.TAG_RFID_BINDINGS),
         new ActionCard(R.id.cardSecureGate,           "gate",               NavigationManager.TAG_GATES),
         new ActionCard(R.id.cardReports,              "reports",            NavigationManager.TAG_REPORTS),
         new ActionCard(R.id.cardAccounting,           "accounting",         NavigationManager.TAG_ACCOUNTING),

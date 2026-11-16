@@ -1308,7 +1308,7 @@ private static final NavItemCfg[] NAV_CONFIGS = {
         }
         if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
             optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
-            actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
+            // [REMOVED-TO-WEB] actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
         }
         if (pm.isAdmin() || pm.isSystemAdmin()) {
             optionsList.add(isArabic ? "🔐 إعدادات أمان الشرائح" : "🔐 RFID Security Settings");

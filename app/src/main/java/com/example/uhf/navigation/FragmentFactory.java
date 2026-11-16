@@ -33,7 +33,7 @@ public class FragmentFactory {
             case "Gates": return new MiraSecureGateFragment();
             case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
             // [REMOVED-TO-WEB] case "Branches": return new MiraBranchesManagementFragment();
-            case "RfidBindings": return new MiraRfidBindingsFragment();
+            // [REMOVED-TO-WEB] case "RfidBindings": return new MiraRfidBindingsFragment();
             case "SoundSettings": return new MiraSoundSettingsFragment();
             case "Snapshots": return new MiraSnapshotsFragment();
             case "ScrapGoldBuy": return new MiraScrapGoldBuyFragment();   
