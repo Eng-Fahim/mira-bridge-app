@@ -220,10 +220,10 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private void applyPermissions() {
-        boolean canView = permissionManager.canView("sales_history") ||
-                         permissionManager.isPosOperator() ||
-                         permissionManager.isManager();
-
+    // بعد
+    boolean canView = permissionManager.canViewSalesHistory()
+               || permissionManager.canViewPos()
+               || permissionManager.isManager();
         if (!canView) {
             showEmptyState(isArabic ? "⛔ غير مصرح لك بالوصول لسجل المبيعات" : "⛔ Access Denied");
             if (pbLoading != null) pbLoading.setVisibility(View.GONE);
@@ -382,12 +382,11 @@ public class MiraSalesHistoryFragment extends Fragment {
 
     private void refreshSales(boolean showProgress) {
         if (!isAdded()) return;
-        if (!permissionManager.canView("sales_history") &&
-            !permissionManager.isPosOperator() &&
+        if (!permissionManager.canViewSalesHistory() &&
+            !permissionManager.canViewPos() &&
             !permissionManager.isManager()) {
-            return;
+        return;
         }
-
         currentPage = 1;
         isLastPage = false;
         hasMoreData = true;
