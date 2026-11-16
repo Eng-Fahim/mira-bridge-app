@@ -237,28 +237,25 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
 
     private void setupBranchFilter() {
-        String role = sessionManager != null ? sessionManager.getRoleString() : "";
-        int userBranchId = branchesManager.getActiveBranchId();
+    int userBranchId = branchesManager.getActiveBranchId();
 
-        boolean canViewAllBranches = "SYSTEM_ADMIN".equalsIgnoreCase(role) ||
-                                     "ORG_ADMIN".equalsIgnoreCase(role) ||
-                                     "ADMIN".equalsIgnoreCase(role);
+    // ✅ القرار من السيرفر — لا role محلي
+    boolean canViewAllBranches = permissionManager.canViewAllBranches();
 
-        if (canViewAllBranches) {
-            selectedBranchId = 0;
-            if (btnFilterBranch != null) {
-                btnFilterBranch.setVisibility(View.VISIBLE);
-                btnFilterBranch.setText(isArabic ? "🏢 جميع الفروع" : "🏢 All Branches");
-                btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
-            }
-        } else {
-            selectedBranchId = userBranchId;
-            if (btnFilterBranch != null) {
-                btnFilterBranch.setVisibility(View.GONE);
-            }
+    if (canViewAllBranches) {
+        selectedBranchId = 0;
+        if (btnFilterBranch != null) {
+            btnFilterBranch.setVisibility(View.VISIBLE);
+            btnFilterBranch.setText(isArabic ? "🏢 جميع الفروع" : "🏢 All Branches");
+            btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
+        }
+    } else {
+        selectedBranchId = userBranchId;
+        if (btnFilterBranch != null) {
+            btnFilterBranch.setVisibility(View.GONE);
         }
     }
-
+}
     private void showBranchSelectionDialog() {
         List<BranchOption> branches = new ArrayList<>();
         branches.add(new BranchOption(0, isArabic ? "🏢 جميع الفروع" : "🏢 All Branches"));
