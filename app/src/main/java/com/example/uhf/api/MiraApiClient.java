@@ -676,17 +676,48 @@ public class MiraApiClient {
         }
 
         boolean isSuccess = responseCode >= 200 && responseCode < 300;
-        String errorMessage = isSuccess ? null
-                : (serverMessage != null ? serverMessage : responseBody);
+String errorMessage = isSuccess ? null
+        : (serverMessage != null ? serverMessage : responseBody);
 
-        ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
-        apiResponse.setBody(responseBody);
+ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
+apiResponse.setBody(responseBody);
 
-        if (isSuccess && serverMessage != null) {
-            apiResponse.message = serverMessage;
+if (isSuccess && serverMessage != null) {
+    apiResponse.message = serverMessage;
+}
+
+// ✅ v4.0 — Server-Driven Capabilities: احفظ الوثيقة القادمة من السيرفر
+// يغطي: /auth/login, /auth/me, /mobile/capabilities, وأي استجابة تحتوي data/legacy_permissions
+if (isSuccess && json != null) {
+    String path = "";
+    try { path = conn.getURL().getPath(); } catch (Exception ignored) {}
+
+    boolean isCapabilitiesSource =
+            path.endsWith("/auth/login")
+         || path.endsWith("/auth/me")
+         || path.endsWith("/auth/reconnect")
+         || path.endsWith("/mobile/capabilities")
+         || path.contains("/mobile/");
+
+    // أو: أي استجابة تحتوي المفاتيح المميزة (احتياط)
+    boolean hasCapabilitiesPayload =
+            json.has("legacy_permissions")
+         || (json.has("data") && json.optJSONObject("data") != null
+             && json.optJSONObject("data").has("modules"));
+
+    if (isCapabilitiesSource || hasCapabilitiesPayload) {
+        try {
+            com.example.uhf.manager.PermissionManager
+                .getInstance(context)
+                .saveFromServer(json);
+            Log.d(TAG, "✅ Capabilities saved from server: " + path);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to save capabilities: " + e.getMessage());
         }
+    }
+}
 
-        return apiResponse;
+return apiResponse;
     }
 
     private InputStream wrapBrotli(InputStream rawStream) {
