@@ -89,7 +89,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         new ActionCard(R.id.cardCashReconciliation,   "cash_reconciliation",NavigationManager.TAG_CASH_RECONCILIATION),
         new ActionCard(R.id.cardAdminHub,             "admin_hub",          NavigationManager.TAG_ADMIN_HUB),
         new ActionCard(R.id.cardServerConfig,         "server_config",      NavigationManager.TAG_SERVER_CONFIG),
-        new ActionCard(R.id.cardAdminUsers,           "admin_users",        NavigationManager.TAG_USERS_MANAGEMENT),
         new ActionCard(R.id.cardAdminBranches,        "admin_branches",     NavigationManager.TAG_BRANCHES),
         new ActionCard(R.id.cardReaderSetup,          "reader_setup",       NavigationManager.TAG_READER_SETUP),
         new ActionCard(R.id.cardQuickAccess,          "quick_access",       NavigationManager.TAG_QUICK_ACCESS),

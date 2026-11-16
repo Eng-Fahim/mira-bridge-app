@@ -435,7 +435,7 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_SERVER_CONFIG:     return new MiraServerConfigFragment();
         case TAG_GOLD_RATES:        return new MiraGoldCurrencyFragment();
         case TAG_PROFILE:           return new MiraProfileFragment();
-        case TAG_USERS_MANAGEMENT:  return new UsersManagementFragment();
+        // [REMOVED-TO-WEB]         case TAG_USERS_MANAGEMENT:  return new UsersManagementFragment();
         case TAG_RFID_WRITE:        return new MiraUHFReadWriteFragment();
         case TAG_READER_SETUP:      return new MiraReaderSetupFragment();
         case TAG_GATE_SETTINGS:     return new MiraGateSettingsFragment();
