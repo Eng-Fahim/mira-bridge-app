@@ -843,7 +843,7 @@ public class MiraSalesHistoryFragment extends Fragment {
         }
 
         @Override
-        int getItemCount() { return items.size(); }
+        public int getItemCount() { return items.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
             TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvDate, tvStatus;
