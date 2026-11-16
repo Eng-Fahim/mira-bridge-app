@@ -296,6 +296,17 @@ public class PermissionManager {
             out.put("Receipt", true);
             out.put("GoldConversion", true);
         } catch (Exception ignored) {}
+        // ✅ اقرأ fragments الصريحة من السيرفر (إن وُجدت) — تتجاوز الاشتقاق
+        JSONObject serverFragments = caps.optJSONObject("fragments");
+        if (serverFragments != null) {
+           Iterator<String> keys = serverFragments.keys();
+           while (keys.hasNext()) {
+           String key = keys.next();
+           try {
+            out.put(key, serverFragments.optBoolean(key, false));
+            } catch (Exception ignored) {}
+            }
+        }
         return out;
     }
 
