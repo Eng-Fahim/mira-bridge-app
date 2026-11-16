@@ -292,5 +292,23 @@ public class PermissionManager {
     public boolean canViewDashboardRecentActivity() {
         return !isGateUser();
     }
+    // ══════════════════════════════════════════════════════════════
+    // ✅ إضافات MiraAdminHub و Dashboard المفقودة
+    // ══════════════════════════════════════════════════════════════
+    public boolean canRefreshGoldManually() {
+        return isManager() || isAdmin() || isSystemAdmin();
+    }
+
+    public boolean canViewReaderSetup() {
+        return isSystemAdmin() || isOrgAdmin() || isManager();
+    }
+
+    public boolean canManageGates() {
+        return isSystemAdmin() || isOrgAdmin() || isBranchManager() || isManager();
+    }
+
+    public boolean canManageUsers() {
+        return isSystemAdmin() || isOrgAdmin();
+    }
 
 }
