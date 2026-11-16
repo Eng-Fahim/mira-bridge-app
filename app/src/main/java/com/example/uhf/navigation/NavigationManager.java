@@ -71,7 +71,7 @@ public class NavigationManager {
     public static final String TAG_GATES             = "Gates";
     public static final String TAG_REPORTS           = "Reports";
     public static final String TAG_ACCOUNTING        = "Accounting";
-    public static final String TAG_ADMIN_HUB         = "AdminHub";
+   // public static final String TAG_ADMIN_HUB         = "AdminHub";
     public static final String TAG_SALES_HISTORY     = "SalesHistory";
     public static final String TAG_SERVER_CONFIG     = "ServerConfig";
     public static final String TAG_GOLD_RATES        = "GoldRates";
@@ -430,7 +430,7 @@ public Fragment createFragmentByTag(@Nullable String tag) {
         case TAG_GATES:             return new MiraSecureGateFragment();
         case TAG_REPORTS:           return new MiraReportsProFragment();
         case TAG_ACCOUNTING:        return new MiraAccountingFragment();
-        case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
+        //case TAG_ADMIN_HUB:         return new MiraAdminHubFragment();
         case TAG_SALES_HISTORY:     return new MiraSalesHistoryFragment();
         case TAG_SERVER_CONFIG:     return new MiraServerConfigFragment();
         case TAG_GOLD_RATES:        return new MiraGoldCurrencyFragment();
