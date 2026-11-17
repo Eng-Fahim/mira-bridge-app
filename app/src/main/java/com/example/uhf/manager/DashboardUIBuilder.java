@@ -9,14 +9,20 @@ import android.widget.TextView;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.fragment.MiraAccountingFragment;
+import com.example.uhf.fragment.MiraAdminHubFragment;
+import com.example.uhf.fragment.MiraAllActivitiesFragment;
+import com.example.uhf.fragment.MiraGoldCurrencyFragment;
+import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraInventoryDashboardFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
-import com.example.uhf.fragment.MiraUHFReadTagFragment;
-import com.example.uhf.fragment.MiraAllActivitiesFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraScrapGoldBuyFragment;
+import com.example.uhf.fragment.MiraSecureGateFragment;
+import com.example.uhf.fragment.MiraTransferFragment;
+import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.navigation.NavigationManager;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -50,128 +56,70 @@ public class DashboardUIBuilder {
     }
 
     // =========================================================
-    //  1. إخفاء/إظهار الواجهات بناءً على الدور (عشرة أدوار)
+    //  1. إخفاء/إظهار الواجهات بناءً على قرار السيرفر الموحد
     // =========================================================
     public void applyLayoutVisibility(View root, DashboardRoleController roleController) {
-        if (root == null || permissions == null) return;
-
-        hideAll(root);
-
-        if (permissions.isSystemAdmin() || permissions.isOrgAdmin() || permissions.isBranchManager()) {
-            showFullAdmin(root, roleController);
-        } else if (permissions.isFinanceManager() || permissions.isAccountant()) {
-            showFinanceDashboard(root, roleController);
-        } else if (permissions.isInventoryManager()) {
-            showInventoryDashboard(root, roleController);
-        } else if (permissions.isAuditor()) {
-            showAuditorDashboard(root, roleController);
-        } else if (permissions.isPosOperator()) {
-            showPosDashboard(root);
-        } else if (permissions.isGateUser()) {
-            showGateDashboard(root);
-        } else {
-            showFullAdmin(root, roleController);
+        if (root == null) return;
+        if (roleController != null) {
+            roleController.applyVisibility(root);
         }
     }
 
-    private void hideAll(View root) {
-        int[] all = {
-            R.id.layoutPosGoldDashboard, R.id.cardShiftSummary,
-            R.id.horizontalScrollCarousel, R.id.dotsIndicator,
-            R.id.heroBalanceCard, R.id.cardGoldPrices, R.id.salesSummaryCard,
-            R.id.alertsStrip, R.id.cardInventoryByKarat, R.id.cardScrapGold,
-            R.id.cardScrapAging, R.id.llRecentActivity, R.id.recentActivityHeader,
-            R.id.cardCharts
-        };
-        for (int id : all) setVisible(root, id, false);
-    }
-
-    private void showFullAdmin(View root, DashboardRoleController roleController) {
-        setVisible(root, R.id.horizontalScrollCarousel, true);
-        setVisible(root, R.id.dotsIndicator, true);
-        setVisible(root, R.id.cardInventoryByKarat, true);
-        setVisible(root, R.id.cardScrapGold, true);
-        setVisible(root, R.id.cardScrapAging, true);
-        setVisible(root, R.id.cardCharts, true);
-        setVisible(root, R.id.llRecentActivity, true);
-        if (roleController != null) roleController.applyVisibility(root);
-    }
-
-    private void showFinanceDashboard(View root, DashboardRoleController roleController) {
-        setVisible(root, R.id.horizontalScrollCarousel, true);
-        setVisible(root, R.id.dotsIndicator, true);
-        setVisible(root, R.id.cardCharts, true);
-        setVisible(root, R.id.llRecentActivity, true);
-        if (roleController != null) roleController.applyVisibility(root);
-    }
-
-    private void showInventoryDashboard(View root, DashboardRoleController roleController) {
-        setVisible(root, R.id.horizontalScrollCarousel, true);
-        setVisible(root, R.id.dotsIndicator, true);
-        setVisible(root, R.id.cardInventoryByKarat, true);
-        setVisible(root, R.id.cardScrapGold, true);
-        setVisible(root, R.id.cardScrapAging, true);
-        setVisible(root, R.id.llRecentActivity, true);
-        if (roleController != null) roleController.applyVisibility(root);
-    }
-
-    private void showAuditorDashboard(View root, DashboardRoleController roleController) {
-        setVisible(root, R.id.horizontalScrollCarousel, true);
-        setVisible(root, R.id.dotsIndicator, true);
-        setVisible(root, R.id.cardInventoryByKarat, true);
-        setVisible(root, R.id.cardCharts, true);
-        setVisible(root, R.id.llRecentActivity, true);
-        if (roleController != null) roleController.applyVisibility(root);
-    }
-
-    private void showPosDashboard(View root) {
-        setVisible(root, R.id.layoutPosGoldDashboard, true);
-    }
-
-    private void showGateDashboard(View root) {
-        setVisible(root, R.id.alertsStrip, true);
-        setVisible(root, R.id.llRecentActivity, true);
-    }
-
     // =========================================================
-    //  2. أزرار الإجراءات السريعة (ديناميكية)
+    //  2. أزرار الإجراءات السريعة (مبنية 100% على صلاحيات السيرفر)
     // =========================================================
     public void setupQuickActionButtons(View root, OnNavigateListener listener) {
         GridLayout gridContainer = root.findViewById(R.id.gridPosQuickActions);
-        if (gridContainer == null) return;
+        if (gridContainer == null || permissions == null) return;
         gridContainer.removeAllViews();
 
-        boolean isPos = permissions.isPosOperator();
-        boolean isGate = permissions.isGateUser();
-
-        if (isPos) {
+        // أزرار العمليات الأساسية حسب صلاحيات الوحدات
+        if (permissions.canUsePos()) {
             addButton(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS, listener);
-            addButton(gridContainer, "مرتجع", R.drawable.ic_reports, new MiraPosFragment(), "Sales", listener);
-            addButton(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY, listener);
-            addButton(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS, listener);
-            addButton(gridContainer, "سجل المبيعات", R.drawable.ic_reports, new MiraSalesHistoryFragment(), "SalesHistory", listener);
-            addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
-
-        } else if (isGate) {
-            if (permissions.canViewRadar()) addButton(gridContainer, "الرادار", R.drawable.ic_radar, new MiraUHFReadTagFragment(), "Radar", listener);
-            if (permissions.canViewGates()) addButton(gridContainer, "بوابة الأمن", R.drawable.ic_gate, new MiraUHFReadTagFragment(), "SecureGate", listener);
-            addButton(gridContainer, "سجل العمليات", R.drawable.ic_reports, new MiraAllActivitiesFragment(), "AllActivities", listener);
-            addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
-
-        } else {
-            if (permissions.canUsePos()) addButton(gridContainer, "بيع", R.drawable.ic_pos, new MiraPosFragment(), NavigationManager.TAG_POS, listener);
-            if (permissions.canBuyScrapGold()) addButton(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY, listener);
-            if (permissions.canViewInventory()) addButton(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard", listener);
-            if (permissions.canViewSalesHistory()) addButton(gridContainer, "سجل المبيعات", R.drawable.ic_reports, new MiraSalesHistoryFragment(), "SalesHistory", listener);
-            if (permissions.canViewReports()) addButton(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS, listener);
-            addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
         }
+        if (permissions.canBuyScrapGold()) {
+            addButton(gridContainer, "شراء كسر", R.drawable.ic_gold_scrap, new MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY, listener);
+        }
+        if (permissions.canViewInventory()) {
+            addButton(gridContainer, "الجرد", R.drawable.ic_inventory_items, new MiraInventoryDashboardFragment(), "InventoryDashboard", listener);
+        }
+        if (permissions.canUseIdentity()) {
+            addButton(gridContainer, "التكويد", R.drawable.ic_identity_studio, new MiraIdentityStudioFragment(), "IdentityStudio", listener);
+        }
+        if (permissions.canViewTransfers()) {
+            addButton(gridContainer, "التحويلات", R.drawable.ic_transfer, new MiraTransferFragment(), "Transfers", listener);
+        }
+        if (permissions.canViewRadar()) {
+            addButton(gridContainer, "الرادار", R.drawable.ic_radar, new MiraUHFRadarLocationFragment(), "Radar", listener);
+        }
+        if (permissions.canViewGates()) {
+            addButton(gridContainer, "البوابات", R.drawable.ic_security, new MiraSecureGateFragment(), "SecureGate", listener);
+        }
+        if (permissions.canViewAccounting()) {
+            addButton(gridContainer, "المحاسبة", R.drawable.ic_accounting, new MiraAccountingFragment(), "Accounting", listener);
+        }
+        if (permissions.canViewSalesHistory()) {
+            addButton(gridContainer, "سجل المبيعات", R.drawable.ic_sales_history, new MiraSalesHistoryFragment(), "SalesHistory", listener);
+        }
+        if (permissions.canViewReports()) {
+            addButton(gridContainer, "التقارير", R.drawable.ic_reports, new MiraReportsProFragment(), NavigationManager.TAG_REPORTS, listener);
+        }
+        if (permissions.canViewGoldRates()) {
+            addButton(gridContainer, "أسعار الذهب", R.drawable.ic_reports, new MiraGoldCurrencyFragment(), "GoldRates", listener);
+        }
+        if (permissions.canViewAdminHub()) {
+            addButton(gridContainer, "الإدارة", R.drawable.ic_admin_hub, new MiraAdminHubFragment(), "AdminHub", listener);
+        }
+
+        // زر دائم للجميع
+        addButton(gridContainer, "الملف الشخصي", R.drawable.ic_user_placeholder, new MiraProfileFragment(), "Profile", listener);
     }
 
     // =========================================================
     //  3. رسم المخططات
     // =========================================================
     public void renderCharts(LineChart adminChart, LineChart posChart, PieChart pieChart, JSONObject data) {
+        if (data == null) return;
         try {
             JSONArray sales7Days = data.optJSONArray("my_sales_last_7_days");
             if (sales7Days == null) sales7Days = data.optJSONArray("sales_last_7_days");
@@ -194,7 +142,7 @@ public class DashboardUIBuilder {
                     labels.add(dateStr);
                 }
 
-                if (adminChart != null) {
+                if (adminChart != null && adminChart.getVisibility() == View.VISIBLE) {
                     LineDataSet dataSet = new LineDataSet(entries, "المبيعات");
                     dataSet.setColor(Color.parseColor("#D4AF37"));
                     dataSet.setCircleColor(Color.parseColor("#D4AF37"));
@@ -215,7 +163,7 @@ public class DashboardUIBuilder {
                     adminChart.invalidate();
                 }
 
-                if (posChart != null) {
+                if (posChart != null && posChart.getVisibility() == View.VISIBLE) {
                     LineDataSet sellDataSet = new LineDataSet(sellEntries, "مبيعات");
                     sellDataSet.setColor(Color.parseColor("#D4AF37"));
                     sellDataSet.setLineWidth(3f);
@@ -248,7 +196,7 @@ public class DashboardUIBuilder {
             }
 
             JSONArray salesByKarat = data.optJSONArray("sales_by_karat");
-            if (salesByKarat != null && pieChart != null) {
+            if (salesByKarat != null && pieChart != null && pieChart.getVisibility() == View.VISIBLE) {
                 List<PieEntry> entriesPie = new ArrayList<>();
                 for (int i = 0; i < salesByKarat.length(); i++) {
                     JSONObject k = salesByKarat.getJSONObject(i);
@@ -274,20 +222,16 @@ public class DashboardUIBuilder {
     }
 
     private void addButton(GridLayout container, String title, int iconRes, Fragment target, String tag, OnNavigateListener listener) {
+        if (!fragment.isAdded() || fragment.getContext() == null) return;
         View view = fragment.getLayoutInflater().inflate(R.layout.item_quick_action_grid, container, false);
         ImageView icon = view.findViewById(R.id.ivQuickIcon);
         TextView text = view.findViewById(R.id.tvQuickText);
-        icon.setImageResource(iconRes);
-        text.setText(title);
+        if (icon != null) icon.setImageResource(iconRes);
+        if (text != null) text.setText(title);
         view.setOnClickListener(v -> {
             v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
             listener.navigateTo(target, tag);
         });
         container.addView(view);
-    }
-
-    private void setVisible(View root, int id, boolean visible) {
-        View v = root.findViewById(id);
-        if (v != null) v.setVisibility(visible ? View.VISIBLE : View.GONE);
     }
 }
