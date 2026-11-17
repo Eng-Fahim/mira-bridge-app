@@ -244,11 +244,10 @@ public class MiraDashboardFragment extends Fragment {
     private void shutdownExecutor() {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
-    
-        @Nullable
+    @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_dashboard_advanced, container, false);
+        return inflater.inflate(R.layout.fragment_mira_dashboard_clean, container, false);
     }
 
     @Override
