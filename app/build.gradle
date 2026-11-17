@@ -88,18 +88,23 @@ android {
 
         // ❌ تم حذف debug buildType لتسريع البناء
     }
-
-    buildFeatures {
+    
+        buildFeatures {
         viewBinding true
         buildConfig true
         compose true
     }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.17'
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
         coreLibraryDesugaringEnabled true
-        kotlinCompilerExtensionVersion '1.5.17' 
     }
+
 
     // ✅ استخدام lint بدلاً من lintOptions (AGP 8+)
     lint {
