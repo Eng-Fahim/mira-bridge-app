@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
 }
-
 android {
     namespace 'com.example.uhf'
     compileSdk 34
@@ -93,12 +92,13 @@ android {
     buildFeatures {
         viewBinding true
         buildConfig true
+        compose true
     }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
         coreLibraryDesugaringEnabled true
+        kotlinCompilerExtensionVersion '1.5.17' 
     }
 
     // ✅ استخدام lint بدلاً من lintOptions (AGP 8+)
@@ -219,6 +219,16 @@ dependencies {
 
     // ==================== WorkManager ====================
     implementation 'androidx.work:work-runtime:2.9.0'
+    
+        // ==================== Jetpack Compose ====================
+    def compose_version = '1.6.8'
+    implementation platform("androidx.compose:compose-bom:2024.05.00")
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.activity:activity-compose:1.9.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
 
     // ==================== Desugaring ====================
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
