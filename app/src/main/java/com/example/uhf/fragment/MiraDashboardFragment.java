@@ -245,7 +245,7 @@ public class MiraDashboardFragment extends Fragment {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
 
-    @    @Override
+    @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         try {
