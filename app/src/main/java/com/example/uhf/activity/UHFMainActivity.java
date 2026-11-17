@@ -796,41 +796,49 @@ private static final NavItemCfg[] NAV_CONFIGS = {
         }
     }
 
-    private void navigateByRole() {
-    try {
-        enableNavigationAfterSetup();
+        private void navigateByRole() {
+        try {
+            enableNavigationAfterSetup();
+            refreshAllPermissionsUI(); // ✅ تحديث القوائم والزر الأصفر فوراً
 
-        Fragment targetFragment;
-        String targetTag;
+            Fragment targetFragment;
+            String targetTag;
 
-        String role = sessionManager != null ? sessionManager.getRoleString().toUpperCase() : "USER";
+            if (permissionManager != null) {
+                if (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin() || permissionManager.isManager()) {
+                    targetFragment = new MiraDashboardFragment();
+                    targetTag = NavigationManager.TAG_DASHBOARD;
+                } else if (permissionManager.isPosOperator()) {
+                    targetFragment = new MiraPosFragment();
+                    targetTag = NavigationManager.TAG_POS;
+                } else if (permissionManager.isInventoryManager()) {
+                    targetFragment = new MiraInventoryProFragment();
+                    targetTag = NavigationManager.TAG_INVENTORY;
+                } else if (permissionManager.isGateUser()) {
+                    targetFragment = new MiraSecureGateFragment();
+                    targetTag = NavigationManager.TAG_GATES;
+                } else if (permissionManager.isFinanceManager() || permissionManager.isAccountant()) {
+                    targetFragment = new MiraAccountingFragment();
+                    targetTag = NavigationManager.TAG_ACCOUNTING;
+                } else {
+                    targetFragment = new MiraDashboardFragment();
+                    targetTag = NavigationManager.TAG_DASHBOARD;
+                }
+            } else {
+                targetFragment = new MiraDashboardFragment();
+                targetTag = NavigationManager.TAG_DASHBOARD;
+            }
 
-        if (role.contains("POS") || role.contains("CASHIER")) {
-            targetFragment = new MiraPosFragment();
-            targetTag = NavigationManager.TAG_POS;
-        } else if (role.contains("INVENTORY") || role.contains("WAREHOUSE")) {
-            targetFragment = new MiraInventoryProFragment();
-            targetTag = NavigationManager.TAG_INVENTORY;
-        } else if (role.contains("GATE") || role.contains("SECURITY")) {
-            targetFragment = new MiraSecureGateFragment();
-            targetTag = NavigationManager.TAG_GATES;
-        } else if (role.contains("ACCOUNTANT") || role.contains("FINANCE")) {
-            targetFragment = new MiraAccountingFragment();
-            targetTag = NavigationManager.TAG_ACCOUNTING;
-        } else {
-            targetFragment = new MiraDashboardFragment();
-            targetTag = NavigationManager.TAG_DASHBOARD;
+            loadFragmentDirectly(targetFragment, targetTag);
+            Log.d(TAG, "✅ Navigated by PermissionManager to: " + targetTag);
+
+        } catch (Exception e) {
+            Log.e(TAG, "navigateByRole error: " + e.getMessage());
+            enableNavigationAfterSetup();
+            loadFragmentDirectly(new MiraDashboardFragment(), NavigationManager.TAG_DASHBOARD);
         }
-
-        loadFragmentDirectly(targetFragment, targetTag);
-        Log.d(TAG, "✅ Navigated by role to: " + targetTag);
-
-    } catch (Exception e) {
-        Log.e(TAG, "navigateByRole error: " + e.getMessage());
-        enableNavigationAfterSetup();
-        loadFragmentDirectly(new MiraDashboardFragment(), NavigationManager.TAG_DASHBOARD);
     }
-}
+
 
 
     private void showSetupBlockedScreen() {
@@ -1582,8 +1590,7 @@ public void onResume() {
             
         }
         if (!checkAutoLock()) return;
-
-applyNavPermissions();   // ⭐ أضف هذا السطر
+        refreshAllPermissionsUI();
 
 updateToolbarTitle();
 if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
@@ -2371,52 +2378,59 @@ private void applyNavPermissions() {
  * ✅ مصفوفة صريحة: ماذا يرى كل دور في القائمة السفلية؟
  * تعتمد على R.id.* الفعلية الموجودة في NAV_CONFIGS
  */
-private boolean isNavItemAllowedForRole(NavItemCfg cfg) {
-    if (cfg == null) return false;
-    if (cfg.alwaysAllowed) return true;
+    private boolean isNavItemAllowedForRole(NavItemCfg cfg) {
+        if (cfg == null) return false;
+        if (cfg.alwaysAllowed) return true;
+        if (permissionManager == null) return false;
 
-    String role = sessionManager != null ? sessionManager.getRoleString().toUpperCase() : "USER";
-    int id = cfg.itemId;
+        int id = cfg.itemId;
 
-    // الإدارة العليا ومدير النظام
-    if (role.contains("ADMIN") || role.contains("SUPER") || role.contains("OWNER")) return true;
+        if (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin() || permissionManager.isAdmin()) {
+            return true;
+        }
 
-    // مدير الفرع
-    if (role.contains("BRANCH_MANAGER") || role.contains("MANAGER")) {
-        return id == R.id.nav_home
-            || id == R.id.nav_accounting
-            || id == R.id.nav_inventory
-            || id == R.id.nav_sales
-            || id == R.id.nav_scrap;
+        if (id == R.id.nav_accounting) {
+            return permissionManager.canViewAccounting();
+        }
+        if (id == R.id.nav_inventory) {
+            return permissionManager.canViewInventory();
+        }
+        if (id == R.id.nav_sales) {
+            return permissionManager.canUsePos();
+        }
+        if (id == R.id.nav_scrap) {
+            return permissionManager.canViewInventory() || permissionManager.canUsePos();
+        }
+
+        return false;
+    }
+    public void refreshAllPermissionsUI() {
+        try {
+            // 1. تحديث القائمة السفلية
+            applyNavPermissions();
+
+            // 2. تحديث زر الإجراءات السريعة (FAB)
+            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+            if (fabActionCenter != null && permissionManager != null) {
+                boolean hideFabForSecurity = permissionManager.isGateUser();
+                boolean hasQuickActions = !hideFabForSecurity
+                        && (permissionManager.isSystemAdmin()
+                            || permissionManager.isOrgAdmin()
+                            || !permissionManager.getAllowedQuickActions().isEmpty());
+
+                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            }
+
+            // 3. إعادة رسم أيقونات الشريط العلوي والثانوي
+            invalidateOptionsMenu();
+            if (navigationManager != null) {
+                updateSecondaryToolbar(navigationManager.getCurrentFragmentTag());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "refreshAllPermissionsUI error: " + e.getMessage());
+        }
     }
 
-    // المحاسب والمدير المالي
-    if (role.contains("ACCOUNTANT") || role.contains("FINANCE")) {
-        return id == R.id.nav_home
-            || id == R.id.nav_accounting;
-    }
-
-    // مدير المخزون
-    if (role.contains("INVENTORY") || role.contains("WAREHOUSE")) {
-        return id == R.id.nav_home
-            || id == R.id.nav_inventory
-            || id == R.id.nav_scrap;
-    }
-
-    // موظف المبيعات
-    if (role.contains("POS") || role.contains("CASHIER") || role.contains("SALES")) {
-        return id == R.id.nav_home
-            || id == R.id.nav_sales
-            || id == R.id.nav_scrap;
-    }
-
-    // الأمن والبوابات
-    if (role.contains("GATE") || role.contains("SECURITY")) {
-        return id == R.id.nav_home;
-    }
-
-    return false;
-}
 
 
 private void resetFabConstraintsToNav(FloatingActionButton fab) {
