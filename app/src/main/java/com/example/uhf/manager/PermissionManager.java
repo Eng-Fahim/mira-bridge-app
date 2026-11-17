@@ -17,19 +17,20 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v4.1 — Server-Driven, Zero Local Decisions
+ *  PermissionManager v4.2 — Server-Driven, Zero Local Decisions
  * ═══════════════════════════════════════════════════════════════════
- *
- *  التغييرات عن v4.0:
- *    ✅ حذف role() نهائياً — لا قراءة من sessionManager.getRoleString()
- *    ✅ كل isX() تقرأ من الوثيقة (moduleEnabled)
- *    ✅ تشفير MIRA_PERMISSIONS عبر EncryptedSharedPreferences
- *    ✅ isSystemAdmin() = moduleEnabled("admin") — ليس قراراً محلياً
  *
  *  المبدأ:
  *    ✅ التطبيق لا يتخذ أي قرار إداري.
- *    ✅ كل القرارات تأتي من السيرفر.
+ *    ✅ كل القرارات تأتي من السيرفر (capabilities.modules).
+ *    ✅ legacyPermissions لم تعد مصدر الحقيقة — fallback فقط.
  *    ✅ كل الدوال القديمة محفوظة (توافق خلفي كامل).
+ *
+ *  التغييرات عن v4.1:
+ *    ✅ canView/canEdit/canDelete/canExport تعمل من modules مباشرة
+ *    ✅ canUsePos/canCreateTransfer/canApproveTransfer من modules.scope
+ *    ✅ dashboard widgets من modules.dashboard.variant
+ *    ✅ إزالة الاعتماد على legacyPermissions (كان يكسر كل شيء)
  */
 public class PermissionManager {
 
@@ -48,10 +49,7 @@ public class PermissionManager {
     private JSONObject legacyPermissions;
     private JSONObject fragments;
 
-    // ═══════════════════════════════════════════════════════
-    //  الأدوار — constants فقط (للعرض عبر getRoleForDisplay)
-    //  لا تُستخدم لاتخاذ قرار
-    // ═══════════════════════════════════════════════════════
+    // الأدوار — constants فقط (للعرض)
     public static final String ROLE_SYSTEM_ADMIN    = "SYSTEM_ADMIN";
     public static final String ROLE_ORG_ADMIN       = "ORG_ADMIN";
     public static final String ROLE_FINANCE_MANAGER = "FINANCE_MANAGER";
@@ -64,7 +62,6 @@ public class PermissionManager {
     public static final String ROLE_SECURITY        = "SECURITY";
     public static final String ROLE_ADMIN           = "ADMIN";
 
-    // Features constants
     public static final String FEATURE_DASHBOARD      = "dashboard";
     public static final String FEATURE_INVENTORY      = "inventory";
     public static final String FEATURE_POS            = "pos";
@@ -105,9 +102,7 @@ public class PermissionManager {
                     .build();
 
             return EncryptedSharedPreferences.create(
-                    context,
-                    PREFS_NAME,
-                    masterKey,
+                    context, PREFS_NAME, masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
@@ -296,49 +291,38 @@ public class PermissionManager {
             out.put("Receipt", true);
             out.put("GoldConversion", true);
         } catch (Exception ignored) {}
+
         // ✅ اقرأ fragments الصريحة من السيرفر (إن وُجدت) — تتجاوز الاشتقاق
         JSONObject serverFragments = caps.optJSONObject("fragments");
         if (serverFragments != null) {
-           Iterator<String> keys = serverFragments.keys();
-           while (keys.hasNext()) {
-           String key = keys.next();
-           try {
-            out.put(key, serverFragments.optBoolean(key, false));
-            } catch (Exception ignored) {}
+            Iterator<String> keys = serverFragments.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                try {
+                    out.put(key, serverFragments.optBoolean(key, false));
+                } catch (Exception ignored) {}
             }
         }
         return out;
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Low-level
-    // ═══════════════════════════════════════════════════════
-    public boolean hasPermission(String feature, String action) {
-        if (legacyPermissions == null) return false;
-        JSONObject f = legacyPermissions.optJSONObject(feature);
-        return f != null && f.optBoolean(action, false);
-    }
-
-    public boolean canView(String feature) {
-        return hasPermission(feature, "view")
-            || hasPermission(feature, "edit")
-            || hasPermission(feature, "delete");
-    }
-    public boolean canEdit(String feature)   { return hasPermission(feature,"edit") || hasPermission(feature,"delete"); }
-    public boolean canDelete(String feature) { return hasPermission(feature,"delete"); }
-    public boolean canExport(String feature) { return hasPermission(feature,"export") || canView(feature); }
-
-    // ═══════════════════════════════════════════════════════
-    //  Module helper
+    //  Module helper — المصدر الوحيد للحقيقة
     // ═══════════════════════════════════════════════════════
     private JSONObject module(String name) {
         if (capabilities == null) return null;
         JSONObject modules = capabilities.optJSONObject("modules");
         return modules == null ? null : modules.optJSONObject(name);
     }
+
     private boolean moduleEnabled(String name) {
         JSONObject m = module(name);
         return m != null && m.optBoolean("enabled", false);
+    }
+
+    private String moduleScope(String name) {
+        JSONObject m = module(name);
+        return m == null ? null : m.optString("scope", null);
     }
 
     private boolean fragmentEnabled(String key) {
@@ -346,17 +330,69 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  ✅ Role checks — كلها من الوثيقة (لا role() محلي)
-    //  ملاحظة: هذه aliases للتوافق الخلفي فقط.
-    //  لا تُستخدم لاتخاذ قرار جديد — استخدم canX() مباشرة.
+    //  ✅ Low-level — من modules (لا legacyPermissions)
+    //  legacyPermissions kept as fallback only
     // ═══════════════════════════════════════════════════════
+    private boolean scopeAllows(String moduleName, String action) {
+        JSONObject m = module(moduleName);
+        if (m == null || !m.optBoolean("enabled", false)) return false;
 
-    /** للعرض فقط — يُرجع اسم الدور من الجلسة (ليس قراراً) */
+        String scope = m.optString("scope", "view");
+
+        switch (action) {
+            case "view":
+                return true; // enabled = يمكنه الرؤية
+            case "edit":
+            case "write":
+            case "operate":
+                return "operate".equals(scope) || "write".equals(scope) || "full".equals(scope);
+            case "delete":
+                return "full".equals(scope);
+            case "export":
+                return "full".equals(scope) || "view_all".equals(scope);
+            default:
+                return false;
+        }
+    }
+
+    public boolean hasPermission(String feature, String action) {
+        // 1) من modules (المصدر الأساسي)
+        if (scopeAllows(feature, action)) return true;
+
+        // 2) fallback: legacyPermissions (لو كان JSON object صحيحاً)
+        if (legacyPermissions != null) {
+            JSONObject f = legacyPermissions.optJSONObject(feature);
+            if (f != null && f.optBoolean(action, false)) return true;
+        }
+
+        return false;
+    }
+
+    public boolean canView(String feature) {
+        return hasPermission(feature, "view")
+            || hasPermission(feature, "edit")
+            || hasPermission(feature, "delete");
+    }
+
+    public boolean canEdit(String feature) {
+        return hasPermission(feature, "edit") || hasPermission(feature, "delete");
+    }
+
+    public boolean canDelete(String feature) {
+        return hasPermission(feature, "delete");
+    }
+
+    public boolean canExport(String feature) {
+        return hasPermission(feature, "export") || canView(feature);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Role checks — من الوثيقة (للعرض فقط، ليس قراراً)
+    // ═══════════════════════════════════════════════════════
     public String getRoleForDisplay() {
         return sessionManager.getRoleString();
     }
 
-    /** إداري إذا كان السيرفر أعطاه module admin */
     public boolean isSystemAdmin()    { return moduleEnabled("admin"); }
     public boolean isOrgAdmin()       { return moduleEnabled("admin"); }
     public boolean isFinanceManager() { return moduleEnabled("accounting"); }
@@ -382,67 +418,66 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  canX() — من الوثيقة
+    //  canX() — كلها من modules (السيرفر يقرر)
     // ═══════════════════════════════════════════════════════
-    public boolean canPerformAccountingSetup()     { return moduleEnabled("accounting"); }
-    public boolean canManageUsersAdvanced()        { return moduleEnabled("users"); }
+    public boolean canPerformAccountingSetup()     { return scopeAllows("accounting", "edit"); }
+    public boolean canManageUsersAdvanced()        { return scopeAllows("users", "edit"); }
     public boolean canViewDashboard()              { return true; }
     public boolean canViewProfile()                { return true; }
 
     public boolean canViewInventory()              { return moduleEnabled("inventory"); }
-    public boolean canEditInventory()              { return canEdit(FEATURE_INVENTORY); }
-    public boolean canDeleteInventory()            { return canDelete(FEATURE_INVENTORY); }
+    public boolean canEditInventory()              { return scopeAllows("inventory", "edit"); }
+    public boolean canDeleteInventory()            { return scopeAllows("inventory", "delete"); }
 
     public boolean canViewPos()                    { return moduleEnabled("pos"); }
-    public boolean canUsePos()                     { return canEdit(FEATURE_POS); }
+    public boolean canUsePos()                     { return scopeAllows("pos", "operate"); }
 
     public boolean canViewTransfers()              { return moduleEnabled("transfers"); }
-    public boolean canCreateTransfer()             { return canEdit(FEATURE_TRANSFERS); }
-    public boolean canApproveTransfer()            { return canEdit(FEATURE_TRANSFERS); }
+    public boolean canCreateTransfer()             { return scopeAllows("transfers", "edit"); }
+    public boolean canApproveTransfer()            { return scopeAllows("transfers", "edit"); }
 
     public boolean canViewIdentity()               { return moduleEnabled("inventory"); }
-    public boolean canUseIdentity()                { return canEdit(FEATURE_IDENTITY); }
+    public boolean canUseIdentity()                { return scopeAllows("inventory", "edit"); }
 
     public boolean canViewRadar()                  { return moduleEnabled("radar"); }
 
     public boolean canViewGates()                  { return moduleEnabled("gate"); }
-    public boolean canManageGates()                { return canEdit(FEATURE_GATES); }
+    public boolean canManageGates()                { return scopeAllows("gate", "edit"); }
 
     public boolean canViewReports()                { return moduleEnabled("reports"); }
-    public boolean canExportReports()              { return canExport(FEATURE_REPORTS); }
+    public boolean canExportReports()              { return scopeAllows("reports", "export"); }
 
     public boolean canViewAccounting()             { return moduleEnabled("accounting"); }
-    public boolean canEditAccounting()             { return canEdit(FEATURE_ACCOUNTING); }
+    public boolean canEditAccounting()             { return scopeAllows("accounting", "edit"); }
 
     public boolean canViewAdminHub()               { return moduleEnabled("admin"); }
-    public boolean canManageUsers()                { return moduleEnabled("users"); }
+    public boolean canManageUsers()                { return scopeAllows("users", "edit"); }
     public boolean canViewBranches()               { return moduleEnabled("branches"); }
-    public boolean canManageBranches()             { return canEdit(FEATURE_BRANCHES); }
+    public boolean canManageBranches()             { return scopeAllows("branches", "edit"); }
 
     public boolean canViewServerConfig()           { return moduleEnabled("settings"); }
 
     public boolean canViewGoldRates()              { return moduleEnabled("gold_rates"); }
-    public boolean canEditGoldRates()              { return canEdit(FEATURE_GOLD_RATES); }
+    public boolean canEditGoldRates()              { return scopeAllows("gold_rates", "edit"); }
 
     public boolean canViewSalesHistory()           { return moduleEnabled("sales_history"); }
-    public boolean canManageQuickAccess()          { return canEdit(FEATURE_QUICK_ACCESS); }
+    public boolean canManageQuickAccess()          { return scopeAllows("quick_access", "edit"); }
 
-    /** ✅ جديد: فلتر كل الفروع في sales history */
     public boolean canViewAllBranches()            { return fragmentEnabled("SalesHistoryAllBranches"); }
 
-    public boolean canWriteRfid()                  { return moduleEnabled("rfid"); }
+    public boolean canWriteRfid()                  { return scopeAllows("rfid", "edit"); }
     public boolean canViewRfidBindings()           { return moduleEnabled("rfid"); }
     public boolean canViewReaderSetup()            { return moduleEnabled("reader_setup") || moduleEnabled("rfid"); }
     public boolean canViewSoundSettings()          { return true; }
     public boolean canViewSnapshots()              { return canViewInventory(); }
 
     public boolean canViewScrapGold()              { return moduleEnabled("scrap") || moduleEnabled("inventory"); }
-    public boolean canBuyScrapGold()               { return canEdit(FEATURE_INVENTORY); }
+    public boolean canBuyScrapGold()               { return scopeAllows("scrap", "edit") || scopeAllows("inventory", "edit"); }
     public boolean canViewScrapAging()             { return canViewScrapGold(); }
 
     public boolean canViewParties()                { return moduleEnabled("parties"); }
     public boolean canViewCashReconciliation()     { return moduleEnabled("accounting"); }
-    public boolean canCreatePurchaseInvoice()      { return moduleEnabled("purchases"); }
+    public boolean canCreatePurchaseInvoice()      { return scopeAllows("purchases", "edit"); }
     public boolean canViewAuditLogs()              { return moduleEnabled("audit"); }
     public boolean canViewGoldConversion()         { return true; }
 
@@ -485,24 +520,39 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Dashboard widgets
+    //  Dashboard widgets — من modules.dashboard.variant
     // ═══════════════════════════════════════════════════════
-    private boolean widget(String key) {
-        if (capabilities == null) return false;
-        JSONObject w = capabilities.optJSONObject("dashboard_widgets");
-        return w != null && w.optBoolean(key, false);
+    private String dashboardVariant() {
+        JSONObject d = module("dashboard");
+        return d == null ? "pos" : d.optString("variant", "pos");
     }
-    public boolean canViewDashboardHero()          { return widget("hero"); }
-    public boolean canViewDashboardSales()         { return widget("sales"); }
+
+    public boolean canViewDashboardHero() {
+        String v = dashboardVariant();
+        return "full".equals(v) || "hero_inventory".equals(v);
+    }
+    public boolean canViewDashboardSales() {
+        String v = dashboardVariant();
+        return "full".equals(v) || "pos".equals(v);
+    }
     public boolean canViewDashboardGoldPrices()    { return canViewGoldRates(); }
     public boolean canViewDashboardInventoryByKarat(){ return canViewInventory(); }
     public boolean canViewDashboardScrap()         { return moduleEnabled("scrap") || moduleEnabled("inventory"); }
     public boolean canViewDashboardScrapAging()    { return canViewDashboardScrap(); }
-    public boolean canViewDashboardCharts()        { return widget("charts"); }
-    public boolean canViewDashboardAlerts()        { return widget("alerts"); }
+    public boolean canViewDashboardCharts() {
+        String v = dashboardVariant();
+        return "full".equals(v) || "hero_inventory".equals(v);
+    }
+    public boolean canViewDashboardAlerts() {
+        String v = dashboardVariant();
+        return "full".equals(v) || "hero_inventory".equals(v);
+    }
     public boolean canViewDashboardRecentActivity(){ return true; }
-    public boolean canRefreshGoldManually()        { return canEdit(FEATURE_GOLD_RATES); }
-    public boolean canRevealSensitiveValues()      { return widget("sensitive"); }
+    public boolean canRefreshGoldManually()        { return scopeAllows("gold_rates", "edit"); }
+    public boolean canRevealSensitiveValues() {
+        String v = dashboardVariant();
+        return "full".equals(v) || "hero_inventory".equals(v);
+    }
 
     // ═══════════════════════════════════════════════════════
     //  Master Gate
@@ -569,4 +619,4 @@ public class PermissionManager {
                 return null;
         }
     }
-}
+    }
