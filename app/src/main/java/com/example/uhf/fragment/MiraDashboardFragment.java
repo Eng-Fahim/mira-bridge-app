@@ -84,7 +84,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private RecentActivityCache activityCache;
     private JSONObject lastSalesData = null;
-    private boolean isHeroHidden = true;
+    private boolean isHeroHidden = false;
     private boolean isSalesHidden = true;
     private boolean isInventoryHidden = true;
     private boolean isScrapHidden = true;
@@ -248,49 +248,51 @@ public class MiraDashboardFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        try {
-            return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
-        } catch (Exception e) {
-            Log.e(TAG, "Dashboard inflate FAILED", e);
-            android.widget.TextView errorView = new android.widget.TextView(container != null ? container.getContext() : requireContext());
-            errorView.setText("Error loading UI: " + e.getMessage());
-            return errorView;
-        }
+        // إرجاع تخطيط الـ XML الذي يحتوي على الـ ComposeView
+        return inflater.inflate(R.layout.fragment_mira_dashboard_advanced, container, false);
     }
 
 
-    @Override
+        @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        try {
-            initializeManagers();
-            initViews(view);
-            setupProfileListener();
-            setupBranchListener();
-            
-            currentBranchId = (branchesManager != null && branchesManager.getActiveBranchId() > 0)
-                    ? branchesManager.getActiveBranchId()
-                    : (sessionManager != null ? sessionManager.getBranchId() : 1);
 
-            initBranchCache(currentBranchId);
-            showShimmer(false);
-            isViewInitialized = true;
-            loadOfflineData();
-            startAutoRefresh();
-            lastDataFetchTime = 0;
+        // تهيئة المديرون والبيانات كما هي
+        initializeManagers();
 
-            fetchData();
-            fetchDashboardCharts();
-            fetchRecentActivity();
-            if (currentBranchId > 0) {
-                fetchScrapSummary(currentBranchId);
-                fetchScrapAging(currentBranchId);
-            }
-
-        } catch (Throwable e) {
-            Log.e(TAG, "onViewCreated", e);
+        ComposeView composeView = view.findViewById(R.id.composeDashboardView);
+        if (composeView != null) {
+            composeView.setContent(() -> {
+                // هنا يتم تمرير المتغيرات الحية (الوزن الإجمالي، القيمة، العيارات القادمة من السيرفر)
+                MiraDashboardScreenKt.MiraDashboardScreen(
+                    currentTotalWeight,     // الوزن الإجمالي الفعلي من السيرفر
+                    currentInventoryValue,  // القيمة الإجمالية الفعلية
+                    0.00,                   // الرصيد النقدي
+                    Arrays.asList(
+                        new KaratDataModel(24, 124.00), // يمكن ربطها بقائمة العيارات الحقيقية
+                        new KaratDataModel(18, 9.50)
+                    ),
+                    () -> {
+                        // عند النقر على زر العين لإخفاء/إظهار الأرصدة
+                        isHeroHidden = !isHeroHidden;
+                        return null;
+                    },
+                    !isHeroHidden,
+                    (action) -> {
+                        // التعامل مع الأزرار السريعة (بيع، شراء، تقارير...)
+                        if (action.equals("sell")) {
+                            navigateToFragment(new MiraPosFragment(), "Sales");
+                        } else if (action.equals("reports")) {
+                            navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities");
+                        }
+                        return null;
+                    }
+                );
+                return null;
+            });
         }
     }
+
 
 
     private void initViews(View v) {
