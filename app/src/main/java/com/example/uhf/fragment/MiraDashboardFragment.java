@@ -244,6 +244,20 @@ public class MiraDashboardFragment extends Fragment {
     private void shutdownExecutor() {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
+    
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        try {
+            return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
+        } catch (Exception e) {
+            Log.e(TAG, "Dashboard inflate FAILED", e);
+            android.widget.TextView errorView = new android.widget.TextView(container != null ? container.getContext() : requireContext());
+            errorView.setText("Error loading UI: " + e.getMessage());
+            return errorView;
+        }
+    }
+
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
