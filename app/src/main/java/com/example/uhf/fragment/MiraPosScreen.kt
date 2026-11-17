@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uhf.model.CartItem
 import com.example.uhf.ui.theme.MiraTheme
+import java.util.Locale
 
 @Composable
 fun MiraPosScreen(
@@ -212,32 +213,45 @@ fun MiraPosScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // زر RFID التفاعلي
-                            Button(
-                                onClick = onScanRfidClick,
-                                onLongClick = onScanRfidLongClick,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isRfidListening) Color(0xFF10B981).copy(alpha = 0.2f) else colors.goldPrimary.copy(alpha = 0.15f)
-                                ),
-                                border = BorderStroke(1.dp, if (isRfidListening) Color(0xFF10B981) else colors.goldPrimary),
+                            // زر RFID التفاعلي مع دعم الضغط الطويل
+                            Surface(
                                 shape = RoundedCornerShape(12.dp),
+                                color = if (isRfidListening) Color(0xFF10B981).copy(alpha = 0.2f) else colors.goldPrimary.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, if (isRfidListening) Color(0xFF10B981) else colors.goldPrimary),
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(46.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .combinedClickable(
+                                        onClick = onScanRfidClick,
+                                        onLongClick = onScanRfidLongClick
+                                    )
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.RssFeed,
-                                    contentDescription = null,
-                                    tint = if (isRfidListening) Color(0xFF10B981) else colors.goldPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (isRfidListening) (if (isArabic) "🟢 يستمع ($rfidCount)" else "🟢 Listening ($rfidCount)") else (if (isArabic) "🎯 قارئ RFID" else "🎯 RFID Scanner"),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textPrimary
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.RssFeed,
+                                        contentDescription = null,
+                                        tint = if (isRfidListening) Color(0xFF10B981) else colors.goldPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isRfidListening) {
+                                            if (isArabic) "🟢 يستمع ($rfidCount)" else "🟢 Listening ($rfidCount)"
+                                        } else {
+                                            if (isArabic) "🎯 قارئ RFID" else "🎯 RFID Scanner"
+                                        },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
                             }
 
                             // زر ماسح الكاميرا الدقيق (Micro-Tag)
@@ -393,7 +407,7 @@ fun MiraPosScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = if (isArabic) "إجمالي القطع: $itemCount" : "Total Items: $itemCount",
+                                    text = if (isArabic) "إجمالي القطع: $itemCount" else "Total Items: $itemCount",
                                     fontSize = 12.sp,
                                     color = colors.textSecondary
                                 )
@@ -416,7 +430,7 @@ fun MiraPosScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = if (isArabic) "تفريغ السلة" : "Clear Cart",
+                                        text = if (isArabic) "تفريغ السلة" else "Clear Cart",
                                         fontSize = 12.sp,
                                         color = Color(0xFFEF4444),
                                         fontWeight = FontWeight.Bold
@@ -446,7 +460,7 @@ fun MiraPosScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (isArabic) "إتمام البيع والدفع" : "Complete Checkout",
+                                text = if (isArabic) "إتمام البيع والدفع" else "Complete Checkout",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -500,7 +514,7 @@ private fun CartItemCard(
                 ) {
                     Text(
                         text = item.karat.ifBlank { "21K" },
-                        fontSize = 11.sp,
+                        fontSize: 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.goldPrimary
                     )
