@@ -46,6 +46,7 @@ import javax.net.ssl.HttpsURLConnection;
 
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
+import com.example.uhf.manager.PermissionManager;
 
 public class MiraApiClient {
 
