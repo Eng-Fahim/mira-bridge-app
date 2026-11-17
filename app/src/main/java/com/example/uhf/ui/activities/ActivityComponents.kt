@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -586,17 +587,17 @@ fun ActivityErrorState(
         Surface(
             onClick = onRetry,
             shape = RoundedCornerShape(50),
-            color = colors.primary
+            color = colors.goldPrimary
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Rounded.Refresh, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.Refresh, null, tint = Color(0xFF060B19), modifier = Modifier.size(18.dp))
                 Text(
                     if (isArabic) "إعادة المحاولة" else "Retry",
-                    color = Color.White,
+                    color = Color(0xFF060B19),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.labelLarge
                 )
