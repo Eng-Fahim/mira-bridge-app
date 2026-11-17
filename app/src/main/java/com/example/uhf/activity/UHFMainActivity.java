@@ -2328,29 +2328,25 @@ private void applyNavPermissions() {
             added++;
         }
 
-        // 3) التحكم في الرؤية
+        // 3) التحكم في الرؤية — [نسخة إصلاح إظهار الشريط السفلي إجبارياً]
         String setupStatus = getCachedSetupStatus();
         boolean setupComplete = SETUP_COMPLETED.equals(setupStatus) || SETUP_LOCKED.equals(setupStatus);
 
         if (setupComplete) {
-            boolean isSecurity = permissionManager.isGateUser();
+            // 🛡️ اجعل الشريط السفلي يظهر دائماً إذا كان المستخدم مسجلاً وصار الإعداد مكتملًا
+            nav.setVisibility(View.VISIBLE);
+            bottomContainer.setVisibility(View.VISIBLE);
+            
+            if (permissionManager != null && permissionManager.isGateUser()) {
+                // استثناء خاص لأمن البوابات فقط إن رغبت، أو اتركه ظاهراً
+                // nav.setVisibility(View.GONE);
+            }
 
-            if (added >= 2) {
-                nav.setVisibility(View.VISIBLE);
-                bottomContainer.setVisibility(View.VISIBLE);
-                if (fab != null) resetFabConstraintsToNav(fab);
-
-            } else if (added == 1) {
-                nav.setVisibility(View.GONE);
-                boolean fabVisible = !isSecurity && (fab != null && fab.getVisibility() == View.VISIBLE);
-                bottomContainer.setVisibility(fabVisible ? View.VISIBLE : View.GONE);
-                if (fab != null && fabVisible) anchorFabToContainerCenter(fab, bottomContainer);
-
-            } else {
-                nav.setVisibility(View.GONE);
-                bottomContainer.setVisibility(View.GONE);
+            if (fab != null) {
+                resetFabConstraintsToNav(fab);
             }
         }
+
 
         // 4) ضبط التحديد على العنصر الحالي
         String currentTag = (navigationManager != null)
@@ -3758,4 +3754,4 @@ public void openLicenseStatus() {
             return 0;
         }
     }
-                        }
+                    }
