@@ -88,7 +88,7 @@
         </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ⬇️ الشريط السفلي والأزرار العائمة -->
+    <!-- ⬇️ الشريط السفلي والأزرار العائمة (مرتبة بدون أي تكرار) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -124,41 +124,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ✅ زر التقارير (مخفي افتراضياً) -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabReports"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:elevation="16dp"
-            android:src="@drawable/ic_reports"
-            android:visibility="gone"
-            app:backgroundTint="?attr/colorSecondary"
-            app:elevation="16dp"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
-            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
-            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-            app:layout_constraintTop_toTopOf="@id/fabActionCenter"
-            app:tint="?attr/colorOnSecondary" />
-
-        <!-- ✅ زر الملف الشخصي (مخفي افتراضياً) -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabProfile"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:elevation="16dp"
-            android:src="@drawable/ic_user_placeholder"
-            android:visibility="gone"
-            app:backgroundTint="?attr/colorSecondary"
-            app:elevation="16dp"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
-            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
-            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-            app:layout_constraintTop_toTopOf="@id/fabActionCenter"
-            app:tint="?attr/colorOnSecondary" />
-
-        <!-- ✅ الزر الرئيسي (الأصفر) -->
+        <!-- 1. الزر الرئيسي (الأصفر) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="56dp"
@@ -176,6 +142,40 @@
             app:maxImageSize="24dp"
             app:pressedTranslationZ="6dp"
             app:tint="?attr/colorOnPrimary" />
+
+        <!-- 2. زر الملف الشخصي -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabProfile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:elevation="18dp"
+            android:src="@drawable/ic_user_placeholder"
+            android:visibility="gone"
+            app:backgroundTint="?attr/colorSecondary"
+            app:elevation="18dp"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
+            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
+            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
+            app:layout_constraintTop_toTopOf="@id/fabActionCenter"
+            app:tint="?attr/colorOnSecondary" />
+
+        <!-- 3. زر التقارير -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabReports"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:elevation="20dp"
+            android:src="@drawable/ic_reports"
+            android:visibility="gone"
+            app:backgroundTint="?attr/colorSecondary"
+            app:elevation="20dp"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
+            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
+            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
+            app:layout_constraintTop_toTopOf="@id/fabActionCenter"
+            app:tint="?attr/colorOnSecondary" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
