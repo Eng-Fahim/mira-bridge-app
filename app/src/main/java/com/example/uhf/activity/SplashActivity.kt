@@ -3,206 +3,170 @@ package com.example.uhf.activity
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Diamond
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.uhf.R
+import com.example.uhf.license.LicenseManager
+import com.example.uhf.manager.MiraOrgProfileManager
+import com.example.uhf.manager.MiraServerConfig
 import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
-import kotlinx.coroutines.delay
+import java.util.Locale
+import java.util.concurrent.Executors
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
 
-    companion object {
-        private const val TAG = "SplashActivity"
-        private const val SPLASH_DURATION_MS = 2800L
-    }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val executor = Executors.newSingleThreadExecutor()
+
+    private var isArabicState by mutableStateOf(true)
+    private var statusMessageState by mutableStateOf("")
+    private var orgDisplayNameState by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // يضبط لون أيقونات شريط الحالة العلوي تلقائياً حسب الوضع الفاتح أو الداكن
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
+
+        isArabicState = Locale.getDefault().language == "ar"
+        statusMessageState = if (isArabicState) {
+            "جاري التحقق من الترخيص والاتصال الآمن..."
+        } else {
+            "Verifying license & secure connection..."
+        }
+
+        val orgProfile = MiraOrgProfileManager.getInstance(this)
+        val savedOrgName = if (isArabicState) orgProfile.orgNameAr else orgProfile.orgNameEn
+        if (!savedOrgName.isNullOrBlank()) {
+            orgDisplayNameState = savedOrgName
+        }
 
         setContent {
-            MiraJewelryTheme {
-                MiraLuxurySplashScreen(
-                    durationMs = SPLASH_DURATION_MS,
-                    onTimeout = { navigateToNextScreen() }
-                )
+            val direction = if (isArabicState) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                MiraJewelryTheme {
+                    SplashScreenContent(
+                        isArabic = isArabicState,
+                        orgName = orgDisplayNameState,
+                        statusMessage = statusMessageState
+                    )
+                }
             }
         }
+
+        verifyLicenseAndRoute()
     }
 
-    private fun navigateToNextScreen() {
-        if (isFinishing || isDestroyed) return
+    private fun verifyLicenseAndRoute() {
+        executor.execute {
+            val startTime = System.currentTimeMillis()
+            val isActivated = isLicenseActivated()
 
-        val target: Class<*> = if (isLicenseActivated()) {
-            Log.d(TAG, "✅ License active — → LoginActivity")
-            LoginActivity::class.java
-        } else {
-            Log.d(TAG, "⚠️ License NOT active — → ActivationActivity")
-            ActivationActivity::class.java
+            val elapsed = System.currentTimeMillis() - startTime
+            val minSplashDuration = 1400L
+            val remainingDelay = (minSplashDuration - elapsed).coerceAtLeast(0L)
+
+            mainHandler.postDelayed({
+                if (isFinishing || isDestroyed) return@postDelayed
+
+                statusMessageState = if (isActivated) {
+                    if (isArabicState) "تم التحقق من الترخيص بنجاح" else "License verified successfully"
+                } else {
+                    if (isArabicState) "مطلوب تفعيل ترخيص المنشأة" else "Enterprise license activation required"
+                }
+
+                val targetClass = if (isActivated) {
+                    LoginActivity::class.java
+                } else {
+                    ActivationActivity::class.java
+                }
+
+                val intent = Intent(this, targetClass).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                }
+                startActivity(intent)
+                finish()
+            }, remainingDelay)
         }
-
-        val intent = Intent(this, target)
-        startActivity(intent)
-        @Suppress("DEPRECATION")
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-        finish()
     }
 
     private fun isLicenseActivated(): Boolean {
         return try {
-            val sm = SessionManager(applicationContext)
+            val licenseManager = LicenseManager.getInstance(this)
+            val sessionManager = SessionManager(this)
+            val serverConfig = MiraServerConfig.getInstance(this)
 
-            var token: String? = null
-            try {
-                val method = sm.javaClass.getMethod("getActivationToken")
-                val result = method.invoke(sm)
-                if (result is String) token = result
-            } catch (e: Exception) {
-                Log.w(TAG, "getActivationToken not available: ${e.message}")
-            }
+            val serverUrl = serverConfig.serverUrl.ifBlank { sessionManager.serverUrl ?: "" }.trim()
+            val hasValidServer = serverUrl.startsWith("https://", ignoreCase = true) &&
+                !serverUrl.contains("ibreg.org", ignoreCase = true)
 
-            if (token.isNullOrEmpty()) {
-                Log.d(TAG, "❌ No activation token → NOT activated")
-                return false
-            }
-
-            val serverUrl = sm.serverUrl
-            if (serverUrl.isNullOrEmpty()) {
-                Log.d(TAG, "❌ No serverUrl → NOT activated")
-                return false
-            }
-            if (serverUrl.contains("id.ibreg.org") || serverUrl.contains("wp-json")) {
-                Log.d(TAG, "❌ serverUrl is legacy WordPress → NOT activated")
-                return false
-            }
-            if (serverUrl.endsWith("/api/v1") || serverUrl.endsWith("/api/v1/")) {
-                Log.d(TAG, "❌ serverUrl is center URL (/api/v1), not customer URL → NOT activated")
-                return false
-            }
-
-            Log.d(TAG, "✅ Activated: token=${token.length} chars, server=$serverUrl")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "License check failed: ${e.message}", e)
+            licenseManager.isActivated && hasValidServer
+        } catch (_: Exception) {
             false
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mainHandler.removeCallbacksAndMessages(null)
+        executor.shutdownNow()
+    }
 }
 
-private val EmeraldStatus = Color(0xFF10B981)
-private val CyanAccent    = Color(0xFF38BDF8)
-
 @Composable
-private fun MiraLuxurySplashScreen(
-    durationMs: Long,
-    onTimeout: () -> Unit
+private fun SplashScreenContent(
+    isArabic: Boolean,
+    orgName: String,
+    statusMessage: String
 ) {
     val colors = MiraTheme.colors
 
+    val entranceAnim = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        delay(durationMs)
-        onTimeout()
+        entranceAnim.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing)
+        )
     }
 
-    var startAnimation by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { startAnimation = true }
-
-    val logoScale by animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0.72f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "logoScale"
-    )
-
-    val contentAlpha by animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 950, easing = FastOutSlowInEasing),
-        label = "contentAlpha"
-    )
-
-    val progressFraction by animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = (durationMs - 200).toInt(), easing = LinearEasing),
-        label = "progressFraction"
-    )
-
-    val infiniteTransition = rememberInfiniteTransition(label = "luxuryLoops")
-
-    val rfidWaveProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
+    val pulseTransition = rememberInfiniteTransition(label = "emblemPulse")
+    val glowScale by pulseTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "rfidWave"
-    )
-
-    val ringRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(16000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ringRotation"
-    )
-
-    val shimmerOffset by infiniteTransition.animateFloat(
-        initialValue = -320f,
-        targetValue = 680f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1850, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "goldShimmer"
-    )
-
-    val goldMetallicBrush = Brush.linearGradient(
-        colors = listOf(
-            colors.goldDeep,
-            colors.goldPrimary,
-            colors.goldHighlight,
-            colors.goldPrimary,
-            colors.goldDeep
-        ),
-        start = Offset(shimmerOffset, 0f),
-        end = Offset(shimmerOffset + 280f, 130f)
+        label = "glowScale"
     )
 
     Surface(
@@ -214,183 +178,105 @@ private fun MiraLuxurySplashScreen(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            colors.backgroundTop,
-                            colors.backgroundMid,
-                            colors.backgroundTop
-                        )
+                        listOf(colors.backgroundTop, colors.backgroundMid, colors.backgroundTop)
                     )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            // 1. الإضاءة المحيطية المتكيفة مع الثيم
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            colors.goldPrimary.copy(alpha = colors.glowAlpha),
-                            CyanAccent.copy(alpha = 0.05f),
-                            Color.Transparent
-                        ),
-                        center = Offset(center.x, center.y - 60.dp.toPx()),
-                        radius = size.minDimension * 0.65f
-                    ),
-                    radius = size.minDimension * 0.65f,
-                    center = Offset(center.x, center.y - 60.dp.toPx())
                 )
-            }
-
-            // 2. المحتوى الرئيسي
+                .padding(24.dp)
+        ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .alpha(contentAlpha)
+                    .align(Alignment.Center)
+                    .alpha(entranceAnim.value)
+                    .scale(0.92f + (0.08f * entranceAnim.value))
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
+                Surface(
+                    shape = CircleShape,
+                    color = colors.goldPrimary.copy(alpha = 0.14f),
+                    border = BorderStroke(1.5.dp, colors.goldPrimary.copy(alpha = 0.65f)),
                     modifier = Modifier
-                        .size(260.dp)
-                        .scale(logoScale)
+                        .size(104.dp)
+                        .scale(glowScale)
                 ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val maxRadius = size.minDimension / 2f
-
-                        val waveRadius = maxRadius * (0.72f + 0.28f * rfidWaveProgress)
-                        val waveAlpha = (1f - rfidWaveProgress) * 0.50f
-                        drawCircle(
-                            color = colors.goldPrimary.copy(alpha = waveAlpha),
-                            radius = waveRadius,
-                            style = Stroke(width = 2.dp.toPx())
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.Diamond,
+                            contentDescription = "MIRA ID",
+                            tint = colors.goldPrimary,
+                            modifier = Modifier.size(50.dp)
                         )
-
-                        rotate(ringRotation) {
-                            drawArc(
-                                brush = Brush.sweepGradient(
-                                    listOf(
-                                        Color.Transparent,
-                                        colors.goldPrimary.copy(alpha = 0.85f),
-                                        colors.goldHighlight,
-                                        CyanAccent.copy(alpha = 0.7f),
-                                        Color.Transparent
-                                    )
-                                ),
-                                startAngle = 0f,
-                                sweepAngle = 260f,
-                                useCenter = false,
-                                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
-                                topLeft = Offset(size.width * 0.06f, size.height * 0.06f),
-                                size = androidx.compose.ui.geometry.Size(
-                                    size.width * 0.88f,
-                                    size.height * 0.88f
-                                )
-                            )
-                        }
                     }
-
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_mira_id_logo),
-                        contentDescription = "MIRA ID Logo",
-                        modifier = Modifier.size(215.dp)
-                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(22.dp))
 
                 Text(
-                    text = "MIRA ID",
-                    style = TextStyle(
-                        brush = goldMetallicBrush,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 6.sp
-                    ),
+                    text = "MIRA ID™",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = colors.goldPrimary,
+                    letterSpacing = 1.5.sp
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = if (orgName.isNotBlank()) {
+                        orgName
+                    } else if (isArabic) {
+                        "منظومة إدارة الذهب والمجوهرات الذكية"
+                    } else {
+                        "Smart Jewelry & RFID Enterprise Suite"
+                    },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(34.dp))
 
-                Text(
-                    text = "SMART JEWELRY RFID TAG",
-                    color = colors.subtitleGold,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 3.2.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Box(
+                LinearProgressIndicator(
+                    color = colors.goldPrimary,
+                    trackColor = colors.trackBackground,
                     modifier = Modifier
-                        .width(180.dp)
-                        .height(1.5.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color.Transparent, colors.goldPrimary, Color.Transparent)
-                            )
-                        )
+                        .width(190.dp)
+                        .height(4.dp)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = "المنظومة الذكية لإدارة وتتبع الذهب والمجوهرات",
-                    color = colors.textPrimary.copy(alpha = 0.90f),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = statusMessage,
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Box(
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(3.5.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.trackBackground)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progressFraction)
-                            .fillMaxHeight()
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        colors.goldDeep,
-                                        colors.goldPrimary,
-                                        colors.goldHighlight,
-                                        CyanAccent
-                                    )
-                                )
-                            )
-                    )
-                }
             }
 
-            // 3. شريط التذييل السفلي
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 26.dp)
-                    .alpha(contentAlpha)
+                    .padding(bottom = 12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(EmeraldStatus)
+                Icon(
+                    imageVector = Icons.Rounded.VerifiedUser,
+                    contentDescription = null,
+                    tint = colors.goldPrimary.copy(alpha = 0.8f),
+                    modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "MIRA TECHNOLOGY • ENTERPRISE EDITION",
-                    color = colors.textSecondary,
-                    fontSize = 10.sp,
-                    letterSpacing = 1.6.sp
+                    text = if (isArabic) {
+                        "ميرا تكنولوجي للحلول الذكية • حماية مشفّرة"
+                    } else {
+                        "MIRA Technology • Hardware-Encrypted Security"
+                    },
+                    fontSize = 11.sp,
+                    color = colors.textSecondary
                 )
             }
         }
