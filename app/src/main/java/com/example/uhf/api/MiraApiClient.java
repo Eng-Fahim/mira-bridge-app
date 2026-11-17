@@ -878,9 +878,23 @@ return apiResponse;
             } catch (Exception e) {
                 Log.e(TAG, "Save user info error: " + e.getMessage());
             }
+            // ✅ جلب capabilities بعد login
+            // ✅ أولاً: حدّث الكاش (token, apiKey, baseUrl, Retrofit)
+refreshCredentials();
 
-           refreshCredentials();
-
+// ✅ ثانياً: اجلب capabilities (سيستخدم التوكن الجديد من الكاش)
+try {
+    ApiResponse capsResp = getWithAuth("/mobile/capabilities");
+    if (capsResp != null && capsResp.isSuccess && capsResp.data != null) {
+        PermissionManager.getInstance(context).saveFromServer(capsResp.data);
+        Log.d(TAG, "✅ Capabilities loaded after login");
+    } else {
+        Log.w(TAG, "⚠️ Capabilities fetch failed: "
+            + (capsResp != null ? capsResp.error : "null response"));
+    }
+} catch (Exception e) {
+    Log.e(TAG, "Capabilities fetch error", e);
+}
         } else {
             invalidateTokenCache();
         }
