@@ -841,7 +841,7 @@ private void showLicenseLoading(boolean show) {
         });
     }
 
-    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
+        private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
         Log.d(TAG, "Login Success for user: " + username);
         playTone(true);
 
@@ -877,13 +877,20 @@ private void showLicenseLoading(boolean show) {
             MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
         }
 
+        // 🛡️ أولاً: حفظ وتفعيل الصلاحيات القادمة من السيرفر حصرياً
+        PermissionManager.resetInstance();
+        PermissionManager pm = PermissionManager.getInstance(appContext);
+        
         String permissionsJson = response.optString("permissions", "");
-        if (!permissionsJson.isEmpty()) {
-            PermissionManager.resetInstance();
-            PermissionManager pm = PermissionManager.getInstance(appContext);
+        if (permissionsJson != null && !permissionsJson.isEmpty()) {
             pm.savePermissions(permissionsJson);
+            Log.d(TAG, "✅ Server-driven permissions saved successfully");
+        } else {
+            // كاش احتياطي طوارئ في حال لم يرسل السيرفر كائن الصلاحيات مباشرة
+            Log.w(TAG, "⚠️ Permissions JSON empty from server response, using role fallback");
         }
 
+        // ثانياً: إنشاء جلسة الدخول
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
         sessionManager.setUserId(userId);
@@ -911,6 +918,7 @@ private void showLicenseLoading(boolean show) {
 
         showSuccessOverlayAndNavigate();
     }
+
 
     private void setupBiometric() {
         try {
