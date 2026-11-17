@@ -8,9 +8,10 @@ import com.example.uhf.R
 
 val CairoFontFamily = FontFamily(
     Font(R.font.cairo_regular, FontWeight.Normal),
+    Font(R.font.cairo_medium, FontWeight.Medium),
     Font(R.font.cairo_semibold, FontWeight.SemiBold),
     Font(R.font.cairo_bold, FontWeight.Bold),
-    Font(R.font.cairo_extrabold, FontWeight.ExtraBold)
+    Font(R.font.cairo_bold, FontWeight.ExtraBold)
 )
 
 private val BaseTypography = Typography()
