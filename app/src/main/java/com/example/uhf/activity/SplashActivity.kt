@@ -9,8 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,16 +25,19 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.uhf.R
 import com.example.uhf.tools.SessionManager
+import com.example.uhf.ui.theme.MiraJewelryTheme
+import com.example.uhf.ui.theme.MiraTheme
 import kotlinx.coroutines.delay
 
 @SuppressLint("CustomSplashScreen")
@@ -46,14 +49,17 @@ class SplashActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // يضبط لون أيقونات شريط الحالة العلوي تلقائياً حسب الوضع الفاتح أو الداكن
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         setContent {
-            MiraLuxurySplashScreen(
-                durationMs = SPLASH_DURATION_MS,
-                onTimeout = { navigateToNextScreen() }
-            )
+            MiraJewelryTheme {
+                MiraLuxurySplashScreen(
+                    durationMs = SPLASH_DURATION_MS,
+                    onTimeout = { navigateToNextScreen() }
+                )
+            }
         }
     }
 
@@ -75,9 +81,6 @@ class SplashActivity : ComponentActivity() {
         finish()
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    //  ⚡ نفس منطق الفحص الصارم تماماً دون أي تغيير لضمان استقرار النظام
-    // ═══════════════════════════════════════════════════════════════════════
     private fun isLicenseActivated(): Boolean {
         return try {
             val sm = SessionManager(applicationContext)
@@ -119,34 +122,26 @@ class SplashActivity : ComponentActivity() {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  🎨 لوحة الألوان الملكية لهوية MIRA ID
-// ═══════════════════════════════════════════════════════════════════════════
-private val DeepNavyTop    = Color(0xFF050A18)
-private val DeepNavyBottom = Color(0xFF0D1936)
-private val GoldLight      = Color(0xFFFFE59E)
-private val GoldPrimary    = Color(0xFFD4AF37)
-private val GoldDark       = Color(0xFF996515)
-private val EmeraldStatus  = Color(0xFF10B981)
-private val CyanAccent     = Color(0xFF38BDF8)
+private val EmeraldStatus = Color(0xFF10B981)
+private val CyanAccent    = Color(0xFF38BDF8)
 
 @Composable
 private fun MiraLuxurySplashScreen(
     durationMs: Long,
     onTimeout: () -> Unit
 ) {
-    // تشغيل المؤقت والانتقال التلقائي
+    val colors = MiraTheme.colors
+
     LaunchedEffect(Unit) {
         delay(durationMs)
         onTimeout()
     }
 
-    // حركات الدخول السينمائية
     var startAnimation by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { startAnimation = true }
 
     val logoScale by animateFloatAsState(
-        targetValue = if (startAnimation) 1f else 0.65f,
+        targetValue = if (startAnimation) 1f else 0.72f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -156,17 +151,16 @@ private fun MiraLuxurySplashScreen(
 
     val contentAlpha by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 950, easing = FastOutSlowInEasing),
         label = "contentAlpha"
     )
 
     val progressFraction by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
-        animationSpec = tween(durationMillis = (durationMs - 250).toInt(), easing = LinearEasing),
+        animationSpec = tween(durationMillis = (durationMs - 200).toInt(), easing = LinearEasing),
         label = "progressFraction"
     )
 
-    // حركات مستمرة: موجات RFID + دوران الحلقة + لمعة الذهب
     val infiniteTransition = rememberInfiniteTransition(label = "luxuryLoops")
 
     val rfidWaveProgress by infiniteTransition.animateFloat(
@@ -183,193 +177,180 @@ private fun MiraLuxurySplashScreen(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(18000, easing = LinearEasing),
+            animation = tween(16000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ringRotation"
     )
 
     val shimmerOffset by infiniteTransition.animateFloat(
-        initialValue = -300f,
-        targetValue = 600f,
+        initialValue = -320f,
+        targetValue = 680f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1900, easing = FastOutSlowInEasing),
+            animation = tween(1850, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "goldShimmer"
     )
 
     val goldMetallicBrush = Brush.linearGradient(
-        colors = listOf(GoldDark, GoldPrimary, GoldLight, GoldPrimary, GoldDark),
+        colors = listOf(
+            colors.goldDeep,
+            colors.goldPrimary,
+            colors.goldHighlight,
+            colors.goldPrimary,
+            colors.goldDeep
+        ),
         start = Offset(shimmerOffset, 0f),
-        end = Offset(shimmerOffset + 260f, 120f)
+        end = Offset(shimmerOffset + 280f, 130f)
     )
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = DeepNavyTop
+        color = colors.backgroundTop
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(DeepNavyTop, DeepNavyBottom, DeepNavyTop)
+                        colors = listOf(
+                            colors.backgroundTop,
+                            colors.backgroundMid,
+                            colors.backgroundTop
+                        )
                     )
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // 1. الهالة الضوئية الذهبية في الخلفية
+            // 1. الإضاءة المحيطية المتكيفة مع الثيم
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            GoldPrimary.copy(alpha = 0.16f),
-                            CyanAccent.copy(alpha = 0.04f),
+                            colors.goldPrimary.copy(alpha = colors.glowAlpha),
+                            CyanAccent.copy(alpha = 0.05f),
                             Color.Transparent
                         ),
-                        center = center,
-                        radius = size.minDimension * 0.55f
+                        center = Offset(center.x, center.y - 60.dp.toPx()),
+                        radius = size.minDimension * 0.65f
                     ),
-                    radius = size.minDimension * 0.55f,
-                    center = center
+                    radius = size.minDimension * 0.65f,
+                    center = Offset(center.x, center.y - 60.dp.toPx())
                 )
             }
 
-            // 2. المحتوى المركزي (الشعار + الاسم + الوصف)
+            // 2. المحتوى الرئيسي
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
-                    .padding(horizontal = 32.dp)
+                    .padding(horizontal = 24.dp)
                     .alpha(contentAlpha)
             ) {
-                // أيقونة الشعار مع موجات RFID والحلقة الدوارة
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(180.dp)
+                        .size(260.dp)
                         .scale(logoScale)
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val maxRadius = size.minDimension / 2f
 
-                        // موجة RFID خارجية متلاشية
-                        val waveRadius = maxRadius * (0.55f + 0.45f * rfidWaveProgress)
-                        val waveAlpha = (1f - rfidWaveProgress) * 0.45f
+                        val waveRadius = maxRadius * (0.72f + 0.28f * rfidWaveProgress)
+                        val waveAlpha = (1f - rfidWaveProgress) * 0.50f
                         drawCircle(
-                            color = GoldPrimary.copy(alpha = waveAlpha),
+                            color = colors.goldPrimary.copy(alpha = waveAlpha),
                             radius = waveRadius,
                             style = Stroke(width = 2.dp.toPx())
                         )
 
-                        // حلقة هندسية دوارة متقطعة
                         rotate(ringRotation) {
                             drawArc(
                                 brush = Brush.sweepGradient(
                                     listOf(
                                         Color.Transparent,
-                                        GoldPrimary.copy(alpha = 0.75f),
-                                        GoldLight,
+                                        colors.goldPrimary.copy(alpha = 0.85f),
+                                        colors.goldHighlight,
+                                        CyanAccent.copy(alpha = 0.7f),
                                         Color.Transparent
                                     )
                                 ),
                                 startAngle = 0f,
-                                sweepAngle = 240f,
+                                sweepAngle = 260f,
                                 useCenter = false,
                                 style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
-                                topLeft = Offset(size.width * 0.14f, size.height * 0.14f),
+                                topLeft = Offset(size.width * 0.06f, size.height * 0.06f),
                                 size = androidx.compose.ui.geometry.Size(
-                                    size.width * 0.72f,
-                                    size.height * 0.72f
+                                    size.width * 0.88f,
+                                    size.height * 0.88f
                                 )
                             )
                         }
                     }
 
-                    // الإطار الدائري الداخلي للشعار
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(104.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(Color(0xFF14244B), Color(0xFF081024))
-                                )
-                            )
-                            .border(
-                                width = 1.5.dp,
-                                brush = Brush.linearGradient(
-                                    listOf(GoldLight, GoldPrimary, GoldDark)
-                                ),
-                                shape = CircleShape
-                            )
-                    ) {
-                        // رسم ماسة ذهبية هندسية (ويمكنك استبدالها بـ Image(painterResource(R.drawable.your_logo)) لاحقاً)
-                        GoldenDiamondEmblem(modifier = Modifier.size(52.dp))
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_mira_id_logo),
+                        contentDescription = "MIRA ID Logo",
+                        modifier = Modifier.size(215.dp)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // اسم المنظومة بتأثير اللمعة الذهبية
                 Text(
                     text = "MIRA ID",
                     style = TextStyle(
                         brush = goldMetallicBrush,
-                        fontSize = 36.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 5.sp
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 6.sp
                     ),
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "SMART JEWELRY & UHF RFID",
-                    color = GoldLight.copy(alpha = 0.75f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 3.sp,
+                    text = "SMART JEWELRY RFID TAG",
+                    color = colors.subtitleGold,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.2.sp,
                     textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // خط فاصل ذهبي متدرج
-                Box(
-                    modifier = Modifier
-                        .width(140.dp)
-                        .height(1.5.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color.Transparent, GoldPrimary, Color.Transparent)
-                            )
-                        )
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // العبارة التعريفية بالعربية
+                Box(
+                    modifier = Modifier
+                        .width(180.dp)
+                        .height(1.5.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.Transparent, colors.goldPrimary, Color.Transparent)
+                            )
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
                     text = "المنظومة الذكية لإدارة وتتبع الذهب والمجوهرات",
-                    color = Color.White.copy(alpha = 0.90f),
+                    color = colors.textPrimary.copy(alpha = 0.90f),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-                // شريط التقدم الذكي
                 Box(
                     modifier = Modifier
-                        .width(180.dp)
-                        .height(3.dp)
+                        .width(200.dp)
+                        .height(3.5.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.10f))
+                        .background(colors.trackBackground)
                 ) {
                     Box(
                         modifier = Modifier
@@ -377,20 +358,25 @@ private fun MiraLuxurySplashScreen(
                             .fillMaxHeight()
                             .background(
                                 Brush.horizontalGradient(
-                                    listOf(GoldDark, GoldPrimary, GoldLight)
+                                    listOf(
+                                        colors.goldDeep,
+                                        colors.goldPrimary,
+                                        colors.goldHighlight,
+                                        CyanAccent
+                                    )
                                 )
                             )
                     )
                 }
             }
 
-            // 3. تذييل الإصدار وحالة الأمان في الأسفل
+            // 3. شريط التذييل السفلي
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(bottom = 28.dp)
+                    .padding(bottom = 26.dp)
                     .alpha(contentAlpha)
             ) {
                 Box(
@@ -402,46 +388,11 @@ private fun MiraLuxurySplashScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "MIRA TECHNOLOGY • ENTERPRISE EDITION",
-                    color = Color.White.copy(alpha = 0.55f),
+                    color = colors.textSecondary,
                     fontSize = 10.sp,
-                    letterSpacing = 1.5.sp
+                    letterSpacing = 1.6.sp
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun GoldenDiamondEmblem(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-
-        val diamondOutline = Path().apply {
-            moveTo(w * 0.25f, h * 0.15f)
-            lineTo(w * 0.75f, h * 0.15f)
-            lineTo(w * 0.95f, h * 0.40f)
-            lineTo(w * 0.50f, h * 0.90f)
-            lineTo(w * 0.05f, h * 0.40f)
-            close()
-        }
-
-        drawPath(
-            path = diamondOutline,
-            brush = Brush.verticalGradient(
-                colors = listOf(GoldLight, GoldPrimary, GoldDark)
-            ),
-            style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round)
-        )
-
-        // خطوط الأوجه الداخلية للماسة
-        val goldStroke = GoldPrimary.copy(alpha = 0.85f)
-        val strokeWidth = 1.5.dp.toPx()
-
-        drawLine(goldStroke, Offset(w * 0.05f, h * 0.40f), Offset(w * 0.95f, h * 0.40f), strokeWidth)
-        drawLine(goldStroke, Offset(w * 0.25f, h * 0.15f), Offset(w * 0.35f, h * 0.40f), strokeWidth)
-        drawLine(goldStroke, Offset(w * 0.75f, h * 0.15f), Offset(w * 0.65f, h * 0.40f), strokeWidth)
-        drawLine(goldStroke, Offset(w * 0.35f, h * 0.40f), Offset(w * 0.50f, h * 0.90f), strokeWidth)
-        drawLine(goldStroke, Offset(w * 0.65f, h * 0.40f), Offset(w * 0.50f, h * 0.90f), strokeWidth)
     }
 }
