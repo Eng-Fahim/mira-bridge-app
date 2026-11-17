@@ -96,6 +96,7 @@ fun MiraJewelryTheme(
     CompositionLocalProvider(LocalMiraColors provides extendedColors) {
         MaterialTheme(
             colorScheme = materialScheme,
+            typography = MiraTypography,
             content = content
         )
     }
