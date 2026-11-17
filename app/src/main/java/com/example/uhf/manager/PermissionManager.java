@@ -619,4 +619,4 @@ public class PermissionManager {
                 return null;
         }
     }
-    }
+}

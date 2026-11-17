@@ -1308,7 +1308,7 @@ private static final NavItemCfg[] NAV_CONFIGS = {
         }
         if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
             optionsList.add(isArabic ? "🏷️ إدارة الشرائح المبرمجة" : "🏷️ RFID Bindings");
-            actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
+            // [REMOVED-TO-WEB] actionsList.add(() -> loadFragment(new MiraRfidBindingsFragment(), "RfidBindings"));
         }
         if (pm.isAdmin() || pm.isSystemAdmin()) {
             optionsList.add(isArabic ? "🔐 إعدادات أمان الشرائح" : "🔐 RFID Security Settings");
@@ -2599,9 +2599,10 @@ setMenuVisible(menu, R.id.action_license_status,
         } else if (id == R.id.action_toggle_language) {
             toggleLanguage();
             return true;
-        } else if (id == R.id.action_branches) {
-            loadFragment(new MiraBranchesManagementFragment(), "Branches");
-            return true;
+        // [REMOVED-TO-WEB] } else if (id == R.id.action_branches) {
+//     loadFragment(new MiraBranchesManagementFragment(), "Branches");
+//     return true;
+// }
         } else if (id == R.id.action_export_data) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;

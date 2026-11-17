@@ -66,11 +66,7 @@
     android:title="باحث القطع"
     app:showAsAction="never" />
     
-    <item
-        android:id="@+id/action_branches"
-        android:icon="@drawable/ic_branch"
-        android:title="@string/menu_branches"
-        app:showAsAction="never" />
+    
 
     <item
         android:id="@+id/action_export_data"

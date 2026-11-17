@@ -72,7 +72,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
     private static final ActionCard[] CARD_CONFIGS = {
         new ActionCard(R.id.cardRfidWrite,            "rfid_write",         NavigationManager.TAG_RFID_WRITE),
         new ActionCard(R.id.cardRadarLocation,        "radar",              NavigationManager.TAG_RADAR),
-        new ActionCard(R.id.cardRfidBindings,         "rfid",               NavigationManager.TAG_RFID_BINDINGS),
         new ActionCard(R.id.cardSecureGate,           "gate",               NavigationManager.TAG_GATES),
         new ActionCard(R.id.cardReports,              "reports",            NavigationManager.TAG_REPORTS),
         new ActionCard(R.id.cardAccounting,           "accounting",         NavigationManager.TAG_ACCOUNTING),
@@ -89,8 +88,6 @@ public class QuickActionsBottomSheetFragment extends BottomSheetDialogFragment {
         new ActionCard(R.id.cardCashReconciliation,   "cash_reconciliation",NavigationManager.TAG_CASH_RECONCILIATION),
         new ActionCard(R.id.cardAdminHub,             "admin_hub",          NavigationManager.TAG_ADMIN_HUB),
         new ActionCard(R.id.cardServerConfig,         "server_config",      NavigationManager.TAG_SERVER_CONFIG),
-        new ActionCard(R.id.cardAdminUsers,           "admin_users",        NavigationManager.TAG_USERS_MANAGEMENT),
-        new ActionCard(R.id.cardAdminBranches,        "admin_branches",     NavigationManager.TAG_BRANCHES),
         new ActionCard(R.id.cardReaderSetup,          "reader_setup",       NavigationManager.TAG_READER_SETUP),
         new ActionCard(R.id.cardQuickAccess,          "quick_access",       NavigationManager.TAG_QUICK_ACCESS),
         new ActionCard(R.id.cardAuditLogs,            "audit_logs",         NavigationManager.TAG_AUDIT_LOGS),
