@@ -247,41 +247,44 @@ public class MiraDashboardFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_dashboard_clean, container, false);
+    // إنشاء الحاوية برمجياً بالكامل لتجاوز مشكلة توليد الـ ViewBinding الخاطئ في الـ CI
+        androidx.compose.ui.platform.ComposeView composeView = new androidx.compose.ui.platform.ComposeView(requireContext());
+        composeView.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        
+        composeView.setContent(() -> {
+            MiraDashboardScreenKt.MiraDashboardScreen(
+                currentTotalWeight,
+                currentInventoryValue,
+                0.00,
+                java.util.Arrays.asList(
+                    new KaratDataModel(24, 124.00),
+                    new KaratDataModel(18, 9.50)
+                ),
+                () -> {
+                    isHeroHidden = !isHeroHidden;
+                    return null;
+                },
+                !isHeroHidden,
+                (action) -> {
+                    if (action.equals("sell")) {
+                        navigateToFragment(new MiraPosFragment(), "Sales");
+                    }
+                    return null;
+                }
+            );
+            return null;
+        });
+
+        return composeView;
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         initializeManagers();
-
-        // ✅ استخدام findViewById المباشر يتجاوز أي خطأ في مولد ViewBinding
-        androidx.compose.ui.platform.ComposeView composeView = view.findViewById(R.id.composeDashboardView);
-        if (composeView != null) {
-            composeView.setContent(() -> {
-                MiraDashboardScreenKt.MiraDashboardScreen(
-                    currentTotalWeight,
-                    currentInventoryValue,
-                    0.00,
-                    java.util.Arrays.asList(
-                        new KaratDataModel(24, 124.00),
-                        new KaratDataModel(18, 9.50)
-                    ),
-                    () -> {
-                        isHeroHidden = !isHeroHidden;
-                        return null;
-                    },
-                    !isHeroHidden,
-                    (action) -> {
-                        if (action.equals("sell")) {
-                            navigateToFragment(new MiraPosFragment(), "Sales");
-                        }
-                        return null;
-                    }
-                );
-                return null;
-            });
-        }
     }
 
     private void initViews(View v) {
