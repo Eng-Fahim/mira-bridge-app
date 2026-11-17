@@ -2,15 +2,15 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     
-    <!-- خلفية شبه شفافة تتماشى مع الطابع الذهبي والداكن -->
-    <solid android:color="#1AFFFFFF" />
+    <!-- خلفية داكنة نصف شفافة تمنح عمقاً وتبرز النصوص البيضاء والذهبية بوضوح تان -->
+    <solid android:color="#40000000" />
     
-    <!-- حواف دائرية ناعمة وعصرية -->
-    <corners android:radius="14dp" />
+    <!-- حواف دائرية ناعمة ومنحنية بأناقة (16dp) -->
+    <corners android:radius="16dp" />
     
-    <!-- إطار خفيف وراقي جداً يبرز البطاقة عن الخلفية -->
+    <!-- إطار ذهبي خفيف وشفاف يحدد الكارت باحترافية ليتماشى مع هوية ميرا -->
     <stroke
-        android:width="1dp"
-        android:color="#33FFFFFF" />
+        android:width="1.2dp"
+        android:color="#59FFD700" />
         
 </shape>
