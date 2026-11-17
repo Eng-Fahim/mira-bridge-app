@@ -10,10 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -39,6 +37,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -96,17 +96,20 @@ class ActivationActivity : ComponentActivity() {
         val initialServerUrl = loadValidSavedServerUrl()
 
         setContent {
-            MiraJewelryTheme {
-                ActivationScreen(
-                    isArabic = isArabic,
-                    initialServerUrl = initialServerUrl,
-                    onLookupServer = { key -> performServerLookup(key) },
-                    onSaveServerUrl = { url -> sessionManager.setServerUrl(url) },
-                    onActivateLicense = { serverUrl, key, onSuccess, onError ->
-                        performLicenseActivation(serverUrl, key, onSuccess, onError)
-                    },
-                    onContinueToLogin = { goToLogin() }
-                )
+            val layoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                MiraJewelryTheme {
+                    ActivationScreen(
+                        isArabic = isArabic,
+                        initialServerUrl = initialServerUrl,
+                        onLookupServer = { key -> performServerLookup(key) },
+                        onSaveServerUrl = { url -> sessionManager.setServerUrl(url) },
+                        onActivateLicense = { serverUrl, key, onSuccess, onError ->
+                            performLicenseActivation(serverUrl, key, onSuccess, onError)
+                        },
+                        onContinueToLogin = { goToLogin() }
+                    )
+                }
             }
         }
     }
@@ -317,10 +320,13 @@ private fun ActivationScreen(
                         try {
                             val facility = response.optJSONObject("facility")
                             if (facility != null) {
-                                facilityName = facility.optString(
-                                    "name_ar",
-                                    facility.optString("name", facilityName)
-                                )
+                                val arName = facility.optString("name_ar", "")
+                                    .takeIf { it.isNotBlank() && it != "null" }
+                                val enName = facility.optString("name_en", "")
+                                    .takeIf { it.isNotBlank() && it != "null" }
+                                val fallbackName = facility.optString("name", facilityName)
+                                    .takeIf { it.isNotBlank() && it != "null" } ?: facilityName
+                                facilityName = if (isArabic) (arName ?: fallbackName) else (enName ?: fallbackName)
                             }
                             val license = response.optJSONObject("license")
                             if (license != null) {
@@ -829,6 +835,7 @@ private fun ServerDiscoveryBanner(
                 } else {
                     "Server endpoint will be resolved automatically"
                 },
+                style = if (hasServer) TextStyle(textDirection = TextDirection.Ltr) else TextStyle.Default,
                 fontSize = 11.sp,
                 color = colors.textSecondary,
                 maxLines = 1,
@@ -845,6 +852,7 @@ private fun ActivationSuccessDialog(
     onContinue: () -> Unit
 ) {
     val colors = MiraTheme.colors
+    val layoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
 
     Dialog(
         onDismissRequest = { /* غير قابل للإغلاق إلا بالمتابعة */ },
@@ -853,98 +861,102 @@ private fun ActivationSuccessDialog(
             dismissOnClickOutside = false
         )
     ) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-            border = BorderStroke(1.5.dp, colors.goldPrimary),
-            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
+        CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                border = BorderStroke(1.5.dp, colors.goldPrimary),
+                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(68.dp)
-                        .clip(CircleShape)
-                        .background(EmeraldSuccess.copy(alpha = 0.15f))
-                        .border(1.5.dp, EmeraldSuccess, CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = EmeraldSuccess,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = if (isArabic) "تم تفعيل المنظومة بنجاح" else "System Activated Successfully",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // بطاقة تفاصيل الترخيص
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(colors.backgroundTop.copy(alpha = 0.50f))
-                        .border(1.dp, colors.cardBorder, RoundedCornerShape(14.dp))
-                        .padding(14.dp)
+                        .padding(24.dp)
                 ) {
-                    if (info.facilityName.isNotEmpty()) {
-                        DetailRow(
-                            label = if (isArabic) "المنشأة:" else "Facility:",
-                            value = info.facilityName
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(68.dp)
+                            .clip(CircleShape)
+                            .background(EmeraldSuccess.copy(alpha = 0.15f))
+                            .border(1.5.dp, EmeraldSuccess, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = EmeraldSuccess,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
-                    if (info.validUntil.isNotEmpty()) {
-                        DetailRow(
-                            label = if (isArabic) "صالح حتى:" else "Valid Until:",
-                            value = info.validUntil
-                        )
-                    }
-                    if (info.serverUrl.isNotEmpty()) {
-                        DetailRow(
-                            label = if (isArabic) "الخادم:" else "Server:",
-                            value = info.serverUrl
-                        )
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(22.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(colors.goldDeep, colors.goldPrimary, colors.goldHighlight)
-                            )
-                        )
-                        .clickable { onContinue() }
-                ) {
                     Text(
-                        text = if (isArabic) "متابعة لتسجيل الدخول" else "Continue to Login",
-                        fontSize = 15.sp,
+                        text = if (isArabic) "تم تفعيل المنظومة بنجاح" else "System Activated Successfully",
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF060B19)
+                        color = colors.textPrimary,
+                        textAlign = TextAlign.Center
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // بطاقة تفاصيل الترخيص
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(colors.backgroundTop.copy(alpha = 0.50f))
+                            .border(1.dp, colors.cardBorder, RoundedCornerShape(14.dp))
+                            .padding(14.dp)
+                    ) {
+                        if (info.facilityName.isNotEmpty()) {
+                            DetailRow(
+                                label = if (isArabic) "المنشأة:" else "Facility:",
+                                value = info.facilityName
+                            )
+                        }
+                        if (info.validUntil.isNotEmpty()) {
+                            DetailRow(
+                                label = if (isArabic) "صالح حتى:" else "Valid Until:",
+                                value = info.validUntil,
+                                forceLtr = true
+                            )
+                        }
+                        if (info.serverUrl.isNotEmpty()) {
+                            DetailRow(
+                                label = if (isArabic) "الخادم:" else "Server:",
+                                value = info.serverUrl,
+                                forceLtr = true
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(22.dp))
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(colors.goldDeep, colors.goldPrimary, colors.goldHighlight)
+                                )
+                            )
+                            .clickable { onContinue() }
+                    ) {
+                        Text(
+                            text = if (isArabic) "متابعة لتسجيل الدخول" else "Continue to Login",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF060B19)
+                        )
+                    }
                 }
             }
         }
@@ -952,7 +964,11 @@ private fun ActivationSuccessDialog(
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+    forceLtr: Boolean = false
+) {
     val colors = MiraTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -967,6 +983,7 @@ private fun DetailRow(label: String, value: String) {
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = value,
+            style = if (forceLtr) TextStyle(textDirection = TextDirection.Ltr) else TextStyle.Default,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = colors.goldPrimary,
