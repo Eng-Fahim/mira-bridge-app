@@ -514,7 +514,7 @@ private fun CartItemCard(
                 ) {
                     Text(
                         text = item.karat.ifBlank { "21K" },
-                        fontSize: 11.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.goldPrimary
                     )
