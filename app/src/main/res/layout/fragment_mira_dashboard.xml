@@ -83,66 +83,244 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <!-- 4.1 HERO BALANCE CARD -->
+                                <!-- 4.1 HERO GOLD BALANCE & KARATS CARD (تصميم مطور وعصري) -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/heroBalanceCard"
-                    android:layout_width="310dp"
+                    android:layout_width="325dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="12dp"
                     app:cardBackgroundColor="@android:color/transparent"
                     app:cardCornerRadius="24dp"
-                    app:cardElevation="6dp"
+                    app:cardElevation="8dp"
                     app:strokeColor="@color/gold_card_stroke"
-                    app:strokeWidth="1dp">
+                    app:strokeWidth="1.5dp">
+
                     <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:minHeight="210dp"
                         android:background="@drawable/bg_hero_gold_gradient">
+
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="vertical"
                             android:padding="20dp">
+
+                            <!-- العنوان العلوي وزر إخفاء/إظهار الحساسية -->
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal">
-                                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="إجمالي قيمة المخزون" android:textColor="@color/hero_text_primary" android:textSize="15sp" android:textStyle="bold" />
-                                <ImageButton android:id="@+id/btnToggleHeroVisibility" android:layout_width="32dp" android:layout_height="32dp" android:background="?attr/selectableItemBackgroundBorderless" android:src="@drawable/ic_eye_off" app:tint="@color/hero_text_primary" />
-                            </LinearLayout>
-                            <TextView android:id="@+id/tvHeroBalance" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="••••••••" android:textColor="@color/hero_text_primary" android:textSize="30sp" android:textStyle="bold" />
-                            <TextView android:id="@+id/tvHeroTrend" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="12sp" android:textColor="@color/hero_text_secondary" android:visibility="gone" tools:text="▲ 2.5%" />
-                            
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:orientation="horizontal" android:weightSum="2">
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن الإجمالي" android:textColor="@color/hero_text_secondary" android:textSize="11sp" />
-                                    <TextView android:id="@+id/tvHeroSubtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="••• g" android:textColor="@color/hero_text_primary" android:textSize="15sp" android:textStyle="bold" />
+                                
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical">
+                                    <View
+                                        android:layout_width="4dp"
+                                        android:layout_height="16dp"
+                                        android:background="#b48a32"
+                                        android:layout_marginEnd="8dp" />
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="رصيد الذهب الصافي"
+                                        android:textColor="@color/hero_text_primary"
+                                        android:textSize="14sp"
+                                        android:textStyle="bold" />
                                 </LinearLayout>
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="عدد القطع" android:textColor="@color/hero_text_secondary" android:textSize="11sp" />
-                                    <TextView android:id="@+id/tvHeroItemCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="•••" android:textColor="@color/hero_text_primary" android:textSize="15sp" android:textStyle="bold" />
-                                </LinearLayout>
+
+                                <ImageButton
+                                    android:id="@+id/btnToggleHeroVisibility"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:background="?attr/selectableItemBackgroundBorderless"
+                                    android:src="@drawable/ic_eye_off"
+                                    app:tint="@color/hero_text_primary" />
                             </LinearLayout>
 
-                            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:orientation="horizontal" android:weightSum="3">
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="USD" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
-                                    <TextView android:id="@+id/tvHeroValueUSD" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" android:textStyle="bold" />
-                                </LinearLayout>
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SAR" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
-                                    <TextView android:id="@+id/tvHeroValueSAR" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" />
-                                </LinearLayout>
-                                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="YER" android:textColor="@color/hero_text_secondary" android:textSize="10sp" />
-                                    <TextView android:id="@+id/tvHeroValueYER" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="••••" android:textColor="@color/hero_text_primary" android:textSize="12sp" />
-                                </LinearLayout>
+                            <!-- الرقم الرئيسي الرائد (إجمالي الوزن بالجرام) -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:orientation="horizontal"
+                                android:gravity="bottom">
+                                <TextView
+                                    android:id="@+id/tvHeroBalance"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="353.30"
+                                    android:textColor="@color/hero_text_primary"
+                                    android:textSize="34sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:layout_marginBottom="6dp"
+                                    android:text="جم"
+                                    android:textColor="@color/hero_text_secondary"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
                             </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvHeroTrend"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:textColor="@color/hero_text_secondary"
+                                android:visibility="gone"
+                                tools:text="▲ 2.5%" />
+
+                            <!-- خط فاصل جمالي شفّاف -->
+                            <View
+                                android:layout_width="match_parent"
+                                android:layout_height="1dp"
+                                android:layout_marginVertical="14dp"
+                                android:background="@color/hero_text_secondary"
+                                android:alpha="0.25" />
+
+                            <!-- 🌟 قسم تفاصيل الأعيار داخل البطاقة (منظم بشكل عائم ومريح) -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:weightSum="2">
+
+                                <!-- عيار 24 -->
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginEnd="6dp"
+                                    android:background="@drawable/bg_karat_glass_card"
+                                    android:orientation="vertical"
+                                    android:padding="10dp">
+                                    <LinearLayout
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center_vertical"
+                                        android:orientation="horizontal">
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="24K"
+                                            android:textColor="#b48a32"
+                                            android:textSize="11sp"
+                                            android:textStyle="bold" />
+                                        <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />
+                                        <ImageView
+                                            android:layout_width="12dp"
+                                            android:layout_height="12dp"
+                                            android:src="@drawable/ic_diamond"
+                                            app:tint="#b48a32" />
+                                    </LinearLayout>
+                                    <TextView
+                                        android:id="@+id/tvHeroSubtitle"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="124.00 جم"
+                                        android:textColor="@color/hero_text_primary"
+                                        android:textSize="14sp"
+                                        android:textStyle="bold" />
+                                    <TextView
+                                        android:id="@+id/tvHeroValueUSD"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="2dp"
+                                        android:text="8,162,424 YER"
+                                        android:textColor="@color/hero_text_secondary"
+                                        android:textSize="10sp" />
+                                </LinearLayout>
+
+                                <!-- عيار 21 (أو الأعيار الأخرى المتاحة) -->
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="6dp"
+                                    android:background="@drawable/bg_karat_glass_card"
+                                    android:orientation="vertical"
+                                    android:padding="10dp">
+                                    <LinearLayout
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:gravity="center_vertical"
+                                        android:orientation="horizontal">
+                                        <TextView
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="21K"
+                                            android:textColor="#b48a32"
+                                            android:textSize="11sp"
+                                            android:textStyle="bold" />
+                                        <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />
+                                        <ImageView
+                                            android:layout_width="12dp"
+                                            android:layout_height="12dp"
+                                            android:src="@drawable/ic_diamond"
+                                            app:tint="#b48a32" />
+                                    </LinearLayout>
+                                    <TextView
+                                        android:id="@+id/tvHeroItemCount"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="72.50 جم"
+                                        android:textColor="@color/hero_text_primary"
+                                        android:textSize="14sp"
+                                        android:textStyle="bold" />
+                                    <TextView
+                                        android:id="@+id/tvHeroValueSAR"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="2dp"
+                                        android:text="452,500 YER"
+                                        android:textColor="@color/hero_text_secondary"
+                                        android:textSize="10sp" />
+                                </LinearLayout>
+
+                            </LinearLayout>
+
+                            <!-- شريط القيمة الإجمالية النقدية بالأسفل -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:background="@drawable/bg_karat_glass_card"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="12dp"
+                                android:paddingVertical="8dp">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="القيمة النقدية الإجمالية"
+                                    android:textColor="@color/hero_text_secondary"
+                                    android:textSize="11sp" />
+
+                                <TextView
+                                    android:id="@+id/tvHeroValueYER"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$30,999.54"
+                                    android:textColor="#b48a32"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
                         </LinearLayout>
                     </FrameLayout>
                 </com.google.android.material.card.MaterialCardView>
+
 
                 <!-- 4.2 LIVE GOLD PRICES CARD -->
                 <com.google.android.material.card.MaterialCardView
