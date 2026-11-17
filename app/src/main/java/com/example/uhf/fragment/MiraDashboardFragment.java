@@ -84,7 +84,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private RecentActivityCache activityCache;
     private JSONObject lastSalesData = null;
-    private boolean isHeroHidden = false;
+    private boolean isHeroHidden = true;
     private boolean isSalesHidden = true;
     private boolean isInventoryHidden = true;
     private boolean isScrapHidden = true;
@@ -245,45 +245,53 @@ public class MiraDashboardFragment extends Fragment {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
     
-        @Nullable
+    @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_dashboard_advanced, container, false);
+        try {
+            return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
+        } catch (Exception e) {
+            Log.e(TAG, "Dashboard inflate FAILED", e);
+            android.widget.TextView errorView = new android.widget.TextView(container != null ? container.getContext() : requireContext());
+            errorView.setText("Error loading UI: " + e.getMessage());
+            return errorView;
+        }
     }
+
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        initializeManagers();
+        try {
+            initializeManagers();
+            initViews(view);
+            setupProfileListener();
+            setupBranchListener();
+            
+            currentBranchId = (branchesManager != null && branchesManager.getActiveBranchId() > 0)
+                    ? branchesManager.getActiveBranchId()
+                    : (sessionManager != null ? sessionManager.getBranchId() : 1);
 
-        // ✅ استخدام findViewById المباشر يتجاوز أي خطأ في مولد ViewBinding
-        androidx.compose.ui.platform.ComposeView composeView = view.findViewById(R.id.composeDashboardView);
-        if (composeView != null) {
-            composeView.setContent(() -> {
-                MiraDashboardScreenKt.MiraDashboardScreen(
-                    currentTotalWeight,
-                    currentInventoryValue,
-                    0.00,
-                    java.util.Arrays.asList(
-                        new KaratDataModel(24, 124.00),
-                        new KaratDataModel(18, 9.50)
-                    ),
-                    () -> {
-                        isHeroHidden = !isHeroHidden;
-                        return null;
-                    },
-                    !isHeroHidden,
-                    (action) -> {
-                        if (action.equals("sell")) {
-                            navigateToFragment(new MiraPosFragment(), "Sales");
-                        }
-                        return null;
-                    }
-                );
-                return null;
-            });
+            initBranchCache(currentBranchId);
+            showShimmer(false);
+            isViewInitialized = true;
+            loadOfflineData();
+            startAutoRefresh();
+            lastDataFetchTime = 0;
+
+            fetchData();
+            fetchDashboardCharts();
+            fetchRecentActivity();
+            if (currentBranchId > 0) {
+                fetchScrapSummary(currentBranchId);
+                fetchScrapAging(currentBranchId);
+            }
+
+        } catch (Throwable e) {
+            Log.e(TAG, "onViewCreated", e);
         }
     }
+
 
     private void initViews(View v) {
         try {
@@ -1593,4 +1601,4 @@ private void computeAndShowAlerts(JSONObject data) {
     }
 
     private boolean canManuallyRefreshGold() { return permissionManager != null && permissionManager.canRefreshGoldManually(); }
-                            }
+                }
