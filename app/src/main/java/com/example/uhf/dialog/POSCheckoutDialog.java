@@ -125,19 +125,18 @@ public class POSCheckoutDialog extends DialogFragment {
     // ═══════════════════════════════════════════════════════════════════
 
     public static POSCheckoutDialog newInstance(double totalAmount, int itemCount, String ratesJson) {
-    POSCheckoutDialog dialog = new POSCheckoutDialog();
-    Bundle args = new Bundle();
-    args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
-    args.putInt(ARG_ITEM_COUNT, itemCount);
-    args.putString("rates_json", ratesJson != null ? ratesJson : "{}");
-    dialog.setArguments(args);
-    return dialog;
-}
+        POSCheckoutDialog dialog = new POSCheckoutDialog();
+        Bundle args = new Bundle();
+        args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
+        args.putInt(ARG_ITEM_COUNT, itemCount);
+        args.putString("rates_json", ratesJson != null ? ratesJson : "{}");
+        dialog.setArguments(args);
+        return dialog;
+    }
 
-// للتوافق العكسي
-public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
-    return newInstance(totalAmount, itemCount, "{}");
-}
+    public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
+        return newInstance(totalAmount, itemCount, "{}");
+    }
 
     public void setCheckoutListener(OnCheckoutListener listener) { this.listener = listener; }
     public void setOnDismissListener(OnDialogDismissListener listener) { this.dismissListener = listener; }
@@ -157,21 +156,20 @@ public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
             totalAmount = getArguments().getDouble(ARG_TOTAL_AMOUNT, 0.0);
             itemCount = getArguments().getInt(ARG_ITEM_COUNT, 0);
         }
-        // ✅ استخرج أسعار الصرف المُمررة من السيرفر
-try {
-    String ratesJson = getArguments() != null
-            ? getArguments().getString("rates_json", "{}") : "{}";
-    JSONObject ratesObj = new JSONObject(ratesJson);
-    java.util.Iterator<String> keys = ratesObj.keys();
-    while (keys.hasNext()) {
-        String k = keys.next();
-        double v = ratesObj.optDouble(k, 0);
-        if (v > 0) serverRates.put(k.toUpperCase(Locale.US), v);
-    }
-    Log.i(TAG, "✅ Server rates loaded: " + serverRates);
-} catch (Exception e) {
-    Log.w(TAG, "Failed to parse server rates: " + e.getMessage());
-}
+        try {
+            String ratesJson = getArguments() != null
+                    ? getArguments().getString("rates_json", "{}") : "{}";
+            JSONObject ratesObj = new JSONObject(ratesJson);
+            java.util.Iterator<String> keys = ratesObj.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                double v = ratesObj.optDouble(k, 0);
+                if (v > 0) serverRates.put(k.toUpperCase(Locale.US), v);
+            }
+            Log.i(TAG, "✅ Server rates loaded: " + serverRates);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to parse server rates: " + e.getMessage());
+        }
         try {
             isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         } catch (Exception e) { isArabic = false; }
@@ -306,7 +304,6 @@ try {
                 Log.e(TAG, "loadPaymentMethods error", e);
             }
 
-            // ✅ الفلترة قبل تعيين finalList
             if (loaded != null && !loaded.isEmpty()) {
                 final int before = loaded.size();
                 loaded.removeIf(m -> m.code != null &&
@@ -330,7 +327,7 @@ try {
     private void loadCurrencies() {
         new Thread(() -> {
             Set<String> currencies = new LinkedHashSet<>();
-            currencies.add("YER"); // دائماً موجودة
+            currencies.add("YER");
 
             try {
                 MiraApiClient client = MiraApiClient.getInstance(requireContext());
@@ -350,7 +347,6 @@ try {
                 Log.e(TAG, "loadCurrencies error", e);
             }
 
-            // ضمان وجود USD و SAR على الأقل
             if (currencies.size() < 2) {
                 currencies.add("USD");
                 currencies.add("SAR");
@@ -361,7 +357,6 @@ try {
                 CURRENCIES.clear();
                 CURRENCIES.addAll(finalList);
 
-                // حدّث كل السطور الموجودة بأسماء العملات الجديدة
                 for (View row : paymentRows) {
                     MaterialAutoCompleteTextView actCurr =
                             row.findViewById(R.id.actCurrency);
@@ -413,146 +408,117 @@ try {
         if (btnConfirmCheckout != null) btnConfirmCheckout.setOnClickListener(v -> validateAndSubmit());
     }
 
-    /**
-     * إضافة سطر دفع جديد.
-     * ✅ Critical: نخزن code الطريقة في actMethod.getTag() لضمان الدقة.
-     */
     private void addPaymentRow(String defaultCurrency, double amount) {
-    View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
+        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
 
-    // ═══════════════════════════════════════════════════════════
-    // 1) الإعلانات — TextInputEditText (مطابق للـ XML)
-    // ═══════════════════════════════════════════════════════════
-    TextInputEditText actMethod = row.findViewById(R.id.actMethod);
-    MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
-    TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
-    EditText etAmount = row.findViewById(R.id.etAmount);
-    TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-    MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
-    ImageButton btnRemove = row.findViewById(R.id.btnRemove);
+        // ✅ تصحيح النوع هنا إلى MaterialAutoCompleteTextView بدلاً من TextInputEditText
+        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
+        MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
+        TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
+        EditText etAmount = row.findViewById(R.id.etAmount);
+        TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
+        MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
+        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
 
-    if (tvRowNumber != null) {
-        tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // 2) بناء خريطة display → code
-    // ═══════════════════════════════════════════════════════════
-    final Map<String, String> displayToCode = new LinkedHashMap<>();
-    for (PaymentMethodDto m : paymentMethods) {
-        String display = m.getDisplayName(isArabic);
-        String account = m.getAccountDisplay(isArabic);
-        String fullName = (account != null && !account.isEmpty())
-                ? display + " (" + account + ")"
-                : display;
-        displayToCode.put(fullName, m.code != null ? m.code : "CASH");
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // 3) إعداد actMethod (لا adapter — نستخدم picker مخصص)
-    // ═══════════════════════════════════════════════════════════
-    if (actMethod != null) {
-        // اختيار افتراضي: أول طريقة في القائمة
-        if (!displayToCode.isEmpty()) {
-            String firstKey = displayToCode.keySet().iterator().next();
-            actMethod.setText(firstKey);
-            actMethod.setTag(displayToCode.get(firstKey));
-        } else {
-            actMethod.setText(isArabic ? "نقداً" : "Cash");
-            actMethod.setTag("CASH");
+        if (tvRowNumber != null) {
+            tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
         }
 
-        // فتح الشاشة المخصصة عند النقر
-        actMethod.setOnClickListener(v -> {
-            showPaymentMethodPicker(actMethod, displayToCode);
-        });
-    }
+        final Map<String, String> displayToCode = new LinkedHashMap<>();
+        for (PaymentMethodDto m : paymentMethods) {
+            String display = m.getDisplayName(isArabic);
+            String account = m.getAccountDisplay(isArabic);
+            String fullName = (account != null && !account.isEmpty())
+                    ? display + " (" + account + ")"
+                    : display;
+            displayToCode.put(fullName, m.code != null ? m.code : "CASH");
+        }
 
-    // ═══════════════════════════════════════════════════════════
-    // 4) إعداد العملة
-    // ═══════════════════════════════════════════════════════════
-    if (actCurrency != null) {
-        actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, CURRENCIES));
-        actCurrency.setText(defaultCurrency, false);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // 5) TextWatcher للمبلغ
-    // ═══════════════════════════════════════════════════════════
-    TextWatcher watcher = new TextWatcher() {
-        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-        @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-            if (tvBaseEquivalent == null || actCurrency == null) return;
-            double amt = parseDouble(s.toString());
-            double rate = getRateToYER(actCurrency.getText().toString());
-            double base = amt * rate;
-            if (rate != 1.0) {
-                tvBaseEquivalent.setVisibility(View.VISIBLE);
-                tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
+        if (actMethod != null) {
+            if (!displayToCode.isEmpty()) {
+                String firstKey = displayToCode.keySet().iterator().next();
+                actMethod.setText(firstKey, false);
+                actMethod.setTag(displayToCode.get(firstKey));
             } else {
-                tvBaseEquivalent.setVisibility(View.GONE);
+                actMethod.setText(isArabic ? "نقداً" : "Cash", false);
+                actMethod.setTag("CASH");
             }
-            updateStatus();
+
+            actMethod.setOnClickListener(v -> {
+                showPaymentMethodPicker(actMethod, displayToCode);
+            });
         }
-        @Override public void afterTextChanged(Editable s) {}
-    };
 
-    if (etAmount != null) etAmount.addTextChangedListener(watcher);
+        if (actCurrency != null) {
+            actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
+                    android.R.layout.simple_dropdown_item_1line, CURRENCIES));
+            actCurrency.setText(defaultCurrency, false);
+        }
 
-    if (actCurrency != null) {
-        actCurrency.setOnItemClickListener((p, v, pos, id) -> {
-            if (etAmount != null) {
-                watcher.onTextChanged(etAmount.getText(), 0, 0, 0);
-            }
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // 6) زر المتبقي
-    // ═══════════════════════════════════════════════════════════
-    if (btnRemaining != null) {
-        btnRemaining.setOnClickListener(v -> {
-            if (etAmount == null || actCurrency == null) return;
-            double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
-            double currentRowAmount = parseDouble(etAmount.getText().toString())
-                    * getRateToYER(actCurrency.getText().toString());
-            double currentPaid = getTotalPaidYER() - currentRowAmount;
-            double rem = requiredTotal - currentPaid - tradeInTotal;
-            if (rem > 0.01) {
+        TextWatcher watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+                if (tvBaseEquivalent == null || actCurrency == null) return;
+                double amt = parseDouble(s.toString());
                 double rate = getRateToYER(actCurrency.getText().toString());
-                etAmount.setText(String.format(Locale.US, "%.2f", rem / rate));
-            }
-        });
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // 7) زر الحذف
-    // ═══════════════════════════════════════════════════════════
-    if (btnRemove != null) {
-        btnRemove.setOnClickListener(v -> {
-            if (paymentRows.size() > 1) {
-                llPaymentsContainer.removeView(row);
-                paymentRows.remove(row);
-                renumberRows();
+                double base = amt * rate;
+                if (rate != 1.0) {
+                    tvBaseEquivalent.setVisibility(View.VISIBLE);
+                    tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
+                } else {
+                    tvBaseEquivalent.setVisibility(View.GONE);
+                }
                 updateStatus();
-            } else {
-                Toast.makeText(requireContext(), "يجب إبقاء سطر واحد", Toast.LENGTH_SHORT).show();
             }
-        });
-    }
+            @Override public void afterTextChanged(Editable s) {}
+        };
 
-    // ═══════════════════════════════════════════════════════════
-    // 8) القيمة الابتدائية
-    // ═══════════════════════════════════════════════════════════
-    if (amount > 0 && etAmount != null) {
-        etAmount.setText(String.format(Locale.US, "%.2f", amount));
-    }
+        if (etAmount != null) etAmount.addTextChangedListener(watcher);
 
-    paymentRows.add(row);
-    llPaymentsContainer.addView(row);
-    updateStatus();
-}
+        if (actCurrency != null) {
+            actCurrency.setOnItemClickListener((p, v, pos, id) -> {
+                if (etAmount != null) {
+                    watcher.onTextChanged(etAmount.getText(), 0, 0, 0);
+                }
+            });
+        }
+
+        if (btnRemaining != null) {
+            btnRemaining.setOnClickListener(v -> {
+                if (etAmount == null || actCurrency == null) return;
+                double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
+                double currentRowAmount = parseDouble(etAmount.getText().toString())
+                        * getRateToYER(actCurrency.getText().toString());
+                double currentPaid = getTotalPaidYER() - currentRowAmount;
+                double rem = requiredTotal - currentPaid - tradeInTotal;
+                if (rem > 0.01) {
+                    double rate = getRateToYER(actCurrency.getText().toString());
+                    etAmount.setText(String.format(Locale.US, "%.2f", rem / rate));
+                }
+            });
+        }
+
+        if (btnRemove != null) {
+            btnRemove.setOnClickListener(v -> {
+                if (paymentRows.size() > 1) {
+                    llPaymentsContainer.removeView(row);
+                    paymentRows.remove(row);
+                    renumberRows();
+                    updateStatus();
+                } else {
+                    Toast.makeText(requireContext(), "يجب إبقاء سطر واحد", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        if (amount > 0 && etAmount != null) {
+            etAmount.setText(String.format(Locale.US, "%.2f", amount));
+        }
+
+        paymentRows.add(row);
+        llPaymentsContainer.addView(row);
+        updateStatus();
+    }
 
     private void renumberRows() {
         for (int i = 0; i < paymentRows.size(); i++) {
@@ -575,9 +541,6 @@ try {
         return total;
     }
 
-    /**
-     * تحديث حالة الدفع (متبقي/متطابق/رصيد) بدعم الوضع الداكن.
-     */
     private void updateStatus() {
         if (tvRemaining == null || tvStatusIcon == null || llStatusBanner == null) return;
 
@@ -612,15 +575,14 @@ try {
             llStatusBanner.setBackgroundColor(Color.parseColor(isDark ? "#1E3A8A" : "#DBEAFE"));
         }
 
-        // إخفاء رسالة الخطأ عند أي تعديل
         if (llInlineError != null && llInlineError.getVisibility() == View.VISIBLE) {
             llInlineError.setVisibility(View.GONE);
         }
     }
+
     private void openTradeInDialog() {
-    double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
-    // ✅ مرّر الأسطر السابقة لكي تظهر عند إعادة الفتح
-    TradeInDialog dialog = TradeInDialog.newInstance(maxValue, this.tradeInLines);
+        double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
+        TradeInDialog dialog = TradeInDialog.newInstance(maxValue, this.tradeInLines);
         dialog.setOnTradeInListener((tradeIns, totalValue) -> {
             this.tradeInLines = tradeIns;
             this.tradeInTotal = totalValue;
@@ -635,17 +597,12 @@ try {
         dialog.show(getParentFragmentManager(), "TradeInDialog");
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Validate & Submit
-    // ═══════════════════════════════════════════════════════════════════
-
     private void validateAndSubmit() {
         double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
         double paid = getTotalPaidYER();
         double totalWithGold = paid + tradeInTotal;
         double diff = totalWithGold - requiredTotal;
 
-        // ❌ نقص
         if (diff < -1.0) {
             String msg = isArabic
                     ? "⚠️ المبلغ ناقص " + String.format(Locale.US, "%,.0f", Math.abs(diff)) + " YER"
@@ -654,7 +611,6 @@ try {
             return;
         }
 
-        // ✅ زيادة: يتطلب رقم هاتف + تأكيد
         if (diff > 1.0) {
             String phone = etCustomerPhone != null
                     ? etCustomerPhone.getText().toString().trim() : "";
@@ -686,7 +642,6 @@ try {
             return;
         }
 
-        // ✅ متطابق
         dispatchCheckout(buildData());
     }
 
@@ -713,15 +668,14 @@ try {
         for (View row : paymentRows) {
             EditText et = row.findViewById(R.id.etAmount);
             MaterialAutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
-            TextInputEditText actMethod = row.findViewById(R.id.actMethod);
+            // ✅ تصحيح النوع هنا أيضاً إلى MaterialAutoCompleteTextView
+            MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
             if (et == null || actCurr == null || actMethod == null) continue;
 
             double amt = parseDouble(et.getText().toString());
             if (amt <= 0) continue;
 
             String curr = actCurr.getText().toString();
-
-            // ✅ اقرأ الكود من Tag (موثوق 100%)
             String methodCode = resolveMethodCode(actMethod);
         
             Log.d(TAG, "Payment row: currency=" + curr
@@ -739,7 +693,6 @@ try {
         }
         data.payments = paymentsArray;
 
-        // paymentMethod الرئيسي (للـ legacy)
         if (paymentsArray.length() > 0) {
             try {
                 data.paymentMethod = paymentsArray.getJSONObject(0).optString("method", "CASH");
@@ -749,31 +702,24 @@ try {
         return data;
     }
 
-    /**
-     * Fallback فقط عند فقدان Tag (نادر) — يطابق النص العربي.
-     */
     private String resolveMethodCode(android.widget.TextView actMethod) {
-    if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
-    if (actMethod.getTag() != null) return String.valueOf(actMethod.getTag());
-    
-    String selectedText = actMethod.getText() != null
-            ? actMethod.getText().toString().trim() : "";
-    for (PaymentMethodDto m : paymentMethods) {
-        if (m == null) continue;
-        String display = m.getDisplayName(isArabic);
-        String account = m.getAccountDisplay(isArabic);
-        String full = (account != null && !account.isEmpty()) ? display + " (" + account + ")" : display;
-        if (full.equals(selectedText)) {
-            return m.code != null ? m.code : "CASH";
+        if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
+        if (actMethod.getTag() != null) return String.valueOf(actMethod.getTag());
+        
+        String selectedText = actMethod.getText() != null
+                ? actMethod.getText().toString().trim() : "";
+        for (PaymentMethodDto m : paymentMethods) {
+            if (m == null) continue;
+            String display = m.getDisplayName(isArabic);
+            String account = m.getAccountDisplay(isArabic);
+            String full = (account != null && !account.isEmpty()) ? display + " (" + account + ")" : display;
+            if (full.equals(selectedText)) {
+                return m.code != null ? m.code : "CASH";
+            }
         }
+        return paymentMethods.get(0).code;
     }
-    return paymentMethods.get(0).code;
-}
 
-    /**
-     * ✅ لا تُغلق الديالوج — أبقها مفتوحة حتى يرد الـ Backend.
-     *    الإغلاق يتم من onCheckoutSuccess() أو onCheckoutError().
-     */
     private void dispatchCheckout(POSCheckoutData data) {
         if (btnConfirmCheckout != null) {
             btnConfirmCheckout.setEnabled(false);
@@ -784,25 +730,12 @@ try {
         if (listener != null) listener.onCheckout(data);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Public callbacks (called by MiraPosFragment)
-    // ═══════════════════════════════════════════════════════════════════
-
-    /**
-     * يُستدعى عند نجاح الـ Backend.
-     * الوظيفة: إغلاق الديالوج فقط (البيانات محفوظة في السلة أصلاً).
-     */
     public void onCheckoutSuccess() {
         try {
             dismissAllowingStateLoss();
         } catch (Exception ignored) {}
     }
 
-    /**
-     * يُستدعى عند فشل الـ Backend.
-     * الوظيفة: عرض الخطأ داخلياً + إعادة تفعيل زر التأكيد.
-     * الإدخالات محفوظة (customer/trade-in/payment rows) — لا شيء يضيع.
-     */
     public void onCheckoutError(String errorMessage) {
         try {
             if (btnConfirmCheckout != null) {
@@ -829,10 +762,6 @@ try {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════════════
-
     private void updateFinalAmount() {
         currentTotalWithDiscountUsd = totalAmount;
         if (tvFinalTotal != null) {
@@ -845,141 +774,129 @@ try {
     }
 
     private double getRateToYER(String currency) {
-    if (currency == null) return 1.0;
-    String curr = currency.toUpperCase(Locale.US).trim();
+        if (currency == null) return 1.0;
+        String curr = currency.toUpperCase(Locale.US).trim();
 
-    if ("YER".equals(curr)) return 1.0;
+        if ("YER".equals(curr)) return 1.0;
 
-    // ✅ أولوية 1: أسعار السيرفر (مضمونة التطابق)
-    if (serverRates.containsKey(curr)) {
-        double r = serverRates.get(curr);
-        if (r > 0) return r;
-    }
-
-    // Fallback: أسعار priceManager المحلية (في حالة عدم وجود السعر)
-    if (priceManager != null) {
-        double currencyRate = priceManager.getExchangeRate(curr);
-        if (currencyRate > 10) return currencyRate;
-
-        double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
-        if (yerRate > 0 && currencyRate > 0) {
-            return yerRate / currencyRate;
+        if (serverRates.containsKey(curr)) {
+            double r = serverRates.get(curr);
+            if (r > 0) return r;
         }
-    }
 
-    if ("SAR".equals(curr)) return 140.0;  // ✅ القيمة الحقيقية من DB
-    if ("USD".equals(curr)) return 530.0;
-    return 1.0;
-}
+        if (priceManager != null) {
+            double currencyRate = priceManager.getExchangeRate(curr);
+            if (currencyRate > 10) return currencyRate;
+
+            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
+            if (yerRate > 0 && currencyRate > 0) {
+                return yerRate / currencyRate;
+            }
+        }
+
+        if ("SAR".equals(curr)) return 140.0;
+        if ("USD".equals(curr)) return 530.0;
+        return 1.0;
+    }
 
     private double parseDouble(String s) {
         try { return Double.parseDouble(s.trim()); }
         catch (Exception e) { return 0; }
     }
-    /**
- * يعرض شاشة اختيار مخصصة مع بحث وأيقونات.
- * بدل Full-screen Radio Button dialog.
- */
-private void showPaymentMethodPicker(
-        android.widget.TextView targetField,
-        java.util.Map<String, String> displayToCode) {
 
-    if (paymentMethods == null || paymentMethods.isEmpty()) return;
+    private void showPaymentMethodPicker(
+            android.widget.TextView targetField,
+            java.util.Map<String, String> displayToCode) {
 
-    // 1) بناء قائمة العرض
-    List<PaymentMethodDto> filtered = new ArrayList<>(paymentMethods);
+        if (paymentMethods == null || paymentMethods.isEmpty()) return;
 
-    // 2) بناء الـ Dialog
-    View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment_picker, null);
-    com.google.android.material.textfield.TextInputEditText etSearch =
-            dialogView.findViewById(R.id.etSearch);
-    android.widget.ListView lvMethods = dialogView.findViewById(R.id.lvMethods);
+        List<PaymentMethodDto> filtered = new ArrayList<>(paymentMethods);
 
-    // 3) Adapter مخصص
-    class PickerAdapter extends android.widget.BaseAdapter {
-        List<PaymentMethodDto> data;
-        PickerAdapter(List<PaymentMethodDto> data) { this.data = data; }
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment_picker, null);
+        com.google.android.material.textfield.TextInputEditText etSearch =
+                dialogView.findViewById(R.id.etSearch);
+        android.widget.ListView lvMethods = dialogView.findViewById(R.id.lvMethods);
 
-        @Override public int getCount() { return data.size(); }
-        @Override public Object getItem(int i) { return data.get(i); }
-        @Override public long getItemId(int i) { return i; }
+        class PickerAdapter extends android.widget.BaseAdapter {
+            List<PaymentMethodDto> data;
+            PickerAdapter(List<PaymentMethodDto> data) { this.data = data; }
 
-        @Override
-        public View getView(int position, View convertView, android.view.ViewGroup parent) {
-            if (convertView == null) {
-                convertView = getLayoutInflater().inflate(R.layout.item_payment_picker_row, parent, false);
-            }
-            PaymentMethodDto m = data.get(position);
-            TextView tvIcon = convertView.findViewById(R.id.tvIcon);
-            TextView tvName = convertView.findViewById(R.id.tvName);
-            TextView tvAccount = convertView.findViewById(R.id.tvAccount);
+            @Override public int getCount() { return data.size(); }
+            @Override public Object getItem(int i) { return data.get(i); }
+            @Override public long getItemId(int i) { return i; }
 
-            tvIcon.setText(m.icon != null && !m.icon.isEmpty() ? m.icon : "💳");
-            tvName.setText(m.getDisplayName(isArabic));
-            String acc = m.getAccountDisplay(isArabic);
-            tvAccount.setText(acc != null ? acc : "");
-            tvAccount.setVisibility(acc != null && !acc.isEmpty() ? View.VISIBLE : View.GONE);
-
-            return convertView;
-        }
-    }
-
-    final PickerAdapter adapter = new PickerAdapter(filtered);
-    lvMethods.setAdapter(adapter);
-
-    // 4) بناء الـ Dialog
-    androidx.appcompat.app.AlertDialog.Builder builder =
-            new androidx.appcompat.app.AlertDialog.Builder(requireContext());
-    builder.setView(dialogView);
-    androidx.appcompat.app.AlertDialog dialog = builder.create();
-
-    // 5) عند اختيار طريقة
-    lvMethods.setOnItemClickListener((parent, view, position, id) -> {
-        PaymentMethodDto selected = filtered.get(position);
-        String displayName = selected.getDisplayName(isArabic);
-        String account = selected.getAccountDisplay(isArabic);
-        String fullName = (account != null && !account.isEmpty())
-                ? displayName + " (" + account + ")"
-                : displayName;
-
-        if (targetField instanceof MaterialAutoCompleteTextView) {
-    ((MaterialAutoCompleteTextView) targetField).setText(fullName, false);
-} else {
-    targetField.setText(fullName);
-}
-targetField.setTag(selected.code);
-        dialog.dismiss();
-    });
-
-    // 6) فلترة أثناء البحث
-    etSearch.addTextChangedListener(new TextWatcher() {
-        @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-        @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-            String q = s != null ? s.toString().trim().toLowerCase() : "";
-            List<PaymentMethodDto> newData = new ArrayList<>();
-            for (PaymentMethodDto m : paymentMethods) {
-                String name = m.getDisplayName(isArabic).toLowerCase();
-                String acc = m.getAccountDisplay(isArabic);
-                if (acc == null) acc = "";
-                acc = acc.toLowerCase();
-                if (q.isEmpty() || name.contains(q) || acc.contains(q)) {
-                    newData.add(m);
+            @Override
+            public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                if (convertView == null) {
+                    convertView = getLayoutInflater().inflate(R.layout.item_payment_picker_row, parent, false);
                 }
+                PaymentMethodDto m = data.get(position);
+                TextView tvIcon = convertView.findViewById(R.id.tvIcon);
+                TextView tvName = convertView.findViewById(R.id.tvName);
+                TextView tvAccount = convertView.findViewById(R.id.tvAccount);
+
+                tvIcon.setText(m.icon != null && !m.icon.isEmpty() ? m.icon : "💳");
+                tvName.setText(m.getDisplayName(isArabic));
+                String acc = m.getAccountDisplay(isArabic);
+                tvAccount.setText(acc != null ? acc : "");
+                tvAccount.setVisibility(acc != null && !acc.isEmpty() ? View.VISIBLE : View.GONE);
+
+                return convertView;
             }
-            adapter.data = newData;
-            adapter.notifyDataSetChanged();
         }
-        @Override public void afterTextChanged(Editable s) {}
-    });
 
-    dialog.show();
+        final PickerAdapter adapter = new PickerAdapter(filtered);
+        lvMethods.setAdapter(adapter);
 
-    // ارتفاع ثابت (لا يأخذ الشاشة كاملة)
-    if (dialog.getWindow() != null) {
-        dialog.getWindow().setLayout(
-                (int) (getResources().getDisplayMetrics().widthPixels * 0.95),
-                (int) (getResources().getDisplayMetrics().heightPixels * 0.7));
-        dialog.getWindow().setBackgroundDrawableResource(R.drawable.rounded_dialog_bg);
+        androidx.appcompat.app.AlertDialog.Builder builder =
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext());
+        builder.setView(dialogView);
+        androidx.appcompat.app.AlertDialog dialog = builder.create();
+
+        lvMethods.setOnItemClickListener((parent, view, position, id) -> {
+            PaymentMethodDto selected = filtered.get(position);
+            String displayName = selected.getDisplayName(isArabic);
+            String account = selected.getAccountDisplay(isArabic);
+            String fullName = (account != null && !account.isEmpty())
+                    ? displayName + " (" + account + ")"
+                    : displayName;
+
+            if (targetField instanceof MaterialAutoCompleteTextView) {
+                ((MaterialAutoCompleteTextView) targetField).setText(fullName, false);
+            } else {
+                targetField.setText(fullName);
+            }
+            targetField.setTag(selected.code);
+            dialog.dismiss();
+        });
+
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+                String q = s != null ? s.toString().trim().toLowerCase() : "";
+                List<PaymentMethodDto> newData = new ArrayList<>();
+                for (PaymentMethodDto m : paymentMethods) {
+                    String name = m.getDisplayName(isArabic).toLowerCase();
+                    String acc = m.getAccountDisplay(isArabic);
+                    if (acc == null) acc = "";
+                    acc = acc.toLowerCase();
+                    if (q.isEmpty() || name.contains(q) || acc.contains(q)) {
+                        newData.add(m);
+                    }
+                }
+                adapter.data = newData;
+                adapter.notifyDataSetChanged();
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
+        dialog.show();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.95),
+                    (int) (getResources().getDisplayMetrics().heightPixels * 0.7));
+            dialog.getWindow().setBackgroundDrawableResource(R.drawable.rounded_dialog_bg);
+        }
     }
-}
 }
