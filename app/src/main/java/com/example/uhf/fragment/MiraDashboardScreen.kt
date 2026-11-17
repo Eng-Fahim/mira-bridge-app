@@ -1,4 +1,4 @@
-package com.example.uhf.ui.fragment
+package com.example.uhf.fragment
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
