@@ -515,6 +515,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void fetchDashboardCharts() {
+    if (roleController != null && !roleController.canFetchCharts()) return;
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
         
         localExecutor.execute(() -> {
@@ -537,8 +538,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private void fetchData() {
         try {
-            boolean isPos = permissionManager != null && permissionManager.isPosOperator();
-            if (!isPos && roleController != null && !roleController.canFetchFullDashboard()) {
+        if (roleController != null && !roleController.canFetchFullDashboard()) {
                 isLoading.set(false);
                 if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 return;
@@ -589,7 +589,7 @@ public class MiraDashboardFragment extends Fragment {
     private void processData(JSONObject data) {
     try {
         // ✅ معالجة خاصة لأمن البوابات (يخرج من الدالة مباشرة)
-        if (permissionManager != null && permissionManager.isGateUser()) {
+        if (roleController != null && roleController.isGateOnlyLayout()) {
             JSONObject gates = data.optJSONObject("gates");
             if (gates != null && alertsStrip != null) {
                 int scans = gates.optInt("scans_today", 0);
@@ -688,7 +688,7 @@ public class MiraDashboardFragment extends Fragment {
             }
         }
 
-        if (permissionManager != null && permissionManager.isPosOperator() && layoutPosGoldDashboard != null) {
+        if (roleController != null && roleController.isPosOnlyLayout() && layoutPosGoldDashboard != null) {
             if (isPosDashboardHidden) {
                 tvPosTotalWeight.setText("•••••");
                 tvPosTotalValue.setText("•••••••");
@@ -947,7 +947,7 @@ public class MiraDashboardFragment extends Fragment {
     }
 private void computeAndShowAlerts(JSONObject data) {
     // ✅ تخطي هذا لأمن البوابات (شريطهم مخصص للإحصائيات)
-    if (permissionManager != null && permissionManager.isGateUser()) return;
+    if (roleController != null && roleController.isGateOnlyLayout()) return;
         try {
             if (data == null) { updateAlerts(0, null); return; }
             int alertsCount = 0; StringBuilder message = new StringBuilder();
