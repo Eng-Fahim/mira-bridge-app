@@ -13,16 +13,21 @@ public class DashboardRoleController {
         this.arabic = arabic;
     }
 
-    /**
+        /**
      * هل الواجهة الأساسية للمستخدم هي واجهة الكاشير (POS) فقط؟
      * (تكون true فقط إذا كان يملك POS ولا يملك صلاحيات إدارية/مخزنية/محاسبية أعلى)
      */
     public boolean isPosOnlyLayout() {
         if (permissions == null) return false;
+        
+        // 🛡️ حماية إضافية: إذا كان مدير نظام أو مدير جهة، فلا تنطبق عليه واجهة POS أبداً مهما كانت الأدوار مدمجة
+        if (permissions.isSystemAdmin() || permissions.isOrgAdmin() || permissions.canViewAdminHub()) {
+            return false;
+        }
+        
         return permissions.canViewPos()
                 && !permissions.canViewDashboardHero()
-                && !permissions.canViewAccounting()
-                && !permissions.canViewAdminHub();
+                && !permissions.canViewAccounting();
     }
 
     /**
@@ -30,6 +35,11 @@ public class DashboardRoleController {
      */
     public boolean isGateOnlyLayout() {
         if (permissions == null) return false;
+        
+        if (permissions.isSystemAdmin() || permissions.isOrgAdmin() || permissions.canViewAdminHub()) {
+            return false;
+        }
+        
         return permissions.canViewGates()
                 && !permissions.canViewDashboardHero()
                 && !permissions.canViewDashboardSales()
