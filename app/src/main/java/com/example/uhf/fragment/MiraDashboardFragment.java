@@ -245,18 +245,40 @@ public class MiraDashboardFragment extends Fragment {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
 
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        try { 
-            return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
-        } catch (Exception e) { 
-            Log.e(TAG, "Dashboard inflate FAILED", e);
-            android.widget.TextView errorView = new android.widget.TextView(container != null ? container.getContext() : requireContext());
-            errorView.setText("Error loading UI: " + e.getMessage());
-            return errorView;
+    @    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        try {
+            initializeManagers();
+            initViews(view);
+            setupProfileListener();
+            setupBranchListener();
+            
+            // ✅ تصحيح جلب رقم الفرع لضمان عمله بدقة مع حسابات الكاشير (POS_OPERATOR)
+            currentBranchId = (branchesManager != null && branchesManager.getActiveBranchId() > 0)
+                    ? branchesManager.getActiveBranchId()
+                    : (sessionManager != null ? sessionManager.getBranchId() : 1);
+
+            initBranchCache(currentBranchId);
+            showShimmer(false);
+            isViewInitialized = true;
+            loadOfflineData();
+            startAutoRefresh();
+            lastDataFetchTime = 0;
+
+            fetchData();
+            fetchDashboardCharts();
+            fetchRecentActivity();
+            if (currentBranchId > 0) {
+                fetchScrapSummary(currentBranchId);
+                fetchScrapAging(currentBranchId);
+            }
+
+        } catch (Throwable e) {
+            Log.e(TAG, "onViewCreated", e);
         }
     }
+
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -1171,12 +1193,15 @@ private void computeAndShowAlerts(JSONObject data) {
         } catch (Exception e) {}
     }
 
-    private void fetchRecentActivity() {
+        private void fetchRecentActivity() {
         if (apiClient == null || !isAdded() || !isSessionValid() || !ensureExecutor()) return;
         
         localExecutor.execute(() -> {
             try {
-                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                // ✅ ضمان استخدام رقم الفرع الفعلي للمستخدم إن لم يكن مسجلاً في الـ BranchesManager
+                int branchId = (currentBranchId > 0) ? currentBranchId
+                        : (sessionManager != null ? sessionManager.getBranchId() : 1);
+
                 MiraApiClient.ApiResponse response = apiClient.getUnifiedActivity(branchId, 15);
                 
                 if (response != null && response.isSuccess && response.data != null) {
@@ -1201,6 +1226,7 @@ private void computeAndShowAlerts(JSONObject data) {
             }
         });
     }
+
 
     private void updateRecentActivityUI(JSONArray activities) {
         if (activities == null || llRecentActivity == null) return;
@@ -1241,7 +1267,7 @@ private void computeAndShowAlerts(JSONObject data) {
         return null;
     }
 
-    private void updatePosRecentActivityUI(JSONArray activities) {
+        private void updatePosRecentActivityUI(JSONArray activities) {
         if (activities == null || llPosRecentActivity == null) return;
         try {
             llPosRecentActivity.removeAllViews();
@@ -1256,7 +1282,12 @@ private void computeAndShowAlerts(JSONObject data) {
                 TextView tvAmount = itemView.findViewById(R.id.tvPosActAmount);
 
                 String icon = item.optString("icon", "🛒");
-                String title = isArabic ? item.optString("title_ar", "") : item.optString("title_en", "");
+                
+                // ✅ احتياط ذكي لقراءة العنوان بغض النظر عن اختلاف تسميات السيرفر
+                String title = isArabic
+                        ? item.optString("title_ar", item.optString("title", item.optString("action", "عملية بيع")))
+                        : item.optString("title_en", item.optString("title", item.optString("action", "Sale Transaction")));
+
                 String timestamp = item.optString("timestamp", "");
                 double amount = item.optDouble("amount", 0);
                 String currency = item.optString("currency", "YER");
@@ -1289,8 +1320,11 @@ private void computeAndShowAlerts(JSONObject data) {
                 itemView.setOnClickListener(v -> handleRecentActivityClick(item));
                 llPosRecentActivity.addView(itemView);
             }
-        } catch (Exception e) { Log.e(TAG, "updatePosRecentActivityUI", e); }
+        } catch (Exception e) { 
+            Log.e(TAG, "updatePosRecentActivityUI", e); 
+        }
     }
+
 
     private void bindActivityToView(View v, JSONObject item) {
         if (v == null || item == null) return;
