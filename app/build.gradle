@@ -1,6 +1,8 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
+
 android {
     namespace 'com.example.uhf'
     compileSdk 34
@@ -82,21 +84,19 @@ android {
             // ⚡ أمان — لا محاكي في نسخة الإنتاج
             buildConfigField "boolean", "ALLOW_SIMULATOR", "false"
 
-            zipAlignEnabled true
             debuggable false
         }
-
-        // ❌ تم حذف debug buildType لتسريع البناء
     }
-    
-        buildFeatures {
+
+    buildFeatures {
         viewBinding true
         buildConfig true
         compose true
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion '1.5.17'
+        // ✅ متوافق مع compose-bom:2024.05.00 و Kotlin 1.9.24
+        kotlinCompilerExtensionVersion '1.5.14'
     }
 
     compileOptions {
@@ -105,8 +105,10 @@ android {
         coreLibraryDesugaringEnabled true
     }
 
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 
-    // ✅ استخدام lint بدلاً من lintOptions (AGP 8+)
     lint {
         checkReleaseBuilds false
         abortOnError false
@@ -114,7 +116,7 @@ android {
         disable 'MissingTranslation', 'ExtraTranslation'
     }
 
-    packagingOptions {
+    packaging {
         resources {
             excludes += [
                 '/META-INF/{AL2.0,LGPL2.1}',
@@ -224,9 +226,8 @@ dependencies {
 
     // ==================== WorkManager ====================
     implementation 'androidx.work:work-runtime:2.9.0'
-    
-        // ==================== Jetpack Compose ====================
-    def compose_version = '1.6.8'
+
+    // ==================== Jetpack Compose ====================
     implementation platform("androidx.compose:compose-bom:2024.05.00")
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
@@ -236,17 +237,4 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
 
     // ==================== Desugaring ====================
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
-
-    // ❌ تم حذف testImplementation و androidTestImplementation
-    // لأنها كانت تُستخدم فقط مع debug variant
-}
-
-// ==================== اسم APK مخصص ====================
-android.applicationVariants.all { variant ->
-    variant.outputs.all { output ->
-        def versionName = variant.versionName
-        def apkName = "MIRA_ID_Smart_Jewelry_Tag_v${versionName}.apk"
-        output.outputFileName = apkName
-    }
-}
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:
