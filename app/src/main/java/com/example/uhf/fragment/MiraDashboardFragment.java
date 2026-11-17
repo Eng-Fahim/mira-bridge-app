@@ -1,7 +1,6 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
-import androidx.compose.ui.platform.ComposeView;
 import android.content.Intent;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
@@ -245,47 +244,18 @@ public class MiraDashboardFragment extends Fragment {
     private void shutdownExecutor() {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
-    @Nullable
+        @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-    // إنشاء الحاوية برمجياً بالكامل لتجاوز مشكلة توليد الـ ViewBinding الخاطئ في الـ CI
-        androidx.compose.ui.platform.ComposeView composeView = new androidx.compose.ui.platform.ComposeView(requireContext());
-        composeView.setLayoutParams(new ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        
-        composeView.setContent(() -> {
-            MiraDashboardScreenKt.MiraDashboardScreen(
-                currentTotalWeight,
-                currentInventoryValue,
-                0.00,
-                java.util.Arrays.asList(
-                    new KaratDataModel(24, 124.00),
-                    new KaratDataModel(18, 9.50)
-                ),
-                () -> {
-                    isHeroHidden = !isHeroHidden;
-                    return null;
-                },
-                !isHeroHidden,
-                (action) -> {
-                    if (action.equals("sell")) {
-                        navigateToFragment(new MiraPosFragment(), "Sales");
-                    }
-                    return null;
-                }
-            );
-            return null;
-        });
-
-        return composeView;
+        // العودة لملف الـ XML الأساسي الأصلي للداشبورد الخاص بك
+        return inflater.inflate(R.layout.fragment_mira_dashboard_advanced, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         initializeManagers();
+        initViews(view);
     }
 
     private void initViews(View v) {
