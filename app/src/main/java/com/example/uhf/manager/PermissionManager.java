@@ -167,10 +167,14 @@ public class PermissionManager {
                 if (caps != null) capabilities = caps;
                 JSONObject perms = data.optJSONObject("permissions");
                 if (perms != null) legacyPermissions = perms;
-            } else if (data != null) {
-                capabilities = data;
-                if (legacy != null) legacyPermissions = legacy;
-            }
+            } else if (data != null && data.has("modules")) {
+    capabilities = data;
+    if (legacy != null) legacyPermissions = legacy;
+} else {
+    // ❌ استجابة بدون capabilities — لا تُحدِّث شيئاً
+    Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
+    return;
+}
 
             fragments = deriveFragments(capabilities);
 
