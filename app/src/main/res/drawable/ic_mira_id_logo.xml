@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="240dp"
+    android:height="240dp"
+    android:viewportWidth="240"
+    android:viewportHeight="240">
+
+    <!-- 1. الهالة الضوئية الملكية الخلفية -->
+    <path android:pathData="M 120,120 m -114,0 a 114,114 0 1,0 228,0 a 114,114 0 1,0 -228,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="120"
+                android:centerY="120"
+                android:gradientRadius="114"
+                android:type="radial">
+                <item android:color="#33D4AF37" android:offset="0.0" />
+                <item android:color="#1A38BDF8" android:offset="0.55" />
+                <item android:color="#00050A18" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 2. الحلقة الخارجية الدقيقة -->
+    <path
+        android:pathData="M 120,14 A 106,106 0 1,1 119.99,14 Z"
+        android:strokeWidth="1.4">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="226"
+                android:endY="226"
+                android:startX="14"
+                android:startY="14"
+                android:type="linear">
+                <item android:color="#99FFE59E" android:offset="0.0" />
+                <item android:color="#44D4AF37" android:offset="0.5" />
+                <item android:color="#9938BDF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 3. أقواس المدار الهندسي الداخلي -->
+    <path
+        android:pathData="M 138,28 A 94,94 0 0,1 212,102 M 212,138 A 94,94 0 0,1 138,212 M 102,212 A 94,94 0 0,1 28,138 M 28,102 A 94,94 0 0,1 102,28"
+        android:strokeAlpha="0.65"
+        android:strokeColor="#D4AF37"
+        android:strokeLineCap="round"
+        android:strokeWidth="2" />
+
+    <!-- 4. موجات RFID الذهبية (الجانب الأيسر) -->
+    <path
+        android:pathData="M 42,96 Q 28,120 42,144"
+        android:strokeColor="#FFE59E"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.6" />
+    <path
+        android:pathData="M 30,86 Q 10,120 30,154"
+        android:strokeAlpha="0.8"
+        android:strokeColor="#D4AF37"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.2" />
+    <path
+        android:pathData="M 22,80 Q 4,120 22,160"
+        android:strokeAlpha="0.45"
+        android:strokeColor="#996515"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+
+    <!-- 5. موجات RFID الذكية السماوية/الذهبية (الجانب الأيمن) -->
+    <path
+        android:pathData="M 198,96 Q 212,120 198,144"
+        android:strokeColor="#7DD3FC"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.6" />
+    <path
+        android:pathData="M 210,86 Q 230,120 210,154"
+        android:strokeAlpha="0.8"
+        android:strokeColor="#38BDF8"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.2" />
+    <path
+        android:pathData="M 218,80 Q 236,120 218,160"
+        android:strokeAlpha="0.45"
+        android:strokeColor="#0284C7"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+
+    <!-- 6. درع الشعار الملكي (الخلفية الكحلية العميقة) -->
+    <path android:pathData="M 62,72 L 178,72 L 194,114 L 120,208 L 46,114 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="120"
+                android:endY="208"
+                android:startX="120"
+                android:startY="72"
+                android:type="linear">
+                <item android:color="#FF13254C" android:offset="0.0" />
+                <item android:color="#FF070E20" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- إطار الدرع الذهبي الخارجي -->
+    <path
+        android:pathData="M 62,72 L 178,72 L 194,114 L 120,208 L 46,114 Z"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3.2">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="194"
+                android:endY="208"
+                android:startX="46"
+                android:startY="72"
+                android:type="linear">
+                <item android:color="#FFFFF0B8" android:offset="0.0" />
+                <item android:color="#FFD4AF37" android:offset="0.5" />
+                <item android:color="#FF8A5A10" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- إطار الدرع الداخلي الرفيع -->
+    <path
+        android:pathData="M 68,78 L 172,78 L 186,114 L 120,198 L 54,114 Z"
+        android:strokeAlpha="0.4"
+        android:strokeColor="#FFE59E"
+        android:strokeWidth="1" />
+
+    <!-- 7. التاج الماسي ثلاثي الأبعاد (أوجه متعددة للإضاءة والظل) -->
+    <!-- الوجه العلوي للماسة -->
+    <path android:pathData="M 96,36 L 144,36 L 136,58 L 104,58 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="144"
+                android:endY="58"
+                android:startX="96"
+                android:startY="36"
+                android:type="linear">
+                <item android:color="#FFFFF6CC" android:offset="0.0" />
+                <item android:color="#FFE5C158" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- الجناح العلوي الأيسر للماسة -->
+    <path android:pathData="M 96,36 L 104,58 L 76,58 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="104"
+                android:endY="58"
+                android:startX="76"
+                android:startY="36"
+                android:type="linear">
+                <item android:color="#FFFFE59E" android:offset="0.0" />
+                <item android:color="#FFC59B27" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- الجناح العلوي الأيمن للماسة -->
+    <path android:pathData="M 144,36 L 164,58 L 136,58 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="164"
+                android:endY="58"
+                android:startX="136"
+                android:startY="36"
+                android:type="linear">
+                <item android:color="#FFD4AF37" android:offset="0.0" />
+                <item android:color="#FF8A5A10" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- القلب المركزي للماسة -->
+    <path android:pathData="M 104,58 L 136,58 L 120,96 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="120"
+                android:endY="96"
+                android:startX="120"
+                android:startY="58"
+                android:type="linear">
+                <item android:color="#FFFFF0B8" android:offset="0.0" />
+                <item android:color="#FFD4AF37" android:offset="0.6" />
+                <item android:color="#FF996515" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- الوجه السفلي الأيسر للماسة -->
+    <path android:pathData="M 76,58 L 104,58 L 120,96 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="120"
+                android:endY="96"
+                android:startX="76"
+                android:startY="58"
+                android:type="linear">
+                <item android:color="#FFD4AF37" android:offset="0.0" />
+                <item android:color="#FF7A4F08" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- الوجه السفلي الأيمن للماسة -->
+    <path android:pathData="M 136,58 L 164,58 L 120,96 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="164"
+                android:endY="96"
+                android:startX="136"
+                android:startY="58"
+                android:type="linear">
+                <item android:color="#FFA67418" android:offset="0.0" />
+                <item android:color="#FF5C3A04" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 8. حرف M المعماري الضخم (MIRA Monogram) -->
+    <path android:pathData="M 68,154 L 68,86 L 92,86 L 120,122 L 148,86 L 172,86 L 172,154 L 156,166 L 156,112 L 120,152 L 84,112 L 84,166 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="172"
+                android:endY="166"
+                android:startX="68"
+                android:startY="86"
+                android:type="linear">
+                <item android:color="#FFFFF2B2" android:offset="0.0" />
+                <item android:color="#FFE5C158" android:offset="0.35" />
+                <item android:color="#FFD4AF37" android:offset="0.7" />
+                <item android:color="#FF8A5A10" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- حافة الإضاءة البارزة أعلى حرف M لإعطاء عمق معدني -->
+    <path
+        android:fillColor="#FFFFF8D6"
+        android:pathData="M 68,86 L 92,86 L 120,122 L 148,86 L 172,86 L 172,91 L 148,91 L 120,127 L 92,91 L 68,91 Z" />
+
+    <!-- 9. جوهرة الشريحة الذكية أسفل الشعار (Smart RFID Core) -->
+    <path android:pathData="M 120,164 L 131,175 L 120,186 L 109,175 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="131"
+                android:endY="186"
+                android:startX="109"
+                android:startY="164"
+                android:type="linear">
+                <item android:color="#FFBAE6FD" android:offset="0.0" />
+                <item android:color="#FF38BDF8" android:offset="0.5" />
+                <item android:color="#FF0284C7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>
