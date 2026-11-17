@@ -245,45 +245,37 @@ public class MiraDashboardFragment extends Fragment {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
     
-    @Nullable
+        @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // إرجاع تخطيط الـ XML الذي يحتوي على الـ ComposeView
         return inflater.inflate(R.layout.fragment_mira_dashboard_advanced, container, false);
     }
 
-
-        @Override
+    @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        // تهيئة المديرون والبيانات كما هي
         initializeManagers();
 
-        ComposeView composeView = view.findViewById(R.id.composeDashboardView);
+        // ✅ استخدام findViewById المباشر يتجاوز أي خطأ في مولد ViewBinding
+        androidx.compose.ui.platform.ComposeView composeView = view.findViewById(R.id.composeDashboardView);
         if (composeView != null) {
             composeView.setContent(() -> {
-                // هنا يتم تمرير المتغيرات الحية (الوزن الإجمالي، القيمة، العيارات القادمة من السيرفر)
                 MiraDashboardScreenKt.MiraDashboardScreen(
-                    currentTotalWeight,     // الوزن الإجمالي الفعلي من السيرفر
-                    currentInventoryValue,  // القيمة الإجمالية الفعلية
-                    0.00,                   // الرصيد النقدي
-                    Arrays.asList(
-                        new KaratDataModel(24, 124.00), // يمكن ربطها بقائمة العيارات الحقيقية
+                    currentTotalWeight,
+                    currentInventoryValue,
+                    0.00,
+                    java.util.Arrays.asList(
+                        new KaratDataModel(24, 124.00),
                         new KaratDataModel(18, 9.50)
                     ),
                     () -> {
-                        // عند النقر على زر العين لإخفاء/إظهار الأرصدة
                         isHeroHidden = !isHeroHidden;
                         return null;
                     },
                     !isHeroHidden,
                     (action) -> {
-                        // التعامل مع الأزرار السريعة (بيع، شراء، تقارير...)
                         if (action.equals("sell")) {
                             navigateToFragment(new MiraPosFragment(), "Sales");
-                        } else if (action.equals("reports")) {
-                            navigateToFragment(new MiraAllActivitiesFragment(), "AllActivities");
                         }
                         return null;
                     }
@@ -292,8 +284,6 @@ public class MiraDashboardFragment extends Fragment {
             });
         }
     }
-
-
 
     private void initViews(View v) {
         try {
