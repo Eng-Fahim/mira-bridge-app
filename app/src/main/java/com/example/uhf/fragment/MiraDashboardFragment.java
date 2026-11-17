@@ -245,7 +245,7 @@ public class MiraDashboardFragment extends Fragment {
         if (localExecutor != null) { try { localExecutor.shutdownNow(); } catch (Exception ignored) {} localExecutor = null; }
     }
 
-    @Override
+    @    @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         try {
@@ -254,7 +254,6 @@ public class MiraDashboardFragment extends Fragment {
             setupProfileListener();
             setupBranchListener();
             
-            // ✅ تصحيح جلب رقم الفرع لضمان عمله بدقة مع حسابات الكاشير (POS_OPERATOR)
             currentBranchId = (branchesManager != null && branchesManager.getActiveBranchId() > 0)
                     ? branchesManager.getActiveBranchId()
                     : (sessionManager != null ? sessionManager.getBranchId() : 1);
@@ -279,30 +278,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        try {
-            initializeManagers();
-            initViews(view);
-            setupProfileListener();
-            setupBranchListener();
-            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            initBranchCache(currentBranchId);
-            showShimmer(false);
-            isViewInitialized = true;
-            loadOfflineData();
-            startAutoRefresh();
-            lastDataFetchTime = 0;
-
-            fetchData();
-            fetchDashboardCharts();
-            fetchRecentActivity();
-            if (currentBranchId > 0) { fetchScrapSummary(currentBranchId); fetchScrapAging(currentBranchId); }
-
-        } catch (Throwable e) { Log.e(TAG, "onViewCreated", e); }
-    }
 
     private void initViews(View v) {
         try {
