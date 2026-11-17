@@ -1,7 +1,10 @@
 package com.example.uhf.ui.activities
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -15,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -24,9 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +59,7 @@ fun AllActivitiesTopBar(
     onRefresh: () -> Unit
 ) {
     val colors = MiraTheme.colors
+
     Surface(
         color = Color.Transparent,
         modifier = Modifier
@@ -82,12 +89,12 @@ fun AllActivitiesTopBar(
                         text = if (isArabic) "جميع العمليات" else "All Activities",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = colors.onSurface
+                        color = colors.textPrimary
                     )
                     Text(
                         text = buildSubtitle(isArabic, totalCount, visibleCount),
                         style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant
+                        color = colors.textSecondary
                     )
                 }
 
@@ -102,7 +109,7 @@ fun AllActivitiesTopBar(
                     icon = Icons.Rounded.Refresh,
                     contentDescription = if (isArabic) "تحديث" else "Refresh",
                     onClick = onRefresh,
-                    tint = colors.primary,
+                    tint = colors.goldPrimary,
                     spinning = isRefreshing
                 )
             }
@@ -123,18 +130,20 @@ private fun GlassIconButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    tint: Color = MiraTheme.colors.onSurface,
+    tint: Color = MiraTheme.colors.textPrimary,
     spinning: Boolean = false
 ) {
     val colors = MiraTheme.colors
     val rotation by animateFloatAsState(
         targetValue = if (spinning) 360f else 0f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Restart),
         label = "spin"
     )
+
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = colors.surface.copy(alpha = 0.85f),
+        color = colors.cardSurface,
         tonalElevation = 1.dp,
         modifier = Modifier.size(42.dp)
     ) {
@@ -145,20 +154,11 @@ private fun GlassIconButton(
                 tint = tint,
                 modifier = Modifier
                     .size(20.dp)
-                    .then(
-                        if (spinning)
-                            Modifier
-                                .graphicsLayerRotation(rotation)
-                        else Modifier
-                    )
+                    .graphicsLayer { rotationZ = rotation }
             )
         }
     }
 }
-
-@Composable
-private fun Modifier.graphicsLayerRotation(degrees: Float): Modifier =
-    androidx.compose.ui.graphics.graphicsLayer { rotationZ = degrees }
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Search Bar
@@ -171,13 +171,14 @@ fun ActivitySearchBar(
     onQueryChange: (String) -> Unit
 ) {
     val colors = MiraTheme.colors
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .height(52.dp),
         shape = RoundedCornerShape(16.dp),
-        color = colors.surface.copy(alpha = 0.9f),
+        color = colors.cardSurface,
         tonalElevation = 1.dp
     ) {
         Row(
@@ -190,7 +191,7 @@ fun ActivitySearchBar(
             Icon(
                 Icons.Rounded.Search,
                 contentDescription = null,
-                tint = colors.onSurfaceVariant,
+                tint = colors.textSecondary,
                 modifier = Modifier.size(20.dp)
             )
             BasicTextField(
@@ -198,13 +199,13 @@ fun ActivitySearchBar(
                 onValueChange = onQueryChange,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                textStyle = TextStyle(color = colors.onSurface, fontSize = 15.sp),
+                textStyle = TextStyle(color = colors.textPrimary, fontSize = 15.sp),
                 decorationBox = { inner ->
                     Box {
                         if (query.isEmpty()) {
                             Text(
                                 placeholder,
-                                color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+                                color = colors.textSecondary.copy(alpha = 0.7f),
                                 fontSize = 15.sp
                             )
                         }
@@ -224,7 +225,7 @@ fun ActivitySearchBar(
                     Icon(
                         Icons.Rounded.Close,
                         contentDescription = null,
-                        tint = colors.onSurfaceVariant,
+                        tint = colors.textSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -237,7 +238,7 @@ fun ActivitySearchBar(
 //  Filter Chips
 // ═══════════════════════════════════════════════════════════════════════
 
-private data class FilterDef(
+data class ActivityFilterDef(
     val key: String,
     val labelAr: String,
     val labelEn: String,
@@ -245,13 +246,13 @@ private data class FilterDef(
     val color: Color
 )
 
-private val FILTERS = listOf(
-    FilterDef("all",       "الكل",     "All",       Icons.Rounded.Apps,           Color(0xFF94A3B8)),
-    FilterDef("sale",      "مبيعات",   "Sales",     Icons.Rounded.PointOfSale,    Color(0xFFD4AF37)),
-    FilterDef("inventory", "جرد",      "Inventory", Icons.Rounded.Inventory2,     Color(0xFF38BDF8)),
-    FilterDef("transfer",  "تحويلات",  "Transfers", Icons.Rounded.SwapHoriz,      Color(0xFFA855F7)),
-    FilterDef("rfid",      "RFID",     "RFID",      Icons.Rounded.Radar,          Color(0xFF06B6D4)),
-    FilterDef("system",    "نظام",     "System",    Icons.Rounded.Settings,       Color(0xFF64748B))
+private val ACTIVITY_FILTERS = listOf(
+    ActivityFilterDef("all",       "الكل",     "All",       Icons.Rounded.Apps,           Color(0xFF94A3B8)),
+    ActivityFilterDef("sale",      "مبيعات",   "Sales",     Icons.Rounded.PointOfSale,    Color(0xFFD4AF37)),
+    ActivityFilterDef("inventory", "جرد",      "Inventory", Icons.Rounded.Inventory2,     Color(0xFF38BDF8)),
+    ActivityFilterDef("transfer",  "تحويلات",  "Transfers", Icons.Rounded.SwapHoriz,      Color(0xFFA855F7)),
+    ActivityFilterDef("rfid",      "RFID",     "RFID",      Icons.Rounded.Radar,          Color(0xFF06B6D4)),
+    ActivityFilterDef("system",    "نظام",     "System",    Icons.Rounded.Settings,       Color(0xFF64748B))
 )
 
 @Composable
@@ -261,21 +262,23 @@ fun ActivityFilterChips(
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MiraTheme.colors
+
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 4.dp)
     ) {
-        items(FILTERS, key = { it.key }) { filter ->
+        items(ACTIVITY_FILTERS, key = { it.key }) { filter ->
             val isSelected = selected == filter.key
             Surface(
                 onClick = { onSelected(filter.key) },
                 shape = RoundedCornerShape(50),
                 color = if (isSelected) filter.color.copy(alpha = 0.18f)
-                        else MiraTheme.colors.surface.copy(alpha = 0.75f),
+                else colors.cardSurface,
                 border = if (isSelected)
-                    androidx.compose.foundation.BorderStroke(1.dp, filter.color.copy(alpha = 0.5f))
-                    else null
+                    BorderStroke(1.dp, filter.color.copy(alpha = 0.5f))
+                else null
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -285,14 +288,14 @@ fun ActivityFilterChips(
                     Icon(
                         filter.icon,
                         contentDescription = null,
-                        tint = if (isSelected) filter.color else MiraTheme.colors.onSurfaceVariant,
+                        tint = if (isSelected) filter.color else colors.textSecondary,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = if (isArabic) filter.labelAr else filter.labelEn,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isSelected) filter.color else MiraTheme.colors.onSurfaceVariant
+                        color = if (isSelected) filter.color else colors.textSecondary
                     )
                 }
             }
@@ -321,16 +324,17 @@ fun ActivityListItem(
     val timeLabel = formatActivityTime(activity.optString("timestamp", ""), isArabic)
 
     val colors = MiraTheme.colors
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = androidx.compose.material.ripple.rememberRipple(),
+                indication = rememberRipple(),
                 onClick = onClick
             ),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.surface.copy(alpha = 0.95f)),
+        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
@@ -362,7 +366,7 @@ fun ActivityListItem(
                         text = title.ifBlank { type.uppercase(Locale.ROOT) },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = colors.onSurface,
+                        color = colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -370,7 +374,7 @@ fun ActivityListItem(
                         Text(
                             text = details,
                             style = MaterialTheme.typography.bodySmall,
-                            color = colors.onSurfaceVariant,
+                            color = colors.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -380,13 +384,13 @@ fun ActivityListItem(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (user.isNotBlank()) {
-                            Text("👤 $user", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                            Text("👤 $user", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
                         }
                         if (user.isNotBlank() && timeLabel.isNotBlank()) {
-                            Text("•", color = colors.onSurfaceVariant.copy(alpha = 0.6f))
+                            Text("•", color = colors.textSecondary.copy(alpha = 0.6f))
                         }
                         if (timeLabel.isNotBlank()) {
-                            Text("🕐 $timeLabel", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                            Text("🕐 $timeLabel", style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
                         }
                     }
                 }
@@ -461,7 +465,8 @@ private fun formatActivityTime(timestamp: String, isArabic: Boolean): String {
             val sdf = SimpleDateFormat(f, Locale.US).apply {
                 timeZone = TimeZone.getTimeZone("UTC")
             }
-            parsed = sdf.parse(timestamp); if (parsed != null) break
+            parsed = sdf.parse(timestamp)
+            if (parsed != null) break
         } catch (_: Exception) {}
     }
     if (parsed == null) return timestamp
@@ -502,13 +507,13 @@ fun ActivityEmptyState(
             title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = colors.onSurface
+            color = colors.textPrimary
         )
         Spacer(Modifier.height(4.dp))
         Text(
             subtitle,
             style = MaterialTheme.typography.bodySmall,
-            color = colors.onSurfaceVariant
+            color = colors.textSecondary
         )
     }
 }
@@ -527,7 +532,7 @@ fun ActivityLoadingState() {
             Text(
                 text = "…",
                 style = MaterialTheme.typography.bodySmall,
-                color = MiraTheme.colors.onSurfaceVariant
+                color = MiraTheme.colors.textSecondary
             )
         }
     }
@@ -566,16 +571,16 @@ fun ActivityErrorState(
             text = if (isArabic) "حدث خطأ" else "Something went wrong",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = colors.onSurface
+            color = colors.textPrimary
         )
         Spacer(Modifier.height(6.dp))
         Text(
             text = message,
             style = MaterialTheme.typography.bodySmall,
-            color = colors.onSurfaceVariant,
+            color = colors.textSecondary,
             maxLines = 4,
             overflow = TextOverflow.Ellipsis,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(16.dp))
         Surface(
@@ -611,7 +616,7 @@ fun EndOfListBadge(isArabic: Boolean) {
         Text(
             text = if (isArabic) "— نهاية العمليات —" else "— End of activities —",
             style = MaterialTheme.typography.labelSmall,
-            color = MiraTheme.colors.onSurfaceVariant.copy(alpha = 0.7f)
+            color = MiraTheme.colors.textSecondary.copy(alpha = 0.7f)
         )
     }
 }
