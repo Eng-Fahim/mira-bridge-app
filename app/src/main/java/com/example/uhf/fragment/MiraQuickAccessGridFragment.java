@@ -18,7 +18,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraQuickAccessSettings;
-import com.example.uhf.fragment.MiraIdentityStudioFragment;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -58,7 +58,7 @@ public class MiraQuickAccessGridFragment extends Fragment {
     }
 
     /**
-     * ✅ عرض الأزرار المخصصة
+     * ✅ عرض الأزرار المفعّلة والتي يمتلك المستخدم صلاحية لها فقط
      */
     private void renderQuickActions(View view) {
         GridLayout gridLayout = view.findViewById(R.id.gridQuickActions);
@@ -66,7 +66,7 @@ public class MiraQuickAccessGridFragment extends Fragment {
         
         gridLayout.removeAllViews();
         
-        // ✅ الحصول على الإجراءات المفعّلة فقط
+        // جلب الإجراءات المفعّلة (مفلترة محلياً وعبر السيرفر)
         List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccess.getEnabledActions();
         
         if (enabledActions.isEmpty()) {
@@ -74,7 +74,6 @@ public class MiraQuickAccessGridFragment extends Fragment {
             return;
         }
         
-        // ✅ حساب عدد الأعمدة (3 أعمدة للشاشات العادية)
         int columnCount = 3;
         gridLayout.setColumnCount(columnCount);
         
@@ -87,13 +86,12 @@ public class MiraQuickAccessGridFragment extends Fragment {
     }
 
     /**
-     * ✅ إنشاء بطاقة زر
+     * ✅ إنشاء بطاقة الزر
      */
     private CardView createActionCard(MiraQuickAccessSettings.QuickAction action) {
         Context context = getContext();
         if (context == null) return null;
         
-        // إنشاء CardView
         CardView card = new CardView(context);
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
         params.width = 0;
@@ -107,22 +105,19 @@ public class MiraQuickAccessGridFragment extends Fragment {
         card.setClickable(true);
         card.setFocusable(true);
         
-        // إنشاء المحتوى
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(16, 20, 16, 20);
         layout.setGravity(android.view.Gravity.CENTER);
         
-        // الأيقونة
         TextView tvIcon = new TextView(context);
         tvIcon.setText(getActionIcon(action.id));
         tvIcon.setTextSize(32);
         tvIcon.setGravity(android.view.Gravity.CENTER);
         layout.addView(tvIcon);
         
-        // العنوان
         TextView tvTitle = new TextView(context);
-        tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
+        tvTitle.setText(action.getLabel(isArabic));
         tvTitle.setTextSize(12);
         tvTitle.setGravity(android.view.Gravity.CENTER);
         tvTitle.setPadding(0, 8, 0, 0);
@@ -132,7 +127,6 @@ public class MiraQuickAccessGridFragment extends Fragment {
         
         card.addView(layout);
         
-        // ✅ النقر على البطاقة
         card.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onQuickActionClick(action.id);
@@ -145,7 +139,7 @@ public class MiraQuickAccessGridFragment extends Fragment {
     }
 
     /**
-     * ✅ معالجة النقر على الإجراء
+     * ✅ معالجة التنقل عند النقر
      */
     private void handleActionClick(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
@@ -182,12 +176,7 @@ public class MiraQuickAccessGridFragment extends Fragment {
                 case "gold_rates":
                     activity.loadFragment(new MiraGoldCurrencyFragment(), "GoldRates");
                     break;
-                /*case "users":
-                    activity.loadFragment(new UsersManagementFragment(), "UsersManagement");
-                    break;*/
-                    
                 case "branches":
-                    // فتح إدارة الفروع
                     Toast.makeText(getContext(), 
                         isArabic ? "إدارة الفروع" : "Branches Management", 
                         Toast.LENGTH_SHORT).show();
@@ -201,9 +190,6 @@ public class MiraQuickAccessGridFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ الحصول على أيقونة الإجراء
-     */
     private String getActionIcon(String actionId) {
         switch (actionId) {
             case "identity": return "🏷️";
@@ -222,9 +208,6 @@ public class MiraQuickAccessGridFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ عرض حالة فارغة
-     */
     private void showEmptyState(View view) {
         GridLayout gridLayout = view.findViewById(R.id.gridQuickActions);
         if (gridLayout == null) return;
@@ -234,8 +217,8 @@ public class MiraQuickAccessGridFragment extends Fragment {
         
         TextView tvEmpty = new TextView(context);
         tvEmpty.setText(isArabic ? 
-            "لا توجد أزرار مفعّلة\nقم بتخصيص الأزرار من الإعدادات" : 
-            "No enabled actions\nCustomize buttons from settings");
+            "لا توجد أزرار مفعّلة أو لا تملك صلاحية الوصول إليها\nقم بمراجعة إدارتك أو تفعيلها من الإعدادات" : 
+            "No enabled actions or you lack permissions\nCheck settings or admin");
         tvEmpty.setTextSize(14);
         tvEmpty.setGravity(android.view.Gravity.CENTER);
         tvEmpty.setPadding(32, 32, 32, 32);
