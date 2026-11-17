@@ -1,6 +1,7 @@
 package com.example.uhf.fragment
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -263,18 +264,22 @@ class MiraAllActivitiesFragment : Fragment() {
     }
 
     private fun setupBackPress() {
-        requireActivity().getOnBackPressedDispatcher().addCallback(
-            getViewLifecycleOwner(),
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    try {
-                        parentFragmentManager.popBackStack()
-                    } catch (e: Exception) {
-                        requireActivity().finish()
+        try {
+            requireActivity().getOnBackPressedDispatcher().addCallback(
+                getViewLifecycleOwner(),
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        try {
+                            parentFragmentManager.popBackStack()
+                        } catch (e: Exception) {
+                            requireActivity().finish()
+                        }
                     }
                 }
-            }
-        )
+            )
+        } catch (e: Exception) {
+            Log.e("MiraAllActivities", "Back press error", e)
+        }
     }
 
     override fun onDestroyView() {
