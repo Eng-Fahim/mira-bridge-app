@@ -20,17 +20,15 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -92,7 +90,6 @@ import com.example.uhf.tools.MemoryManager
 import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
-import org.json.JSONObject
 import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.NoSuchAlgorithmException
@@ -466,11 +463,12 @@ class LoginActivity : AppCompatActivity() {
         recreate()
     }
 
-    private fun saveServerUrl(rawUrl: String) {
+    private fun saveServerUrl(rawUrl: String): Boolean {
         var url = rawUrl.trim()
-        if (isValidServerUrl(url)) {
+        return if (isValidServerUrl(url)) {
             if (!url.endsWith("/")) url += "/"
             serverUrlState = url
+            serverErrorState = null
             sessionManager.setServerUrl(url)
             MiraServerConfig.getInstance(this).setBaseUrl(url)
 
@@ -487,6 +485,7 @@ class LoginActivity : AppCompatActivity() {
                 if (isArabicState) "✓ تم حفظ رابط الخادم بنجاح" else "✓ Server URL saved",
                 Toast.LENGTH_SHORT
             ).show()
+            true
         } else {
             serverErrorState = if (isArabicState) {
                 "يجب استخدام HTTPS للاتصال الآمن"
@@ -494,6 +493,7 @@ class LoginActivity : AppCompatActivity() {
                 "HTTPS required for secure connection"
             }
             triggerShake()
+            false
         }
     }
 
@@ -1071,7 +1071,7 @@ private fun LoginVaultScreen(
     appVersion: String,
     serverUrl: String,
     onServerUrlChange: (String) -> Unit,
-    onSaveServerUrl: (String) -> Unit,
+    onSaveServerUrl: (String) -> Boolean,
     serverError: String?,
     username: String,
     onUsernameChange: (String) -> Unit,
@@ -1102,7 +1102,11 @@ private fun LoginVaultScreen(
     val scrollState = rememberScrollState()
 
     var passwordVisible by remember { mutableStateOf(false) }
-    var serverPanelExpanded by remember { mutableStateOf(false) }
+
+    // بوابة صيانة الخادم المخفية (7 نقرات متتالية على ميدالية الشعار)
+    var logoTapCount by remember { mutableIntStateOf(0) }
+    var lastLogoTapTimeMs by remember { mutableLongStateOf(0L) }
+    var showHiddenServerDialog by remember { mutableStateOf(false) }
 
     // مؤقت حي لحالة القفل الأمني (Lockout Countdown)
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -1190,58 +1194,26 @@ private fun LoginVaultScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 14.dp)
             ) {
-                // 1. شريط الأدوات العلوي (تبديل اللغة + إعدادات الخادم)
+                // 1. شريط الأدوات العلوي (شارة الإصدار + تبديل اللغة فقط)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // زر إعدادات الخادم
+                    // شارة إصدار النظام
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = colors.cardSurface.copy(alpha = 0.85f),
-                        border = BorderStroke(
-                            1.dp,
-                            if (serverPanelExpanded) colors.goldPrimary else colors.cardBorder
-                        ),
-                        modifier = Modifier.clickable {
-                            serverPanelExpanded = !serverPanelExpanded
-                        }
+                        color = colors.cardSurface.copy(alpha = 0.75f),
+                        border = BorderStroke(1.dp, colors.cardBorder)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Dns,
-                                contentDescription = null,
-                                tint = colors.goldPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isArabic) "الخادم" else "Server",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = colors.textPrimary
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = if (serverPanelExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                                contentDescription = null,
-                                tint = colors.textSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        Text(
+                            text = appVersion,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textSecondary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
                     }
-
-                    // شارة إصدار النظام
-                    Text(
-                        text = appVersion,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.textSecondary
-                    )
 
                     // زر تبديل اللغة
                     Surface(
@@ -1271,101 +1243,25 @@ private fun LoginVaultScreen(
                     }
                 }
 
-                // 2. لوحة إعدادات الخادم القابلة للطي
-                AnimatedVisibility(
-                    visible = serverPanelExpanded,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                        border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.5f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = if (isArabic) "رابط خادم المنشأة (HTTPS)" else "Facility Server Endpoint (HTTPS)",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.goldPrimary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = serverUrl,
-                                onValueChange = onServerUrlChange,
-                                singleLine = true,
-                                isError = serverError != null,
-                                textStyle = TextStyle(
-                                    fontSize = 13.sp,
-                                    textDirection = TextDirection.Ltr,
-                                    color = colors.textPrimary
-                                ),
-                                placeholder = {
-                                    Text(
-                                        text = "https://jewelry.ibreg.org/api",
-                                        fontSize = 12.sp,
-                                        color = colors.textSecondary.copy(alpha = 0.5f)
-                                    )
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = colors.goldPrimary,
-                                    unfocusedBorderColor = colors.cardBorder,
-                                    errorBorderColor = ErrorCrimson
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            if (serverError != null) {
-                                Text(
-                                    text = serverError,
-                                    color = ErrorCrimson,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                horizontalArrangement = Arrangement.End,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Button(
-                                    onClick = {
-                                        onSaveServerUrl(serverUrl)
-                                        if (serverError == null) serverPanelExpanded = false
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = colors.goldPrimary,
-                                        contentColor = Color(0xFF060B19)
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (isArabic) "حفظ الرابط" else "Save URL",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(22.dp))
 
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // 3. ميدالية الشعار الملكية + هوية المنشأة
+                // 2. ميدالية الشعار الملكية + هوية المنشأة (7 نقرات تفتح إعدادات الخادم للإدارة)
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(134.dp)
+                    modifier = Modifier
+                        .size(134.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            val now = System.currentTimeMillis()
+                            logoTapCount = if (now - lastLogoTapTimeMs > 3000L) 1 else logoTapCount + 1
+                            lastLogoTapTimeMs = now
+                            if (logoTapCount >= 7) {
+                                logoTapCount = 0
+                                showHiddenServerDialog = true
+                            }
+                        }
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         rotate(ringRotation) {
@@ -1445,7 +1341,7 @@ private fun LoginVaultScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 4. بطاقة تسجيل الدخول الرئيسية (مع حركة الاهتزاز)
+                // 3. بطاقة تسجيل الدخول الرئيسية (مع حركة الاهتزاز)
                 Card(
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
@@ -1677,7 +1573,7 @@ private fun LoginVaultScreen(
 
                         Spacer(modifier = Modifier.height(22.dp))
 
-                        // 5. صف أزرار الدخول (زر الدخول الذهبي + زر البصمة الحيوية)
+                        // 4. صف أزرار الدخول (زر الدخول الذهبي + زر البصمة الحيوية)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1774,7 +1670,7 @@ private fun LoginVaultScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 6. تذييل الأمان
+                // 5. تذييل الأمان
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
@@ -1799,7 +1695,7 @@ private fun LoginVaultScreen(
                 }
             }
 
-            // 7. شاشة نجاح تسجيل الدخول السينمائية (Success Overlay)
+            // 6. شاشة نجاح تسجيل الدخول السينمائية (Success Overlay)
             AnimatedVisibility(
                 visible = showSuccessOverlay,
                 enter = fadeIn(tween(300)),
@@ -1812,6 +1708,22 @@ private fun LoginVaultScreen(
                 )
             }
         }
+    }
+
+    // 7. نافذة صيانة خادم المنشأة المخفية (تُفتح بـ 7 نقرات على الشعار)
+    if (showHiddenServerDialog) {
+        HiddenServerConfigDialog(
+            isArabic = isArabic,
+            serverUrl = serverUrl,
+            serverError = serverError,
+            onServerUrlChange = onServerUrlChange,
+            onDismiss = { showHiddenServerDialog = false },
+            onSave = {
+                if (onSaveServerUrl(serverUrl)) {
+                    showHiddenServerDialog = false
+                }
+            }
+        )
     }
 
     // 8. حوار تأكيد الدخول في وضع الأوفلاين
@@ -1832,6 +1744,123 @@ private fun LoginVaultScreen(
             onRetry = onBlockedRetry,
             onReActivate = onBlockedReActivate
         )
+    }
+}
+
+@Composable
+private fun HiddenServerConfigDialog(
+    isArabic: Boolean,
+    serverUrl: String,
+    serverError: String?,
+    onServerUrlChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit
+) {
+    val colors = MiraTheme.colors
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.5.dp, colors.goldPrimary.copy(alpha = 0.65f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.Dns,
+                        contentDescription = null,
+                        tint = colors.goldPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isArabic) "رابط خادم المنشأة (HTTPS)" else "Facility Server Endpoint (HTTPS)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.goldPrimary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = serverUrl,
+                    onValueChange = onServerUrlChange,
+                    singleLine = true,
+                    isError = serverError != null,
+                    textStyle = TextStyle(
+                        fontSize = 13.sp,
+                        textDirection = TextDirection.Ltr,
+                        color = colors.textPrimary
+                    ),
+                    placeholder = {
+                        Text(
+                            text = "https://jewelry.ibreg.org/api",
+                            fontSize = 12.sp,
+                            color = colors.textSecondary.copy(alpha = 0.5f)
+                        )
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.goldPrimary,
+                        unfocusedBorderColor = colors.cardBorder,
+                        errorBorderColor = ErrorCrimson
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (serverError != null) {
+                    Text(
+                        text = serverError,
+                        color = ErrorCrimson,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, colors.cardBorder),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = if (isArabic) "إغلاق" else "Close",
+                            fontSize = 12.sp,
+                            color = colors.textSecondary
+                        )
+                    }
+
+                    Button(
+                        onClick = onSave,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF060B19)
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isArabic) "حفظ الرابط" else "Save URL",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
