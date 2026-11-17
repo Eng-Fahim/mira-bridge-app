@@ -1,520 +1,607 @@
-package com.example.uhf.fragment
+package com.example.uhf.ui.activities
 
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.util.Log
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
-import com.example.uhf.api.MiraApiClient
-import com.example.uhf.dialog.ActivityDetailsBottomSheet
-import com.example.uhf.manager.MiraBranchesManager
-import com.example.uhf.ui.activities.*
-import com.example.uhf.ui.theme.MiraJewelryTheme
+import androidx.compose.ui.unit.sp
 import com.example.uhf.ui.theme.MiraTheme
-import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.io.FileWriter
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.TimeZone
 
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- *  شاشة جميع العمليات — Kotlin + Compose
- * ───────────────────────────────────────────────────────────────────────────
- *  ✅ سلوك مطابق للنسخة Java (pagination, filter, search, export)
- *  ✅ تصميم Compose حديث: TopBar متدرج + بحث مخصص + شرائح فلترة
- *  ✅ LazyColumn بتحميل تدريجي تلقائي عند الوصول لنهاية القائمة
- *  ✅ حالات: Loading / Empty / Error / NoResults — كل واحدة بمكوّن مستقل
- * ═══════════════════════════════════════════════════════════════════════════
- */
-class MiraAllActivitiesFragment : Fragment() {
+// ═══════════════════════════════════════════════════════════════════════
+//  Top Bar
+// ═══════════════════════════════════════════════════════════════════════
 
-    companion object {
-        private const val TAG = "MiraAllActivities"
-        private const val PAGE_SIZE = 20
-        private const val MAX_PAGE_SIZE = 200
-    }
+@Composable
+fun AllActivitiesTopBar(
+    isArabic: Boolean,
+    totalCount: Int,
+    visibleCount: Int,
+    isRefreshing: Boolean,
+    onBack: () -> Unit,
+    onExport: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    val palette = MiraTheme.colors
+    val scheme = MaterialTheme.colorScheme
 
-    // ── Managers & threading ────────────────────────────────────────
-    private var apiClient: MiraApiClient? = null
-    private var branchesManager: MiraBranchesManager? = null
-    private var executor: ExecutorService? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val isRequestInFlight = AtomicBoolean(false)
-    private var isDestroyed = false
-
-    // ── Internal (non-compose) state ────────────────────────────────
-    private val allActivities = mutableListOf<JSONObject>()
-    private var currentPage = 1
-    private var hasMorePages = true
-    private var totalOnServer = -1
-    private var isLoadingMore = false
-
-    // ── Compose state ───────────────────────────────────────────────
-    private var isArabicState by mutableStateOf(true)
-    private var activitiesState by mutableStateOf<List<JSONObject>>(emptyList())
-    private var currentFilterState by mutableStateOf("all")
-    private var currentSearchState by mutableStateOf("")
-    private var isLoadingState by mutableStateOf(false)
-    private var isRefreshingState by mutableStateOf(false)
-    private var errorMessageState by mutableStateOf<String?>(null)
-    private var totalCountState by mutableIntStateOf(0)
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════════════
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View = ComposeView(requireContext()).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        setContent {
-            val direction = if (isArabicState) LayoutDirection.Rtl else LayoutDirection.Ltr
-            CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                MiraJewelryTheme { MiraAllActivitiesScreen() }
-            }
-        }
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        try {
-            isDestroyed = false
-            isArabicState = Locale.getDefault().language == "ar"
-            apiClient = MiraApiClient.getInstance(requireContext())
-            branchesManager = MiraBranchesManager.getInstance(requireContext())
-            executor = Executors.newFixedThreadPool(2)
-            loadActivities(reset = true)
-        } catch (t: Throwable) {
-            Log.e(TAG, "onViewCreated error", t)
-        }
-    }
-
-    override fun onDestroyView() {
-        isDestroyed = true
-        try { executor?.shutdownNow() } catch (_: Exception) {}
-        executor = null
-        mainHandler.removeCallbacksAndMessages(null)
-        super.onDestroyView()
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Loading
-    // ═══════════════════════════════════════════════════════════════════
-
-    private fun loadActivities(reset: Boolean) {
-        val client = apiClient
-        val exec = executor
-        if (client == null || exec == null) {
-            showError(if (isArabicState) "العميل غير مهيأ" else "Client not initialized")
-            return
-        }
-        if (!isRequestInFlight.compareAndSet(false, true)) {
-            isRefreshingState = false
-            return
-        }
-
-        if (reset) {
-            currentPage = 1
-            hasMorePages = true
-            isLoadingMore = false
-            totalOnServer = -1
-            allActivities.clear()
-            errorMessageState = null
-        }
-
-        isLoadingState = allActivities.isEmpty()
-        val pageToLoad = currentPage
-        val requestLimit = minOf(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE)
-
-        exec.execute {
-            try {
-                val branchId = branchesManager?.activeBranchId ?: 0
-                Log.d(TAG, "→ loadActivities | branch=$branchId page=$pageToLoad limit=$requestLimit reset=$reset")
-
-                val response = client.getUnifiedActivity(branchId, requestLimit)
-                postToMain { handleResponse(response, reset, pageToLoad) }
-            } catch (t: Throwable) {
-                Log.e(TAG, "loadActivities exception", t)
-                postToMain {
-                    finishLoading()
-                    showError(t.message)
-                }
-            } finally {
-                isRequestInFlight.set(false)
-            }
-        }
-    }
-
-    private fun handleResponse(
-        response: MiraApiClient.ApiResponse?,
-        reset: Boolean,
-        pageToLoad: Int
-    ) {
-        if (isDestroyed) return
-        finishLoading()
-
-        if (response == null) {
-            showError(if (isArabicState) "فشل الاتصال بالخادم" else "Server connection failed")
-            return
-        }
-        if (!response.isSuccess) {
-            val err = response.error?.takeIf { it.isNotBlank() } ?: "HTTP ${response.code}"
-            showError(err)
-            return
-        }
-        val data = response.data
-        if (data == null) {
-            showError(if (isArabicState) "استجابة غير صالحة من الخادم" else "Invalid server response")
-            return
-        }
-
-        val activities: JSONArray = extractActivitiesArray(data)
-            ?: run {
-                showError(if (isArabicState) "بنية الاستجابة غير متوقعة" else "Unexpected response structure")
-                return
-            }
-
-        if (reset) allActivities.clear()
-        for (i in 0 until activities.length()) {
-            activities.optJSONObject(i)?.let { allActivities.add(it) }
-        }
-
-        // hasMorePages
-        val serverTotal = data.optInt("total", -1)
-        hasMorePages = if (serverTotal >= 0) {
-            totalOnServer = serverTotal
-            allActivities.size < serverTotal
-        } else {
-            activities.length() >= minOf(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE)
-        }
-
-        errorMessageState = null
-        applyFilters()
-    }
-
-    private fun extractActivitiesArray(top: JSONObject): JSONArray? {
-        top.optJSONArray("activities")?.let { return it }
-        top.optJSONArray("data")?.let { return it }
-        top.optJSONArray("items")?.let { return it }
-        top.optJSONArray("logs")?.let { return it }
-        top.optJSONArray("result")?.let { return it }
-        top.optJSONObject("data")?.let { nested ->
-            nested.optJSONArray("activities")?.let { return it }
-            nested.optJSONArray("items")?.let { return it }
-            nested.optJSONArray("logs")?.let { return it }
-        }
-        return null
-    }
-
-    private fun loadMore() {
-        if (isLoadingMore || !hasMorePages || isRequestInFlight.get()) return
-        isLoadingMore = true
-        currentPage++
-        loadActivities(reset = false)
-    }
-
-    private fun finishLoading() {
-        isLoadingMore = false
-        isLoadingState = false
-        isRefreshingState = false
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Filters (in-memory)
-    // ═══════════════════════════════════════════════════════════════════
-
-    private fun applyFilters() {
-        val filtered = allActivities.filter { matchesType(it) && matchesSearch(it) }
-        totalCountState = allActivities.size
-        activitiesState = filtered
-    }
-
-    private fun matchesType(act: JSONObject): Boolean {
-        if (currentFilterState == "all") return true
-        val type = act.optString("type", "").lowercase(Locale.ROOT)
-        val filter = currentFilterState.lowercase(Locale.ROOT)
-        return type == filter || type.contains(filter)
-    }
-
-    private fun matchesSearch(act: JSONObject): Boolean {
-        if (currentSearchState.isEmpty()) return true
-        val fields = arrayOf(
-            "title_ar", "title_en", "details_ar", "details_en",
-            "user", "username", "title", "details", "status"
-        )
-        return fields.any {
-            act.optString(it, "").lowercase(Locale.ROOT).contains(currentSearchState)
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Actions
-    // ═══════════════════════════════════════════════════════════════════
-
-    private fun onFilterSelected(filter: String) {
-        currentFilterState = filter
-        applyFilters()
-    }
-
-    private fun onSearchChanged(query: String) {
-        currentSearchState = query.trim().lowercase(Locale.ROOT)
-        applyFilters()
-    }
-
-    private fun onRefresh() {
-        isRefreshingState = true
-        loadActivities(reset = true)
-    }
-
-    private fun onBack() {
-        try { parentFragmentManager.popBackStack() } catch (_: Exception) {}
-    }
-
-    private fun onActivityClick(activity: JSONObject) {
-        try {
-            val sheet = ActivityDetailsBottomSheet.newInstance(activity, isArabicState)
-            sheet.show(parentFragmentManager, "ActivityDetails")
-        } catch (e: Exception) {
-            Log.e(TAG, "details error", e)
-        }
-    }
-
-    private fun showError(message: String?) {
-        if (isDestroyed) return
-        val msg = message?.takeIf { it.isNotBlank() }
-            ?: (if (isArabicState) "تعذّر تحميل العمليات" else "Failed to load activities")
-
-        allActivities.clear()
-        activitiesState = emptyList()
-        totalCountState = 0
-        errorMessageState = msg
-
-        if (isAdded) {
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun postToMain(r: Runnable) {
-        mainHandler.post {
-            if (isDestroyed) return@post
-            try { r.run() } catch (t: Throwable) { Log.e(TAG, "main crash", t) }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  CSV Export
-    // ═══════════════════════════════════════════════════════════════════
-
-    private fun exportActivities() {
-        val list = activitiesState
-        if (list.isEmpty()) {
-            Toast.makeText(
-                requireContext(),
-                if (isArabicState) "⚠️ لا توجد عمليات للتصدير" else "⚠️ No activities to export",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-        val exec = executor ?: return
-        val ctx = requireContext().applicationContext
-
-        exec.execute {
-            try {
-                val dir = File(ctx.getExternalFilesDir(null), "exports").apply { mkdirs() }
-                val fileName = "activities_${
-                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                }.csv"
-                val file = File(dir, fileName)
-
-                FileWriter(file).use { w ->
-                    w.append("Timestamp,Type,Title,Details,User,Amount,Currency,Status\n")
-                    for (a in list) {
-                        w.append(escapeCsv(a.optString("timestamp", ""))).append(",")
-                        w.append(escapeCsv(a.optString("type", ""))).append(",")
-                        w.append(escapeCsv(a.optString("title_ar", a.optString("title_en", "")))).append(",")
-                        w.append(escapeCsv(a.optString("details_ar", a.optString("details_en", "")))).append(",")
-                        w.append(escapeCsv(a.optString("user", a.optString("username", "")))).append(",")
-                        w.append(escapeCsv(a.optDouble("amount", 0.0).toString())).append(",")
-                        w.append(escapeCsv(a.optString("currency", ""))).append(",")
-                        w.append(escapeCsv(a.optString("status", ""))).append("\n")
-                    }
-                    w.flush()
-                }
-
-                postToMain {
-                    Toast.makeText(
-                        ctx,
-                        (if (isArabicState) "✅ تم التصدير إلى: " else "✅ Exported to: ") + file.absolutePath,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            } catch (t: Throwable) {
-                Log.e(TAG, "export error", t)
-                postToMain {
-                    Toast.makeText(
-                        ctx,
-                        if (isArabicState) "❌ فشل التصدير" else "❌ Export failed",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-    }
-
-    private fun escapeCsv(v: String?): String {
-        if (v.isNullOrEmpty()) return ""
-        return if (v.contains(",") || v.contains("\"") || v.contains("\n"))
-            "\"${v.replace("\"", "\"\"")}\"" else v
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Screen
-    // ═══════════════════════════════════════════════════════════════════
-
-    @Composable
-    private fun MiraAllActivitiesScreen() {
-        val colors = MiraTheme.colors
-        val listState = rememberLazyListState()
-
-        // كشف نهاية القائمة لتحميل المزيد
-        val shouldLoadMore by remember {
-            derivedStateOf {
-                val info = listState.layoutInfo
-                val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-                info.totalItemsCount > 0 && last >= info.totalItemsCount - 3
-            }
-        }
-        LaunchedEffect(shouldLoadMore) {
-            if (shouldLoadMore) loadMore()
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(colors.backgroundTop, colors.backgroundMid, colors.backgroundTop)
-                    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(palette.backgroundMid.copy(alpha = 0.9f), Color.Transparent)
                 )
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AllActivitiesTopBar(
-                isArabic = isArabicState,
-                totalCount = totalCountState,
-                visibleCount = activitiesState.size,
-                isRefreshing = isRefreshingState,
-                onBack = ::onBack,
-                onExport = ::exportActivities,
-                onRefresh = ::onRefresh
+            GlassIconButton(
+                icon = Icons.Rounded.ArrowBack,
+                contentDescription = if (isArabic) "رجوع" else "Back",
+                onClick = onBack
             )
 
-            ActivitySearchBar(
-                query = currentSearchState,
-                placeholder = if (isArabicState) "ابحث في العمليات…" else "Search activities…",
-                onQueryChange = ::onSearchChanged
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isArabic) "جميع العمليات" else "All Activities",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurface
+                )
+                Text(
+                    text = buildSubtitle(isArabic, totalCount, visibleCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant
+                )
+            }
+
+            GlassIconButton(
+                icon = Icons.Rounded.FileDownload,
+                contentDescription = if (isArabic) "تصدير" else "Export",
+                onClick = onExport,
+                tint = Color(0xFF10B981)
             )
 
-            ActivityFilterChips(
-                isArabic = isArabicState,
-                selected = currentFilterState,
-                onSelected = ::onFilterSelected,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            GlassIconButton(
+                icon = Icons.Rounded.Refresh,
+                contentDescription = if (isArabic) "تحديث" else "Refresh",
+                onClick = onRefresh,
+                tint = scheme.primary,
+                spinning = isRefreshing
             )
+        }
+    }
+}
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                when {
-                    isLoadingState && activitiesState.isEmpty() ->
-                        ActivityLoadingState()
+private fun buildSubtitle(isArabic: Boolean, total: Int, visible: Int): String = when {
+    total == 0 -> if (isArabic) "لا عمليات" else "No activities"
+    total == visible -> if (isArabic) "$total عملية" else "$total activities"
+    else -> if (isArabic) "$visible من $total" else "$visible of $total"
+}
 
-                    errorMessageState != null ->
-                        ActivityErrorState(
-                            isArabic = isArabicState,
-                            message = errorMessageState!!,
-                            onRetry = ::onRefresh
+@Composable
+private fun GlassIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    spinning: Boolean = false
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (spinning) 360f else 0f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Restart),
+        label = "spin"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier
+                .size(20.dp)
+                .graphicsLayer { rotationZ = rotation }
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Search Bar
+// ═══════════════════════════════════════════════════════════════════════
+
+@Composable
+fun ActivitySearchBar(
+    query: String,
+    placeholder: String,
+    onQueryChange: (String) -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .height(52.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(scheme.surface.copy(alpha = 0.9f))
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            Icons.Rounded.Search,
+            contentDescription = null,
+            tint = scheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            textStyle = TextStyle(color = scheme.onSurface, fontSize = 15.sp),
+            decorationBox = { inner ->
+                Box {
+                    if (query.isEmpty()) {
+                        Text(
+                            placeholder,
+                            color = scheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            fontSize = 15.sp
                         )
+                    }
+                    inner()
+                }
+            }
+        )
+        AnimatedVisibility(
+            visible = query.isNotEmpty(),
+            enter = scaleIn() + fadeIn(),
+            exit = scaleOut() + fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable { onQueryChange("") },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = null,
+                    tint = scheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
 
-                    activitiesState.isEmpty() && currentSearchState.isEmpty() && currentFilterState == "all" ->
-                        ActivityEmptyState(
-                            isArabic = isArabicState,
-                            icon = "📭",
-                            title = if (isArabicState) "لا توجد عمليات" else "No activities",
-                            subtitle = if (isArabicState) "ستظهر هنا العمليات فور تسجيلها" else "Activities will appear here once recorded"
+// ═══════════════════════════════════════════════════════════════════════
+//  Filter Chips
+// ═══════════════════════════════════════════════════════════════════════
+
+private data class FilterDef(
+    val key: String,
+    val labelAr: String,
+    val labelEn: String,
+    val icon: ImageVector,
+    val color: Color
+)
+
+private val FILTERS = listOf(
+    FilterDef("all",       "الكل",     "All",       Icons.Rounded.Apps,           Color(0xFF94A3B8)),
+    FilterDef("sale",      "مبيعات",   "Sales",     Icons.Rounded.PointOfSale,    Color(0xFFD4AF37)),
+    FilterDef("inventory", "جرد",      "Inventory", Icons.Rounded.Inventory2,     Color(0xFF38BDF8)),
+    FilterDef("transfer",  "تحويلات",  "Transfers", Icons.Rounded.SwapHoriz,      Color(0xFFA855F7)),
+    FilterDef("rfid",      "RFID",     "RFID",      Icons.Rounded.Radar,          Color(0xFF06B6D4)),
+    FilterDef("system",    "نظام",     "System",    Icons.Rounded.Settings,       Color(0xFF64748B))
+)
+
+@Composable
+fun ActivityFilterChips(
+    isArabic: Boolean,
+    selected: String,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scheme = MaterialTheme.colorScheme
+
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp)
+    ) {
+        items(FILTERS, key = { it.key }) { filter ->
+            val isSelected = selected == filter.key
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (isSelected) filter.color.copy(alpha = 0.18f)
+                        else scheme.surface.copy(alpha = 0.75f)
+                    )
+                    .then(
+                        if (isSelected)
+                            Modifier.background(
+                                color = Color.Transparent,
+                                shape = RoundedCornerShape(50)
+                            )
+                        else Modifier
+                    )
+                    .clickable { onSelected(filter.key) }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    filter.icon,
+                    contentDescription = null,
+                    tint = if (isSelected) filter.color else scheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = if (isArabic) filter.labelAr else filter.labelEn,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) filter.color else scheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Activity List Item
+// ═══════════════════════════════════════════════════════════════════════
+
+@Composable
+fun ActivityListItem(
+    activity: JSONObject,
+    isArabic: Boolean,
+    onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    val type = activity.optString("type", "").lowercase(Locale.ROOT)
+    val (icon, color) = styleForType(type)
+
+    val title = pickLocalized(activity, "title", isArabic)
+    val details = pickLocalized(activity, "details", isArabic)
+    val user = activity.optString("user", activity.optString("username", ""))
+    val amount = activity.optDouble("amount", 0.0)
+    val currency = activity.optString("currency", "")
+    val timeLabel = formatActivityTime(activity.optString("timestamp", ""), isArabic)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = scheme.surface.copy(alpha = 0.95f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(color)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = title.ifBlank { type.uppercase(Locale.ROOT) },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (details.isNotBlank()) {
+                        Text(
+                            text = details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-
-                    activitiesState.isEmpty() ->
-                        ActivityEmptyState(
-                            isArabic = isArabicState,
-                            icon = "🔍",
-                            title = if (isArabicState) "لا نتائج مطابقة" else "No matching results",
-                            subtitle = if (isArabicState) "جرّب تغيير الفلتر أو البحث" else "Try a different filter or search"
-                        )
-
-                    else -> {
-                        LazyColumn(
-                            state = listState,
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(
-                                items = activitiesState,
-                                key = { it.optString("id", it.hashCode().toString()) }
-                            ) { act ->
-                                ActivityListItem(
-                                    activity = act,
-                                    isArabic = isArabicState,
-                                    onClick = { onActivityClick(act) }
-                                )
-                            }
-
-                            if (hasMorePages) {
-                                item(key = "__load_more__") {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        androidx.compose.material3.CircularProgressIndicator(
-                                            modifier = Modifier.size(22.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                    }
-                                }
-                            } else if (activitiesState.isNotEmpty()) {
-                                item(key = "__end__") {
-                                    EndOfListBadge(isArabic = isArabicState)
-                                }
-                            }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (user.isNotBlank()) {
+                            Text("👤 $user", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                        }
+                        if (user.isNotBlank() && timeLabel.isNotBlank()) {
+                            Text("•", color = scheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        }
+                        if (timeLabel.isNotBlank()) {
+                            Text("🕐 $timeLabel", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
                         }
                     }
                 }
+
+                if (amount > 0.0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(color.copy(alpha = 0.14f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = formatAmount(amount, currency),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = color
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+private fun styleForType(type: String): Pair<ImageVector, Color> = when {
+    type.contains("sale") || type.contains("pos") ->
+        Icons.Rounded.PointOfSale to Color(0xFFD4AF37)
+    type.contains("inventory") || type.contains("stock") ->
+        Icons.Rounded.Inventory2 to Color(0xFF38BDF8)
+    type.contains("transfer") || type.contains("swap") ->
+        Icons.Rounded.SwapHoriz to Color(0xFFA855F7)
+    type.contains("rfid") || type.contains("scan") || type.contains("gate") ->
+        Icons.Rounded.Radar to Color(0xFF06B6D4)
+    type.contains("system") || type.contains("login") || type.contains("logout") ->
+        Icons.Rounded.Settings to Color(0xFF64748B)
+    else -> Icons.Rounded.Info to Color(0xFF94A3B8)
+}
+
+private fun pickLocalized(obj: JSONObject, prefix: String, isArabic: Boolean): String {
+    val ar = obj.optString("${prefix}_ar", "")
+    val en = obj.optString("${prefix}_en", "")
+    val plain = obj.optString(prefix, "")
+    return when {
+        isArabic && ar.isNotBlank() -> ar
+        !isArabic && en.isNotBlank() -> en
+        plain.isNotBlank() -> plain
+        ar.isNotBlank() -> ar
+        else -> en
+    }
+}
+
+private fun formatAmount(amount: Double, currency: String): String {
+    val nf = NumberFormat.getNumberInstance(Locale.US).apply {
+        maximumFractionDigits = 2
+        minimumFractionDigits = 0
+    }
+    val num = nf.format(amount)
+    return if (currency.isBlank()) num else "$num $currency"
+}
+
+private fun formatActivityTime(timestamp: String, isArabic: Boolean): String {
+    if (timestamp.isBlank()) return ""
+    val formats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd HH:mm"
+    )
+    var parsed: Date? = null
+    for (f in formats) {
+        try {
+            val sdf = SimpleDateFormat(f, Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            parsed = sdf.parse(timestamp)
+            if (parsed != null) break
+        } catch (_: Exception) {}
+    }
+    if (parsed == null) return timestamp
+
+    val diff = System.currentTimeMillis() - parsed.time
+    return when {
+        diff < 0 -> timestamp
+        diff < 60_000 -> if (isArabic) "الآن" else "just now"
+        diff < 3_600_000 -> "${diff / 60_000}${if (isArabic) " د" else "m"}"
+        diff < 86_400_000 -> "${diff / 3_600_000}${if (isArabic) " س" else "h"}"
+        diff < 604_800_000 -> "${diff / 86_400_000}${if (isArabic) " ي" else "d"}"
+        else -> SimpleDateFormat("MMM d", if (isArabic) Locale("ar") else Locale.US).format(parsed)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Empty / Loading / Error / End of List
+// ═══════════════════════════════════════════════════════════════════════
+
+@Composable
+fun ActivityEmptyState(
+    isArabic: Boolean,
+    icon: String,
+    title: String,
+    subtitle: String
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = icon, fontSize = 56.sp)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = scheme.onSurface
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun ActivityLoadingState() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
+    }
+}
+
+@Composable
+fun ActivityErrorState(
+    isArabic: Boolean,
+    message: String,
+    onRetry: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFEF4444).copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Rounded.WarningAmber,
+                contentDescription = null,
+                tint = Color(0xFFEF4444),
+                modifier = Modifier.size(36.dp)
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = if (isArabic) "حدث خطأ" else "Something went wrong",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = scheme.onSurface
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(scheme.primary)
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(Icons.Rounded.Refresh, null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Text(
+                if (isArabic) "إعادة المحاولة" else "Retry",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+    }
+}
+
+@Composable
+fun EndOfListBadge(isArabic: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (isArabic) "— نهاية العمليات —" else "— End of activities —",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
     }
 }
