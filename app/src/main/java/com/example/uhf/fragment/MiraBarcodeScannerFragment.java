@@ -1,24 +1,40 @@
 package com.example.uhf.fragment;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
+import android.media.Image;
 import android.media.ToneGenerator;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.Size;
+import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraControl;
+import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.FocusMeteringAction;
 import androidx.camera.core.ImageAnalysis;
@@ -29,12 +45,12 @@ import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.navigation.NavigationManager;
-
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
@@ -42,6 +58,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,44 +68,50 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraBarcodeScannerFragment v3.1 — Small Code Mastery Edition
+ *  MiraBarcodeScannerFragment v4.0 — Micro-Tag Precision Edition
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * يدعم البطاقات 6mm × 6mm:
- *   ✅ Auto-Zoom ذكي (ML Kit يكتشف → نزوّم تلقائياً → يفك)
- *   ✅ ML Kit + CameraX
- *   ✅ Continuous AF + Tap-to-Focus
- *   ✅ Pinch-to-Zoom (5x max)
- *   ✅ Multi-frame Confirmation
- *   ✅ Torch + GS1/QR/DataMatrix
+ * مهيأ خصيصاً لبطاقات الذهب والمجوهرات متناهية الصغر (3mm - 8mm):
+ *   ✅ Micro-ROI Center Crop: تركيز التحليل على منطقة الهدف لرفع دقة الفك
+ *   ✅ Quick Optical/Digital Zoom Bar: أزرار 1x / 2x / 3x / 4x / 5x + Pinch-to-Zoom
+ *   ✅ Smart Auto-Zoom: تكبير تلقائي ذكي فور اكتشاف كود صغير
+ *   ✅ Continuous AF + Tap-to-Focus + Anti-Glare Torch Control
+ *   ✅ Multi-frame Confirmation لمنع القراءات الخاطئة
  */
 public class MiraBarcodeScannerFragment extends Fragment {
 
     private static final String TAG = "MiraBarcodeScanner";
     private static final int CAMERA_PERMISSION_CODE = 1001;
 
-    private static final long SCAN_COOLDOWN_MS = 800;
+    private static final long SCAN_COOLDOWN_MS = 800L;
 
-    private static final int COLOR_READY = Color.parseColor("#38BDF8");
-    private static final int COLOR_SUCCESS = Color.parseColor("#4ADE80");
+    private static final int COLOR_READY   = Color.parseColor("#38BDF8");
+    private static final int COLOR_SUCCESS = Color.parseColor("#10B981");
+    private static final int COLOR_GOLD    = Color.parseColor("#D4AF37");
 
-    private static final float MAX_ZOOM = 5.0f;
     private static final float MIN_ZOOM = 1.0f;
+    private static final float DEFAULT_MICRO_ZOOM = 2.0f;
+    private static final float MAX_ZOOM_FALLBACK = 5.0f;
 
-    private static final long CONFIRM_WINDOW_MS = 180L;
+    private static final long CONFIRM_WINDOW_MS = 220L;
     private static final int REQUIRED_CONFIRMATIONS = 2;
 
-    // ✅ [v3.1] Auto-Zoom
-    private static final long AUTO_ZOOM_COOLDOWN_MS = 700L;
-    private static final float MIN_BARCODE_RATIO = 0.015f;
-    private static final float TARGET_BARCODE_RATIO = 0.08f;
+    // Auto-Zoom للبطاقات الدقيقة
+    private static final long AUTO_ZOOM_COOLDOWN_MS = 650L;
+    private static final float MIN_BARCODE_RATIO = 0.018f;
+    private static final float TARGET_BARCODE_RATIO = 0.095f;
+
+    private static final float[] ZOOM_PRESETS = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
 
     // ==================== UI ====================
     private PreviewView previewView;
     private View scannerOverlay, scanLine;
     private TextView tvScanStatus, tvScannedData;
-    private TextView tvZoomLevel; // ✅ [v3.1] مؤشر الزوم
+    private TextView tvZoomLevel;
     private ImageButton btnClose, btnFlash;
+
+    private final List<TextView> zoomChipViews = new ArrayList<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     // ==================== Camera ====================
     private ProcessCameraProvider cameraProvider;
@@ -101,27 +125,26 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private ToneGenerator toneGenerator;
     private volatile boolean isScanning = true;
     private volatile boolean isViewDestroyed = false;
-    private long lastScanTime = 0;
+    private long lastScanTime = 0L;
 
     // ==================== Listeners & State ====================
     private OnBarcodeScannedListener barcodeListener;
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
-    private android.content.Context appContext;
+    private Context appContext;
 
-    private androidx.activity.OnBackPressedCallback backCallback;
+    private OnBackPressedCallback backCallback;
 
     private volatile boolean isCompleted = false;
     private volatile boolean isCameraBound = false;
 
-    // ✅ [v3.0] Zoom
+    // ==================== Zoom & Focus ====================
     private volatile float currentZoom = 1.0f;
-    private android.view.ScaleGestureDetector scaleDetector;
-
-    // ✅ [v3.1] Auto-Zoom
+    private volatile float maxSupportedZoom = MAX_ZOOM_FALLBACK;
+    private ScaleGestureDetector scaleDetector;
     private volatile long lastAutoZoomTime = 0L;
 
-    // ✅ Multi-frame Confirmation
+    // ==================== Multi-frame Confirmation ====================
     @Nullable private volatile String candidateCode = null;
     private volatile long candidateTime = 0L;
     private volatile int candidateConfirmations = 0;
@@ -148,6 +171,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         isViewDestroyed = false;
+        isCompleted = false;
         appContext = requireContext().getApplicationContext();
 
         try {
@@ -159,7 +183,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
             scanLine = view.findViewById(R.id.scanLine);
             tvScanStatus = view.findViewById(R.id.tvScanStatus);
             tvScannedData = view.findViewById(R.id.tvScannedData);
-            tvZoomLevel = view.findViewById(R.id.tvZoomLevel); // ✅ [v3.1]
+            tvZoomLevel = view.findViewById(R.id.tvZoomLevel);
             btnClose = view.findViewById(R.id.btnCloseScanner);
             btnFlash = view.findViewById(R.id.btnToggleFlash);
 
@@ -172,13 +196,19 @@ public class MiraBarcodeScannerFragment extends Fragment {
             }
 
             applyLanguageAndDirection(view);
+            injectMicroZoomControlBar(view);
 
             if (btnClose != null) btnClose.setOnClickListener(v -> closeScanner());
             if (btnFlash != null) btnFlash.setOnClickListener(v -> toggleFlash());
 
             if (cameraExecutor == null || cameraExecutor.isShutdown()) {
-                cameraExecutor = Executors.newSingleThreadExecutor();
+                cameraExecutor = Executors.newSingleThreadExecutor(r -> {
+                    Thread t = new Thread(r, "MiraMicroBarcodeAnalyzer");
+                    t.setDaemon(true);
+                    return t;
+                });
             }
+
             if (toneGenerator == null) {
                 try {
                     toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
@@ -205,10 +235,119 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
+    /**
+     * إضافة شريط تحكم بالتكبير البصري السريع (1x - 5x) فوق واجهة الكاميرا
+     * لتسهيل قراءة الباركود وQR الصغير جداً بدون اهتزاز اليد.
+     */
+    private void injectMicroZoomControlBar(@NonNull View root) {
+        if (!(root instanceof ViewGroup)) return;
+        try {
+            ViewGroup container = (ViewGroup) root;
+            zoomChipViews.clear();
+
+            LinearLayout barWrapper = new LinearLayout(requireContext());
+            barWrapper.setOrientation(LinearLayout.VERTICAL);
+            barWrapper.setGravity(Gravity.CENTER_HORIZONTAL);
+
+            TextView hintLabel = new TextView(requireContext());
+            hintLabel.setText(isArabic
+                    ? "وضع البطاقات الدقيقة • اختر التكبير أو المس الشاشة للتركيز"
+                    : "Micro-Tag Mode • Select Zoom or Tap Screen to Focus");
+            hintLabel.setTextColor(Color.parseColor("#E2E8F0"));
+            hintLabel.setTextSize(11f);
+            hintLabel.setGravity(Gravity.CENTER);
+            hintLabel.setPadding(dp(12), dp(4), dp(12), dp(8));
+            barWrapper.addView(hintLabel);
+
+            LinearLayout pillRow = new LinearLayout(requireContext());
+            pillRow.setOrientation(LinearLayout.HORIZONTAL);
+            pillRow.setGravity(Gravity.CENTER);
+            pillRow.setPadding(dp(8), dp(6), dp(8), dp(6));
+
+            GradientDrawable pillBg = new GradientDrawable();
+            pillBg.setColor(Color.parseColor("#CC0A1124"));
+            pillBg.setCornerRadius(dp(28));
+            pillBg.setStroke(dp(1), Color.parseColor("#55D4AF37"));
+            pillRow.setBackground(pillBg);
+
+            for (final float zoomFactor : ZOOM_PRESETS) {
+                TextView chip = new TextView(requireContext());
+                String label = String.format(Locale.US, "%.0fx", zoomFactor);
+                chip.setText(label);
+                chip.setTextSize(12f);
+                chip.setTypeface(null, Typeface.BOLD);
+                chip.setGravity(Gravity.CENTER);
+                chip.setPadding(dp(13), dp(6), dp(13), dp(6));
+
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+                lp.setMargins(dp(3), 0, dp(3), 0);
+                chip.setLayoutParams(lp);
+
+                chip.setOnClickListener(v -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                    applyZoomRatio(zoomFactor, true);
+                });
+
+                zoomChipViews.add(chip);
+                pillRow.addView(chip);
+            }
+
+            barWrapper.addView(pillRow);
+
+            if (container instanceof FrameLayout) {
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+                params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+                params.bottomMargin = dp(36);
+                container.addView(barWrapper, params);
+            } else {
+                container.addView(barWrapper);
+            }
+
+            updateZoomChipsSelection(DEFAULT_MICRO_ZOOM);
+        } catch (Exception e) {
+            Log.w(TAG, "injectMicroZoomControlBar error: " + e.getMessage());
+        }
+    }
+
+    private void updateZoomChipsSelection(float activeZoom) {
+        try {
+            for (int i = 0; i < zoomChipViews.size() && i < ZOOM_PRESETS.length; i++) {
+                TextView chip = zoomChipViews.get(i);
+                float preset = ZOOM_PRESETS[i];
+                boolean isSelected = Math.abs(activeZoom - preset) < 0.45f;
+
+                GradientDrawable chipBg = new GradientDrawable();
+                chipBg.setCornerRadius(dp(20));
+                if (isSelected) {
+                    chipBg.setColor(COLOR_GOLD);
+                    chip.setTextColor(Color.parseColor("#060B19"));
+                } else {
+                    chipBg.setColor(Color.TRANSPARENT);
+                    chip.setTextColor(Color.parseColor("#CBD5E1"));
+                }
+                chip.setBackground(chipBg);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private int dp(int value) {
+        try {
+            return Math.round(value * getResources().getDisplayMetrics().density);
+        } catch (Exception e) {
+            return value;
+        }
+    }
+
     private void setupBackHandler() {
         if (getActivity() == null) return;
 
-        backCallback = new androidx.activity.OnBackPressedCallback(true) {
+        backCallback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
                 closeScanner();
@@ -293,7 +432,9 @@ public class MiraBarcodeScannerFragment extends Fragment {
                         View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
             }
             if (tvScanStatus != null) {
-                tvScanStatus.setText(isArabic ? "📷 قرّب الكاميرا من الباركود" : "📷 Move closer to barcode");
+                tvScanStatus.setText(isArabic
+                        ? "🎯 ضع البطاقة الصغيرة داخل الإطار"
+                        : "🎯 Place micro-tag inside frame");
                 tvScanStatus.setTextColor(COLOR_READY);
             }
             if (btnFlash != null) btnFlash.setContentDescription(isArabic ? "فلاش" : "Flash");
@@ -313,9 +454,11 @@ public class MiraBarcodeScannerFragment extends Fragment {
                             Barcode.FORMAT_EAN_13,
                             Barcode.FORMAT_EAN_8,
                             Barcode.FORMAT_CODE_39
-                    ).build();
+                    )
+                    .enableAllPotentialBarcodes()
+                    .build();
             barcodeScanner = BarcodeScanning.getClient(options);
-            Log.i(TAG, "✅ ML Kit ready — QR + DataMatrix + 1D");
+            Log.i(TAG, "✅ ML Kit Micro-Tag Scanner ready — QR + DataMatrix + 1D");
             return barcodeScanner != null;
         } catch (Exception e) {
             Log.e(TAG, "Error initializing barcode scanner: " + e.getMessage());
@@ -367,7 +510,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
                             .build();
                     preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-                    // ✅ [v3.0] دقة عالية للتحليل
+                    // دقة عالية لالتقاط تفاصيل الكود الصغير جداً
                     ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                             .setTargetResolution(new Size(1920, 1080))
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -383,12 +526,23 @@ public class MiraBarcodeScannerFragment extends Fragment {
                             MiraBarcodeScannerFragment.this, selector, preview, imageAnalysis);
                     cameraControl = camera.getCameraControl();
 
+                    try {
+                        CameraInfo info = camera.getCameraInfo();
+                        if (info.getZoomState().getValue() != null) {
+                            maxSupportedZoom = Math.min(8.0f,
+                                    info.getZoomState().getValue().getMaxZoomRatio());
+                        }
+                    } catch (Exception ignored) {}
+
                     isCameraBound = true;
                     isScanning = true;
 
                     setupFocusAndZoom();
 
-                    Log.d(TAG, "✅ Camera bound at 1920×1080");
+                    // تفعيل تكبير ابتدائي 2.0x لتسهيل قراءة بطاقات المجوهرات الصغيرة فوراً
+                    applyZoomRatio(DEFAULT_MICRO_ZOOM, false);
+
+                    Log.d(TAG, "✅ Camera bound at 1920×1080 with Micro-Zoom 2.0x");
 
                 } catch (Exception e) {
                     Log.e(TAG, "Error starting camera: " + e.getMessage(), e);
@@ -402,63 +556,63 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void setupFocusAndZoom() {
         if (cameraControl == null || previewView == null) return;
 
         try {
-            // ─── 1) التركيز التلقائي المستمر ───
-try {
-    FocusMeteringAction autofocus =
-            new FocusMeteringAction.Builder(
-                    previewView.getMeteringPointFactory()
-                            .createPoint(0.5f, 0.5f),
-                    FocusMeteringAction.FLAG_AF
-                            | FocusMeteringAction.FLAG_AE
-            ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
-    cameraControl.startFocusAndMetering(autofocus);
-    Log.i(TAG, "🎯 Continuous autofocus enabled");
-} catch (Exception e) {
-    Log.w(TAG, "Autofocus setup failed (device may not support AF): " + e.getMessage());
-}
+            // 1) تركيز تلقائي مستمر في مركز الإطار
+            triggerCenterAutoFocus();
 
-            previewView.setOnTouchListener((v, event) -> {
-                if (event.getAction() == android.view.MotionEvent.ACTION_UP) {
-                    try {
-                        FocusMeteringAction focus =
-                                new FocusMeteringAction.Builder(
-                                        previewView.getMeteringPointFactory()
-                                                .createPoint(event.getX(), event.getY()),
-                                        FocusMeteringAction.FLAG_AF
-                                                | FocusMeteringAction.FLAG_AE
-                                ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
-                        cameraControl.startFocusAndMetering(focus);
-                        showHintSafe(isArabic ? "🎯 جاري التركيز..." : "🎯 Focusing...", COLOR_READY);
-                    } catch (Exception ignored) {}
-                }
-                if (scaleDetector != null) {
-                    scaleDetector.onTouchEvent(event);
-                }
-                return true;
-            });
-
-            scaleDetector = new android.view.ScaleGestureDetector(
+            // 2) اللمس للتركيز الفوري + التكبير بالسحب (Pinch-to-Zoom)
+            scaleDetector = new ScaleGestureDetector(
                     requireContext(),
-                    new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                         @Override
-                        public boolean onScale(@NonNull android.view.ScaleGestureDetector d) {
+                        public boolean onScale(@NonNull ScaleGestureDetector d) {
                             try {
                                 float newZoom = currentZoom * d.getScaleFactor();
-                                newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
-                                applyAutoZoom(newZoom);
-                                showHintSafe(String.format(Locale.US,
-                                        "🔍 %.1fx", newZoom), COLOR_READY);
+                                applyZoomRatio(newZoom, true);
                             } catch (Exception ignored) {}
                             return true;
                         }
                     });
 
+            previewView.setOnTouchListener((v, event) -> {
+                if (scaleDetector != null) {
+                    scaleDetector.onTouchEvent(event);
+                }
+                if (event.getAction() == MotionEvent.ACTION_UP && event.getPointerCount() == 1) {
+                    try {
+                        FocusMeteringAction focus =
+                                new FocusMeteringAction.Builder(
+                                        previewView.getMeteringPointFactory()
+                                                .createPoint(event.getX(), event.getY()),
+                                        FocusMeteringAction.FLAG_AF | FocusMeteringAction.FLAG_AE
+                                ).setAutoCancelDuration(3, TimeUnit.SECONDS).build();
+                        cameraControl.startFocusAndMetering(focus);
+                        showHintSafe(isArabic ? "🎯 تم ضبط البؤرة" : "🎯 Focus locked", COLOR_READY);
+                    } catch (Exception ignored) {}
+                }
+                return true;
+            });
+
         } catch (Exception e) {
             Log.w(TAG, "setupFocusAndZoom error: " + e.getMessage());
+        }
+    }
+
+    private void triggerCenterAutoFocus() {
+        if (cameraControl == null || previewView == null) return;
+        try {
+            FocusMeteringAction autofocus =
+                    new FocusMeteringAction.Builder(
+                            previewView.getMeteringPointFactory().createPoint(0.5f, 0.5f),
+                            FocusMeteringAction.FLAG_AF | FocusMeteringAction.FLAG_AE
+                    ).setAutoCancelDuration(2, TimeUnit.SECONDS).build();
+            cameraControl.startFocusAndMetering(autofocus);
+        } catch (Exception e) {
+            Log.w(TAG, "triggerCenterAutoFocus failed: " + e.getMessage());
         }
     }
 
@@ -473,11 +627,12 @@ try {
         });
     }
 
-    // ==================== Image Analysis ====================
+    // ==================== Image Analysis with Micro-ROI ====================
 
+    @SuppressWarnings("UnsafeOptInUsageError")
     private void analyzeImage(@NonNull ImageProxy imageProxy) {
-        if (barcodeScanner == null || !isScanning || isViewDestroyed
-                || imageProxy.getImage() == null) {
+        Image mediaImage = imageProxy.getImage();
+        if (barcodeScanner == null || !isScanning || isViewDestroyed || mediaImage == null) {
             closeImageProxySafely(imageProxy);
             return;
         }
@@ -490,9 +645,19 @@ try {
         };
 
         try {
-            @SuppressWarnings("UnsafeOptInUsageError")
+            // اقتصاص منطقة التركيز المركزية (Micro-ROI) لرفع حساسية ML Kit مع الرموز الصغيرة
+            int imgW = mediaImage.getWidth();
+            int imgH = mediaImage.getHeight();
+            if (imgW > 200 && imgH > 200) {
+                int cropW = (int) (imgW * 0.68f);
+                int cropH = (int) (imgH * 0.68f);
+                int left = (imgW - cropW) / 2;
+                int top = (imgH - cropH) / 2;
+                imageProxy.setCropRect(new Rect(left, top, left + cropW, top + cropH));
+            }
+
             InputImage inputImage = InputImage.fromMediaImage(
-                    imageProxy.getImage(), imageProxy.getImageInfo().getRotationDegrees());
+                    mediaImage, imageProxy.getImageInfo().getRotationDegrees());
 
             barcodeScanner.process(inputImage)
                     .addOnSuccessListener(barcodes -> {
@@ -512,7 +677,7 @@ try {
                                     break;
                                 }
 
-                                android.graphics.Rect box = b.getBoundingBox();
+                                Rect box = b.getBoundingBox();
                                 if (box != null) {
                                     int area = box.width() * box.height();
                                     if (area > largestArea) {
@@ -555,7 +720,7 @@ try {
         if (now - lastAutoZoomTime < AUTO_ZOOM_COOLDOWN_MS) return;
         if (cameraControl == null) return;
 
-        android.graphics.Rect box = barcode.getBoundingBox();
+        Rect box = barcode.getBoundingBox();
         if (box == null) return;
 
         int imageW = image.getWidth();
@@ -567,45 +732,44 @@ try {
 
         if (barcodeRatio >= MIN_BARCODE_RATIO) return;
 
-        float neededZoomFactor = (float) Math.sqrt(TARGET_BARCODE_RATIO / barcodeRatio);
-        float newZoom = Math.min(MAX_ZOOM, currentZoom * neededZoomFactor);
+        float neededZoomFactor = (float) Math.sqrt(TARGET_BARCODE_RATIO / Math.max(barcodeRatio, 0.002f));
+        float newZoom = Math.min(maxSupportedZoom, currentZoom * neededZoomFactor);
         newZoom = Math.max(MIN_ZOOM, newZoom);
 
         if (newZoom < currentZoom * 1.15f) return;
 
         lastAutoZoomTime = now;
-        applyAutoZoom(newZoom);
+        applyZoomRatio(newZoom, true);
+        triggerCenterAutoFocus();
 
-        String hint = isArabic
-                ? "🔍 تكبير تلقائي " + String.format(Locale.US, "%.1fx", newZoom)
-                : "🔍 Auto-zoom " + String.format(Locale.US, "%.1fx", newZoom);
-        showHintSafe(hint, COLOR_READY);
-
-        Log.i(TAG, "🔍 Auto-zoom: " + currentZoom
-                + "x → " + newZoom + "x (barcode " + (barcodeRatio * 100) + "%)");
+        Log.i(TAG, "🔍 Auto-zoom: " + currentZoom + "x → " + newZoom + "x");
     }
 
-    private void applyAutoZoom(float newZoom) {
-    try {
-        if (cameraControl == null) return;
+    private void applyZoomRatio(float requestedZoom, boolean showHudHint) {
+        try {
+            if (cameraControl == null) return;
 
-        // ✅ نُخزّن القيمة النهائية في متغير final لاستخدامه في الـ lambda
-        final float finalZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+            final float finalZoom = Math.max(MIN_ZOOM, Math.min(maxSupportedZoom, requestedZoom));
+            currentZoom = finalZoom;
+            cameraControl.setZoomRatio(finalZoom);
 
-        currentZoom = finalZoom;
-        cameraControl.setZoomRatio(finalZoom);
-
-        if (tvZoomLevel != null) {
-            tvZoomLevel.post(() -> {
+            mainHandler.post(() -> {
+                if (isViewDestroyed) return;
                 if (tvZoomLevel != null) {
                     tvZoomLevel.setText(String.format(Locale.US, "%.1fx", finalZoom));
                 }
+                updateZoomChipsSelection(finalZoom);
+                if (showHudHint && tvScanStatus != null && isScanning) {
+                    tvScanStatus.setText(isArabic
+                            ? String.format(Locale.US, "🔍 تكبير %.1fx — ثبّت اليد قليلاً", finalZoom)
+                            : String.format(Locale.US, "🔍 Zoom %.1fx — Hold steady", finalZoom));
+                    tvScanStatus.setTextColor(COLOR_READY);
+                }
             });
+        } catch (Exception e) {
+            Log.w(TAG, "applyZoomRatio error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.w(TAG, "applyAutoZoom error: " + e.getMessage());
     }
-}
 
     private void closeImageProxySafely(ImageProxy imageProxy) {
         try {
@@ -651,7 +815,7 @@ try {
         safeRun(() -> {
             try {
                 if (tvScanStatus != null) {
-                    tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
+                    tvScanStatus.setText(isArabic ? "✅ تم التقاط الرمز بنجاح" : "✅ Code Captured");
                     tvScanStatus.setTextColor(COLOR_SUCCESS);
                 }
                 if (tvScannedData != null) {
@@ -675,11 +839,11 @@ try {
             forwardToPOS(data);
         }
 
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+        mainHandler.postDelayed(() -> {
             if (isAdded() && !isViewDestroyed) {
                 closeScanner();
             }
-        }, 800);
+        }, 550);
     }
 
     private void forwardToPOS(String data) {
@@ -752,7 +916,7 @@ try {
 
         if (!isAdded()) return;
 
-        androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+        FragmentManager fm = getParentFragmentManager();
         if (fm.getBackStackEntryCount() > 0) {
             try {
                 fm.popBackStack();
@@ -801,7 +965,7 @@ try {
 
                 scanLine.animate()
                         .translationY(height - 2)
-                        .setDuration(2000)
+                        .setDuration(1800)
                         .withEndAction(() -> {
                             if (scanLine == null || isViewDestroyed || !isScanning) return;
                             scanLine.setTranslationY(0);
@@ -890,6 +1054,9 @@ try {
         isViewDestroyed = true;
         isScanning = false;
 
+        mainHandler.removeCallbacksAndMessages(null);
+        zoomChipViews.clear();
+
         if (scanLine != null) {
             try { scanLine.animate().cancel(); } catch (Exception ignored) {}
         }
@@ -922,7 +1089,7 @@ try {
         scanLine = null;
         tvScanStatus = null;
         tvScannedData = null;
-        tvZoomLevel = null; // ✅ [v3.1]
+        tvZoomLevel = null;
         btnClose = null;
         btnFlash = null;
 
