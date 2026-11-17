@@ -157,39 +157,36 @@ public class PermissionManager {
     }
 
     public void saveFromServer(JSONObject fullResponseJson) {
-    if (fullResponseJson == null) return;
-    try {
-        JSONObject data = fullResponseJson.optJSONObject("data");
-        JSONObject legacy = fullResponseJson.optJSONObject("legacy_permissions");
+        if (fullResponseJson == null) return;
+        try {
+            JSONObject data = fullResponseJson.optJSONObject("data");
+            JSONObject legacy = fullResponseJson.optJSONObject("legacy_permissions");
 
-        // حالة /auth/me: data.user + data.mobile_capabilities
-        if (data != null && data.has("mobile_capabilities")) {
-            JSONObject caps = data.optJSONObject("mobile_capabilities");
-            if (caps != null) capabilities = caps;
-            JSONObject perms = data.optJSONObject("permissions");
-            if (perms != null) legacyPermissions = perms;
-        }
-        // حالة /mobile/capabilities: data = capabilities نفسها
-        else if (data != null && data.has("modules")) {
-            capabilities = data;
-            if (legacy != null) legacyPermissions = legacy;
-        }
-        // ❌ أي استجابة أخرى (مثل /auth/login) — تجاهلها
-        else {
-            Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
-            return;
-        }
-
-        fragments = deriveFragments(capabilities);
-        prefs.edit()
-             .putString(KEY_CAPABILITIES, capabilities.toString())
-             .putString(KEY_LEGACY,       legacyPermissions.toString())
-             .putString(KEY_FRAGMENTS,    fragments.toString())
-             .apply();
-    } catch (Exception e) {
-        Log.e(TAG, "saveFromServer error: " + e.getMessage());
-    }
+            if (data != null && data.has("mobile_capabilities")) {
+                JSONObject caps = data.optJSONObject("mobile_capabilities");
+                if (caps != null) capabilities = caps;
+                JSONObject perms = data.optJSONObject("permissions");
+                if (perms != null) legacyPermissions = perms;
+            } else if (data != null && data.has("modules")) {
+    capabilities = data;
+    if (legacy != null) legacyPermissions = legacy;
+} else {
+    // ❌ استجابة بدون capabilities — لا تُحدِّث شيئاً
+    Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
+    return;
 }
+
+            fragments = deriveFragments(capabilities);
+
+            prefs.edit()
+                 .putString(KEY_CAPABILITIES, capabilities.toString())
+                 .putString(KEY_LEGACY,       legacyPermissions.toString())
+                 .putString(KEY_FRAGMENTS,    fragments.toString())
+                 .apply();
+        } catch (Exception e) {
+            Log.e(TAG, "saveFromServer error: " + e.getMessage());
+        }
+    }
 
     @Deprecated
     public void savePermissions(String permissionsJson) {
