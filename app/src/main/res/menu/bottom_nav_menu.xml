@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 5 عناصر كحد أقصى — الباقي يُبنى ديناميكياً في applyNavPermissions() -->
     <item
         android:id="@+id/nav_home"
         android:icon="@drawable/ic_home"
         android:title="@string/nav_home" />
 
     <item
-        android:id="@+id/nav_sales"
-        android:icon="@drawable/ic_sales"
-        android:title="@string/nav_sales" />
+        android:id="@+id/nav_accounting"
+        android:icon="@drawable/ic_accounting"
+        android:title="@string/nav_accounting" />
 
     <item
         android:id="@+id/nav_inventory"
@@ -18,9 +17,9 @@
         android:title="@string/nav_inventory" />
 
     <item
-        android:id="@+id/nav_accounting"
-        android:icon="@drawable/ic_accounting"
-        android:title="@string/nav_accounting" />
+        android:id="@+id/nav_sales"
+        android:icon="@drawable/ic_sales"
+        android:title="@string/nav_sales" />
 
     <item
         android:id="@+id/nav_scrap"
