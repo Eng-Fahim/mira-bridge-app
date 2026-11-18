@@ -340,7 +340,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
 
         isFragmentDestroyed = false
 
-               // 1) Executors
+                 // 1) Executors
         val sharedPool: ExecutorService = try {
             miraExecutor = MiraExecutorService.getInstance()
             if (miraExecutor != null && miraExecutor!!.isHealthy) {
@@ -354,7 +354,6 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         }
         backgroundExecutor = sharedPool
         ioExecutor = sharedPool
-        }
 
         // 2) Locale + RTL
         try {
