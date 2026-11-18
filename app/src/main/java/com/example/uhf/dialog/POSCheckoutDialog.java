@@ -1,902 +1,1503 @@
-package com.example.uhf.dialog;
+package com.example.uhf.dialog
 
-
-import android.app.Dialog;
-import android.content.DialogInterface;
-import android.content.res.Configuration;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.ArrayAdapter;
-import android.widget.EditText;
-import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatDelegate;
-import androidx.fragment.app.DialogFragment;
-
-import com.example.uhf.R;
-import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.api.dto.PaymentMethodDto;
-import com.example.uhf.manager.MiraPriceManager;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.textfield.MaterialAutoCompleteTextView;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
-import com.google.gson.Gson;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import android.app.Dialog
+import android.content.DialogInterface
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.Window
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.fragment.app.DialogFragment
+import com.example.uhf.api.MiraApiClient
+import com.example.uhf.api.dto.PaymentMethodDto
+import com.example.uhf.manager.MiraPriceManager
+import com.example.uhf.ui.theme.MiraJewelryTheme
+import com.example.uhf.ui.theme.MiraTheme
+import com.google.gson.Gson
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Locale
+import java.util.UUID
+import kotlin.math.abs
 
 /**
- * POSCheckoutDialog v2.0 — Full Web Parity
+ * POSCheckoutDialog (Jetpack Compose Edition) — Full Web & ERP Parity
  *
- * 🎯 الميزات الأساسية:
- *  - اختيار طريقة الدفع من قائمة (MaterialAutoCompleteTextView) — قائمة من السيرفر
- *  - اختيار العملة من قائمة (YER/SAR/USD + أي عملة أخرى من exchange_rates)
- *  - زر "المتبقي" لكل سطر
- *  - دعم عدة دفعات وعدة عملات
- *  - دعم دفع بالذهب (Trade-in)
- *  - إظهار حالة الدفع (ناقص/متطابق/رصيد دائن) بدعم الوضع الداكن
- *  - لا تُغلق عند الفشل — تعرض الخطأ داخلياً وتحفظ الإدخالات
- *
- * 🔧 Critical: code المخزن في actMethod.getTag() هو المصدر الموثوق
- *    (لا نطابق النص العربي — يسبب أخطاء "طريقة الدفع غير معرّفة")
+ * - اختيار طريقة الدفع من قائمة قابلة للبحث (code هو المصدر الموثوق)
+ * - دعم تعدد العملات (YER / SAR / USD + عملات السيرفر) وأسعار الصرف اللحظية
+ * - زر تعبئة "المتبقي" الذكي لكل سطر دفع
+ * - دعم الدفع بالذهب الكسر (TradeInDialog)
+ * - مطابقة محاسبية فورية (متطابق / ناقص / رصيد دائن)
+ * - الاحتفاظ بكامل المدخلات وعرض الخطأ داخلياً عند رفض السيرفر
  */
-public class POSCheckoutDialog extends DialogFragment {
+class POSCheckoutDialog : DialogFragment() {
 
-    private static final String TAG = "POSCheckoutDialog";
-    private static final String ARG_TOTAL_AMOUNT = "total_amount";
-    private static final String ARG_ITEM_COUNT = "item_count";
+    companion object {
+        private const val TAG = "POSCheckoutDialog"
+        private const val ARG_TOTAL_AMOUNT = "total_amount"
+        private const val ARG_ITEM_COUNT = "item_count"
+        private const val ARG_RATES_JSON = "rates_json"
 
-    private final List<String> CURRENCIES = new ArrayList<>(Arrays.asList("YER", "SAR", "USD"));
-
-    public interface OnCheckoutListener { void onCheckout(POSCheckoutData data); }
-    public interface OnDialogDismissListener { void onDialogDismissed(); }
-
-    public static class POSCheckoutData {
-        public String customerName = "", customerPhone = "", customerEmail = "",
-                customerAddress = "", customerNotes = "";
-        public String paymentMethod = "CASH", accountCode = "1101", currency = "MIX";
-        public double originalTotal = 0.0, discount = 0.0, discountAmount = 0.0, finalAmount = 0.0;
-        public JSONArray payments = new JSONArray();
-        public JSONArray tradeIns = new JSONArray();
-        public double tradeInTotal = 0.0;
-        public String localUuid = "";
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  State
-    // ═══════════════════════════════════════════════════════════════════
-
-    private double totalAmount = 0.0;
-    private int itemCount = 0;
-    private OnCheckoutListener listener;
-    private OnDialogDismissListener dismissListener;
-    private boolean isArabic;
-    private MiraPriceManager priceManager;
-    private final java.util.Map<String, Double> serverRates = new java.util.HashMap<>();
-
-    // View references
-    private TextView tvDialogTitle, tvItemCount, tvFinalTotal, tvRemaining, tvStatusIcon,
-            tvStatusLabel, tvTradeInTotal;
-    private LinearLayout llPaymentsContainer, llTradeInSummary, llStatusBanner,
-            llInlineError;
-    private TextView tvInlineError;
-    private MaterialButton btnCloseDialog, btnCancelCheckout, btnConfirmCheckout,
-            btnAddPayment, btnTradeIn;
-    private EditText etCustomerName, etCustomerPhone;
-    private TextInputLayout tilCustomerName, tilCustomerPhone;
-
-    // Data
-    private final List<PaymentMethodDto> paymentMethods = new ArrayList<>();
-    private final List<View> paymentRows = new ArrayList<>();
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
-    private double tradeInTotal = 0.0;
-    private JSONArray tradeInLines = new JSONArray();
-    private double currentTotalWithDiscountUsd = 0.0;
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Constructor / Lifecycle
-    // ═══════════════════════════════════════════════════════════════════
-
-    public static POSCheckoutDialog newInstance(double totalAmount, int itemCount, String ratesJson) {
-        POSCheckoutDialog dialog = new POSCheckoutDialog();
-        Bundle args = new Bundle();
-        args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
-        args.putInt(ARG_ITEM_COUNT, itemCount);
-        args.putString("rates_json", ratesJson != null ? ratesJson : "{}");
-        dialog.setArguments(args);
-        return dialog;
-    }
-
-    public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
-        return newInstance(totalAmount, itemCount, "{}");
-    }
-
-    public void setCheckoutListener(OnCheckoutListener listener) { this.listener = listener; }
-    public void setOnDismissListener(OnDialogDismissListener listener) { this.dismissListener = listener; }
-
-    @Override
-    public void onDismiss(@NonNull DialogInterface dialog) {
-        super.onDismiss(dialog);
-        if (dismissListener != null) {
-            try { dismissListener.onDialogDismissed(); } catch (Exception ignored) {}
-        }
-    }
-
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            totalAmount = getArguments().getDouble(ARG_TOTAL_AMOUNT, 0.0);
-            itemCount = getArguments().getInt(ARG_ITEM_COUNT, 0);
-        }
-        try {
-            String ratesJson = getArguments() != null
-                    ? getArguments().getString("rates_json", "{}") : "{}";
-            JSONObject ratesObj = new JSONObject(ratesJson);
-            java.util.Iterator<String> keys = ratesObj.keys();
-            while (keys.hasNext()) {
-                String k = keys.next();
-                double v = ratesObj.optDouble(k, 0);
-                if (v > 0) serverRates.put(k.toUpperCase(Locale.US), v);
+        @JvmStatic
+        fun newInstance(totalAmount: Double, itemCount: Int, ratesJson: String?): POSCheckoutDialog {
+            return POSCheckoutDialog().apply {
+                arguments = Bundle().apply {
+                    putDouble(ARG_TOTAL_AMOUNT, totalAmount)
+                    putInt(ARG_ITEM_COUNT, itemCount)
+                    putString(ARG_RATES_JSON, ratesJson ?: "{}")
+                }
             }
-            Log.i(TAG, "✅ Server rates loaded: " + serverRates);
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to parse server rates: " + e.getMessage());
         }
+
+        @JvmStatic
+        fun newInstance(totalAmount: Double, itemCount: Int): POSCheckoutDialog {
+            return newInstance(totalAmount, itemCount, "{}")
+        }
+    }
+
+    interface OnCheckoutListener {
+        fun onCheckout(data: POSCheckoutData?)
+    }
+
+    interface OnDialogDismissListener {
+        fun onDialogDismissed()
+    }
+
+    class POSCheckoutData {
+        @JvmField var customerName: String = ""
+        @JvmField var customerPhone: String = ""
+        @JvmField var customerEmail: String = ""
+        @JvmField var customerAddress: String = ""
+        @JvmField var customerNotes: String = ""
+        @JvmField var paymentMethod: String = "CASH"
+        @JvmField var accountCode: String = "1101"
+        @JvmField var currency: String = "MIX"
+        @JvmField var originalTotal: Double = 0.0
+        @JvmField var discount: Double = 0.0
+        @JvmField var discountAmount: Double = 0.0
+        @JvmField var finalAmount: Double = 0.0
+        @JvmField var payments: JSONArray = JSONArray()
+        @JvmField var tradeIns: JSONArray = JSONArray()
+        @JvmField var tradeInTotal: Double = 0.0
+        @JvmField var localUuid: String = ""
+    }
+
+    private data class PaymentRowUiModel(
+        val id: String = UUID.randomUUID().toString(),
+        val method: PaymentMethodDto,
+        val currency: String = "YER",
+        val amountText: String = ""
+    )
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  State & Dependencies
+    // ═══════════════════════════════════════════════════════════════════
+
+    private var totalAmount: Double = 0.0
+    private var itemCount: Int = 0
+    private var listener: OnCheckoutListener? = null
+    private var dismissListener: OnDialogDismissListener? = null
+    private var isArabic: Boolean = true
+    private var priceManager: MiraPriceManager? = null
+    private val serverRates = HashMap<String, Double>()
+
+    private var tradeInLines = JSONArray()
+    private var currentTotalWithDiscountUsd: Double = 0.0
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Reactive Compose States
+    private val paymentMethodsState = mutableStateListOf<PaymentMethodDto>()
+    private val currenciesState = mutableStateListOf("YER", "SAR", "USD")
+    private val paymentRowsState = mutableStateListOf<PaymentRowUiModel>()
+
+    private var customerNameState by mutableStateOf("")
+    private var customerPhoneState by mutableStateOf("")
+    private var phoneFieldErrorState by mutableStateOf<String?>(null)
+
+    private var tradeInTotalState by mutableDoubleStateOf(0.0)
+    private var inlineErrorState by mutableStateOf<String?>(null)
+    private var isSubmittingState by mutableStateOf(false)
+    private var showStoreCreditConfirmState by mutableStateOf(false)
+    private var pendingCreditDiffState by mutableDoubleStateOf(0.0)
+    private var pendingCheckoutData: POSCheckoutData? = null
+
+    fun setCheckoutListener(listener: OnCheckoutListener?) {
+        this.listener = listener
+    }
+
+    fun setOnDismissListener(listener: OnDialogDismissListener?) {
+        this.dismissListener = listener
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
         try {
-            isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-        } catch (Exception e) { isArabic = false; }
-        if (getContext() != null) {
-            priceManager = MiraPriceManager.getInstance(getContext());
+            dismissListener?.onDialogDismissed()
+        } catch (_: Exception) {
         }
     }
 
-    @NonNull
-    @Override
-    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        Dialog dialog = super.onCreateDialog(savedInstanceState);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().requestFeature(Window.FEATURE_NO_TITLE);
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        }
-        return dialog;
-    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        if (getDialog() != null && getDialog().getWindow() != null) {
-            getDialog().getWindow().setLayout(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.95),
-                    WindowManager.LayoutParams.WRAP_CONTENT);
-            getDialog().getWindow().setDimAmount(0.6f);
-        }
-    }
+        arguments?.let { args ->
+            totalAmount = args.getDouble(ARG_TOTAL_AMOUNT, 0.0)
+            itemCount = args.getInt(ARG_ITEM_COUNT, 0)
+            currentTotalWithDiscountUsd = totalAmount
 
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.dialog_pos_checkout, container, false);
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        bindViews(view);
-        applyLanguage();
-        loadPaymentMethods();
-        loadCurrencies();
-    }
-
-    private void bindViews(View view) {
-        tvDialogTitle    = view.findViewById(R.id.tvDialogTitle);
-        tvItemCount      = view.findViewById(R.id.tvItemCount);
-        tvFinalTotal     = view.findViewById(R.id.tvFinalTotal);
-        tvRemaining      = view.findViewById(R.id.tvRemaining);
-        tvStatusIcon     = view.findViewById(R.id.tvStatusIcon);
-        tvStatusLabel    = view.findViewById(R.id.tvStatusLabel);
-        tvTradeInTotal   = view.findViewById(R.id.tvTradeInTotal);
-
-        llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
-        llTradeInSummary    = view.findViewById(R.id.llTradeInSummary);
-        llStatusBanner      = view.findViewById(R.id.llStatusBanner);
-        llInlineError       = view.findViewById(R.id.llInlineError);
-        tvInlineError       = view.findViewById(R.id.tvInlineError);
-
-        btnCloseDialog     = view.findViewById(R.id.btnCloseDialog);
-        btnCancelCheckout  = view.findViewById(R.id.btnCancelCheckout);
-        btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
-        btnAddPayment      = view.findViewById(R.id.btnAddPayment);
-        btnTradeIn         = view.findViewById(R.id.btnTradeIn);
-
-        etCustomerName   = view.findViewById(R.id.etCustomerName);
-        etCustomerPhone  = view.findViewById(R.id.etCustomerPhone);
-        tilCustomerName  = view.findViewById(R.id.tilCustomerName);
-        tilCustomerPhone = view.findViewById(R.id.tilCustomerPhone);
-    }
-
-    private void applyLanguage() {
-        if (tvDialogTitle != null) tvDialogTitle.setText(isArabic ? "الدفع" : "Payment");
-        if (tvItemCount != null) tvItemCount.setText(formatItemCount(itemCount));
-        if (btnCancelCheckout != null) btnCancelCheckout.setText(isArabic ? "إلغاء" : "Cancel");
-        if (btnConfirmCheckout != null) btnConfirmCheckout.setText(isArabic ? "تأكيد الدفع" : "Confirm");
-        if (btnAddPayment != null) btnAddPayment.setText(isArabic ? "+ إضافة دفعة" : "+ Add Payment");
-        if (btnTradeIn != null) btnTradeIn.setText(isArabic ? "دفع بالذهب" : "Pay with Gold");
-    }
-
-    private String formatItemCount(int count) {
-        if (isArabic) {
-            if (count == 0) return "0 قطعة";
-            if (count == 1) return "قطعة واحدة";
-            if (count == 2) return "قطعتان";
-            if (count <= 10) return count + " قطع";
-            return count + " قطعة";
-        }
-        return count + (count == 1 ? " item" : " items");
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Data Loading
-    // ═══════════════════════════════════════════════════════════════════
-
-    private void loadPaymentMethods() {
-        new Thread(() -> {
-            List<PaymentMethodDto> loaded = null;
             try {
-                MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.getPaymentMethods();
+                val ratesJson = args.getString(ARG_RATES_JSON, "{}") ?: "{}"
+                val ratesObj = JSONObject(ratesJson)
+                val keys = ratesObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val v = ratesObj.optDouble(k, 0.0)
+                    if (v > 0) {
+                        serverRates[k.uppercase(Locale.US)] = v
+                    }
+                }
+                Log.i(TAG, "✅ Server rates loaded: $serverRates")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to parse server rates: ${e.message}")
+            }
+        }
+
+        isArabic = try {
+            val tags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+            if (tags.isNotEmpty()) tags.contains("ar")
+            else Locale.getDefault().language == "ar"
+        } catch (_: Exception) {
+            Locale.getDefault().language == "ar"
+        }
+
+        context?.let {
+            priceManager = MiraPriceManager.getInstance(it)
+        }
+
+        // تهيئة أولية فورية بالبدائل ريثما تكتمل استجابة السيرفر
+        paymentMethodsState.clear()
+        paymentMethodsState.addAll(getFallbackMethods())
+        if (paymentRowsState.isEmpty()) {
+            paymentRowsState.add(
+                PaymentRowUiModel(
+                    method = paymentMethodsState.first(),
+                    currency = "YER",
+                    amountText = ""
+                )
+            )
+        }
+    }
+
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val dialog = super.onCreateDialog(savedInstanceState)
+        dialog.window?.apply {
+            requestFeature(Window.FEATURE_NO_TITLE)
+            setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+        return dialog
+    }
+
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.apply {
+            setLayout(
+                (resources.displayMetrics.widthPixels * 0.96).toInt(),
+                WindowManager.LayoutParams.WRAP_CONTENT
+            )
+            setDimAmount(0.65f)
+        }
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                MiraJewelryTheme {
+                    CheckoutDialogContent()
+                }
+            }
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        loadPaymentMethods()
+        loadCurrencies()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Server Data Loading
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun loadPaymentMethods() {
+        val appCtx = context?.applicationContext ?: return
+        Thread {
+            var loaded: MutableList<PaymentMethodDto>? = null
+            try {
+                val client = MiraApiClient.getInstance(appCtx)
+                val response = client.paymentMethods
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray arr = response.data.optJSONArray("data");
-                    if (arr == null) arr = response.data.optJSONArray("methods");
-                    if (arr == null) arr = response.data.optJSONArray("payment_methods");
-                    if (arr == null) arr = response.data.optJSONArray("items");
+                    val dataObj = response.data!!
+                    val arr = dataObj.optJSONArray("data")
+                        ?: dataObj.optJSONArray("methods")
+                        ?: dataObj.optJSONArray("payment_methods")
+                        ?: dataObj.optJSONArray("items")
 
                     if (arr != null && arr.length() > 0) {
-                        Gson gson = new Gson();
-                        loaded = new ArrayList<>();
-                        for (int i = 0; i < arr.length(); i++) {
+                        val gson = Gson()
+                        loaded = ArrayList()
+                        for (i in 0 until arr.length()) {
                             try {
-                                PaymentMethodDto m = gson.fromJson(
-                                        arr.getJSONObject(i).toString(), PaymentMethodDto.class);
-                                if (m != null && m.code != null && !m.code.isEmpty()) {
-                                    loaded.add(m);
+                                val m = gson.fromJson(
+                                    arr.getJSONObject(i).toString(),
+                                    PaymentMethodDto::class.java
+                                )
+                                if (m != null && !m.code.isNullOrEmpty()) {
+                                    loaded.add(m)
                                 }
-                            } catch (Exception e) {
-                                Log.w(TAG, "skip malformed method", e);
+                            } catch (e: Exception) {
+                                Log.w(TAG, "skip malformed method", e)
                             }
                         }
-                        Log.i(TAG, "✅ Loaded " + loaded.size() + " payment methods from server");
                     }
-                } else {
-                    Log.w(TAG, "⚠️ getPaymentMethods failed: "
-                            + (response != null ? response.error : "null"));
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "loadPaymentMethods error", e);
+            } catch (e: Exception) {
+                Log.e(TAG, "loadPaymentMethods error", e)
             }
 
-            if (loaded != null && !loaded.isEmpty()) {
-                final int before = loaded.size();
-                loaded.removeIf(m -> m.code != null &&
-                        (m.code.equalsIgnoreCase("TRADE_IN") ||
-                         m.code.equalsIgnoreCase("CUSTOMER_CREDIT")));
-                Log.i(TAG, "Filtered: " + before + " → " + loaded.size() + " methods");
+            if (!loaded.isNullOrEmpty()) {
+                loaded.removeAll { m ->
+                    m.code != null && (
+                        m.code.equals("TRADE_IN", ignoreCase = true) ||
+                        m.code.equals("CUSTOMER_CREDIT", ignoreCase = true)
+                    )
+                }
             }
 
-            final List<PaymentMethodDto> finalList = (loaded != null && !loaded.isEmpty())
-                    ? loaded
-                    : getFallbackMethods();
+            val finalList = if (!loaded.isNullOrEmpty()) loaded else getFallbackMethods()
 
-            mainHandler.post(() -> {
-                paymentMethods.clear();
-                paymentMethods.addAll(finalList);
-                setupUI();
-            });
-        }).start();
+            mainHandler.post {
+                if (!isAdded) return@post
+                paymentMethodsState.clear()
+                paymentMethodsState.addAll(finalList)
+
+                // تحديث سطور الدفع بأول طريقة معتمدة من السيرفر إذا لم يغيرها المستخدم بعد
+                val defaultMethod = finalList.firstOrNull() ?: return@post
+                for (i in paymentRowsState.indices) {
+                    val row = paymentRowsState[i]
+                    val stillExists = finalList.any { it.code == row.method.code }
+                    if (!stillExists) {
+                        paymentRowsState[i] = row.copy(method = defaultMethod)
+                    } else {
+                        val matched = finalList.first { it.code == row.method.code }
+                        paymentRowsState[i] = row.copy(method = matched)
+                    }
+                }
+            }
+        }.start()
     }
 
-    private void loadCurrencies() {
-        new Thread(() -> {
-            Set<String> currencies = new LinkedHashSet<>();
-            currencies.add("YER");
+    private fun loadCurrencies() {
+        val appCtx = context?.applicationContext ?: return
+        Thread {
+            val currencies = LinkedHashSet<String>()
+            currencies.add("YER")
 
             try {
-                MiraApiClient client = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = client.getExchangeRates();
+                val client = MiraApiClient.getInstance(appCtx)
+                val response = client.exchangeRates
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray arr = response.data.optJSONArray("data");
-                    if (arr == null) arr = response.data.optJSONArray("rates");
+                    val dataObj = response.data!!
+                    val arr = dataObj.optJSONArray("data") ?: dataObj.optJSONArray("rates")
                     if (arr != null) {
-                        for (int i = 0; i < arr.length(); i++) {
-                            JSONObject r = arr.getJSONObject(i);
-                            String from = r.optString("from_currency", "").toUpperCase(Locale.US);
-                            if (!from.isEmpty()) currencies.add(from);
+                        for (i in 0 until arr.length()) {
+                            val r = arr.getJSONObject(i)
+                            val from = r.optString("from_currency", "").uppercase(Locale.US)
+                            if (from.isNotEmpty()) currencies.add(from)
                         }
                     }
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "loadCurrencies error", e);
+            } catch (e: Exception) {
+                Log.e(TAG, "loadCurrencies error", e)
             }
 
-            if (currencies.size() < 2) {
-                currencies.add("USD");
-                currencies.add("SAR");
+            if (currencies.size < 2) {
+                currencies.add("USD")
+                currencies.add("SAR")
             }
 
-            final List<String> finalList = new ArrayList<>(currencies);
-            mainHandler.post(() -> {
-                CURRENCIES.clear();
-                CURRENCIES.addAll(finalList);
-
-                for (View row : paymentRows) {
-                    MaterialAutoCompleteTextView actCurr =
-                            row.findViewById(R.id.actCurrency);
-                    if (actCurr != null) {
-                        actCurr.setAdapter(new ArrayAdapter<>(requireContext(),
-                                android.R.layout.simple_dropdown_item_1line, CURRENCIES));
-                    }
-                }
-                Log.i(TAG, "✅ Loaded currencies: " + CURRENCIES);
-            });
-        }).start();
+            val finalList = ArrayList(currencies)
+            mainHandler.post {
+                if (!isAdded) return@post
+                currenciesState.clear()
+                currenciesState.addAll(finalList)
+            }
+        }.start()
     }
 
-    private List<PaymentMethodDto> getFallbackMethods() {
-        List<PaymentMethodDto> list = new ArrayList<>();
-        String[][] fallback = {
-                {"CASH",            "نقداً",            "Cash",           "💵", "111001", "الصندوق الرئيسي", "Main Cash Box"},
-                {"POS_MADA",        "شبكة مدى",         "POS Mada",       "💳", "112521", "شبكة مدى",       "Mada Network"},
-                {"VISA_MASTER",     "فيزا/ماستر",       "Visa/Master",    "💳", "112521", "فيزا/ماستر",     "Visa/Mastercard"},
-                {"BANK_TRANSFER",   "تحويل بنكي",       "Bank Transfer",  "🏦", "1102",   "البنك",          "Bank"},
-                {"E_WALLET",        "محفظة إلكترونية",  "E-Wallet",       "📱", "1103",   "محفظة",          "Wallet"}
-        };
-        for (String[] f : fallback) {
-            PaymentMethodDto m = new PaymentMethodDto();
-            m.code = f[0];
-            m.nameAr = f[1];
-            m.nameEn = f[2];
-            m.icon = f[3];
-            m.accountCode = f[4];
-            m.accountNameAr = f[5];
-            m.accountName = f[6];
-            list.add(m);
+    private fun getFallbackMethods(): List<PaymentMethodDto> {
+        val list = ArrayList<PaymentMethodDto>()
+        val fallback = arrayOf(
+            arrayOf("CASH", "نقداً", "Cash", "💵", "111001", "الصندوق الرئيسي", "Main Cash Box"),
+            arrayOf("POS_MADA", "شبكة مدى", "POS Mada", "💳", "112521", "شبكة مدى", "Mada Network"),
+            arrayOf("VISA_MASTER", "فيزا/ماستر", "Visa/Master", "💳", "112521", "فيزا/ماستر", "Visa/Mastercard"),
+            arrayOf("BANK_TRANSFER", "تحويل بنكي", "Bank Transfer", "🏦", "1102", "البنك", "Bank"),
+            arrayOf("E_WALLET", "محفظة إلكترونية", "E-Wallet", "📱", "1103", "محفظة", "Wallet")
+        )
+        for (f in fallback) {
+            val m = PaymentMethodDto().apply {
+                code = f[0]
+                nameAr = f[1]
+                nameEn = f[2]
+                icon = f[3]
+                accountCode = f[4]
+                accountNameAr = f[5]
+                accountName = f[6]
+            }
+            list.add(m)
         }
-        return list;
+        return list
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Setup UI
+    //  Financial Calculations & Exchange Rates
     // ═══════════════════════════════════════════════════════════════════
 
-    private void setupUI() {
-        updateFinalAmount();
-        addPaymentRow("YER", 0.0);
+    private fun getRateToYER(currency: String?): Double {
+        if (currency == null) return 1.0
+        val curr = currency.uppercase(Locale.US).trim()
+        if (curr == "YER") return 1.0
 
-        if (btnCloseDialog != null)     btnCloseDialog.setOnClickListener(v -> dismiss());
-        if (btnCancelCheckout != null)  btnCancelCheckout.setOnClickListener(v -> dismiss());
-        if (btnAddPayment != null)      btnAddPayment.setOnClickListener(v -> addPaymentRow("YER", 0.0));
-        if (btnTradeIn != null)         btnTradeIn.setOnClickListener(v -> openTradeInDialog());
-        if (btnConfirmCheckout != null) btnConfirmCheckout.setOnClickListener(v -> validateAndSubmit());
-    }
+        val srvRate = serverRates[curr]
+        if (srvRate != null && srvRate > 0) return srvRate
 
-    private void addPaymentRow(String defaultCurrency, double amount) {
-        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
+        priceManager?.let { pm ->
+            val currencyRate = pm.getExchangeRate(curr)
+            if (currencyRate > 10) return currencyRate
 
-        // ✅ تصحيح النوع هنا إلى MaterialAutoCompleteTextView بدلاً من TextInputEditText
-        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-        MaterialAutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
-        TextView tvRowNumber = row.findViewById(R.id.tvRowNumber);
-        EditText etAmount = row.findViewById(R.id.etAmount);
-        TextView tvBaseEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-        MaterialButton btnRemaining = row.findViewById(R.id.btnRemaining);
-        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
-
-        if (tvRowNumber != null) {
-            tvRowNumber.setText(String.valueOf(paymentRows.size() + 1));
-        }
-
-        final Map<String, String> displayToCode = new LinkedHashMap<>();
-        for (PaymentMethodDto m : paymentMethods) {
-            String display = m.getDisplayName(isArabic);
-            String account = m.getAccountDisplay(isArabic);
-            String fullName = (account != null && !account.isEmpty())
-                    ? display + " (" + account + ")"
-                    : display;
-            displayToCode.put(fullName, m.code != null ? m.code : "CASH");
-        }
-
-        if (actMethod != null) {
-            if (!displayToCode.isEmpty()) {
-                String firstKey = displayToCode.keySet().iterator().next();
-                actMethod.setText(firstKey, false);
-                actMethod.setTag(displayToCode.get(firstKey));
-            } else {
-                actMethod.setText(isArabic ? "نقداً" : "Cash", false);
-                actMethod.setTag("CASH");
-            }
-
-            actMethod.setOnClickListener(v -> {
-                showPaymentMethodPicker(actMethod, displayToCode);
-            });
-        }
-
-        if (actCurrency != null) {
-            actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
-                    android.R.layout.simple_dropdown_item_1line, CURRENCIES));
-            actCurrency.setText(defaultCurrency, false);
-        }
-
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-                if (tvBaseEquivalent == null || actCurrency == null) return;
-                double amt = parseDouble(s.toString());
-                double rate = getRateToYER(actCurrency.getText().toString());
-                double base = amt * rate;
-                if (rate != 1.0) {
-                    tvBaseEquivalent.setVisibility(View.VISIBLE);
-                    tvBaseEquivalent.setText(String.format(Locale.US, "≈ %,.2f YER", base));
-                } else {
-                    tvBaseEquivalent.setVisibility(View.GONE);
-                }
-                updateStatus();
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        };
-
-        if (etAmount != null) etAmount.addTextChangedListener(watcher);
-
-        if (actCurrency != null) {
-            actCurrency.setOnItemClickListener((p, v, pos, id) -> {
-                if (etAmount != null) {
-                    watcher.onTextChanged(etAmount.getText(), 0, 0, 0);
-                }
-            });
-        }
-
-        if (btnRemaining != null) {
-            btnRemaining.setOnClickListener(v -> {
-                if (etAmount == null || actCurrency == null) return;
-                double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
-                double currentRowAmount = parseDouble(etAmount.getText().toString())
-                        * getRateToYER(actCurrency.getText().toString());
-                double currentPaid = getTotalPaidYER() - currentRowAmount;
-                double rem = requiredTotal - currentPaid - tradeInTotal;
-                if (rem > 0.01) {
-                    double rate = getRateToYER(actCurrency.getText().toString());
-                    etAmount.setText(String.format(Locale.US, "%.2f", rem / rate));
-                }
-            });
-        }
-
-        if (btnRemove != null) {
-            btnRemove.setOnClickListener(v -> {
-                if (paymentRows.size() > 1) {
-                    llPaymentsContainer.removeView(row);
-                    paymentRows.remove(row);
-                    renumberRows();
-                    updateStatus();
-                } else {
-                    Toast.makeText(requireContext(), "يجب إبقاء سطر واحد", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        if (amount > 0 && etAmount != null) {
-            etAmount.setText(String.format(Locale.US, "%.2f", amount));
-        }
-
-        paymentRows.add(row);
-        llPaymentsContainer.addView(row);
-        updateStatus();
-    }
-
-    private void renumberRows() {
-        for (int i = 0; i < paymentRows.size(); i++) {
-            TextView tvNum = paymentRows.get(i).findViewById(R.id.tvRowNumber);
-            if (tvNum != null) {
-                tvNum.setText(String.valueOf(i + 1));
+            val yerRate = pm.getExchangeRate(MiraPriceManager.CURRENCY_YER)
+            if (yerRate > 0 && currencyRate > 0) {
+                return yerRate / currencyRate
             }
         }
-    }
 
-    private double getTotalPaidYER() {
-        double total = 0;
-        for (View row : paymentRows) {
-            EditText et = row.findViewById(R.id.etAmount);
-            MaterialAutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
-            if (et == null || actCurr == null) continue;
-            double amt = parseDouble(et.getText().toString());
-            total += amt * getRateToYER(actCurr.getText().toString());
-        }
-        return total;
-    }
-
-    private void updateStatus() {
-        if (tvRemaining == null || tvStatusIcon == null || llStatusBanner == null) return;
-
-        double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
-        double paid = getTotalPaidYER();
-        double totalWithGold = paid + tradeInTotal;
-        double remaining = requiredTotal - totalWithGold;
-
-        boolean isDark = (getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-
-        if (Math.abs(remaining) < 1) {
-            tvStatusIcon.setText("✅");
-            if (tvStatusLabel != null)
-                tvStatusLabel.setText(isArabic ? "متطابق" : "Matched");
-            tvRemaining.setText("0 YER");
-            tvRemaining.setTextColor(Color.parseColor(isDark ? "#86EFAC" : "#16A34A"));
-            llStatusBanner.setBackgroundColor(Color.parseColor(isDark ? "#14532D" : "#DCFCE7"));
-        } else if (remaining > 0) {
-            tvStatusIcon.setText("⚠️");
-            if (tvStatusLabel != null)
-                tvStatusLabel.setText(isArabic ? "المتبقي" : "Remaining");
-            tvRemaining.setText(String.format(Locale.US, "%,.0f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor(isDark ? "#FCA5A5" : "#DC2626"));
-            llStatusBanner.setBackgroundColor(Color.parseColor(isDark ? "#7F1D1D" : "#FEE2E2"));
-        } else {
-            tvStatusIcon.setText("💰");
-            if (tvStatusLabel != null)
-                tvStatusLabel.setText(isArabic ? "سيُضاف رصيد دائن" : "Store Credit");
-            tvRemaining.setText(String.format(Locale.US, "+%,.0f YER", Math.abs(remaining)));
-            tvRemaining.setTextColor(Color.parseColor(isDark ? "#93C5FD" : "#2563EB"));
-            llStatusBanner.setBackgroundColor(Color.parseColor(isDark ? "#1E3A8A" : "#DBEAFE"));
-        }
-
-        if (llInlineError != null && llInlineError.getVisibility() == View.VISIBLE) {
-            llInlineError.setVisibility(View.GONE);
+        return when (curr) {
+            "SAR" -> 140.0
+            "USD" -> 530.0
+            else -> 1.0
         }
     }
 
-    private void openTradeInDialog() {
-        double maxValue = currentTotalWithDiscountUsd * getRateToYER("USD");
-        TradeInDialog dialog = TradeInDialog.newInstance(maxValue, this.tradeInLines);
-        dialog.setOnTradeInListener((tradeIns, totalValue) -> {
-            this.tradeInLines = tradeIns;
-            this.tradeInTotal = totalValue;
-            if (tvTradeInTotal != null) {
-                tvTradeInTotal.setText(String.format(Locale.US, "%,.0f YER", totalValue));
+    private fun parseDouble(s: String?): Double {
+        if (s.isNullOrBlank()) return 0.0
+        return try {
+            s.trim().replace(",", "").toDouble()
+        } catch (_: Exception) {
+            0.0
+        }
+    }
+
+    private fun getTotalPaidYER(): Double {
+        var total = 0.0
+        for (row in paymentRowsState) {
+            val amt = parseDouble(row.amountText)
+            total += amt * getRateToYER(row.currency)
+        }
+        return total
+    }
+
+    private fun formatFinalTotalDisplay(): String {
+        return priceManager?.formatPriceDefault(totalAmount)
+            ?: String.format(Locale.US, "%,.2f YER", totalAmount)
+    }
+
+    private fun formatItemCount(count: Int): String {
+        if (isArabic) {
+            return when {
+                count == 0 -> "0 قطعة"
+                count == 1 -> "قطعة واحدة"
+                count == 2 -> "قطعتان"
+                count <= 10 -> "$count قطع"
+                else -> "$count قطعة"
             }
-            if (llTradeInSummary != null) {
-                llTradeInSummary.setVisibility(totalValue > 0 ? View.VISIBLE : View.GONE);
-            }
-            updateStatus();
-        });
-        dialog.show(getParentFragmentManager(), "TradeInDialog");
+        }
+        return count.toString() + if (count == 1) " item" else " items"
     }
 
-    private void validateAndSubmit() {
-        double requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD");
-        double paid = getTotalPaidYER();
-        double totalWithGold = paid + tradeInTotal;
-        double diff = totalWithGold - requiredTotal;
+    // ═══════════════════════════════════════════════════════════════════
+    //  Trade-In, Validation & Submission
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun openTradeInDialog() {
+        val maxValue = currentTotalWithDiscountUsd * getRateToYER("USD")
+        val tradeDialog = TradeInDialog.newInstance(maxValue, tradeInLines)
+        tradeDialog.setOnTradeInListener { tradeIns, totalValue ->
+            this.tradeInLines = tradeIns
+            this.tradeInTotalState = totalValue
+            inlineErrorState = null
+        }
+        tradeDialog.show(parentFragmentManager, "TradeInDialog")
+    }
+
+    private fun validateAndSubmit() {
+        val requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD")
+        val paid = getTotalPaidYER()
+        val totalWithGold = paid + tradeInTotalState
+        val diff = totalWithGold - requiredTotal
 
         if (diff < -1.0) {
-            String msg = isArabic
-                    ? "⚠️ المبلغ ناقص " + String.format(Locale.US, "%,.0f", Math.abs(diff)) + " YER"
-                    : "⚠️ Short by " + String.format(Locale.US, "%,.0f", Math.abs(diff)) + " YER";
-            showInlineError(msg);
-            return;
+            inlineErrorState = if (isArabic) {
+                "⚠️ المبلغ ناقص ${String.format(Locale.US, "%,.0f", abs(diff))} YER"
+            } else {
+                "⚠️ Short by ${String.format(Locale.US, "%,.0f", abs(diff))} YER"
+            }
+            return
         }
 
         if (diff > 1.0) {
-            String phone = etCustomerPhone != null
-                    ? etCustomerPhone.getText().toString().trim() : "";
+            val phone = customerPhoneState.trim()
             if (phone.isEmpty()) {
-                if (tilCustomerPhone != null) {
-                    tilCustomerPhone.setError(isArabic
-                            ? "مطلوب لإنشاء رصيد دائن"
-                            : "Required to create store credit");
+                phoneFieldErrorState = if (isArabic) {
+                    "مطلوب لإنشاء رصيد دائن"
+                } else {
+                    "Required to create store credit"
                 }
-                showInlineError(isArabic
-                        ? "⚠️ الدفع الزائد يتطلب رقم هاتف العميل (لحفظ الرصيد الدائن)"
-                        : "⚠️ Overpayment requires customer phone (to save credit)");
-                return;
+                inlineErrorState = if (isArabic) {
+                    "⚠️ الدفع الزائد يتطلب رقم هاتف العميل (لحفظ الرصيد الدائن)"
+                } else {
+                    "⚠️ Overpayment requires customer phone (to save credit)"
+                }
+                return
             }
 
-            final POSCheckoutData pendingData = buildData();
-            new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                    .setTitle(isArabic ? "💰 سيُضاف رصيد دائن" : "💰 Store Credit")
-                    .setMessage(isArabic
-                            ? "المبلغ المدفوع أكثر من الفاتورة بـ "
-                              + String.format(Locale.US, "%,.2f", diff)
-                              + " YER\n\nسيُحفظ هذا المبلغ كرصيد دائن للعميل (صالح 12 شهراً)."
-                            : "Overpaid by " + String.format(Locale.US, "%,.2f", diff)
-                              + " YER\n\nThis will be saved as store credit (valid 12 months).")
-                    .setPositiveButton(isArabic ? "متابعة" : "Continue",
-                            (d, w) -> dispatchCheckout(pendingData))
-                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                    .show();
-            return;
+            pendingCheckoutData = buildData()
+            pendingCreditDiffState = diff
+            showStoreCreditConfirmState = true
+            return
         }
 
-        dispatchCheckout(buildData());
+        dispatchCheckout(buildData())
     }
 
-    private void showInlineError(String message) {
-        if (llInlineError == null || tvInlineError == null) {
-            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
-            return;
+    private fun buildData(): POSCheckoutData {
+        val data = POSCheckoutData().apply {
+            customerName = customerNameState.trim()
+            customerPhone = customerPhoneState.trim()
+            originalTotal = totalAmount
+            finalAmount = totalAmount
+            tradeIns = tradeInLines
+            tradeInTotal = tradeInTotalState
         }
-        tvInlineError.setText(message);
-        llInlineError.setVisibility(View.VISIBLE);
-        llInlineError.requestFocus();
-    }
 
-    private POSCheckoutData buildData() {
-        POSCheckoutData data = new POSCheckoutData();
-        data.customerName = etCustomerName != null ? etCustomerName.getText().toString().trim() : "";
-        data.customerPhone = etCustomerPhone != null ? etCustomerPhone.getText().toString().trim() : "";
-        data.originalTotal = totalAmount;
-        data.finalAmount = totalAmount;
-        data.tradeIns = tradeInLines;
-        data.tradeInTotal = tradeInTotal;
+        val paymentsArray = JSONArray()
+        for (row in paymentRowsState) {
+            val amt = parseDouble(row.amountText)
+            if (amt <= 0) continue
 
-        JSONArray paymentsArray = new JSONArray();
-        for (View row : paymentRows) {
-            EditText et = row.findViewById(R.id.etAmount);
-            MaterialAutoCompleteTextView actCurr = row.findViewById(R.id.actCurrency);
-            // ✅ تصحيح النوع هنا أيضاً إلى MaterialAutoCompleteTextView
-            MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-            if (et == null || actCurr == null || actMethod == null) continue;
-
-            double amt = parseDouble(et.getText().toString());
-            if (amt <= 0) continue;
-
-            String curr = actCurr.getText().toString();
-            String methodCode = resolveMethodCode(actMethod);
-        
-            Log.d(TAG, "Payment row: currency=" + curr
-                    + " amount=" + amt + " method=" + methodCode);
+            val curr = row.currency
+            val methodCode = row.method.code?.takeIf { it.isNotEmpty() } ?: "CASH"
 
             try {
-                JSONObject pObj = new JSONObject();
-                pObj.put("currency", curr);
-                pObj.put("amount", amt);
-                pObj.put("exchange_rate", getRateToYER(curr));
-                pObj.put("base_amount", amt * getRateToYER(curr));
-                pObj.put("method", methodCode);
-                paymentsArray.put(pObj);
-            } catch (Exception ignored) {}
+                val pObj = JSONObject().apply {
+                    put("currency", curr)
+                    put("amount", amt)
+                    put("exchange_rate", getRateToYER(curr))
+                    put("base_amount", amt * getRateToYER(curr))
+                    put("method", methodCode)
+                }
+                paymentsArray.put(pObj)
+            } catch (_: Exception) {
+            }
         }
-        data.payments = paymentsArray;
+        data.payments = paymentsArray
 
         if (paymentsArray.length() > 0) {
             try {
-                data.paymentMethod = paymentsArray.getJSONObject(0).optString("method", "CASH");
-            } catch (Exception ignored) {}
-        }
-
-        return data;
-    }
-
-    private String resolveMethodCode(android.widget.TextView actMethod) {
-        if (actMethod == null || paymentMethods.isEmpty()) return "CASH";
-        if (actMethod.getTag() != null) return String.valueOf(actMethod.getTag());
-        
-        String selectedText = actMethod.getText() != null
-                ? actMethod.getText().toString().trim() : "";
-        for (PaymentMethodDto m : paymentMethods) {
-            if (m == null) continue;
-            String display = m.getDisplayName(isArabic);
-            String account = m.getAccountDisplay(isArabic);
-            String full = (account != null && !account.isEmpty()) ? display + " (" + account + ")" : display;
-            if (full.equals(selectedText)) {
-                return m.code != null ? m.code : "CASH";
+                data.paymentMethod = paymentsArray.getJSONObject(0).optString("method", "CASH")
+            } catch (_: Exception) {
             }
         }
-        return paymentMethods.get(0).code;
+
+        return data
     }
 
-    private void dispatchCheckout(POSCheckoutData data) {
-        if (btnConfirmCheckout != null) {
-            btnConfirmCheckout.setEnabled(false);
-            btnConfirmCheckout.setText(isArabic ? "⏳ جاري التنفيذ..." : "⏳ Processing...");
-        }
-        if (llInlineError != null) llInlineError.setVisibility(View.GONE);
-
-        if (listener != null) listener.onCheckout(data);
+    private fun dispatchCheckout(data: POSCheckoutData) {
+        isSubmittingState = true
+        inlineErrorState = null
+        listener?.onCheckout(data)
     }
 
-    public void onCheckoutSuccess() {
+    fun onCheckoutSuccess() {
         try {
-            dismissAllowingStateLoss();
-        } catch (Exception ignored) {}
+            dismissAllowingStateLoss()
+        } catch (_: Exception) {
+        }
     }
 
-    public void onCheckoutError(String errorMessage) {
+    fun onCheckoutError(errorMessage: String?) {
         try {
-            if (btnConfirmCheckout != null) {
-                btnConfirmCheckout.setEnabled(true);
-                btnConfirmCheckout.setText(isArabic ? "تأكيد الدفع" : "Confirm");
-            }
-
-            String cleanMsg = (errorMessage != null && !errorMessage.isEmpty())
-                    ? errorMessage
-                    : (isArabic ? "خطأ غير معروف" : "Unknown error");
-
-            if (llInlineError != null && tvInlineError != null) {
-                tvInlineError.setText(cleanMsg);
-                llInlineError.setVisibility(View.VISIBLE);
-                llInlineError.requestFocus();
+            isSubmittingState = false
+            val cleanMsg = if (!errorMessage.isNullOrBlank()) {
+                errorMessage
             } else {
-                Toast.makeText(requireContext(), cleanMsg, Toast.LENGTH_LONG).show();
+                if (isArabic) "خطأ غير معروف" else "Unknown error"
             }
-
-            Log.w(TAG, "Backend rejected checkout: " + cleanMsg);
-
-        } catch (Exception e) {
-            Log.e(TAG, "onCheckoutError", e);
+            inlineErrorState = cleanMsg
+            Log.w(TAG, "Backend rejected checkout: $cleanMsg")
+        } catch (e: Exception) {
+            Log.e(TAG, "onCheckoutError", e)
         }
     }
 
-    private void updateFinalAmount() {
-        currentTotalWithDiscountUsd = totalAmount;
-        if (tvFinalTotal != null) {
-            if (priceManager != null) {
-                tvFinalTotal.setText(priceManager.formatPriceDefault(totalAmount));
-            } else {
-                tvFinalTotal.setText(String.format(Locale.US, "%,.2f YER", totalAmount));
-            }
-        }
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    //  Jetpack Compose UI
+    // ═══════════════════════════════════════════════════════════════════
 
-    private double getRateToYER(String currency) {
-        if (currency == null) return 1.0;
-        String curr = currency.toUpperCase(Locale.US).trim();
+    @Composable
+    private fun CheckoutDialogContent() {
+        val colors = MiraTheme.colors
+        val isAr = isArabic
 
-        if ("YER".equals(curr)) return 1.0;
+        val requiredTotalYer = currentTotalWithDiscountUsd * getRateToYER("USD")
+        val paidYer = getTotalPaidYER()
+        val totalWithGoldYer = paidYer + tradeInTotalState
+        val remainingYer = requiredTotalYer - totalWithGoldYer
 
-        if (serverRates.containsKey(curr)) {
-            double r = serverRates.get(curr);
-            if (r > 0) return r;
-        }
+        var pickerForRowIndex by remember { mutableIntStateOf(-1) }
 
-        if (priceManager != null) {
-            double currencyRate = priceManager.getExchangeRate(curr);
-            if (currencyRate > 10) return currencyRate;
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 680.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // 1. Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.backgroundMid)
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(colors.goldPrimary.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.Payments,
+                                contentDescription = null,
+                                tint = colors.goldPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (isAr) "إتمام الدفع" else "Checkout & Payment",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = formatItemCount(itemCount),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.goldPrimary
+                            )
+                        }
+                    }
 
-            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
-            if (yerRate > 0 && currencyRate > 0) {
-                return yerRate / currencyRate;
-            }
-        }
-
-        if ("SAR".equals(curr)) return 140.0;
-        if ("USD".equals(curr)) return 530.0;
-        return 1.0;
-    }
-
-    private double parseDouble(String s) {
-        try { return Double.parseDouble(s.trim()); }
-        catch (Exception e) { return 0; }
-    }
-
-    private void showPaymentMethodPicker(
-            android.widget.TextView targetField,
-            java.util.Map<String, String> displayToCode) {
-
-        if (paymentMethods == null || paymentMethods.isEmpty()) return;
-
-        List<PaymentMethodDto> filtered = new ArrayList<>(paymentMethods);
-
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment_picker, null);
-        com.google.android.material.textfield.TextInputEditText etSearch =
-                dialogView.findViewById(R.id.etSearch);
-        android.widget.ListView lvMethods = dialogView.findViewById(R.id.lvMethods);
-
-        class PickerAdapter extends android.widget.BaseAdapter {
-            List<PaymentMethodDto> data;
-            PickerAdapter(List<PaymentMethodDto> data) { this.data = data; }
-
-            @Override public int getCount() { return data.size(); }
-            @Override public Object getItem(int i) { return data.get(i); }
-            @Override public long getItemId(int i) { return i; }
-
-            @Override
-            public View getView(int position, View convertView, android.view.ViewGroup parent) {
-                if (convertView == null) {
-                    convertView = getLayoutInflater().inflate(R.layout.item_payment_picker_row, parent, false);
-                }
-                PaymentMethodDto m = data.get(position);
-                TextView tvIcon = convertView.findViewById(R.id.tvIcon);
-                TextView tvName = convertView.findViewById(R.id.tvName);
-                TextView tvAccount = convertView.findViewById(R.id.tvAccount);
-
-                tvIcon.setText(m.icon != null && !m.icon.isEmpty() ? m.icon : "💳");
-                tvName.setText(m.getDisplayName(isArabic));
-                String acc = m.getAccountDisplay(isArabic);
-                tvAccount.setText(acc != null ? acc : "");
-                tvAccount.setVisibility(acc != null && !acc.isEmpty() ? View.VISIBLE : View.GONE);
-
-                return convertView;
-            }
-        }
-
-        final PickerAdapter adapter = new PickerAdapter(filtered);
-        lvMethods.setAdapter(adapter);
-
-        androidx.appcompat.app.AlertDialog.Builder builder =
-                new androidx.appcompat.app.AlertDialog.Builder(requireContext());
-        builder.setView(dialogView);
-        androidx.appcompat.app.AlertDialog dialog = builder.create();
-
-        lvMethods.setOnItemClickListener((parent, view, position, id) -> {
-            PaymentMethodDto selected = filtered.get(position);
-            String displayName = selected.getDisplayName(isArabic);
-            String account = selected.getAccountDisplay(isArabic);
-            String fullName = (account != null && !account.isEmpty())
-                    ? displayName + " (" + account + ")"
-                    : displayName;
-
-            if (targetField instanceof MaterialAutoCompleteTextView) {
-                ((MaterialAutoCompleteTextView) targetField).setText(fullName, false);
-            } else {
-                targetField.setText(fullName);
-            }
-            targetField.setTag(selected.code);
-            dialog.dismiss();
-        });
-
-        etSearch.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-                String q = s != null ? s.toString().trim().toLowerCase() : "";
-                List<PaymentMethodDto> newData = new ArrayList<>();
-                for (PaymentMethodDto m : paymentMethods) {
-                    String name = m.getDisplayName(isArabic).toLowerCase();
-                    String acc = m.getAccountDisplay(isArabic);
-                    if (acc == null) acc = "";
-                    acc = acc.toLowerCase();
-                    if (q.isEmpty() || name.contains(q) || acc.contains(q)) {
-                        newData.add(m);
+                    IconButton(
+                        onClick = { if (!isSubmittingState) dismiss() },
+                        enabled = !isSubmittingState
+                    ) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = null,
+                            tint = colors.textSecondary
+                        )
                     }
                 }
-                adapter.data = newData;
-                adapter.notifyDataSetChanged();
+
+                Divider(color = colors.goldPrimary.copy(alpha = 0.2f))
+
+                // 2. Scrollable Body
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // بطاقة الإجمالي والمطابقة الفورية
+                    TotalAndReconciliationCard(
+                        isArabic = isAr,
+                        finalTotalFormatted = formatFinalTotalDisplay(),
+                        requiredYer = requiredTotalYer,
+                        remainingYer = remainingYer,
+                        tradeInTotal = tradeInTotalState
+                    )
+
+                    // رسالة الخطأ الداخلية (تظهر دون مسح الإدخالات)
+                    AnimatedVisibility(visible = !inlineErrorState.isNullOrEmpty()) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.55f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Rounded.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = inlineErrorState ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFEF4444)
+                                )
+                            }
+                        }
+                    }
+
+                    // بيانات العميل (اختياري إلا في حالة الرصيد الدائن)
+                    CustomerInfoSection(
+                        isArabic = isAr,
+                        name = customerNameState,
+                        phone = customerPhoneState,
+                        phoneError = phoneFieldErrorState,
+                        enabled = !isSubmittingState,
+                        onNameChange = { customerNameState = it },
+                        onPhoneChange = {
+                            customerPhoneState = it
+                            phoneFieldErrorState = null
+                            if (inlineErrorState != null) inlineErrorState = null
+                        }
+                    )
+
+                    // قسم سطور الدفع المتعددة
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isAr) "تفاصيل الدفعات" else "Payment Lines",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // زر الدفع بالذهب الكسر (Trade-in)
+                            OutlinedButton(
+                                onClick = { openTradeInDialog() },
+                                enabled = !isSubmittingState,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.55f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.goldPrimary)
+                            ) {
+                                Icon(Icons.Rounded.Diamond, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isAr) "دفع بالذهب" else "Pay with Gold",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // زر إضافة دفعة جديدة
+                            OutlinedButton(
+                                onClick = {
+                                    val defaultM = paymentMethodsState.firstOrNull()
+                                        ?: getFallbackMethods().first()
+                                    paymentRowsState.add(
+                                        PaymentRowUiModel(
+                                            method = defaultM,
+                                            currency = "YER",
+                                            amountText = ""
+                                        )
+                                    )
+                                    inlineErrorState = null
+                                },
+                                enabled = !isSubmittingState,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.55f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981))
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isAr) "إضافة دفعة" else "Add Line",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // قائمة سطور الدفع
+                    paymentRowsState.forEachIndexed { index, row ->
+                        PaymentRowCard(
+                            index = index,
+                            row = row,
+                            isArabic = isAr,
+                            currencies = currenciesState,
+                            rateToYer = getRateToYER(row.currency),
+                            enabled = !isSubmittingState,
+                            onOpenMethodPicker = { pickerForRowIndex = index },
+                            onCurrencySelected = { newCurr ->
+                                paymentRowsState[index] = row.copy(currency = newCurr)
+                                inlineErrorState = null
+                            },
+                            onAmountChanged = { newAmt ->
+                                paymentRowsState[index] = row.copy(amountText = newAmt)
+                                inlineErrorState = null
+                            },
+                            onFillRemaining = {
+                                val currentRowYer = parseDouble(row.amountText) * getRateToYER(row.currency)
+                                val otherPaidYer = getTotalPaidYER() - currentRowYer
+                                val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
+                                if (remYer > 0.01) {
+                                    val rate = getRateToYER(row.currency)
+                                    val formatted = String.format(Locale.US, "%.2f", remYer / rate)
+                                    paymentRowsState[index] = row.copy(amountText = formatted)
+                                    inlineErrorState = null
+                                }
+                            },
+                            onRemoveRow = {
+                                if (paymentRowsState.size > 1) {
+                                    paymentRowsState.removeAt(index)
+                                    inlineErrorState = null
+                                } else {
+                                    Toast.makeText(
+                                        requireContext(),
+                                        if (isAr) "يجب إبقاء سطر واحد" else "At least one payment row required",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        )
+                    }
+                }
+
+                Divider(color = colors.textSecondary.copy(alpha = 0.14f))
+
+                // 3. Footer Actions
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.backgroundMid)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { dismiss() },
+                        enabled = !isSubmittingState,
+                        modifier = Modifier.height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.35f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textSecondary)
+                    ) {
+                        Text(
+                            text = if (isAr) "إلغاء" else "Cancel",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Button(
+                        onClick = { validateAndSubmit() },
+                        enabled = !isSubmittingState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF0A0F1D)
+                        )
+                    ) {
+                        if (isSubmittingState) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF0A0F1D)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isAr) "جاري التنفيذ..." else "Processing...",
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isAr) "تأكيد الدفع" else "Confirm Payment",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 15.sp
+                            )
+                        }
+                    }
+                }
             }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        }
 
-        dialog.show();
+        // نافذة اختيار طريقة الدفع القابلة للبحث
+        if (pickerForRowIndex in paymentRowsState.indices) {
+            PaymentMethodPickerDialog(
+                isArabic = isAr,
+                methods = paymentMethodsState,
+                onDismiss = { pickerForRowIndex = -1 },
+                onSelect = { selectedMethod ->
+                    val idx = pickerForRowIndex
+                    if (idx in paymentRowsState.indices) {
+                        paymentRowsState[idx] = paymentRowsState[idx].copy(method = selectedMethod)
+                        inlineErrorState = null
+                    }
+                    pickerForRowIndex = -1
+                }
+            )
+        }
 
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.95),
-                    (int) (getResources().getDisplayMetrics().heightPixels * 0.7));
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.rounded_dialog_bg);
+        // نافذة تأكيد إنشاء رصيد دائن عند الدفع الزائد
+        if (showStoreCreditConfirmState) {
+            AlertDialog(
+                onDismissRequest = { showStoreCreditConfirmState = false },
+                containerColor = colors.cardSurface,
+                title = {
+                    Text(
+                        text = if (isAr) "💰 سيُضاف رصيد دائن" else "💰 Store Credit",
+                        color = colors.textPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (isAr) {
+                            "المبلغ المدفوع أكثر من الفاتورة بـ ${String.format(Locale.US, "%,.2f", pendingCreditDiffState)} YER\n\nسيُحفظ هذا المبلغ كرصيد دائن للعميل (صالح 12 شهراً)."
+                        } else {
+                            "Overpaid by ${String.format(Locale.US, "%,.2f", pendingCreditDiffState)} YER\n\nThis will be saved as store credit (valid 12 months)."
+                        },
+                        color = colors.textSecondary
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showStoreCreditConfirmState = false
+                            pendingCheckoutData?.let { dispatchCheckout(it) }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF0A0F1D)
+                        )
+                    ) {
+                        Text(if (isAr) "متابعة" else "Continue", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showStoreCreditConfirmState = false }) {
+                        Text(if (isAr) "إلغاء" else "Cancel", color = colors.textSecondary)
+                    }
+                }
+            )
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Sub-Components
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Composable
+    private fun TotalAndReconciliationCard(
+        isArabic: Boolean,
+        finalTotalFormatted: String,
+        requiredYer: Double,
+        remainingYer: Double,
+        tradeInTotal: Double
+    ) {
+        val colors = MiraTheme.colors
+
+        val (statusColor, statusIcon, statusLabel, statusAmountText) = when {
+            abs(remainingYer) < 1.0 -> Quadruple(
+                Color(0xFF10B981),
+                Icons.Rounded.CheckCircle,
+                if (isArabic) "متطابق" else "Matched",
+                "0 YER"
+            )
+            remainingYer > 0 -> Quadruple(
+                Color(0xFFEF4444),
+                Icons.Rounded.WarningAmber,
+                if (isArabic) "المتبقي" else "Remaining",
+                String.format(Locale.US, "%,.0f YER", remainingYer)
+            )
+            else -> Quadruple(
+                Color(0xFF3B82F6),
+                Icons.Rounded.AccountBalanceWallet,
+                if (isArabic) "سيُضاف رصيد دائن" else "Store Credit",
+                String.format(Locale.US, "+%,.0f YER", abs(remainingYer))
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = colors.backgroundMid,
+            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.28f))
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (isArabic) "إجمالي الفاتورة" else "Invoice Total",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = String.format(Locale.US, "≈ %,.0f YER", requiredYer),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary.copy(alpha = 0.8f)
+                        )
+                    }
+                    Text(
+                        text = finalTotalFormatted,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.goldPrimary
+                    )
+                }
+
+                // ملخص الذهب الكسر إن وُجد
+                if (tradeInTotal > 0) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = colors.goldPrimary.copy(alpha = 0.14f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Rounded.Diamond,
+                                    contentDescription = null,
+                                    tint = colors.goldPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isArabic) "مخصوم ذهب كسر (Trade-in)" else "Gold Trade-in",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = colors.goldPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Text(
+                                text = String.format(Locale.US, "-%,.0f YER", tradeInTotal),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.goldPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // شريط حالة المطابقة (متطابق / ناقص / رصيد دائن)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = statusColor.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.45f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = statusIcon,
+                                contentDescription = null,
+                                tint = statusColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = statusLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
+                        Text(
+                            text = statusAmountText,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = statusColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun CustomerInfoSection(
+        isArabic: Boolean,
+        name: String,
+        phone: String,
+        phoneError: String?,
+        enabled: Boolean,
+        onNameChange: (String) -> Unit,
+        onPhoneChange: (String) -> Unit
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                enabled = enabled,
+                singleLine = true,
+                label = {
+                    Text(
+                        text = if (isArabic) "اسم العميل (اختياري)" else "Customer Name",
+                        fontSize = 12.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f)
+            )
+
+            OutlinedTextField(
+                value = phone,
+                onValueChange = onPhoneChange,
+                enabled = enabled,
+                singleLine = true,
+                isError = phoneError != null,
+                label = {
+                    Text(
+                        text = phoneError ?: if (isArabic) "رقم الهاتف" else "Phone",
+                        fontSize = 12.sp
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Rounded.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+
+    @Composable
+    private fun PaymentRowCard(
+        index: Int,
+        row: PaymentRowUiModel,
+        isArabic: Boolean,
+        currencies: List<String>,
+        rateToYer: Double,
+        enabled: Boolean,
+        onOpenMethodPicker: () -> Unit,
+        onCurrencySelected: (String) -> Unit,
+        onAmountChanged: (String) -> Unit,
+        onFillRemaining: () -> Unit,
+        onRemoveRow: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+        var currencyMenuExpanded by remember { mutableStateOf(false) }
+
+        val methodDisplay = remember(row.method, isArabic) {
+            val disp = row.method.getDisplayName(isArabic)
+            val acc = row.method.getAccountDisplay(isArabic)
+            val icon = row.method.icon?.takeIf { it.isNotEmpty() } ?: "💳"
+            if (!acc.isNullOrEmpty()) "$icon $disp ($acc)" else "$icon $disp"
+        }
+
+        val parsedAmount = parseDouble(row.amountText)
+        val equivalentYer = parsedAmount * rateToYer
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = colors.backgroundMid,
+            border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.16f))
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // الصف العلوي: رقم السطر + اختيار طريقة الدفع + حذف السطر
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(colors.goldPrimary.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.goldPrimary
+                        )
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(enabled = enabled) { onOpenMethodPicker() },
+                        shape = RoundedCornerShape(10.dp),
+                        color = colors.cardSurface,
+                        border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = methodDisplay,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                Icons.Rounded.ArrowDropDown,
+                                contentDescription = null,
+                                tint = colors.goldPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onRemoveRow,
+                        enabled = enabled,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.DeleteOutline,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // الصف السفلي: المبلغ + العملة + زر تعبئة المتبقي
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = row.amountText,
+                        onValueChange = onAmountChanged,
+                        enabled = enabled,
+                        singleLine = true,
+                        placeholder = {
+                            Text("0.00", style = MaterialTheme.typography.bodySmall)
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Done
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // قائمة اختيار العملة
+                    Box {
+                        Surface(
+                            modifier = Modifier
+                                .height(52.dp)
+                                .clickable(enabled = enabled) { currencyMenuExpanded = true },
+                            shape = RoundedCornerShape(10.dp),
+                            color = colors.cardSurface,
+                            border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = row.currency,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.goldPrimary
+                                )
+                                Icon(
+                                    Icons.Rounded.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = currencyMenuExpanded,
+                            onDismissRequest = { currencyMenuExpanded = false }
+                        ) {
+                            currencies.forEach { curr ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = curr,
+                                            fontWeight = if (curr == row.currency) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    onClick = {
+                                        currencyMenuExpanded = false
+                                        onCurrencySelected(curr)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // زر تعبئة المتبقي
+                    FilledTonalButton(
+                        onClick = onFillRemaining,
+                        enabled = enabled,
+                        modifier = Modifier.height(52.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = colors.goldPrimary.copy(alpha = 0.18f),
+                            contentColor = colors.goldPrimary
+                        )
+                    ) {
+                        Text(
+                            text = if (isArabic) "المتبقي" else "Rest",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // المعادل بالريال اليمني عند اختيار عملة أجنبية
+                if (rateToYer != 1.0 && parsedAmount > 0) {
+                    Text(
+                        text = String.format(Locale.US, "≈ %,.2f YER (سعر الصرف: %,.1f)", equivalentYer, rateToYer),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun PaymentMethodPickerDialog(
+        isArabic: Boolean,
+        methods: List<PaymentMethodDto>,
+        onDismiss: () -> Unit,
+        onSelect: (PaymentMethodDto) -> Unit
+    ) {
+        val colors = MiraTheme.colors
+        var searchQuery by remember { mutableStateOf("") }
+
+        val filtered = remember(searchQuery, methods.size) {
+            val q = searchQuery.trim().lowercase(Locale.US)
+            if (q.isEmpty()) methods
+            else methods.filter { m ->
+                val name = m.getDisplayName(isArabic).lowercase(Locale.US)
+                val acc = (m.getAccountDisplay(isArabic) ?: "").lowercase(Locale.US)
+                name.contains(q) || acc.contains(q)
+            }
+        }
+
+        Dialog(onDismissRequest = onDismiss) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 460.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isArabic) "اختر طريقة الدفع" else "Select Payment Method",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Rounded.Close, contentDescription = null, tint = colors.textSecondary)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        singleLine = true,
+                        placeholder = {
+                            Text(
+                                text = if (isArabic) "بحث بالاسم أو الحساب..." else "Search method or account...",
+                                fontSize = 13.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        items(filtered, key = { it.code ?: UUID.randomUUID().toString() }) { method ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelect(method) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = colors.backgroundMid,
+                                border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.14f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = method.icon?.takeIf { it.isNotEmpty() } ?: "💳",
+                                        fontSize = 20.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = method.getDisplayName(isArabic),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.textPrimary
+                                        )
+                                        val acc = method.getAccountDisplay(isArabic)
+                                        if (!acc.isNullOrEmpty()) {
+                                            Text(
+                                                text = acc,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = colors.goldPrimary
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        Icons.Rounded.ChevronRight,
+                                        contentDescription = null,
+                                        tint = colors.textSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private data class Quadruple<A, B, C, D>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D
+    )
 }
