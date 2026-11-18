@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
+    android:background="#0A0F1D"
     tools:context=".activity.UHFMainActivity">
 
+    <!-- 1. الهيدر العلوي بهوية MIRA الداكنة والذهبية -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="#0F172A"
         android:stateListAnimator="@null"
         app:elevation="0dp"
         app:liftOnScroll="false">
@@ -22,31 +23,80 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorSurface"
-            android:paddingHorizontal="8dp"
+            android:background="#0F172A"
+            android:paddingHorizontal="12dp"
             app:contentInsetStartWithNavigation="0dp"
-            app:menu="@menu/main_menu">
+            app:menu="@menu/main_menu"
+            app:titleTextColor="#F8FAFC">
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:gravity="center_vertical"
                 android:orientation="vertical"
                 android:paddingEnd="8dp">
-                <TextView android:id="@+id/tvTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1" android:textColor="?attr/colorOnSurface" android:textSize="15sp" android:textStyle="bold" tools:text="منظومة الذهب الدولية" />
-                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
-                    <TextView android:id="@+id/tvSubtitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:alpha="0.8" android:ellipsize="end" android:maxLines="1" android:textColor="?attr/colorOnSurface" android:textSize="10sp" tools:text="📍 Main Branch" />
-                    <View android:id="@+id/statusDot" android:layout_width="8dp" android:layout_height="8dp" android:layout_marginStart="6dp" android:background="@drawable/bg_status_dot" android:visibility="gone" />
-                    <TextView android:id="@+id/statusText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:textColor="?attr/colorOnSurface" android:textSize="9sp" android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#F8FAFC"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="منظومة الذهب الدولية" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#D4AF37"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        tools:text="📍 Main Branch" />
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_status_dot"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:textColor="#94A3B8"
+                        android:textSize="10sp"
+                        android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- خط ذهبي رفيع أسفل الهيدر -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#26D4AF37" />
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:visibility="gone"
             android:layoutDirection="locale"
+            android:visibility="gone"
             app:contentInsetEnd="0dp"
             app:contentInsetEndWithActions="0dp"
             app:contentInsetStart="0dp"
@@ -55,10 +105,11 @@
             app:paddingStart="0dp" />
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- 2. حاوية الشاشات (بدون paddingBottom ثابت حتى لا يُقتطع أسفل شاشات Compose) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface"
+        android:background="#0A0F1D"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <FrameLayout
@@ -66,7 +117,6 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:clipToPadding="false"
-            android:paddingBottom="90dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -76,19 +126,41 @@
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:alpha="0.85"
-            android:background="#CC000000"
+            android:alpha="0.90"
+            android:background="#E60A0F1D"
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
-            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:gravity="center" android:orientation="vertical">
-                <com.google.android.material.progressindicator.CircularProgressIndicator android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminate="true" app:indicatorColor="#FFFFFF" app:indicatorSize="56dp" app:trackThickness="4dp" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="جاري التحميل..." android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    app:indicatorColor="#D4AF37"
+                    app:indicatorSize="56dp"
+                    app:trackColor="#1E293B"
+                    app:trackThickness="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="جاري التحميل..."
+                    android:textColor="#F8FAFC"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
             </LinearLayout>
         </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ⬇️ الشريط السفلي والأزرار العائمة (مرتبة بدون أي تكرار) -->
+    <!-- 3. الشريط السفلي العائم والأزرار الذهبية -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -98,22 +170,23 @@
         android:clipToPadding="false"
         android:layoutDirection="locale"
         android:paddingHorizontal="16dp"
-        android:paddingBottom="18dp">
+        android:paddingBottom="16dp">
 
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="0dp"
-            android:layout_height="72dp"
-            android:layout_marginTop="34dp"
+            android:layout_height="70dp"
+            android:layout_marginTop="32dp"
             android:background="@drawable/bg_floating_bottom_nav_with_shadow"
-            android:elevation="4dp"
+            android:elevation="8dp"
             android:layoutDirection="locale"
-            app:elevation="4dp"
+            app:backgroundTint="#111827"
+            app:elevation="8dp"
             app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
             app:itemBackground="@null"
-            app:itemIconSize="24dp"
+            app:itemIconSize="23dp"
             app:itemIconTint="@color/nav_item_color_selector"
-            app:itemRippleColor="@color/nav_ripple_color"
+            app:itemRippleColor="#26D4AF37"
             app:itemTextAppearanceActive="@style/NavItemTextActive"
             app:itemTextAppearanceInactive="@style/NavItemTextInactive"
             app:itemTextColor="@color/nav_item_color_selector"
@@ -124,14 +197,14 @@
             app:layout_constraintTop_toTopOf="parent"
             app:menu="@menu/bottom_nav_menu" />
 
-        <!-- 1. الزر الرئيسي (الأصفر) -->
+        <!-- زر الألماسة الرئيسي (ذهبي MIRA) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabActionCenter"
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:elevation="14dp"
             android:src="@drawable/ic_diamond"
-            app:backgroundTint="?attr/colorPrimary"
+            app:backgroundTint="#D4AF37"
             app:borderWidth="0dp"
             app:elevation="14dp"
             app:fabCustomSize="56dp"
@@ -141,9 +214,9 @@
             app:layout_constraintTop_toTopOf="@id/bottomNavigationView"
             app:maxImageSize="24dp"
             app:pressedTranslationZ="6dp"
-            app:tint="?attr/colorOnPrimary" />
+            app:tint="#0A0F1D" />
 
-        <!-- 2. زر الملف الشخصي -->
+        <!-- زر الملف الشخصي -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabProfile"
             android:layout_width="wrap_content"
@@ -151,16 +224,16 @@
             android:elevation="18dp"
             android:src="@drawable/ic_user_placeholder"
             android:visibility="gone"
-            app:backgroundTint="?attr/colorSecondary"
+            app:backgroundTint="#1E293B"
             app:elevation="18dp"
             app:fabSize="mini"
             app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
             app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
             app:layout_constraintStart_toStartOf="@id/fabActionCenter"
             app:layout_constraintTop_toTopOf="@id/fabActionCenter"
-            app:tint="?attr/colorOnSecondary" />
+            app:tint="#D4AF37" />
 
-        <!-- 3. زر التقارير -->
+        <!-- زر التقارير -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabReports"
             android:layout_width="wrap_content"
@@ -168,14 +241,14 @@
             android:elevation="20dp"
             android:src="@drawable/ic_reports"
             android:visibility="gone"
-            app:backgroundTint="?attr/colorSecondary"
+            app:backgroundTint="#1E293B"
             app:elevation="20dp"
             app:fabSize="mini"
             app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
             app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
             app:layout_constraintStart_toStartOf="@id/fabActionCenter"
             app:layout_constraintTop_toTopOf="@id/fabActionCenter"
-            app:tint="?attr/colorOnSecondary" />
+            app:tint="#10B981" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
