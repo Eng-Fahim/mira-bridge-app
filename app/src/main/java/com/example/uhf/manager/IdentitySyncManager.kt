@@ -23,11 +23,6 @@ import kotlin.math.pow
 
 /**
  * IdentitySyncManager - الإصدار 4.1 (Kotlin Enterprise Edition)
- *
- * إدارة المزامنة المحلية والسحابية لعمليات تكويد المجوهرات:
- *  • حماية كاملة ضد Race Conditions والتكرار أثناء المزامنة الجماعية أو الفردية
- *  • تحديث فوري للإحصائيات وحالات الفشل النهائي (MAX_SYNC_ATTEMPTS)
- *  • توافق كامل مع الاستدعاءات من Java و Kotlin
  */
 class IdentitySyncManager(
     context: Context,
@@ -74,7 +69,7 @@ class IdentitySyncManager(
 
     interface SyncCallback {
         fun onSyncComplete(syncedCount: Int)
-        fun onSyncError(error: String)
+        fun onSyncError(error: String?)
     }
 
     interface DetailedSyncCallback {
@@ -82,7 +77,7 @@ class IdentitySyncManager(
         fun onItemSynced(itemIndex: Int, totalCount: Int, epc: String)
         fun onItemFailed(itemIndex: Int, totalCount: Int, epc: String, error: String)
         fun onSyncComplete(syncedCount: Int, failedCount: Int)
-        fun onSyncError(error: String)
+        fun onSyncError(error: String?)
     }
 
     interface SingleItemCallback {
@@ -119,19 +114,29 @@ class IdentitySyncManager(
         @JvmField val lastError: String = b.lastError
         @JvmField val payload: JSONObject = b.payload
 
-        fun getFormattedSavedAt(): String = formatDate(savedAt, "dd/MM/yyyy HH:mm")
+        fun getFormattedSavedAt(): String {
+            return formatDate(savedAt, "dd/MM/yyyy HH:mm")
+        }
 
-        fun getFormattedLastAttempt(): String =
-            if (lastAttempt <= 0L) "-" else formatDate(lastAttempt, "dd/MM HH:mm")
+        fun getFormattedLastAttempt(): String {
+            return if (lastAttempt <= 0L) "-" else formatDate(lastAttempt, "dd/MM HH:mm")
+        }
 
-        fun getFormattedNextRetry(): String =
-            if (nextRetryAt <= 0L) "-" else formatDate(nextRetryAt, "dd/MM HH:mm")
+        fun getFormattedNextRetry(): String {
+            return if (nextRetryAt <= 0L) "-" else formatDate(nextRetryAt, "dd/MM HH:mm")
+        }
 
-        fun isPending(): Boolean = STATUS_PENDING == status || STATUS_SYNCING == status
+        fun isPending(): Boolean {
+            return STATUS_PENDING == status || STATUS_SYNCING == status
+        }
 
-        fun isFailed(): Boolean = STATUS_FAILED == status || STATUS_FAILED_MAX == status
+        fun isFailed(): Boolean {
+            return STATUS_FAILED == status || STATUS_FAILED_MAX == status
+        }
 
-        fun canRetry(): Boolean = isFailed() && attempts < MAX_SYNC_ATTEMPTS
+        fun canRetry(): Boolean {
+            return isFailed() && attempts < MAX_SYNC_ATTEMPTS
+        }
 
         class Builder {
             internal var id: String = ""
@@ -200,7 +205,9 @@ class IdentitySyncManager(
 
         @JvmOverloads
         fun getLastSyncFormatted(isArabic: Boolean = true): String {
-            if (lastSyncTime <= 0L) return if (isArabic) "أبداً" else "Never"
+            if (lastSyncTime <= 0L) {
+                return if (isArabic) "أبداً" else "Never"
+            }
             return try {
                 SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(lastSyncTime))
             } catch (_: Exception) {
@@ -220,7 +227,6 @@ class IdentitySyncManager(
     private val cachedPendingCount = AtomicInteger(-1)
     private val pendingLock = Any()
 
-    // حماية ضد تشغيل مزامنة متزامنة لنفس السجل المفرد
     private val inFlightItemIds: MutableSet<String> =
         Collections.newSetFromMap(ConcurrentHashMap())
 
@@ -247,7 +253,6 @@ class IdentitySyncManager(
                 }
                 enriched.put("epc", targetEpc)
 
-                // استبدال السجل المعلق لنفس EPC مع الإبقاء على السجلات المكتملة أو الفاشلة نهائياً
                 for (i in arr.length() - 1 downTo 0) {
                     val existing = arr.optJSONObject(i) ?: continue
                     val existingEpc = existing.optString("epc", "").trim()
@@ -288,19 +293,20 @@ class IdentitySyncManager(
 
     // ==================== READ ====================
 
-    fun getPendingCount(): Int {
-        val cached = cachedPendingCount.get()
-        if (cached >= 0) return cached
+    val pendingCount: Int
+        get() {
+            val cached = cachedPendingCount.get()
+            if (cached >= 0) return cached
 
-        return try {
-            val json = offlineCache.getString(KEY_PENDING_ENCODES, "[]") ?: "[]"
-            val count = JSONArray(json).length()
-            cachedPendingCount.set(count)
-            count
-        } catch (_: Exception) {
-            0
+            return try {
+                val json = offlineCache.getString(KEY_PENDING_ENCODES, "[]") ?: "[]"
+                val count = JSONArray(json).length()
+                cachedPendingCount.set(count)
+                count
+            } catch (_: Exception) {
+                0
+            }
         }
-    }
 
     fun getPendingItems(): JSONArray {
         synchronized(pendingLock) {
@@ -321,7 +327,9 @@ class IdentitySyncManager(
         }
     }
 
-    fun getAllSyncLogs(): List<SyncLogItem> = getAllSyncLogsInternal()
+    fun getAllSyncLogs(): List<SyncLogItem> {
+        return getAllSyncLogsInternal()
+    }
 
     private fun getAllSyncLogsInternal(): List<SyncLogItem> {
         synchronized(pendingLock) {
@@ -385,7 +393,6 @@ class IdentitySyncManager(
                 for (i in 0 until arr.length()) {
                     val obj = arr.optJSONObject(i)
                     if (obj != null && id == obj.optString(META_ID)) {
-                        // نسخ الكائن لتجنب تعديل مرجع المستدعي
                         val cloned = JSONObject(newPayload.toString())
                         cloned.put(META_ID, id)
                         cloned.put(META_ATTEMPTS, obj.optInt(META_ATTEMPTS, 0))
@@ -508,7 +515,7 @@ class IdentitySyncManager(
             override fun onSyncComplete(syncedCount: Int, failedCount: Int) {
                 callback?.onSyncComplete(syncedCount)
             }
-            override fun onSyncError(error: String) {
+            override fun onSyncError(error: String?) {
                 callback?.onSyncError(error)
             }
         })
@@ -604,7 +611,9 @@ class IdentitySyncManager(
 
                         if (response != null && response.isSuccess) {
                             synced++
-                            if (newAttempts > 1) retrySuccessesThisRun++
+                            if (newAttempts > 1) {
+                                retrySuccessesThisRun++
+                            }
                             payload.put(META_STATUS, STATUS_SYNCED)
                             payload.put(META_SYNCED_AT, System.currentTimeMillis())
                             callback?.onItemSynced(i, totalCount, epc)
@@ -857,7 +866,7 @@ class IdentitySyncManager(
                 lastSyncStr,
                 totalSynced,
                 totalFailed,
-                getPendingCount()
+                pendingCount
             )
         } catch (_: Exception) {
             "Stats unavailable"
@@ -879,7 +888,7 @@ class IdentitySyncManager(
                     totalSynced,
                     totalFailed,
                     retrySuccesses,
-                    getPendingCount(),
+                    pendingCount,
                     lastBackoff
                 )
                 callback.onLoaded(stats)
@@ -889,9 +898,13 @@ class IdentitySyncManager(
         }
     }
 
-    fun isSyncing(): Boolean = isSyncing.get()
+    fun isSyncing(): Boolean {
+        return isSyncing.get()
+    }
 
-    fun isShutdown(): Boolean = isShutdown.get()
+    fun isShutdown(): Boolean {
+        return isShutdown.get()
+    }
 
     fun shutdown() {
         isShutdown.set(true)
@@ -1016,6 +1029,11 @@ class IdentitySyncManager(
         }
     }
 
+    private fun saveSyncStats(synced: Int, failed: Int) {
+        accumulateStats(synced, failed, 0)
+        flushStatsIfNeeded()
+    }
+
     fun getHealthReport(): String {
         return buildString {
             append("🏥 IdentitySyncManager Health\n")
@@ -1023,7 +1041,7 @@ class IdentitySyncManager(
             append("Executor: ").append(if (executor.isShutdown) "SHUTDOWN" else "OK").append("\n")
             append("Syncing: ").append(isSyncing.get()).append("\n")
             append("Shutdown: ").append(isShutdown.get()).append("\n")
-            append("Pending: ").append(getPendingCount()).append("\n")
+            append("Pending: ").append(pendingCount).append("\n")
             append("Network: ").append(if (isNetworkAvailable()) "OK" else "OFFLINE").append("\n")
         }
     }
