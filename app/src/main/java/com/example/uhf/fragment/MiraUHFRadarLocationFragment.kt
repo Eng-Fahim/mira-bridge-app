@@ -75,7 +75,7 @@ class MiraUHFRadarLocationFragment : KeyDwonFragment() {
     private var rfidManager: RFIDManager? = null
 
     private var simulationMode = false
-    private var isArabic = false
+    var isArabic: Boolean = true
 
     // UI Elements
     private var radarView: RadarView? = null
@@ -472,6 +472,7 @@ class MiraUHFRadarLocationFragment : KeyDwonFragment() {
             RadarMode.SINGLE_TARGET -> if (isArabic) "🎯 تتبع قطعة محددة" else "🎯 Single Target"
             RadarMode.OPEN_SCAN -> if (isArabic) "📡 مسح مفتوح" else "📡 Open Scan"
             RadarMode.MISSING_SEARCH -> if (isArabic) "🔍 كاشف المفقودات" else "🔍 Missing Scanner"
+            RadarMode.SECURITY_GATE -> if (isArabic) "🛡️ بوابة أمنية" else "🛡️ Security Gate"
         }
         if (inventoryFlag) {
             modeName += if (isArabic) " (نشط)" else " (active)"
