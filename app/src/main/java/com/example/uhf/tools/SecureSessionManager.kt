@@ -41,6 +41,16 @@ class SecureSessionManager private constructor(context: Context) {
     private var serverUrlCacheTime: Long = 0
     private var cachedLastActiveTime: Long? = null
     private var cachedSessionLocked: Boolean? = null
+    
+    // ✅ ضع الخصائص التوافقية هنا في مستوى الكلاس مباشرة:
+    val userId: Int
+        get() = getUserId()
+
+    val branchId: Int
+        get() = getBranchId()
+
+    val username: String
+        get() = getUsername()
 
     enum class Role {
         SYSTEM_ADMIN,
@@ -55,11 +65,13 @@ class SecureSessionManager private constructor(context: Context) {
         SECURITY,
         ADMIN
     }
+    
 
     init {
         val appContext = context.applicationContext
         userPrefs = appContext.getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE)
-
+        
+        
         try {
             keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
                 load(null)
