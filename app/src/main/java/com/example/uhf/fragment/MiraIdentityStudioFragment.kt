@@ -835,8 +835,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
         handler.postDelayed(scanRetryRunnable!!, SCAN_RETRY_INTERVAL_MS)
     }
-
-    private fun stopRfidScanningMode() {
+        private fun stopRfidScanningMode() {
         scanGeneration.incrementAndGet()
 
         val wasScanning = isRfidScanning
@@ -853,6 +852,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
 
         updateScanningUI(false)
+        restorePowerForEncoding() // ✅ خفض الطاقة فوراً حتى لو أُفلت الزناد دون قراءة شريحة
 
         if (!wasScanning) return
         val ctx = appContext ?: return
