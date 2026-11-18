@@ -123,7 +123,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         private const val TAG = "MiraIdentityStudio"
         private const val ENABLE_TEMP_MANUAL_EPC = true // ✅ أضف هذا السطر (اجعله false لإخفاء البطاقة لاحقاً)
 
-        private const val RFID_TIMEOUT_MS = 30000L       private const val MIN_TID_LENGTH = 12
+        private const val RFID_TIMEOUT_MS = 30000L       
+        private const val MIN_TID_LENGTH = 12
         private const val MAX_TID_LENGTH = 32
         private const val MAX_PHOTOS = 5
         private const val ENABLE_TID_LENGTH_VALIDATION = true
