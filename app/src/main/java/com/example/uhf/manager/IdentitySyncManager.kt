@@ -822,33 +822,43 @@ class IdentitySyncManager(
 
     // ==================== Utilities ====================
 
-    fun isEpcDuplicateLocally(epc: String?): Boolean {
-        if (epc.isNullOrBlank()) return false
-        val cleanEpc = epc.trim().uppercase(Locale.US)
+   fun isEpcDuplicateLocally(epc: String?): Boolean {
+    if (epc.isNullOrBlank()) return false
+    val cleanEpc = epc.trim().uppercase(Locale.US)
 
-        synchronized(pendingLock) {
-            try {
-                val pendingJson = offlineCache.getString(KEY_PENDING_ENCODES, "[]") ?: "[]"
-                val pendingArray = JSONArray(pendingJson)
+    var isDuplicate = false
 
-                for (i in 0 until pendingArray.length()) {
-                    val item = pendingArray.optJSONObject(i) ?: continue
-                    val storedEpc = item.optString("epc", "").trim().uppercase(Locale.US)
-                    if (cleanEpc == storedEpc) return true
+    synchronized(pendingLock) {
+        try {
+            val pendingJson = offlineCache.getString(KEY_PENDING_ENCODES, "[]") ?: "[]"
+            val pendingArray = JSONArray(pendingJson)
+
+            for (i in 0 until pendingArray.length()) {
+                val item = pendingArray.optJSONObject(i) ?: continue
+                val storedEpc = item.optString("epc", "").trim().uppercase(Locale.US)
+                if (cleanEpc == storedEpc) {
+                    isDuplicate = true
+                    break
                 }
+            }
 
+            if (!isDuplicate) {
                 val draftJson = offlineCache.getString(KEY_DRAFT, null)
                 if (draftJson != null) {
                     val draft = JSONObject(draftJson)
                     val draftEpc = draft.optString("epc", "").trim().uppercase(Locale.US)
-                    if (cleanEpc == draftEpc) return true
+                    if (cleanEpc == draftEpc) {
+                        isDuplicate = true
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "isEpcDuplicateLocally error: ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "isEpcDuplicateLocally error: ${e.message}")
         }
-        return false
     }
+
+    return isDuplicate
+}
 
     @Deprecated("Use getStatsAsync() instead")
     fun getSyncStats(): String {
