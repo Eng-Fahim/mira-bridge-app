@@ -23,11 +23,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -290,7 +290,7 @@ class MiraPosFragment : MiraBaseFragment() {
 
             rfidManager = RFIDManager.getInstance(ctx)
             rfidManager?.let { manager ->
-                rfidListener = object : MiraIRFIDReader.OnTagReadListener {
+                val listener = object : MiraIRFIDReader.OnTagReadListener {
                     override fun onTagRead(epc: String, rssi: Int) {
                         if (currentScanMode == ScanMode.RFID) {
                             safeRun { onRingScanned(epc) }
@@ -310,7 +310,8 @@ class MiraPosFragment : MiraBaseFragment() {
                         Log.e(TAG, "RFID Error: $error")
                     }
                 }
-                manager.addListener(rfidListener)
+                rfidListener = listener
+                manager.addListener(listener)
             }
 
             setupCartListener()
@@ -419,15 +420,15 @@ class MiraPosFragment : MiraBaseFragment() {
             }
             backPressedCallback = null
 
-            if (rfidManager != null && rfidListener != null) {
-                rfidManager?.removeListener(rfidListener)
-                rfidListener = null
+            rfidListener?.let { listener ->
+                rfidManager?.removeListener(listener)
             }
+            rfidListener = null
 
-            if (cartManager != null && cartListener != null) {
-                cartManager?.removeListener(cartListener)
-                cartListener = null
+            cartListener?.let { listener ->
+                cartManager?.removeListener(listener)
             }
+            cartListener = null
 
             restoreOriginalPower()
 
@@ -472,10 +473,11 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private fun setupCartListener() {
         val manager = cartManager ?: return
-        cartListener = PosCartManager.OnCartChangedListener { snapshot, _, _ ->
+        val listener = PosCartManager.OnCartChangedListener { snapshot, _, _ ->
             safeRun { syncCartState(snapshot) }
         }
-        manager.addListener(cartListener)
+        cartListener = listener
+        manager.addListener(listener)
     }
 
     private fun syncCartState(snapshot: PosCartManager.CartSnapshot) {
@@ -1532,14 +1534,18 @@ class MiraPosFragment : MiraBaseFragment() {
             val dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count, ratesJson)
             activeCheckoutDialog = dialog
 
-            dialog.setCheckoutListener { data ->
-                if (data != null) executeCheckoutDirectly(data)
-            }
+            dialog.setCheckoutListener(object : POSCheckoutDialog.OnCheckoutListener {
+                override fun onCheckout(data: POSCheckoutDialog.POSCheckoutData?) {
+                    if (data != null) executeCheckoutDirectly(data)
+                }
+            })
 
-            dialog.setOnDismissListener {
-                isCheckoutDialogShowing = false
-                activeCheckoutDialog = null
-            }
+            dialog.setOnDismissListener(object : POSCheckoutDialog.OnDialogDismissListener {
+                override fun onDialogDismissed() {
+                    isCheckoutDialogShowing = false
+                    activeCheckoutDialog = null
+                }
+            })
 
             val fm = parentFragmentManager
             if (!fm.isStateSaved) {
@@ -1639,15 +1645,16 @@ class MiraPosFragment : MiraBaseFragment() {
                     safeRun {
                         PosUIManager.dismissDialog(finalLoadingDialog)
                         isButtonsBusyState = false
+                        val errText = e.message ?: if (isArabic) "حدث خطأ غير متوقع" else "Unexpected error"
                         if (activeCheckoutDialog != null && activeCheckoutDialog?.isAdded == true) {
                             activeCheckoutDialog?.onCheckoutError(
-                                if (isArabic) "خطأ في الاتصال: ${e.message}" else "Network error: ${e.message}"
+                                if (isArabic) "خطأ في الاتصال: $errText" else "Network error: $errText"
                             )
                         } else {
                             PosUIManager.showRetryDialog(
                                 requireContext(),
                                 getString(R.string.pos_dialog_error_title),
-                                e.message,
+                                errText,
                                 { executeCheckoutDirectly(data) },
                                 isArabic
                             )
@@ -3282,7 +3289,7 @@ class MiraPosFragment : MiraBaseFragment() {
                     border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.4f))
                 ) {
                     Text(
-                        text = item.karat.ifEmpty { "21K" },
+                        text = (item.karat ?: "").ifEmpty { "21K" },
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.ExtraBold,
@@ -3294,8 +3301,11 @@ class MiraPosFragment : MiraBaseFragment() {
 
                 // تفاصيل القطعة
                 Column(modifier = Modifier.weight(1f)) {
+                    val itemTitle = (item.name ?: "").ifEmpty {
+                        if (isArabic) "قطعة مجوهرات" else "Jewelry Item"
+                    }
                     Text(
-                        text = item.title.ifEmpty { if (isArabic) "قطعة مجوهرات" else "Jewelry Item" },
+                        text = itemTitle,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
@@ -3324,7 +3334,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         }
                     }
 
-                    val codeLabel = item.serialNo.ifEmpty { item.epc }
+                    val codeLabel = (item.serialNo ?: "").ifEmpty { item.epc ?: "" }
                     if (codeLabel.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
