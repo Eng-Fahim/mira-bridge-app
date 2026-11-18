@@ -14,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -53,10 +52,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
 import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.manager.MiraBranchesManager
@@ -71,6 +68,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MiraSalesHistoryFragment : Fragment() {
 
@@ -87,14 +85,17 @@ class MiraSalesHistoryFragment : Fragment() {
         val paymentMethod: String,
         val date: String,
         val rawJson: String,
-        val amount: Double,
+        val amountLocal: Double,
         val amountUSD: Double,
         val currency: String,
+        val exchangeRate: Double,
         val itemCount: Int,
         val branchId: Int,
         val refundStatus: String,
         val refundReason: String,
-        val refundedAt: String
+        val refundedAt: String,
+        val hasTradeIn: Boolean,
+        val isMixedPayment: Boolean
     )
 
     private data class BranchOption(
@@ -115,8 +116,7 @@ class MiraSalesHistoryFragment : Fragment() {
     private val saleList = ArrayList<MiraSaleItem>()
     private var currentPage = 1
 
-    @Volatile
-    private var isLoading = false
+    private val isLoadingAtomic = AtomicBoolean(false)
     private var isLastPage = false
     private var hasMoreData = true
     private var totalItems = 0
@@ -173,10 +173,6 @@ class MiraSalesHistoryFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        Log.d(
-            "CAPS_DEBUG",
-            "fragments: " + PermissionManager.getInstance(requireContext()).canViewAllBranches()
-        )
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
@@ -365,7 +361,7 @@ class MiraSalesHistoryFragment : Fragment() {
         currentPage = 1
         isLastPage = false
         hasMoreData = true
-        isLoading = false
+        isLoadingAtomic.set(false)
         isEndOfListState = false
 
         if (showProgress) {
@@ -377,33 +373,40 @@ class MiraSalesHistoryFragment : Fragment() {
             }
         }
 
-        loadSalesPage(1, true)
+        loadSalesPage(page = 1, isRefresh = true)
     }
 
     private fun loadMoreSales() {
-        if (isLoading || !hasMoreData || isLastPage) {
+        if (!hasMoreData || isLastPage) {
             if (isLastPage && saleList.isNotEmpty()) {
                 isEndOfListState = true
             }
             return
         }
+        if (isLoadingAtomic.get()) return
 
-        isLoading = true
         isLoadingMoreState = true
         isEndOfListState = false
-
-        loadSalesPage(currentPage + 1, false)
+        loadSalesPage(page = currentPage + 1, isRefresh = false)
     }
 
     private fun loadSalesPage(page: Int, isRefresh: Boolean) {
-        if (isLoading && !isRefresh) return
-        isLoading = true
+        if (!isLoadingAtomic.compareAndSet(false, true)) return
 
-        if (networkExecutor.isShutdown) return
+        if (networkExecutor.isShutdown) {
+            isLoadingAtomic.set(false)
+            return
+        }
 
-        val querySnapshot = searchQueryState
+        val querySnapshot = searchQueryState.trim()
         val filterSnapshot = currentFilterState
         val branchSnapshot = selectedBranchIdState
+
+        // تمرير كود الفلتر المتوافق مع السيرفر (أو جلب الكل عند الفلترة محلياً على الدفع بالذهب/المتعدد)
+        val serverPaymentFilter = when (filterSnapshot) {
+            "ALL", "TRADE_IN", "MIXED" -> "ALL"
+            else -> filterSnapshot
+        }
 
         networkExecutor.execute {
             try {
@@ -414,11 +417,11 @@ class MiraSalesHistoryFragment : Fragment() {
                 val client = apiClient
                 if (client == null) {
                     mainHandler.post {
+                        isLoadingAtomic.set(false)
                         if (!isAdded) return@post
                         isInitialLoadingState = false
                         isRefreshingState = false
                         isLoadingMoreState = false
-                        isLoading = false
                         if (saleList.isEmpty()) {
                             emptyMessageState =
                                 if (isArabic) "⚠️ خطأ في تهيئة النظام" else "⚠️ System initialization error"
@@ -427,10 +430,10 @@ class MiraSalesHistoryFragment : Fragment() {
                     return@execute
                 }
 
-                val response = if (querySnapshot.isNotEmpty() || filterSnapshot != "ALL" || branchSnapshot > 0) {
+                val response = if (querySnapshot.isNotEmpty() || serverPaymentFilter != "ALL" || branchSnapshot > 0) {
                     client.getSalesHistoryAdvanced(
                         querySnapshot,
-                        filterSnapshot,
+                        serverPaymentFilter,
                         null,
                         null,
                         page,
@@ -468,22 +471,25 @@ class MiraSalesHistoryFragment : Fragment() {
                     if (totalCount == 0) totalCount = rootData.optInt("total", 0)
                     if (!hasMore) hasMore = rootData.optBoolean("has_more", false)
 
+                    val rawCount = sales?.length() ?: 0
                     var items = if (sales != null) parseSalesJson(sales) else ArrayList()
 
                     if (branchSnapshot > 0) {
                         items = items.filter { it.branchId == branchSnapshot }
                     }
 
-                    if (sales != null && sales.length() > 0) {
+                    if (isRefresh && querySnapshot.isEmpty() && filterSnapshot == "ALL" && branchSnapshot == 0 &&
+                        sales != null && sales.length() > 0
+                    ) {
                         saveSalesOffline(sales)
                     }
 
-                    val isLast = !hasMore || items.size < PAGE_SIZE
+                    val isLast = !hasMore && rawCount < PAGE_SIZE
 
                     mainHandler.post {
+                        isLoadingAtomic.set(false)
                         if (!isAdded) return@post
 
-                        isLoading = false
                         isInitialLoadingState = false
                         isRefreshingState = false
                         isLoadingMoreState = false
@@ -496,7 +502,11 @@ class MiraSalesHistoryFragment : Fragment() {
                             hasMoreData = !isLast
                             isLastPage = isLast
                         } else {
-                            saleList.addAll(items)
+                            if (items.isNotEmpty()) {
+                                val existingIds = saleList.mapTo(HashSet()) { it.saleId }
+                                val uniqueNew = items.filter { it.saleId !in existingIds }
+                                saleList.addAll(uniqueNew)
+                            }
                             currentPage = page
                             hasMoreData = !isLast
                             isLastPage = isLast
@@ -513,11 +523,11 @@ class MiraSalesHistoryFragment : Fragment() {
                     }
                 } else {
                     mainHandler.post {
+                        isLoadingAtomic.set(false)
                         if (!isAdded) return@post
                         isInitialLoadingState = false
                         isRefreshingState = false
                         isLoadingMoreState = false
-                        isLoading = false
                         if (saleList.isEmpty()) {
                             emptyMessageState =
                                 if (isArabic) "📭 لا توجد مبيعات مسجلة" else "📭 No sales recorded"
@@ -527,11 +537,11 @@ class MiraSalesHistoryFragment : Fragment() {
             } catch (e: Exception) {
                 Log.e(TAG, "Exception loading sales", e)
                 mainHandler.post {
+                    isLoadingAtomic.set(false)
                     if (!isAdded) return@post
                     isInitialLoadingState = false
                     isRefreshingState = false
                     isLoadingMoreState = false
-                    isLoading = false
                     if (saleList.isEmpty()) {
                         emptyMessageState =
                             if (isArabic) "⚠️ خطأ في تحميل البيانات" else "⚠️ Error loading data"
@@ -546,54 +556,117 @@ class MiraSalesHistoryFragment : Fragment() {
         for (i in 0 until sales.length()) {
             val sale = sales.optJSONObject(i) ?: continue
 
-            val saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")))
+            val saleId = sale.optString(
+                "sale_number",
+                sale.optString(
+                    "invoice_number",
+                    sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")))
+                )
+            )
             val customerName = sale.optString(
                 "customer_name",
-                sale.optString("client_name", if (isArabic) "عميل افتراضي" else "Customer")
+                sale.optString("client_name", if (isArabic) "عميل نقدي" else "Cash Customer")
             )
-            val currency = sale.optString("currency", sale.optString("currency_code", "USD"))
 
-            val amountUsdRaw = sale.optDouble("final_amount_usd", sale.optDouble("total_amount_usd", 0.0))
-            val amountLocal = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0.0)))
-
-            val resolvedUsd = if (amountUsdRaw > 0) {
-                amountUsdRaw
+            val rawCurrency = sale.optString("currency", sale.optString("currency_code", ""))
+            val isMixCurrency = rawCurrency.equals("MIX", ignoreCase = true)
+            val currency = if (rawCurrency.isBlank() || isMixCurrency) {
+                priceManager?.defaultCurrency?.takeIf { it.isNotBlank() } ?: "YER"
             } else {
-                when (currency.uppercase(Locale.US)) {
-                    "USD" -> amountLocal
-                    "YER" -> {
-                        var rate = priceManager?.getExchangeRate("YER") ?: 530.0
-                        if (rate <= 0) rate = 530.0
-                        amountLocal / rate
-                    }
-                    "SAR" -> {
-                        var rate = priceManager?.getExchangeRate("SAR") ?: 3.75
-                        if (rate <= 0) rate = 3.75
-                        amountLocal / rate
-                    }
-                    else -> amountLocal
+                rawCurrency.uppercase(Locale.US)
+            }
+
+            var rate = sale.optDouble("exchange_rate", 0.0)
+            if (rate <= 1.0 && priceManager != null) {
+                try {
+                    val pmRate = priceManager!!.getExchangeRate(if (currency == "USD") "YER" else currency)
+                    if (pmRate > 1.0) rate = pmRate
+                } catch (_: Exception) {
                 }
             }
+            if (rate <= 1.0) {
+                rate = if (currency == "SAR") 3.75 else 530.0
+            }
+
+            val amountUsdRaw = sale.optDouble("final_amount_usd", sale.optDouble("total_amount_usd", 0.0))
+            val amountLocalRaw = sale.optDouble(
+                "final_amount",
+                sale.optDouble("total_amount", sale.optDouble("final_amount_local", sale.optDouble("amount", 0.0)))
+            )
+
+            val resolvedUsd = when {
+                amountUsdRaw > 0 -> amountUsdRaw
+                currency == "USD" -> amountLocalRaw
+                rate > 0 -> amountLocalRaw / rate
+                else -> amountLocalRaw
+            }
+
+            val resolvedLocal = when {
+                amountLocalRaw > 0 -> amountLocalRaw
+                currency == "USD" -> resolvedUsd
+                else -> resolvedUsd * rate
+            }
+
+            val tradeInsArr = sale.optJSONArray("trade_ins")
+                ?: sale.optJSONArray("gold_payments")
+                ?: sale.optJSONArray("trade_in_items")
+            val tradeInTotal = sale.optDouble("trade_in_total", 0.0)
+            val hasTradeIn = (tradeInsArr != null && tradeInsArr.length() > 0) || tradeInTotal > 0.0
+
+            val paymentsArr = sale.optJSONArray("payments")
+            val payMethodRaw = sale.optString("payment_method", sale.optString("pay_type", "CASH"))
+            val isMixed = isMixCurrency ||
+                (paymentsArr != null && paymentsArr.length() > 1) ||
+                (hasTradeIn && paymentsArr != null && paymentsArr.length() > 0) ||
+                payMethodRaw.equals("MIX", ignoreCase = true) ||
+                payMethodRaw.equals("MIXED", ignoreCase = true) ||
+                payMethodRaw.equals("SPLIT", ignoreCase = true)
+
+            val itemsArr = sale.optJSONArray("items")
+                ?: sale.optJSONArray("sold_items")
+                ?: sale.optJSONArray("products")
+            val parsedCount = sale.optInt(
+                "item_count",
+                sale.optInt("total_items", sale.optInt("count", itemsArr?.length() ?: 0))
+            )
 
             items.add(
                 MiraSaleItem(
                     saleId = saleId,
                     customerName = customerName,
-                    paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH")),
-                    date = sale.optString("created_at", sale.optString("date", "")),
+                    paymentMethod = payMethodRaw,
+                    date = sale.optString("created_at", sale.optString("timestamp", sale.optString("date", ""))),
                     rawJson = sale.toString(),
-                    amount = resolvedUsd,
+                    amountLocal = resolvedLocal,
                     amountUSD = resolvedUsd,
                     currency = currency,
-                    itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0))),
+                    exchangeRate = rate,
+                    itemCount = parsedCount,
                     branchId = sale.optInt("branch_id", 0),
                     refundStatus = sale.optString("refund_status", sale.optString("status", "completed")),
                     refundReason = sale.optString("refund_reason", ""),
-                    refundedAt = sale.optString("refunded_at", "")
+                    refundedAt = sale.optString("refunded_at", ""),
+                    hasTradeIn = hasTradeIn,
+                    isMixedPayment = isMixed
                 )
             )
         }
         return items
+    }
+
+    private fun matchesPaymentFilter(item: MiraSaleItem, filterCode: String): Boolean {
+        if (filterCode == "ALL") return true
+        val m = item.paymentMethod.uppercase(Locale.ROOT).trim()
+        return when (filterCode) {
+            "CASH" -> m == "CASH" && !item.isMixedPayment && !item.hasTradeIn
+            "CARD" -> m == "CARD" || m == "POS_MADA" || m == "VISA_MASTER" || m.startsWith("POS_")
+            "TRANSFER" -> m == "TRANSFER" || m == "BANK_TRANSFER" || m == "E_WALLET" ||
+                m.startsWith("BANK_") || m.startsWith("WALLET_")
+            "TRADE_IN" -> item.hasTradeIn || m == "TRADE_IN"
+            "MIXED" -> item.isMixedPayment || m == "MIX" || m == "MIXED" || m == "SPLIT"
+            "CREDIT" -> m == "CREDIT" || m == "CUSTOMER_CREDIT"
+            else -> m == filterCode
+        }
     }
 
     private fun filterSales(query: String?) {
@@ -606,8 +679,7 @@ class MiraSalesHistoryFragment : Fragment() {
         } else {
             saleList.filter { item ->
                 val branchMatch = branchFilter <= 0 || item.branchId == branchFilter
-                val payMatch = paymentFilter == "ALL" ||
-                    item.paymentMethod.uppercase(Locale.ROOT) == paymentFilter
+                val payMatch = matchesPaymentFilter(item, paymentFilter)
                 val queryMatch = q.isEmpty() ||
                     item.customerName.lowercase(Locale.ROOT).contains(q) ||
                     item.saleId.lowercase(Locale.ROOT).contains(q)
@@ -624,13 +696,17 @@ class MiraSalesHistoryFragment : Fragment() {
     }
 
     private fun updateSummaryCards(list: List<MiraSaleItem>) {
-        var totalRevenueUSD = 0.0
+        var netRevenueUSD = 0.0
         for (item in list) {
-            totalRevenueUSD += item.amountUSD
+            val status = item.refundStatus.lowercase(Locale.ROOT)
+            if (status != "refunded" && status != "fully_refunded") {
+                netRevenueUSD += item.amountUSD
+            }
         }
 
-        totalRevenueTextState = formatPrice(totalRevenueUSD)
-        val totalCount = if (totalItems > 0) totalItems else list.size
+        totalRevenueTextState = formatPrice(netRevenueUSD)
+        val isFiltered = searchQueryState.isNotBlank() || currentFilterState != "ALL" || selectedBranchIdState > 0
+        val totalCount = if (!isFiltered && totalItems > 0) totalItems else list.size
         invoicesCountTextState = String.format(Locale.US, "%,d", totalCount)
         showingCountTextState = String.format(Locale.US, "%,d", list.size)
     }
@@ -642,6 +718,16 @@ class MiraSalesHistoryFragment : Fragment() {
             else String.format(Locale.US, "$%,.2f", usdAmount)
         } catch (_: Exception) {
             String.format(Locale.US, "$%,.2f", usdAmount)
+        }
+    }
+
+    private fun formatSaleAmountDisplay(sale: MiraSaleItem): String {
+        return if (sale.currency.equals("USD", ignoreCase = true) || sale.amountLocal <= 0) {
+            String.format(Locale.US, "$%,.2f", sale.amountUSD)
+        } else {
+            val localStr = String.format(Locale.US, "%,.0f %s", sale.amountLocal, sale.currency)
+            val usdStr = String.format(Locale.US, "$%,.2f", sale.amountUSD)
+            "$localStr ($usdStr)"
         }
     }
 
@@ -661,16 +747,39 @@ class MiraSalesHistoryFragment : Fragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Open Receipt Navigation
+    //  Open Receipt Navigation (Enriched JSON for MiraReceiptFragment)
     // ═══════════════════════════════════════════════════════════════════
+
+    private fun buildEnrichedReceiptJson(sale: MiraSaleItem): String {
+        return try {
+            val obj = JSONObject(sale.rawJson)
+            if (obj.optString("sale_number", "").isEmpty()) {
+                obj.put("sale_number", sale.saleId)
+            }
+            if (obj.optDouble("exchange_rate", 0.0) <= 1.0 && sale.exchangeRate > 1.0) {
+                obj.put("exchange_rate", sale.exchangeRate)
+            }
+            if (obj.optString("branch_name", "").isEmpty() && sale.branchId > 0) {
+                val bName = branchesManager?.allBranches?.firstOrNull { it.id == sale.branchId }?.name
+                if (!bName.isNullOrBlank()) {
+                    obj.put("branch_name", bName)
+                }
+            }
+            obj.toString()
+        } catch (_: Exception) {
+            sale.rawJson
+        }
+    }
 
     private fun openReceipt(sale: MiraSaleItem) {
         try {
+            val enrichedJson = buildEnrichedReceiptJson(sale)
             val act = activity
             if (act is UHFMainActivity) {
-                act.openReceiptFragment(sale.rawJson)
+                act.openReceiptFragment(enrichedJson)
             } else if (isAdded) {
-                openReceiptWithAdd(sale.rawJson)
+                MiraReceiptFragment.newInstance(enrichedJson)
+                    .show(parentFragmentManager, "mira_receipt")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening receipt", e)
@@ -681,31 +790,6 @@ class MiraSalesHistoryFragment : Fragment() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
-        }
-    }
-
-    private fun openReceiptWithAdd(receiptJson: String) {
-        try {
-            val receipt = MiraReceiptFragment.newInstance(receiptJson)
-            val fm = parentFragmentManager
-            fm.beginTransaction()
-                .hide(this)
-                .add(android.R.id.content, receipt, "mira_receipt")
-                .addToBackStack("mira_receipt")
-                .commit()
-
-            fm.addOnBackStackChangedListener(object : FragmentManager.OnBackStackChangedListener {
-                override fun onBackStackChanged() {
-                    if (fm.backStackEntryCount == 0 && isAdded) {
-                        fm.beginTransaction()
-                            .show(this@MiraSalesHistoryFragment)
-                            .commit()
-                        fm.removeOnBackStackChangedListener(this)
-                    }
-                }
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in openReceiptWithAdd", e)
         }
     }
 
@@ -721,21 +805,31 @@ class MiraSalesHistoryFragment : Fragment() {
         val listState = rememberLazyListState()
 
         var branchMenuExpanded by remember { mutableStateOf(false) }
+        var isFirstSearchEffect by remember { mutableStateOf(true) }
 
         val paymentFilters = remember {
             listOf(
                 PaymentFilterOption("ALL", "الكل", "All", Icons.Rounded.FilterList),
                 PaymentFilterOption("CASH", "نقداً", "Cash", Icons.Rounded.Payments),
                 PaymentFilterOption("CARD", "بطاقة", "Card", Icons.Rounded.CreditCard),
-                PaymentFilterOption("TRANSFER", "تحويل", "Transfer", Icons.Rounded.AccountBalance),
+                PaymentFilterOption("TRANSFER", "تحويل / محفظة", "Transfer", Icons.Rounded.AccountBalance),
+                PaymentFilterOption("TRADE_IN", "دفع بالذهب", "Gold Trade-In", Icons.Rounded.Toll),
+                PaymentFilterOption("MIXED", "متعدد", "Mixed", Icons.Rounded.AccountBalanceWallet),
                 PaymentFilterOption("CREDIT", "آجل", "Credit", Icons.Rounded.Schedule)
             )
         }
 
-        // Debounced search filter (300ms)
+        // Instant local filter + Debounced server search (400ms)
         LaunchedEffect(searchQueryState) {
-            delay(300)
+            if (isFirstSearchEffect) {
+                isFirstSearchEffect = false
+                return@LaunchedEffect
+            }
             filterSales(searchQueryState)
+            delay(400)
+            if (hasMoreData || searchQueryState.isNotEmpty()) {
+                refreshSales(false)
+            }
         }
 
         // Infinite scroll trigger when reaching near bottom
@@ -749,7 +843,7 @@ class MiraSalesHistoryFragment : Fragment() {
         }
 
         LaunchedEffect(shouldLoadMore) {
-            if (shouldLoadMore && canViewSalesState && !isLoading && hasMoreData && !isLastPage) {
+            if (shouldLoadMore && canViewSalesState && !isLoadingAtomic.get() && hasMoreData && !isLastPage) {
                 loadMoreSales()
             }
         }
@@ -820,7 +914,6 @@ class MiraSalesHistoryFragment : Fragment() {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // فلتر الفروع (يظهر فقط لمن يملك صلاحية عرض جميع الفروع)
                             if (canViewAllBranchesState && canViewSalesState) {
                                 Box {
                                     Surface(
@@ -884,7 +977,6 @@ class MiraSalesHistoryFragment : Fragment() {
                                 }
                             }
 
-                            // زر التحديث
                             val infiniteTransition = rememberInfiniteTransition(label = "refresh_spin")
                             val spinAngle by infiniteTransition.animateFloat(
                                 initialValue = 0f,
@@ -920,7 +1012,7 @@ class MiraSalesHistoryFragment : Fragment() {
                         }
                     }
 
-                    // 2. بطاقة ملخص الإيرادات والفواتير (Executive KPI Card)
+                    // 2. بطاقة ملخص الإيرادات والفواتير
                     if (canViewSalesState) {
                         SalesSummaryHeroCard(
                             isArabic = isAr,
@@ -981,7 +1073,6 @@ class MiraSalesHistoryFragment : Fragment() {
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            // رقائق فلترة طرق الدفع
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -994,6 +1085,7 @@ class MiraSalesHistoryFragment : Fragment() {
                                         modifier = Modifier.clickable {
                                             if (currentFilterState != opt.code) {
                                                 currentFilterState = opt.code
+                                                filterSales(searchQueryState)
                                                 refreshSales(true)
                                             }
                                         },
@@ -1082,15 +1174,12 @@ class MiraSalesHistoryFragment : Fragment() {
                                         SaleInvoiceCard(
                                             sale = sale,
                                             isArabic = isAr,
-                                            formattedAmount = formatPrice(
-                                                if (sale.amountUSD > 0) sale.amountUSD else sale.amount
-                                            ),
+                                            formattedAmount = formatSaleAmountDisplay(sale),
                                             formattedDate = formatDisplayDate(sale.date),
                                             onClick = { openReceipt(sale) }
                                         )
                                     }
 
-                                    // مؤشر تحميل المزيد
                                     if (isLoadingMoreState) {
                                         item(key = "loading_more_footer") {
                                             Row(
@@ -1171,10 +1260,9 @@ class MiraSalesHistoryFragment : Fragment() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // إجمالي الإيرادات
                     Column(modifier = Modifier.weight(1.4f)) {
                         Text(
-                            text = if (isArabic) "إجمالي المبيعات" else "Total Revenue",
+                            text = if (isArabic) "صافي المبيعات" else "Net Revenue",
                             style = MaterialTheme.typography.labelMedium,
                             color = colors.textSecondary
                         )
@@ -1189,7 +1277,6 @@ class MiraSalesHistoryFragment : Fragment() {
                         )
                     }
 
-                    // فاصل عمودي
                     Box(
                         modifier = Modifier
                             .width(1.dp)
@@ -1197,7 +1284,6 @@ class MiraSalesHistoryFragment : Fragment() {
                             .background(colors.textSecondary.copy(alpha = 0.2f))
                     )
 
-                    // عدد الفواتير
                     Column(
                         modifier = Modifier.weight(0.8f),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -1216,7 +1302,6 @@ class MiraSalesHistoryFragment : Fragment() {
                         )
                     }
 
-                    // فاصل عمودي
                     Box(
                         modifier = Modifier
                             .width(1.dp)
@@ -1224,7 +1309,6 @@ class MiraSalesHistoryFragment : Fragment() {
                             .background(colors.textSecondary.copy(alpha = 0.2f))
                     )
 
-                    // المعروض حالياً
                     Column(
                         modifier = Modifier.weight(0.8f),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -1247,6 +1331,28 @@ class MiraSalesHistoryFragment : Fragment() {
         }
     }
 
+    private fun resolvePaymentBadge(sale: MiraSaleItem, isArabic: Boolean): Pair<String, Color> {
+        val m = sale.paymentMethod.uppercase(Locale.ROOT).trim()
+        return when {
+            sale.isMixedPayment || m == "MIX" || m == "MIXED" || m == "SPLIT" ->
+                (if (isArabic) "متعدد 💰" else "Mixed 💰") to Color(0xFF8B5CF6)
+            sale.hasTradeIn && (m == "CASH" || m == "TRADE_IN") ->
+                (if (isArabic) "دفع بالذهب 🥇" else "Gold Trade-In 🥇") to Color(0xFFD97706)
+            m == "CARD" || m == "POS_MADA" || m == "VISA_MASTER" || m.startsWith("POS_") ->
+                (if (isArabic) "بطاقة / شبكة" else "Card / POS") to Color(0xFF3B82F6)
+            m.startsWith("WALLET_") || m == "E_WALLET" ->
+                (if (isArabic) "محفظة إلكترونية" else "E-Wallet") to Color(0xFF06B6D4)
+            m == "TRANSFER" || m == "BANK_TRANSFER" || m.startsWith("BANK_") ->
+                (if (isArabic) "تحويل بنكي" else "Bank Transfer") to Color(0xFF0EA5E9)
+            m == "CREDIT" ->
+                (if (isArabic) "آجل (ذمم)" else "Credit") to Color(0xFFF59E0B)
+            m == "CUSTOMER_CREDIT" ->
+                (if (isArabic) "رصيد دائن" else "Customer Credit") to Color(0xFF6366F1)
+            else ->
+                (if (isArabic) "نقداً (${sale.currency})" else "Cash (${sale.currency})") to Color(0xFF10B981)
+        }
+    }
+
     @Composable
     private fun SaleInvoiceCard(
         sale: MiraSaleItem,
@@ -1259,12 +1365,12 @@ class MiraSalesHistoryFragment : Fragment() {
 
         val (statusText, statusColor, statusIcon) = when (sale.refundStatus.lowercase(Locale.ROOT)) {
             "refunded", "fully_refunded" -> Triple(
-                if (isArabic) "مرتجع" else "Refunded",
+                if (isArabic) "مرتجع كلي" else "Refunded",
                 Color(0xFFEF4444),
                 Icons.Rounded.Autorenew
             )
             "partially_refunded" -> Triple(
-                if (isArabic) "مرتجع جزئياً" else "Partial Refund",
+                if (isArabic) "مرتجع جزئي" else "Partial Refund",
                 Color(0xFFF59E0B),
                 Icons.Rounded.Autorenew
             )
@@ -1275,12 +1381,7 @@ class MiraSalesHistoryFragment : Fragment() {
             )
         }
 
-        val (payLabel, payColor) = when (sale.paymentMethod.uppercase(Locale.ROOT)) {
-            "CARD" -> (if (isArabic) "بطاقة" else "Card") to Color(0xFF3B82F6)
-            "TRANSFER" -> (if (isArabic) "تحويل" else "Transfer") to Color(0xFF06B6D4)
-            "CREDIT" -> (if (isArabic) "آجل" else "Credit") to Color(0xFFF59E0B)
-            else -> (if (isArabic) "نقداً" else "Cash") to Color(0xFF10B981)
-        }
+        val (payLabel, payColor) = resolvePaymentBadge(sale, isArabic)
 
         Card(
             modifier = Modifier
@@ -1296,7 +1397,6 @@ class MiraSalesHistoryFragment : Fragment() {
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // الصف العلوي: رقم الفاتورة + شارة الدفع + شارة الحالة
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1331,9 +1431,21 @@ class MiraSalesHistoryFragment : Fragment() {
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
+
+                        if (sale.hasTradeIn && sale.isMixedPayment) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFD97706).copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "🥇",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
                     }
 
-                    // حالة الفاتورة
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = statusColor.copy(alpha = 0.15f),
@@ -1360,7 +1472,6 @@ class MiraSalesHistoryFragment : Fragment() {
                     }
                 }
 
-                // الصف الأوسط: اسم العميل والتاريخ
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1407,7 +1518,6 @@ class MiraSalesHistoryFragment : Fragment() {
 
                 Divider(color = colors.textSecondary.copy(alpha = 0.12f))
 
-                // الصف السفلي: عدد القطع + الإجمالي الذهبي + سهم فتح الإيصال
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1429,12 +1539,18 @@ class MiraSalesHistoryFragment : Fragment() {
                         )
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.End
+                    ) {
                         Text(
                             text = formattedAmount,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            color = colors.goldPrimary
+                            color = colors.goldPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Icon(
