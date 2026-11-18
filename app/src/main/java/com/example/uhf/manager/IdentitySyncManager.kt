@@ -934,61 +934,62 @@ class IdentitySyncManager(
     }
 
     private fun extractCleanErrorMessage(response: MiraApiClient.ApiResponse?): String {
-        if (response == null) return "Unknown error"
+    if (response == null) return "Unknown error"
 
-        response.data?.let { data ->
-            try {
-                val errorObj = data.optJSONObject("error")
-                if (errorObj != null) {
-                    val msgAr = errorObj.optString("message", "")
-                    val msgEn = errorObj.optString("message_en", "")
-                    var msg = msgAr.ifEmpty { msgEn }
+    val data = response.data
+    if (data != null) {
+        try {
+            val errorObj = data.optJSONObject("error")
+            if (errorObj != null) {
+                val msgAr = errorObj.optString("message", "")
+                val msgEn = errorObj.optString("message_en", "")
+                var msg = if (msgAr.isNotEmpty()) msgAr else msgEn
 
-                    val details = errorObj.optJSONObject("details")
-                    if (details != null) {
-                        val suggestion = details.optString("suggestion", "")
-                        if (suggestion.isNotEmpty() && !msg.contains(suggestion)) {
-                            msg += "\n\n💡 $suggestion"
-                        }
+                val details = errorObj.optJSONObject("details")
+                if (details != null) {
+                    val suggestion = details.optString("suggestion", "")
+                    if (suggestion.isNotEmpty() && !msg.contains(suggestion)) {
+                        msg = "$msg\n\n💡 $suggestion"
                     }
-                    if (msg.isNotEmpty()) return msg
                 }
-
-                val rootMsg = data.optString("message", "")
-                if (rootMsg.isNotEmpty() && !rootMsg.startsWith("{")) {
-                    return rootMsg
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "extractCleanErrorMessage: data parse error", e)
+                if (msg.isNotEmpty()) return msg
             }
-        }
 
-        val respMsg = response.message
-        if (!respMsg.isNullOrEmpty() && !respMsg.startsWith("{")) {
-            return respMsg
-        }
-
-        val respErr = response.error
-        if (!respErr.isNullOrEmpty() && !respErr.startsWith("{")) {
-            return respErr
-        }
-
-        if (!respErr.isNullOrBlank() && respErr.trim().startsWith("{")) {
-            try {
-                val json = JSONObject(respErr)
-                val errorObj = json.optJSONObject("error")
-                if (errorObj != null) {
-                    val msgAr = errorObj.optString("message", "")
-                    val msgEn = errorObj.optString("message_en", "")
-                    val msg = msgAr.ifEmpty { msgEn }
-                    if (msg.isNotEmpty()) return msg
-                }
-            } catch (_: Exception) {
+            val rootMsg = data.optString("message", "")
+            if (rootMsg.isNotEmpty() && !rootMsg.startsWith("{")) {
+                return rootMsg
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "extractCleanErrorMessage: data parse error", e)
         }
-
-        return "❌ فشل العملية"
     }
+
+    val respMsg = response.message
+    if (!respMsg.isNullOrEmpty() && !respMsg.startsWith("{")) {
+        return respMsg
+    }
+
+    val respErr = response.error
+    if (!respErr.isNullOrEmpty() && !respErr.startsWith("{")) {
+        return respErr
+    }
+
+    if (!respErr.isNullOrBlank() && respErr.trim().startsWith("{")) {
+        try {
+            val json = JSONObject(respErr)
+            val errorObj = json.optJSONObject("error")
+            if (errorObj != null) {
+                val msgAr = errorObj.optString("message", "")
+                val msgEn = errorObj.optString("message_en", "")
+                val msg = if (msgAr.isNotEmpty()) msgAr else msgEn
+                if (msg.isNotEmpty()) return msg
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    return "❌ فشل العملية"
+}
 
     private fun calculateBackoffDelay(attempts: Int): Long {
         val delay = INITIAL_RETRY_DELAY_MS * 2.0.pow(attempts.toDouble()).toLong()
