@@ -65,7 +65,8 @@ class MiraScrapReceiptFragment : BottomSheetDialogFragment() {
 
     private var purchaseId: Int = 0
     private var rawJson: String? = null
-    private var isArabic: Bool = true
+    private var isArabic: Boolean = true
+
 
     // تفاصيل الإيصال المتفاعلة
     private var companyNameState by mutableStateOf("MIRA ID™")
