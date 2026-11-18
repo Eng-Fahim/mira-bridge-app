@@ -20,15 +20,14 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.uhf.BuildConfig
-import com.example.uhf.R
 import com.example.uhf.MiraRfid.MiraReaderSettings
 import com.example.uhf.MiraRfid.MiraScanSessionController
 import com.example.uhf.MiraRfid.RFIDManager
+import com.example.uhf.R
 import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.adapter.ModernScannedItemsAdapter
 import com.example.uhf.api.MiraApiClient
@@ -46,7 +45,6 @@ import com.example.uhf.manager.inventory.InventorySessionManager
 import com.example.uhf.manager.inventory.InventorySnapshotManager
 import com.example.uhf.model.InventoryItem
 import com.example.uhf.model.InventoryReport
-import com.example.uhf.model.InventorySnapshot
 import com.example.uhf.model.ScannedItemDisplay
 import com.example.uhf.utils.InventoryAnimationHelper
 import com.example.uhf.utils.MiraExecutorService
@@ -131,7 +129,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
                 }
 
                 debugOverlay?.text = debugLog.toString()
-            } catch (ignored: Exception) {}
+            } catch (_: Exception) {}
         }
     }
 
@@ -259,8 +257,8 @@ class MiraInventoryProFragment : KeyDwonFragment(),
 
     // ==================== Executors ====================
     private var miraExecutor: MiraExecutorService? = null
-    private var backgroundExecutor: ExecutorService? = null
-    private var ioExecutor: ExecutorService? = null
+    private lateinit var backgroundExecutor: ExecutorService
+    private lateinit var ioExecutor: ExecutorService
 
     // ==================== Handler ====================
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -326,17 +324,18 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         // Executors
         try {
             miraExecutor = MiraExecutorService.getInstance()
-            if (miraExecutor != null && miraExecutor!!.isHealthy()) {
-                backgroundExecutor = miraExecutor!!.backgroundExecutor
-                ioExecutor = miraExecutor!!.backgroundExecutor
+            val exec = if (miraExecutor != null && miraExecutor!!.isHealthy()) {
+                miraExecutor!!.backgroundExecutor
             } else {
-                backgroundExecutor = Executors.newSingleThreadExecutor()
-                ioExecutor = backgroundExecutor
+                Executors.newSingleThreadExecutor()
             }
+            backgroundExecutor = exec
+            ioExecutor = exec
         } catch (e: Exception) {
             Log.e(TAG, "Executor init error", e)
-            backgroundExecutor = Executors.newSingleThreadExecutor()
-            ioExecutor = backgroundExecutor
+            val fallbackExec = Executors.newSingleThreadExecutor()
+            backgroundExecutor = fallbackExec
+            ioExecutor = fallbackExec
         }
 
         // Locale + RTL
@@ -756,9 +755,9 @@ class MiraInventoryProFragment : KeyDwonFragment(),
 
     private fun setupSearchBar() {
         etSearchItems?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count) {
-                filterItems(s.toString())
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                filterItems(s?.toString() ?: "")
                 btnClearSearch?.visibility = if ((s?.length ?: 0) > 0) View.VISIBLE else View.GONE
             }
             override fun afterTextChanged(s: Editable?) {}
@@ -943,11 +942,11 @@ class MiraInventoryProFragment : KeyDwonFragment(),
                 (activity as? UHFMainActivity)?.setNavigationLocked(false)
             } catch (_: Exception) {}
 
-            val activity = activity as? UHFMainActivity
-            if (activity?.navigationManager != null) {
-                activity.navigationManager.goToDashboard()
+            val act = activity as? UHFMainActivity
+            if (act?.navigationManager != null) {
+                act.navigationManager.goToDashboard()
             } else {
-                activity?.loadFragmentDirectly(MiraDashboardFragment(), com.example.uhf.navigation.NavigationManager.TAG_DASHBOARD)
+                act?.loadFragmentDirectly(MiraDashboardFragment(), com.example.uhf.navigation.NavigationManager.TAG_DASHBOARD)
             }
         } catch (e: Exception) {
             Log.e(TAG, "navigateAwayFromInventory error", e)
@@ -1109,7 +1108,8 @@ class MiraInventoryProFragment : KeyDwonFragment(),
 
         val d = scanSession?.evaluateTag(epc) ?: return
         when (d) {
-            MiraScanSessionController.Decision.REJECT_SESSION_OFF -> return
+            MiraScanSessionController.Decision.REJECT_SESSION_OFF,
+            MiraScanSessionController.Decision.REJECT_DUP_FILTER -> return
             MiraScanSessionController.Decision.REJECT_LIMIT -> {
                 scanSession?.confirmLimitReached()
                 return
@@ -1305,12 +1305,12 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         if (!isAdded || isFragmentDestroyed || catalogManager == null) return
         val sessionAtStart = inventoryEngine?.clientSessionId
 
-        backgroundExecutor?.execute {
+        backgroundExecutor.execute {
             catalogManager?.fetchCatalog(apiClient, branchesManager, object : InventoryCatalogManager.CatalogCallback {
                 override fun onCatalogLoaded(catalog: Map<String, InventoryItem>?) {
                     mainHandler.post {
-                        if (!isAdded || isFragmentDestroyed) return$post
-                        if (sessionAtStart == null || inventoryEngine == null || sessionAtStart != inventoryEngine?.clientSessionId) return$post
+                        if (!isAdded || isFragmentDestroyed) return@post
+                        if (sessionAtStart == null || inventoryEngine == null || sessionAtStart != inventoryEngine?.clientSessionId) return@post
 
                         inventoryEngine?.setCatalog(catalog)
                         catalogEpcs.clear()
@@ -1329,7 +1329,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
                     if (sessionAtStart == null || inventoryEngine == null || sessionAtStart != inventoryEngine?.clientSessionId) return
                     mainHandler.post {
                         addDebugLine("❌ Catalog FAILED")
-                        if (!isAdded || isFragmentDestroyed) return$post
+                        if (!isAdded || isFragmentDestroyed) return@post
                         tvInventoryStatus?.text = if (isArabic) "📡 جرد بدون كتالوج" else "📡 Blind inventory (no catalog)"
                     }
                 }
@@ -1398,7 +1398,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         shouldResumeOnNextStart = true
 
         mainHandler.post {
-            if (!isAdded || isFragmentDestroyed) return$post
+            if (!isAdded || isFragmentDestroyed) return@post
             updateMainToggleButton(false)
             animateMainButton()
             tvInventoryStatus?.text = if (isArabic) "⏸️ الجرد موقوف مؤقتاً" else "⏸️ Inventory paused"
@@ -1419,7 +1419,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         shouldResumeOnNextStart = false
 
         mainHandler.post {
-            if (!isAdded || isFragmentDestroyed) return$post
+            if (!isAdded || isFragmentDestroyed) return@post
             updateMainToggleButton(false)
             animateMainButton()
             (activity as? UHFMainActivity)?.setNavigationLocked(false)
@@ -1456,7 +1456,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         clearAllLists()
         showToast(if (isArabic) "🔄 جاري تحميل كتالوج $category..." else "🔄 Loading catalog...")
 
-        backgroundExecutor?.execute {
+        backgroundExecutor.execute {
             if (isFragmentDestroyed || catalogManager == null) return@execute
             var catalogMap: Map<String, InventoryItem>? = null
             val latch = java.util.concurrent.CountDownLatch(1)
@@ -1477,7 +1477,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
             val filtered = catalogManager?.filterByCategory(fullCatalog, category) ?: ConcurrentHashMap()
 
             mainHandler.post {
-                if (!isAdded || isFragmentDestroyed) return$post
+                if (!isAdded || isFragmentDestroyed) return@post
                 inventoryEngine?.clearSession()
                 scanSession?.onSessionReset()
 
@@ -2228,10 +2228,15 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         try {
             if (!isAdded || isFragmentDestroyed) return
             if (isScanning) {
-                showExitWarning {
-                    stopScanning()
-                    mainHandler.postDelayed({ navigateToSnapshots() }, 400)
-                }
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(if (isArabic) "⚠️ الجرد قيد التشغيل" else "⚠️ Scan Running")
+                    .setMessage(if (isArabic) "سيتم إيقاف الجرد للانتقال إلى اللقطات. متابعة؟" else "Scanning will stop to open snapshots. Continue?")
+                    .setPositiveButton(if (isArabic) "متابعة" else "Continue") { _, _ ->
+                        stopScanning()
+                        mainHandler.postDelayed({ navigateToSnapshots() }, 400)
+                    }
+                    .setNegativeButton(if (isArabic) "إلغاء" else "Cancel", null)
+                    .show()
             } else {
                 navigateToSnapshots()
             }
@@ -2279,7 +2284,6 @@ class MiraInventoryProFragment : KeyDwonFragment(),
     }
 
     private fun buildReportHtml(): String {
-        // HTML generation mirroring original Java method
         return "<html dir=\"${if (isArabic) "rtl" else "ltr"}\"><body><h1>Inventory Report</h1></body></html>"
     }
 
@@ -2503,7 +2507,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
                 val name = input.text.toString().trim()
-                ioExecutor?.execute {
+                ioExecutor.execute {
                     try {
                         val snapshot = snapshotManager?.createSnapshot(
                             inventoryEngine?.clientSessionId ?: "",
@@ -2524,7 +2528,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
 
     private fun autoSaveSnapshotAfterCommit(serverReport: JSONObject?) {
         if (!autoSnapshotEnabled || snapshotManager == null || inventoryEngine == null) return
-        ioExecutor?.execute {
+        ioExecutor.execute {
             try {
                 val snapshot = snapshotManager?.createSnapshot(
                     inventoryEngine!!.clientSessionId,
@@ -2701,7 +2705,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
     }
 
     override fun getHostContext(): Context? = context
-    override fun getActivity(): Activity? = activity
+    override fun getHostActivity(): Activity? = activity
     override fun isHostAlive(): Boolean = isAdded && !isFragmentDestroyed
 
     override fun onSessionTagAccepted(epc: String?, rssi: Int) {}
