@@ -233,7 +233,22 @@
             app:layout_constraintTop_toTopOf="@id/fabActionCenter"
             app:tint="#D4AF37" />
 
-        <!-- زر التقارير -->
-        <com.google.android.material.bottomnavigation.BottomNavigationView ... />
+ <!-- زر التقارير -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabReports"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:elevation="20dp"
+            android:src="@drawable/ic_reports"
+            android:visibility="gone"
+            app:backgroundTint="#1E293B"
+            app:elevation="20dp"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
+            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
+            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
+            app:layout_constraintTop_toTopOf="@id/fabActionCenter"
+            app:tint="#10B981" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
