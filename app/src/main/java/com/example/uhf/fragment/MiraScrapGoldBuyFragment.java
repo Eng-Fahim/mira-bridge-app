@@ -1,471 +1,1139 @@
-package com.example.uhf.fragment;
+package com.example.uhf.fragment
 
-import android.graphics.Color;
-import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.AutoCompleteTextView;
-import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.fragment.app.Fragment
+import com.example.uhf.api.MiraApiClient
+import com.example.uhf.manager.MiraBranchesManager
+import com.example.uhf.manager.MiraPriceManager
+import com.example.uhf.tools.SessionManager
+import com.example.uhf.ui.theme.MiraJewelryTheme
+import com.example.uhf.ui.theme.MiraTheme
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Locale
+import kotlin.math.abs
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
+class MiraScrapGoldBuyFragment : Fragment() {
 
-import com.example.uhf.R;
-import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.MiraPriceManager;
-import com.example.uhf.tools.SessionManager;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.textfield.MaterialAutoCompleteTextView;
-import com.google.android.material.textfield.TextInputEditText;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.List;
-
-public class MiraScrapGoldBuyFragment extends Fragment {
-
-    private TextInputEditText etCustomerName, etCustomerPhone, etWeight, etMarketPrice, etDeduction;
-    private AutoCompleteTextView ddKarat;
-    private TextView tvTotalAmount, tvRemaining;
-    private MaterialButton btnSavePurchase, btnAddPayment;
-    private LinearLayout llPaymentsContainer;
-
-    private String[] karats = {"24", "22", "21", "18", "14"};
-    private final String[] CURRENCIES = {"YER", "SAR", "USD"};
-
-    private final List<View> paymentRows = new ArrayList<>();
-    private double totalGoldValue = 0;
-    private MiraPriceManager priceManager;
-
-    private List<JSONObject> availableMethods = new ArrayList<>();
-    private boolean isMethodsLoaded = false;
-
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_scrap_gold_buy, container, false);
-
-        priceManager = MiraPriceManager.getInstance(requireContext());
-
-        initViews(view);
-        setupKaratDropdown();
-        setupCalculations();
-
-        loadPaymentMethods();
-
-        btnSavePurchase.setOnClickListener(v -> savePurchase());
-        btnAddPayment.setOnClickListener(v -> addPaymentRow("YER", 0.0));
-
-        return view;
+    private data class PaymentMethodOption(
+        val code: String,
+        val nameAr: String,
+        val nameEn: String,
+        val icon: String
+    ) {
+        fun displayLabel(isArabic: Boolean): String {
+            val label = if (isArabic) nameAr else nameEn
+            return "$icon $label"
+        }
     }
 
-    private void initViews(View view) {
-        etCustomerName = view.findViewById(R.id.etCustomerName);
-        etCustomerPhone = view.findViewById(R.id.etCustomerPhone);
-        etWeight = view.findViewById(R.id.etWeight);
-        etMarketPrice = view.findViewById(R.id.etMarketPrice);
-        etDeduction = view.findViewById(R.id.etDeduction);
-        ddKarat = view.findViewById(R.id.ddKarat);
-        tvTotalAmount = view.findViewById(R.id.tvTotalAmount);
-        tvRemaining = view.findViewById(R.id.tvRemaining);
-        btnSavePurchase = view.findViewById(R.id.btnSavePurchase);
-        btnAddPayment = view.findViewById(R.id.btnAddPayment);
-        llPaymentsContainer = view.findViewById(R.id.llPaymentsContainer);
+    private data class PaymentRowState(
+        val id: Long = System.nanoTime(),
+        val currency: String = "YER",
+        val methodCode: String = "CASH",
+        val amountText: String = ""
+    )
+
+    private val karats = listOf("24", "22", "21", "18", "14")
+    private val currencies = listOf("YER", "SAR", "USD")
+
+    private var priceManager: MiraPriceManager? = null
+    private var isArabic: Boolean = true
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Jetpack Compose Reactive States
+    // ═══════════════════════════════════════════════════════════════════
+
+    private var customerNameState by mutableStateOf("")
+    private var customerPhoneState by mutableStateOf("")
+    private var selectedKaratState by mutableStateOf("21")
+    private var weightTextState by mutableStateOf("")
+    private var marketPriceTextState by mutableStateOf("")
+    private var deductionTextState by mutableStateOf("")
+
+    private var availableMethodsState by mutableStateOf<List<PaymentMethodOption>>(emptyList())
+    private val paymentRowsState = mutableStateListOf<PaymentRowState>()
+
+    private var isSavingState by mutableStateOf(false)
+    private var successDialogDataState by mutableStateOf<Pair<Int, String>?>(null)
+
+    private fun checkIsArabic(): Boolean {
+        return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+            resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
     }
 
-    private void loadPaymentMethods() {
-        new Thread(() -> {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                MiraJewelryTheme {
+                    ScrapGoldBuyScreen()
+                }
+            }
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        isArabic = checkIsArabic()
+        view.layoutDirection = if (isArabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        priceManager = MiraPriceManager.getInstance(requireContext())
+
+        loadPaymentMethods()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Payment Methods & Rates
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun loadPaymentMethods() {
+        Thread {
+            val loaded = ArrayList<PaymentMethodOption>()
             try {
-                MiraApiClient api = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = api.getPaymentMethods();
+                val ctx = context ?: return@Thread
+                val api = MiraApiClient.getInstance(ctx)
+                val response = api.getPaymentMethods()
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray arr = response.data.optJSONArray("data");
-                    if (arr == null) arr = response.data.optJSONArray("methods");
+                    val arr = response.data!!.optJSONArray("data")
+                        ?: response.data!!.optJSONArray("methods")
 
                     if (arr != null) {
-                        for (int i = 0; i < arr.length(); i++) {
-                            availableMethods.add(arr.getJSONObject(i));
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.optJSONObject(i) ?: continue
+                            val code = obj.optString("code", "CASH")
+                            val nameAr = obj.optString("name_ar", code)
+                            val nameEn = obj.optString("name_en", nameAr)
+                            val icon = obj.optString("icon", "💳")
+                            loaded.add(PaymentMethodOption(code, nameAr, nameEn, icon))
                         }
                     }
                 }
-            } catch (Exception ignored) {}
-
-            if (availableMethods.isEmpty()) {
-                try {
-                    JSONObject cash = new JSONObject();
-                    cash.put("code", "CASH"); cash.put("name_ar", "نقداً"); cash.put("icon", "💵");
-                    JSONObject bank = new JSONObject();
-                    bank.put("code", "BANK_TRANSFER"); bank.put("name_ar", "تحويل بنكي"); bank.put("icon", "🏦");
-                    availableMethods.add(cash);
-                    availableMethods.add(bank);
-                } catch (Exception ignored) {}
+            } catch (_: Exception) {
             }
 
-            isMethodsLoaded = true;
-
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> addPaymentRow("YER", 0.0));
+            if (loaded.isEmpty()) {
+                loaded.add(PaymentMethodOption("CASH", "نقداً", "Cash", "💵"))
+                loaded.add(PaymentMethodOption("BANK_TRANSFER", "تحويل بنكي", "Bank Transfer", "🏦"))
             }
-        }).start();
-    }
 
-    // ✅ يستخدم MaterialAutoCompleteTextView بدل Spinner
-    private void setupMethodDropdown(MaterialAutoCompleteTextView actMethod) {
-        if (actMethod == null) return;
-        List<String> methodNames = new ArrayList<>();
-        for (JSONObject obj : availableMethods) {
-            String icon = obj.optString("icon", "💳");
-            String name = obj.optString("name_ar", obj.optString("code", "نقداً"));
-            methodNames.add(icon + " " + name);
-        }
-        String[] arr = methodNames.toArray(new String[0]);
-        actMethod.setAdapter(new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, arr));
-        if (arr.length > 0) {
-            actMethod.setText(arr[0], false);
-        }
-    }
-
-    private void setupKaratDropdown() {
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, karats);
-        ddKarat.setAdapter(adapter);
-        ddKarat.setText("21", false);
-        ddKarat.setOnItemClickListener((parent, view, position, id) -> calculateTotal());
-    }
-
-    private void setupCalculations() {
-        TextWatcher watcher = new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateTotal(); }
-            @Override public void afterTextChanged(Editable s) {}
-        };
-        etWeight.addTextChangedListener(watcher);
-        etMarketPrice.addTextChangedListener(watcher);
-        etDeduction.addTextChangedListener(watcher);
-    }
-
-    private void calculateTotal() {
-        try {
-            double weight = getDoubleFromEditText(etWeight);
-            double marketPrice = getDoubleFromEditText(etMarketPrice);
-            double deduction = getDoubleFromEditText(etDeduction);
-
-            if (weight > 0 && marketPrice > 0) {
-                double totalBeforeDeduction = weight * marketPrice;
-                double totalDeduction = weight * deduction;
-                totalGoldValue = totalBeforeDeduction - totalDeduction;
-                tvTotalAmount.setText(String.format(Locale.US, "%,.2f YER", totalGoldValue));
-            } else {
-                totalGoldValue = 0;
-                tvTotalAmount.setText("0.00 YER");
+            activity?.runOnUiThread {
+                if (!isAdded) return@runOnUiThread
+                availableMethodsState = loaded
+                if (paymentRowsState.isEmpty()) {
+                    val defaultCode = loaded.firstOrNull()?.code ?: "CASH"
+                    paymentRowsState.add(
+                        PaymentRowState(currency = "YER", methodCode = defaultCode, amountText = "")
+                    )
+                }
             }
-            updateRemainingBalance();
-        } catch (Exception e) {
-            tvTotalAmount.setText("0.00 YER");
-        }
+        }.start()
     }
 
-    private double getRateToYER(String currency) {
-        if ("YER".equalsIgnoreCase(currency)) return 1.0;
+    private fun getRateToYER(currency: String): Double {
+        if ("YER".equals(currency, ignoreCase = true)) return 1.0
 
-        if (priceManager != null) {
-            double yerRate = priceManager.getExchangeRate(MiraPriceManager.CURRENCY_YER);
-            double currencyRate = priceManager.getExchangeRate(currency);
+        priceManager?.let { pm ->
+            val yerRate = pm.getExchangeRate(MiraPriceManager.CURRENCY_YER)
+            val currencyRate = pm.getExchangeRate(currency)
 
-            if (currencyRate > 10) return currencyRate;
+            if (currencyRate > 10) return currencyRate
 
             if (yerRate > 0 && currencyRate > 0) {
-                return yerRate / currencyRate;
+                return yerRate / currencyRate
             }
         }
 
-        if ("SAR".equalsIgnoreCase(currency)) return 141.33;
-        if ("USD".equalsIgnoreCase(currency)) return 530.0;
-        return 1.0;
+        if ("SAR".equals(currency, ignoreCase = true)) return 141.33
+        if ("USD".equals(currency, ignoreCase = true)) return 530.0
+        return 1.0
     }
 
-    // ✅ يستخدم actCurrency + actMethod
-    private void addPaymentRow(String defaultCurrency, double amount) {
-        View row = getLayoutInflater().inflate(R.layout.item_payment_row, llPaymentsContainer, false);
-        AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
-        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-        TextInputEditText etAmount = row.findViewById(R.id.etAmount);
-        TextView tvEquivalent = row.findViewById(R.id.tvBaseEquivalent);
-        ImageButton btnRemove = row.findViewById(R.id.btnRemove);
-
-        // إعداد عملة الدفع
-        if (actCurrency != null) {
-            actCurrency.setAdapter(new ArrayAdapter<>(requireContext(),
-                    android.R.layout.simple_dropdown_item_1line, CURRENCIES));
-            actCurrency.setText(defaultCurrency, false);
-        }
-
-        // إعداد طريقة الدفع
-        setupMethodDropdown(actMethod);
-
-        Runnable updateEquivalent = () -> {
-            try {
-                String curr = actCurrency != null
-                        ? actCurrency.getText().toString().trim().toUpperCase() : "YER";
-                if (curr.isEmpty()) curr = "YER";
-                double rate = getRateToYER(curr);
-                double amt = getDoubleFromEditText(etAmount);
-                double base = amt * rate;
-                if (tvEquivalent != null) {
-                    tvEquivalent.setText(String.format(Locale.US, "%,.2f YER", base));
-                }
-            } catch (Exception ignored) {}
-        };
-
-        etAmount.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                updateEquivalent.run();
-                updateRemainingBalance();
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
-        if (actCurrency != null) {
-            actCurrency.setOnItemClickListener((parent, v, position, id) -> {
-                updateEquivalent.run();
-                updateRemainingBalance();
-            });
-        }
-
-        if (btnRemove != null) {
-            btnRemove.setOnClickListener(v -> {
-                if (llPaymentsContainer.getChildCount() > 1) {
-                    llPaymentsContainer.removeView(row);
-                    paymentRows.remove(row);
-                    updateRemainingBalance();
-                } else {
-                    Toast.makeText(requireContext(),
-                            "يجب أن يبقى سطر دفع واحد على الأقل", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        paymentRows.add(row);
-        llPaymentsContainer.addView(row);
-        if (amount > 0) etAmount.setText(String.valueOf(amount));
-        updateEquivalent.run();
+    private fun addPaymentRow(defaultCurrency: String = "YER", amount: Double = 0.0) {
+        val defaultCode = availableMethodsState.firstOrNull()?.code ?: "CASH"
+        val amtStr = if (amount > 0) String.format(Locale.US, "%.2f", amount) else ""
+        paymentRowsState.add(
+            PaymentRowState(
+                currency = defaultCurrency,
+                methodCode = defaultCode,
+                amountText = amtStr
+            )
+        )
     }
 
-    // ✅ يقرأ من actCurrency
-    private void updateRemainingBalance() {
-        double totalPaidBase = 0;
-        for (View row : paymentRows) {
-            AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
-            TextInputEditText et = row.findViewById(R.id.etAmount);
-            String curr = actCurrency != null
-                    ? actCurrency.getText().toString().trim().toUpperCase() : "YER";
-            if (curr.isEmpty()) curr = "YER";
-            double rate = getRateToYER(curr);
-            double amount = getDoubleFromEditText(et);
-            totalPaidBase += (amount * rate);
-        }
+    // ═══════════════════════════════════════════════════════════════════
+    //  Save Purchase
+    // ═══════════════════════════════════════════════════════════════════
 
-        double remaining = totalGoldValue - totalPaidBase;
+    private fun savePurchase(totalGoldValue: Double, totalPaidBase: Double) {
+        val weight = weightTextState.trim().toDoubleOrNull() ?: 0.0
+        val marketPrice = marketPriceTextState.trim().toDoubleOrNull() ?: 0.0
+        val deduction = deductionTextState.trim().toDoubleOrNull() ?: 0.0
 
-        if (Math.abs(remaining) < 1) {
-            tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor("#16A34A"));
-        } else if (remaining > 0) {
-            tvRemaining.setText(String.format(Locale.US, "%,.2f YER", remaining));
-            tvRemaining.setTextColor(Color.parseColor("#DC2626"));
-        } else {
-            tvRemaining.setText(String.format(Locale.US, "+ %,.2f YER", Math.abs(remaining)));
-            tvRemaining.setTextColor(Color.parseColor("#F59E0B"));
-        }
-    }
-
-    // ✅ يستخدم actCurrency/actMethod
-    private void setFormEnabled(boolean enabled) {
-        etCustomerName.setEnabled(enabled);
-        etCustomerPhone.setEnabled(enabled);
-        etWeight.setEnabled(enabled);
-        etMarketPrice.setEnabled(enabled);
-        etDeduction.setEnabled(enabled);
-        ddKarat.setEnabled(enabled);
-        btnAddPayment.setEnabled(enabled);
-        for (View row : paymentRows) {
-            View curr = row.findViewById(R.id.actCurrency);
-            View method = row.findViewById(R.id.actMethod);
-            View amount = row.findViewById(R.id.etAmount);
-            View remove = row.findViewById(R.id.btnRemove);
-            if (curr != null) curr.setEnabled(enabled);
-            if (method != null) method.setEnabled(enabled);
-            if (amount != null) amount.setEnabled(enabled);
-            if (remove != null) remove.setEnabled(enabled);
-        }
-    }
-
-    // ✅ helper: رمز العملة المختارة
-    private String getSelectedCurrency(View row) {
-        AutoCompleteTextView actCurrency = row.findViewById(R.id.actCurrency);
-        if (actCurrency == null) return "YER";
-        String text = actCurrency.getText() != null
-                ? actCurrency.getText().toString().trim().toUpperCase() : "";
-        return text.isEmpty() ? "YER" : text;
-    }
-
-    // ✅ helper: كود طريقة الدفع المختارة
-    private String getSelectedMethodCode(View row) {
-        MaterialAutoCompleteTextView actMethod = row.findViewById(R.id.actMethod);
-        if (actMethod == null) return "CASH";
-        String selected = actMethod.getText() != null
-                ? actMethod.getText().toString().trim() : "";
-        if (selected.isEmpty()) return "CASH";
-
-        for (JSONObject obj : availableMethods) {
-            String icon = obj.optString("icon", "💳");
-            String name = obj.optString("name_ar", obj.optString("code", "نقداً"));
-            String display = icon + " " + name;
-            if (display.equals(selected)) {
-                return obj.optString("code", "CASH");
-            }
-        }
-        return "CASH";
-    }
-
-    // ✅ يستخدم actCurrency/actMethod
-    private void savePurchase() {
-        double weight = getDoubleFromEditText(etWeight);
-        double marketPrice = getDoubleFromEditText(etMarketPrice);
         if (weight <= 0 || marketPrice <= 0) {
-            Toast.makeText(requireContext(), "الرجاء إدخال الوزن والسعر", Toast.LENGTH_SHORT).show();
-            return;
+            toast(if (isArabic) "الرجاء إدخال الوزن والسعر" else "Please enter weight and price")
+            return
         }
 
-        JSONArray paymentsArray = new JSONArray();
-        double totalPaidBase = 0;
-
-        for (View row : paymentRows) {
-            TextInputEditText et = row.findViewById(R.id.etAmount);
-            double amount = getDoubleFromEditText(et);
-
+        val paymentsArray = JSONArray()
+        for (row in paymentRowsState) {
+            val amount = row.amountText.trim().toDoubleOrNull() ?: 0.0
             if (amount > 0) {
                 try {
-                    String curr = getSelectedCurrency(row);
-                    double rate = getRateToYER(curr);
-                    double base = amount * rate;
-                    totalPaidBase += base;
-
-                    JSONObject pObj = new JSONObject();
-                    pObj.put("currency", curr);
-                    pObj.put("amount", amount);
-                    pObj.put("exchange_rate", rate);
-                    pObj.put("base_amount", base);
-                    pObj.put("method", getSelectedMethodCode(row));
-
-                    paymentsArray.put(pObj);
-                } catch (Exception e) { e.printStackTrace(); }
+                    val rate = getRateToYER(row.currency)
+                    val base = amount * rate
+                    val pObj = JSONObject().apply {
+                        put("currency", row.currency)
+                        put("amount", amount)
+                        put("exchange_rate", rate)
+                        put("base_amount", base)
+                        put("method", row.methodCode)
+                    }
+                    paymentsArray.put(pObj)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
 
-        if (Math.abs(totalPaidBase - totalGoldValue) > 1) {
-            Toast.makeText(requireContext(),
-                    "⚠️ إجمالي المدفوعات لا يطابق قيمة الذهب", Toast.LENGTH_LONG).show();
-            return;
+        if (abs(totalPaidBase - totalGoldValue) > 1.0) {
+            toast(
+                if (isArabic) "⚠️ إجمالي المدفوعات لا يطابق قيمة الذهب"
+                else "⚠️ Total payments do not match gold value"
+            )
+            return
         }
 
-        JSONObject payload = new JSONObject();
+        val payload = JSONObject()
         try {
-            payload.put("customer_name", etCustomerName.getText() != null
-                    ? etCustomerName.getText().toString().trim() : "");
-            payload.put("customer_phone", etCustomerPhone.getText() != null
-                    ? etCustomerPhone.getText().toString().trim() : "");
-            payload.put("gross_weight_grams", weight);
-            payload.put("gold_karat", ddKarat.getText().toString() + "K");
-            payload.put("market_price_per_gram", marketPrice);
-            payload.put("deduction_per_gram", getDoubleFromEditText(etDeduction));
-            payload.put("total_amount", totalGoldValue);
-            payload.put("payments", paymentsArray);
+            payload.put("customer_name", customerNameState.trim())
+            payload.put("customer_phone", customerPhoneState.trim())
+            payload.put("gross_weight_grams", weight)
+            payload.put("gold_karat", "${selectedKaratState}K")
+            payload.put("market_price_per_gram", marketPrice)
+            payload.put("deduction_per_gram", deduction)
+            payload.put("total_amount", totalGoldValue)
+            payload.put("payments", paymentsArray)
 
-            MiraBranchesManager branchesManager = MiraBranchesManager.getInstance(requireContext());
-            payload.put("branch_id", branchesManager.getActiveBranchId());
-            SessionManager sessionManager = new SessionManager(requireContext());
-            payload.put("user_id", sessionManager.getUserId());
-        } catch (Exception e) { e.printStackTrace(); }
+            val branchesManager = MiraBranchesManager.getInstance(requireContext())
+            payload.put("branch_id", branchesManager.activeBranchId)
+            val sessionManager = SessionManager(requireContext())
+            payload.put("user_id", sessionManager.userId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
-        setFormEnabled(false);
-        btnSavePurchase.setEnabled(false);
-        btnSavePurchase.setText("⏳ جاري الحفظ...");
+        isSavingState = true
 
-        new Thread(() -> {
-            MiraApiClient api = MiraApiClient.getInstance(requireContext());
-            MiraApiClient.ApiResponse response = api.saveScrapPurchase(payload);
+        Thread {
+            val ctx = context ?: return@Thread
+            val api = MiraApiClient.getInstance(ctx)
+            val response = api.saveScrapPurchase(payload)
 
-            if (getActivity() == null || isDetached()) return;
+            val act = activity ?: return@Thread
+            if (isDetached) return@Thread
 
-            getActivity().runOnUiThread(() -> {
-                setFormEnabled(true);
-                btnSavePurchase.setEnabled(true);
-                btnSavePurchase.setText(R.string.save_purchase);
+            act.runOnUiThread {
+                if (!isAdded) return@runOnUiThread
+                isSavingState = false
 
-                if (response.isSuccess && response.data != null) {
-                    int purchaseId = response.data.optInt("purchase_id", 0);
-                    String purchaseNumber = response.data.optString("purchase_number", "");
-                    showSuccessDialog(purchaseId, purchaseNumber);
+                if (response != null && response.isSuccess && response.data != null) {
+                    val purchaseId = response.data!!.optInt("purchase_id", 0)
+                    val purchaseNumber = response.data!!.optString("purchase_number", "")
+                    successDialogDataState = purchaseId to purchaseNumber
                 } else {
-                    String errorMsg = response.error != null ? response.error : "فشل الاتصال بالسيرفر";
-                    Toast.makeText(requireContext(), errorMsg, Toast.LENGTH_LONG).show();
+                    val errorMsg = response?.error
+                        ?: if (isArabic) "فشل الاتصال بالسيرفر" else "Server connection failed"
+                    toast(errorMsg)
                 }
-            });
-        }).start();
+            }
+        }.start()
     }
 
-    private void showSuccessDialog(int purchaseId, String purchaseNumber) {
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("✅ تم الحفظ بنجاح")
-            .setMessage("تم تسجيل عملية شراء الكسر بنجاح.\n\nرقم العملية: " + purchaseNumber
-                    + "\n\nهل تريد طباعة الإيصال للعميل الآن؟")
-            .setPositiveButton("🖨️ عرض وطباعة الإيصال", (dialog, which) -> {
-                if (purchaseId > 0) {
-                    MiraScrapReceiptFragment receipt = MiraScrapReceiptFragment.newInstance(purchaseId, null);
-                    receipt.show(getParentFragmentManager(), "ScrapReceipt");
+    private fun clearFields() {
+        weightTextState = ""
+        marketPriceTextState = ""
+        deductionTextState = ""
+        customerNameState = ""
+        customerPhoneState = ""
+
+        paymentRowsState.clear()
+        addPaymentRow("YER", 0.0)
+    }
+
+    private fun toast(msg: String) {
+        if (isAdded && context != null) {
+            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Jetpack Compose UI
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Composable
+    private fun ScrapGoldBuyScreen() {
+        val colors = MiraTheme.colors
+        val isAr = isArabic
+
+        val weight = weightTextState.trim().toDoubleOrNull() ?: 0.0
+        val marketPrice = marketPriceTextState.trim().toDoubleOrNull() ?: 0.0
+        val deduction = deductionTextState.trim().toDoubleOrNull() ?: 0.0
+
+        val grossBeforeDeduction = if (weight > 0 && marketPrice > 0) weight * marketPrice else 0.0
+        val totalDeduction = if (weight > 0 && deduction > 0) weight * deduction else 0.0
+        val totalGoldValue = if (weight > 0 && marketPrice > 0) {
+            grossBeforeDeduction - totalDeduction
+        } else {
+            0.0
+        }
+
+        val totalPaidBase = paymentRowsState.sumOf { row ->
+            val amt = row.amountText.trim().toDoubleOrNull() ?: 0.0
+            amt * getRateToYER(row.currency)
+        }
+
+        val remaining = totalGoldValue - totalPaidBase
+
+        val remainingColor = when {
+            abs(remaining) < 1.0 -> Color(0xFF10B981)
+            remaining > 0 -> Color(0xFFEF4444)
+            else -> Color(0xFFF59E0B)
+        }
+
+        val remainingFormatted = when {
+            remaining < -1.0 -> String.format(Locale.US, "+ %,.2f YER", abs(remaining))
+            else -> String.format(Locale.US, "%,.2f YER", remaining)
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = colors.backgroundTop
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(colors.backgroundTop, colors.backgroundMid, colors.backgroundTop)
+                        )
+                    )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                ) {
+                    // 1. الشريط العلوي
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colors.goldPrimary.copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Diamond,
+                                    contentDescription = null,
+                                    tint = colors.goldPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = if (isAr) "شراء ذهب كسر" else "Buy Scrap Gold",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = if (isAr) "تقييم الوزن والعيار وتسوية الدفعات" else "Weight & karat valuation and settlement",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clickable(enabled = !isSavingState) { clearFields() },
+                            shape = RoundedCornerShape(12.dp),
+                            color = colors.cardSurface,
+                            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Autorenew,
+                                    contentDescription = null,
+                                    tint = colors.goldPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // 2. بطاقة ملخص القيمة والمتبقي (Hero Valuation Card)
+                    ScrapValuationHeroCard(
+                        isArabic = isAr,
+                        totalGoldValue = totalGoldValue,
+                        totalDeduction = totalDeduction,
+                        remainingFormatted = remainingFormatted,
+                        remainingColor = remainingColor
+                    )
+
+                    // 3. محتوى النموذج القابل للتمرير
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // أ. بيانات البائع / العميل
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                            border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.16f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Person,
+                                        contentDescription = null,
+                                        tint = colors.goldPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isAr) "بيانات البائع" else "Seller Details",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
+
+                                OutlinedTextField(
+                                    value = customerNameState,
+                                    onValueChange = { customerNameState = it },
+                                    enabled = !isSavingState,
+                                    singleLine = true,
+                                    label = { Text(if (isAr) "اسم العميل / البائع" else "Customer Name") },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    },
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                OutlinedTextField(
+                                    value = customerPhoneState,
+                                    onValueChange = { customerPhoneState = it },
+                                    enabled = !isSavingState,
+                                    singleLine = true,
+                                    label = { Text(if (isAr) "رقم الهاتف" else "Phone Number") },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Phone,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        // ب. تفاصيل الذهب والتسعير
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.3f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Calculate,
+                                        contentDescription = null,
+                                        tint = colors.goldPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isAr) "تفاصيل الوزن والعيار والتسعير" else "Weight, Karat & Pricing",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                }
+
+                                // اختيار العيار عبر رقائق سريعة
+                                Text(
+                                    text = if (isAr) "عيار الذهب" else "Gold Karat",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = colors.textSecondary
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    karats.forEach { karat ->
+                                        val selected = selectedKaratState == karat
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable(enabled = !isSavingState) {
+                                                    selectedKaratState = karat
+                                                },
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (selected) colors.goldPrimary.copy(alpha = 0.2f)
+                                            else colors.backgroundMid,
+                                            border = BorderStroke(
+                                                if (selected) 1.5.dp else 1.dp,
+                                                if (selected) colors.goldPrimary
+                                                else colors.textSecondary.copy(alpha = 0.2f)
+                                            )
+                                        ) {
+                                            Text(
+                                                text = "${karat}K",
+                                                modifier = Modifier.padding(vertical = 10.dp),
+                                                textAlign = TextAlign.Center,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = if (selected) colors.goldPrimary else colors.textSecondary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // الوزن الصافي (جرام)
+                                OutlinedTextField(
+                                    value = weightTextState,
+                                    onValueChange = { weightTextState = it },
+                                    enabled = !isSavingState,
+                                    singleLine = true,
+                                    label = { Text(if (isAr) "الوزن (جرام)" else "Weight (grams)") },
+                                    suffix = { Text("g", color = colors.goldPrimary, fontWeight = FontWeight.Bold) },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Decimal,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                // سعر السوق للجرام + الخصم لكل جرام
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = marketPriceTextState,
+                                        onValueChange = { marketPriceTextState = it },
+                                        enabled = !isSavingState,
+                                        singleLine = true,
+                                        label = { Text(if (isAr) "سعر الجرام (YER)" else "Price/g (YER)") },
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Decimal,
+                                            imeAction = ImeAction.Next
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    OutlinedTextField(
+                                        value = deductionTextState,
+                                        onValueChange = { deductionTextState = it },
+                                        enabled = !isSavingState,
+                                        singleLine = true,
+                                        label = { Text(if (isAr) "الخصم / جرام" else "Deduction/g") },
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Decimal,
+                                            imeAction = ImeAction.Done
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // ج. قسم الدفعات متعددة العملات
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Payments,
+                                            contentDescription = null,
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isAr) "دفعات الصرف للعميل" else "Payouts to Customer",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.textPrimary
+                                        )
+                                    }
+
+                                    FilledTonalButton(
+                                        onClick = { addPaymentRow("YER", 0.0) },
+                                        enabled = !isSavingState,
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = Color(0xFF10B981).copy(alpha = 0.16f),
+                                            contentColor = Color(0xFF10B981)
+                                        )
+                                    ) {
+                                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (isAr) "إضافة دفعة" else "Add Row",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                paymentRowsState.forEachIndexed { index, row ->
+                                    ScrapPaymentRowCard(
+                                        index = index,
+                                        row = row,
+                                        isArabic = isAr,
+                                        enabled = !isSavingState,
+                                        methods = availableMethodsState,
+                                        remainingInYer = remaining,
+                                        onUpdateRow = { updated ->
+                                            paymentRowsState[index] = updated
+                                        },
+                                        onRemoveRow = {
+                                            if (paymentRowsState.size > 1) {
+                                                paymentRowsState.removeAt(index)
+                                            } else {
+                                                toast(
+                                                    if (isAr) "يجب أن يبقى سطر دفع واحد على الأقل"
+                                                    else "At least one payment row is required"
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // 4. الشريط السفلي لحفظ العملية
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = colors.cardSurface,
+                        shadowElevation = 12.dp,
+                        border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.25f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Button(
+                                onClick = { savePurchase(totalGoldValue, totalPaidBase) },
+                                enabled = !isSavingState,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colors.goldPrimary,
+                                    contentColor = Color(0xFF0A0F1D)
+                                )
+                            ) {
+                                if (isSavingState) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.5.dp,
+                                        color = Color(0xFF0A0F1D)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = if (isAr) "⏳ جاري الحفظ..." else "⏳ Saving...",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 15.sp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Save,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isAr) "حفظ عملية شراء الكسر" else "Save Scrap Purchase",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-                clearFields();
-            })
-            .setNegativeButton("إغلاق", (dialog, which) -> clearFields())
-            .setCancelable(false)
-            .show();
+            }
+        }
+
+        // نافذة النجاح وطباعة الإيصال
+        successDialogDataState?.let { (purchaseId, purchaseNumber) ->
+            AlertDialog(
+                onDismissRequest = {},
+                containerColor = colors.cardSurface,
+                title = {
+                    Text(
+                        text = if (isAr) "✅ تم الحفظ بنجاح" else "✅ Saved Successfully",
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (isAr) {
+                            "تم تسجيل عملية شراء الكسر بنجاح.\n\nرقم العملية: $purchaseNumber\n\nهل تريد طباعة الإيصال للعميل الآن؟"
+                        } else {
+                            "Scrap purchase recorded successfully.\n\nOperation #: $purchaseNumber\n\nWould you like to print the receipt now?"
+                        },
+                        color = colors.textPrimary
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            successDialogDataState = null
+                            if (purchaseId > 0) {
+                                val receipt = MiraScrapReceiptFragment.newInstance(purchaseId, null)
+                                receipt.show(parentFragmentManager, "ScrapReceipt")
+                            }
+                            clearFields()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF0A0F1D)
+                        )
+                    ) {
+                        Icon(Icons.Rounded.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isAr) "عرض وطباعة الإيصال" else "View & Print Receipt",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            successDialogDataState = null
+                            clearFields()
+                        }
+                    ) {
+                        Text(
+                            text = if (isAr) "إغلاق" else "Close",
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+            )
+        }
     }
 
-    private double getDoubleFromEditText(TextInputEditText editText) {
-        if (editText == null || editText.getText() == null) return 0.0;
-        String text = editText.getText().toString().trim();
-        if (text.isEmpty()) return 0.0;
-        try { return Double.parseDouble(text); } catch (NumberFormatException e) { return 0.0; }
+    @Composable
+    private fun ScrapValuationHeroCard(
+        isArabic: Boolean,
+        totalGoldValue: Double,
+        totalDeduction: Double,
+        remainingFormatted: String,
+        remainingColor: Color
+    ) {
+        val colors = MiraTheme.colors
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.45f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                colors.goldPrimary.copy(alpha = 0.16f),
+                                Color(0xFF10B981).copy(alpha = 0.08f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1.1f)) {
+                        Text(
+                            text = if (isArabic) "صافي قيمة الذهب" else "Net Gold Value",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = String.format(Locale.US, "%,.2f YER", totalGoldValue),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.goldPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (totalDeduction > 0) {
+                            Text(
+                                text = String.format(
+                                    Locale.US,
+                                    if (isArabic) "خصم: -%,.2f YER" else "Deducted: -%,.2f YER",
+                                    totalDeduction
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(42.dp)
+                            .background(colors.textSecondary.copy(alpha = 0.22f))
+                    )
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = if (isArabic) "المتبقي للتسوية" else "Remaining Balance",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = remainingFormatted,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = remainingColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
     }
 
-    private void clearFields() {
-        etWeight.setText("");
-        etMarketPrice.setText("");
-        etDeduction.setText("");
-        etCustomerName.setText("");
-        etCustomerPhone.setText("");
-        tvTotalAmount.setText("0.00 YER");
+    @Composable
+    private fun ScrapPaymentRowCard(
+        index: Int,
+        row: PaymentRowState,
+        isArabic: Boolean,
+        enabled: Boolean,
+        methods: List<PaymentMethodOption>,
+        remainingInYer: Double,
+        onUpdateRow: (PaymentRowState) -> Unit,
+        onRemoveRow: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+        var methodMenuExpanded by remember { mutableStateOf(false) }
 
-        llPaymentsContainer.removeAllViews();
-        paymentRows.clear();
-        addPaymentRow("YER", 0.0);
-        updateRemainingBalance();
+        val rate = getRateToYER(row.currency)
+        val amountVal = row.amountText.trim().toDoubleOrNull() ?: 0.0
+        val baseEquivalent = amountVal * rate
+
+        val selectedMethodObj = methods.firstOrNull { it.code == row.methodCode }
+            ?: methods.firstOrNull()
+            ?: PaymentMethodOption("CASH", "نقداً", "Cash", "💵")
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = colors.backgroundMid,
+            border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.2f))
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // الصف العلوي: رقم الدفعة + اختيار طريقة الدفع + زر الحذف
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.goldPrimary.copy(alpha = 0.18f)
+                    ) {
+                        Text(
+                            text = "#${index + 1}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.goldPrimary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    // قائمة طريقة الدفع
+                    Box(modifier = Modifier.weight(1f)) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = enabled && methods.isNotEmpty()) {
+                                    methodMenuExpanded = true
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = colors.cardSurface,
+                            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = selectedMethodObj.displayLabel(isArabic),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = colors.goldPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = methodMenuExpanded,
+                            onDismissRequest = { methodMenuExpanded = false }
+                        ) {
+                            methods.forEach { method ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = method.displayLabel(isArabic),
+                                            fontWeight = if (method.code == row.methodCode)
+                                                FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    onClick = {
+                                        methodMenuExpanded = false
+                                        onUpdateRow(row.copy(methodCode = method.code))
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clickable(enabled = enabled) { onRemoveRow() },
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFEF4444).copy(alpha = 0.14f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.DeleteOutline,
+                                contentDescription = null,
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                // اختيار العملة (YER / SAR / USD)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    currencies.forEach { curr ->
+                        val selected = row.currency == curr
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(enabled = enabled) {
+                                    onUpdateRow(row.copy(currency = curr))
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) Color(0xFF06B6D4).copy(alpha = 0.18f)
+                            else colors.cardSurface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (selected) Color(0xFF06B6D4)
+                                else colors.textSecondary.copy(alpha = 0.2f)
+                            )
+                        ) {
+                            Text(
+                                text = curr,
+                                modifier = Modifier.padding(vertical = 7.dp),
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selected) Color(0xFF06B6D4) else colors.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                // حقل المبلغ + زر تعبئة المتبقي تلقائياً
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = row.amountText,
+                        onValueChange = { onUpdateRow(row.copy(amountText = it)) },
+                        enabled = enabled,
+                        singleLine = true,
+                        label = { Text(if (isArabic) "المبلغ (${row.currency})" else "Amount (${row.currency})") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Done
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (remainingInYer > 0.5 && rate > 0) {
+                        val neededInRowCurrency = (amountVal * rate + remainingInYer) / rate
+                        OutlinedButton(
+                            onClick = {
+                                onUpdateRow(
+                                    row.copy(
+                                        amountText = String.format(Locale.US, "%.2f", neededInRowCurrency)
+                                    )
+                                )
+                            },
+                            enabled = enabled,
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
+                            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.goldPrimary)
+                        ) {
+                            Text(
+                                text = if (isArabic) "المتبقي" else "Fill",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // المعادل بالريال اليمني
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isArabic) "المعادل الأساسي:" else "Base Equivalent:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.textSecondary
+                    )
+                    Text(
+                        text = String.format(Locale.US, "%,.2f YER", baseEquivalent),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF10B981)
+                    )
+                }
+            }
+        }
     }
 }
