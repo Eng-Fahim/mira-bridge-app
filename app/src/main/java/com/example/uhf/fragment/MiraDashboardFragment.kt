@@ -66,7 +66,6 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MiraDashboardFragment : Fragment() {
-
     companion object {
         private const val TAG = "MiraDashboardFragment"
         private const val OFFLINE_PREFS_BASE = "dashboard_cache_u"
