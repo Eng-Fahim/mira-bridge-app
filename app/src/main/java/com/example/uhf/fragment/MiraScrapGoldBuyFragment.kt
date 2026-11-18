@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -242,15 +241,34 @@ class MiraScrapGoldBuyFragment : Fragment() {
             return
         }
 
+        val netPricePerGram = (marketPrice - deduction).coerceAtLeast(0.0)
+        val karatWithSuffix = "${selectedKaratState}K"
+        val resolvedCustomerName = customerNameState.trim().ifEmpty {
+            if (isArabic) "عميل نقدي" else "Cash Customer"
+        }
+
         val payload = JSONObject()
         try {
-            payload.put("customer_name", customerNameState.trim())
+            payload.put("customer_name", resolvedCustomerName)
             payload.put("customer_phone", customerPhoneState.trim())
+
+            // إرسال جميع مفاتيح الوزن المطلوبة من السيرفر لتجنب خطأ Validation
+            payload.put("weight_grams", weight)
+            payload.put("net_weight_grams", weight)
             payload.put("gross_weight_grams", weight)
-            payload.put("gold_karat", "${selectedKaratState}K")
+            payload.put("stone_weight_grams", 0.0)
+
+            // العيار بصيغتي السيرفر
+            payload.put("gold_karat", karatWithSuffix)
+            payload.put("karat", karatWithSuffix)
+
+            // سعر الجرام والخصم بصيغتي السيرفر
+            payload.put("price_per_gram", netPricePerGram)
             payload.put("market_price_per_gram", marketPrice)
             payload.put("deduction_per_gram", deduction)
+
             payload.put("total_amount", totalGoldValue)
+            payload.put("currency", "YER")
             payload.put("payments", paymentsArray)
 
             val branchesManager = MiraBranchesManager.getInstance(requireContext())
@@ -276,16 +294,43 @@ class MiraScrapGoldBuyFragment : Fragment() {
                 isSavingState = false
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    val purchaseId = response.data!!.optInt("purchase_id", 0)
-                    val purchaseNumber = response.data!!.optString("purchase_number", "")
+                    val dataObj = response.data!!.optJSONObject("data") ?: response.data!!
+                    val purchaseId = dataObj.optInt("purchase_id", dataObj.optInt("id", 0))
+                    val purchaseNumber = dataObj.optString("purchase_number", "")
                     successDialogDataState = purchaseId to purchaseNumber
                 } else {
-                    val errorMsg = response?.error
-                        ?: if (isArabic) "فشل الاتصال بالسيرفر" else "Server connection failed"
-                    toast(errorMsg)
+                    val detailedError = extractValidationErrors(response?.data, response?.error)
+                    toast(detailedError)
                 }
             }
         }.start()
+    }
+
+    private fun extractValidationErrors(data: JSONObject?, fallbackError: String?): String {
+        try {
+            val errorsObj = data?.optJSONObject("errors")
+            if (errorsObj != null) {
+                val messages = ArrayList<String>()
+                val keys = errorsObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val arr = errorsObj.optJSONArray(k)
+                    if (arr != null && arr.length() > 0) {
+                        messages.add(arr.optString(0))
+                    } else {
+                        val single = errorsObj.optString(k, "")
+                        if (single.isNotEmpty()) messages.add(single)
+                    }
+                }
+                if (messages.isNotEmpty()) {
+                    return messages.joinToString("\n")
+                }
+            }
+            val msg = data?.optString("message", "")
+            if (!msg.isNullOrBlank()) return msg
+        } catch (_: Exception) {
+        }
+        return fallbackError ?: if (isArabic) "فشل الاتصال بالسيرفر" else "Server connection failed"
     }
 
     private fun clearFields() {
@@ -301,7 +346,7 @@ class MiraScrapGoldBuyFragment : Fragment() {
 
     private fun toast(msg: String) {
         if (isAdded && context != null) {
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -321,7 +366,7 @@ class MiraScrapGoldBuyFragment : Fragment() {
         val grossBeforeDeduction = if (weight > 0 && marketPrice > 0) weight * marketPrice else 0.0
         val totalDeduction = if (weight > 0 && deduction > 0) weight * deduction else 0.0
         val totalGoldValue = if (weight > 0 && marketPrice > 0) {
-            grossBeforeDeduction - totalDeduction
+            (grossBeforeDeduction - totalDeduction).coerceAtLeast(0.0)
         } else {
             0.0
         }
@@ -361,20 +406,22 @@ class MiraScrapGoldBuyFragment : Fragment() {
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
-                        .navigationBarsPadding()
                 ) {
-                    // 1. الشريط العلوي
+                    // 1. الشريط العلوي مع زر حفظ سريع وزر تصفير
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
+                                    .size(40.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(colors.goldPrimary.copy(alpha = 0.16f)),
                                 contentAlignment = Alignment.Center
@@ -383,45 +430,78 @@ class MiraScrapGoldBuyFragment : Fragment() {
                                     imageVector = Icons.Rounded.Diamond,
                                     contentDescription = null,
                                     tint = colors.goldPrimary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
                                     text = if (isAr) "شراء ذهب كسر" else "Buy Scrap Gold",
-                                    style = MaterialTheme.typography.titleLarge,
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = colors.textPrimary
+                                    color = colors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (isAr) "تقييم الوزن والعيار وتسوية الدفعات" else "Weight & karat valuation and settlement",
+                                    text = if (isAr) "تقييم الوزن والعيار وتسوية الدفعات" else "Weight & karat valuation",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = colors.textSecondary
+                                    color = colors.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        Surface(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clickable(enabled = !isSavingState) { clearFields() },
-                            shape = RoundedCornerShape(12.dp),
-                            color = colors.cardSurface,
-                            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Autorenew,
-                                    contentDescription = null,
-                                    tint = colors.goldPrimary,
-                                    modifier = Modifier.size(20.dp)
+                            // زر حفظ علوي سريع يظهر عند اكتمال البيانات
+                            Button(
+                                onClick = { savePurchase(totalGoldValue, totalPaidBase) },
+                                enabled = !isSavingState && totalGoldValue > 0 && abs(remaining) < 1.0,
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colors.goldPrimary,
+                                    contentColor = Color(0xFF0A0F1D)
                                 )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isAr) "حفظ" else "Save",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clickable(enabled = !isSavingState) { clearFields() },
+                                shape = RoundedCornerShape(12.dp),
+                                color = colors.cardSurface,
+                                border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Autorenew,
+                                        contentDescription = null,
+                                        tint = colors.goldPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
 
-                    // 2. بطاقة ملخص القيمة والمتبقي (Hero Valuation Card)
+                    // 2. بطاقة ملخص القيمة والمتبقي
                     ScrapValuationHeroCard(
                         isArabic = isAr,
                         totalGoldValue = totalGoldValue,
@@ -430,12 +510,12 @@ class MiraScrapGoldBuyFragment : Fragment() {
                         remainingColor = remainingColor
                     )
 
-                    // 3. محتوى النموذج القابل للتمرير
+                    // 3. محتوى النموذج + زر الحفظ الرئيسي فوق شريط التنقل السفلي
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 110.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         // أ. بيانات البائع / العميل
@@ -525,7 +605,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                                     )
                                 }
 
-                                // اختيار العيار عبر رقائق سريعة
                                 Text(
                                     text = if (isAr) "عيار الذهب" else "Gold Karat",
                                     style = MaterialTheme.typography.labelMedium,
@@ -564,7 +643,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                                     }
                                 }
 
-                                // الوزن الصافي (جرام)
                                 OutlinedTextField(
                                     value = weightTextState,
                                     onValueChange = { weightTextState = it },
@@ -580,7 +658,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
-                                // سعر السوق للجرام + الخصم لكل جرام
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -694,58 +771,43 @@ class MiraScrapGoldBuyFragment : Fragment() {
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
-                    // 4. الشريط السفلي لحفظ العملية
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = colors.cardSurface,
-                        shadowElevation = 12.dp,
-                        border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.25f))
-                    ) {
-                        Box(
+                        // د. زر الحفظ الرئيسي مرفوع بوضوح فوق شريط التنقل السفلي
+                        Button(
+                            onClick = { savePurchase(totalGoldValue, totalPaidBase) },
+                            enabled = !isSavingState,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .height(54.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.goldPrimary,
+                                contentColor = Color(0xFF0A0F1D)
+                            )
                         ) {
-                            Button(
-                                onClick = { savePurchase(totalGoldValue, totalPaidBase) },
-                                enabled = !isSavingState,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.goldPrimary,
-                                    contentColor = Color(0xFF0A0F1D)
+                            if (isSavingState) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = Color(0xFF0A0F1D)
                                 )
-                            ) {
-                                if (isSavingState) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.5.dp,
-                                        color = Color(0xFF0A0F1D)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = if (isAr) "⏳ جاري الحفظ..." else "⏳ Saving...",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 15.sp
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Save,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (isAr) "حفظ عملية شراء الكسر" else "Save Scrap Purchase",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 15.sp
-                                    )
-                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = if (isAr) "⏳ جاري الحفظ..." else "⏳ Saving...",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.Save,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isAr) "حفظ عملية شراء الكسر" else "Save Scrap Purchase",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp
+                                )
                             }
                         }
                     }
@@ -845,7 +907,7 @@ class MiraScrapGoldBuyFragment : Fragment() {
                             )
                         )
                     )
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -883,7 +945,7 @@ class MiraScrapGoldBuyFragment : Fragment() {
                     Box(
                         modifier = Modifier
                             .width(1.dp)
-                            .height(42.dp)
+                            .height(40.dp)
                             .background(colors.textSecondary.copy(alpha = 0.22f))
                     )
 
@@ -943,7 +1005,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // الصف العلوي: رقم الدفعة + اختيار طريقة الدفع + زر الحذف
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -962,7 +1023,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                         )
                     }
 
-                    // قائمة طريقة الدفع
                     Box(modifier = Modifier.weight(1f)) {
                         Surface(
                             modifier = Modifier
@@ -1036,7 +1096,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                     }
                 }
 
-                // اختيار العملة (YER / SAR / USD)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1070,7 +1129,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                     }
                 }
 
-                // حقل المبلغ + زر تعبئة المتبقي تلقائياً
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1115,7 +1173,6 @@ class MiraScrapGoldBuyFragment : Fragment() {
                     }
                 }
 
-                // المعادل بالريال اليمني
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
