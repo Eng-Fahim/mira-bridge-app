@@ -1830,6 +1830,70 @@ public ApiResponse getDashboardCharts(int branchId) {
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
+    
+        /**
+     * إرسال طلب تغيير حالة قطعة أثناء الجرد إلى السيرفر (تالف، مفقود، موجود، إلخ).
+     * السيرفر هو صاحب القرار الوحيد في التحقق والتحديث وإرجاع الحالة المعتمدة.
+     */
+    public ApiResponse updateInventoryItemStatus(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
+                MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+                payload.put("branch_id", bm.getActiveBranchId());
+            }
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            return postWithAuth("/inventory/item-status", payload);
+        } catch (Exception e) {
+            Log.e(TAG, "updateInventoryItemStatus error: " + e.getMessage());
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
+        }
+    }
+
+    public ApiResponse updateInventoryItemStatus(int sessionId, String epc,
+                                                 String requestedStatus,
+                                                 String damageType, String notes) {
+        JSONObject payload = new JSONObject();
+        try {
+            if (sessionId > 0) payload.put("session_id", sessionId);
+            payload.put("epc", epc != null ? epc : "");
+            payload.put("status", requestedStatus != null ? requestedStatus : "");
+            if (damageType != null && !damageType.isEmpty()) {
+                payload.put("damage_type", damageType);
+            }
+            if (notes != null && !notes.isEmpty()) {
+                payload.put("notes", notes);
+            }
+        } catch (Exception ignored) {}
+        return updateInventoryItemStatus(payload);
+    }
+
+    /**
+     * جلب الكتالوج المرجعي المعتمد للجرد من السيرفر مباشرة دون الاعتماد على الكاش المحلي.
+     */
+    public ApiResponse getInventoryExpectedCatalog(int branchId, String location) {
+        try {
+            int effectiveBranchId = branchId > 0
+                    ? branchId
+                    : MiraBranchesManager.getInstance(context).getActiveBranchId();
+            StringBuilder endpoint = new StringBuilder("/inventory/expected-catalog?branch_id=")
+                    .append(effectiveBranchId);
+            if (location != null && !location.trim().isEmpty()) {
+                endpoint.append("&location=").append(URLEncoder.encode(location.trim(), "UTF-8"));
+            }
+            return getWithAuthLongTimeout(endpoint.toString());
+        } catch (Exception e) {
+            Log.e(TAG, "getInventoryExpectedCatalog error: " + e.getMessage());
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
+        }
+    }
+
 
     // ==================== Encode / Tags ====================
     public ApiResponse encodeItem(JSONObject itemPayload) {
