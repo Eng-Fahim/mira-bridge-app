@@ -2014,37 +2014,38 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun performAutoSync() {
-        val sm = syncManager ?: return
-        val exec = miraExecutor ?: return
-        val pendingCount = sm.pendingCount
-        if (pendingCount == 0) return
+    val sm = syncManager ?: return
+    val exec = miraExecutor ?: return
+    val pendingCount = sm.getPendingCount() // ✅ تم التصحيح
+    if (pendingCount == 0) return
 
-        val branchId = branchesManager?.activeBranchId ?: 1
-        exec.networkExecutor.execute {
-            sm.syncPendingEncodes(branchId, object : IdentitySyncManager.SyncCallback {
-                override fun onSyncComplete(syncedCount: Int) {
-                    if (syncedCount > 0) {
-                        safeRun {
-                            updatePendingSyncBadge()
-                            if (isAdded && context != null) {
-                                showToast(
-                                    if (isArabic) "✅ تمت مزامنة $syncedCount تكويد"
-                                    else "✅ Synced $syncedCount encodings"
-                                )
-                            }
-                            notifyDashboardUpdate("sync_complete")
+    val branchId = branchesManager?.activeBranchId ?: 1
+    exec.networkExecutor.execute {
+        sm.syncPendingEncodes(branchId, object : IdentitySyncManager.SyncCallback {
+            override fun onSyncComplete(syncedCount: Int) {
+                if (syncedCount > 0) {
+                    safeRun {
+                        updatePendingSyncBadge()
+                        if (isAdded && context != null) {
+                            showToast(
+                                if (isArabic) "✅ تمت مزامنة $syncedCount تكويد"
+                                else "✅ Synced $syncedCount encodings"
+                            )
                         }
+                        notifyDashboardUpdate("sync_complete")
                     }
                 }
+            }
 
-                override fun onSyncError(error: String?) {}
-            })
-        }
+            override fun onSyncError(error: String) {} // ✅ String بدون ?
+        })
     }
+}
 
-    private fun updatePendingSyncBadge() {
-        pendingSyncCountState = syncManager?.pendingCount ?: 0
-    }
+private fun updatePendingSyncBadge() {
+    pendingSyncCountState = syncManager?.getPendingCount() ?: 0 // ✅ تم التصحيح
+}
+
 
     private fun uploadItemImages(itemId: Int, imagePaths: List<String>) {
         val client = apiClient ?: return
