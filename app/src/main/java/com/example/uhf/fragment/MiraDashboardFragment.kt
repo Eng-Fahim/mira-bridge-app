@@ -52,6 +52,8 @@ import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.dashboard.*
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
+import com.example.uhf.fragment.MiraInventoryDashboardFragment
+
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.NumberFormat
@@ -327,6 +329,7 @@ class MiraDashboardFragment : Fragment() {
         if (pm.canViewInventory()) {
             list.add(QuickActionItem("الجرد", "Inventory", Icons.Rounded.Inventory2, Color(0xFF38BDF8), "InventoryDashboard") { MiraInventoryDashboardFragment() })
         }
+        
         if (pm.canUseIdentity()) {
             list.add(QuickActionItem("التكويد", "Encoding", Icons.Rounded.QrCode2, Color(0xFF10B981), "IdentityStudio") { MiraIdentityStudioFragment() })
         }
