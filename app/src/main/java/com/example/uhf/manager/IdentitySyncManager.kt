@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
 import kotlin.math.pow
+
 /**
  * IdentitySyncManager - الإصدار 4.1 (Kotlin Enterprise Edition)
  */
