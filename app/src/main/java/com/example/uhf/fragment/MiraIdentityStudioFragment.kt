@@ -108,6 +108,8 @@ import java.util.Random
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
+import androidx.appcompat.app.AlertDialog
+
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -718,7 +720,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         )
     }
 
-    private fun startScanWithManager(gen: Int, mgr: RFIDManager) {
+        private fun startScanWithManager(gen: Int, mgr: RFIDManager) {
         if (scanGeneration.get() != gen) return
         if (!isTriggerDown) {
             isRfidScanning = false
@@ -727,7 +729,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
 
         try {
-            encodingRfidListener = object : MiraIRFIDReader.OnTagReadListener {
+            val listener = object : MiraIRFIDReader.OnTagReadListener {
                 override fun onTagRead(epc: String?, rssi: Int) {
                     if (!isRfidScanning || epc.isNullOrBlank()) return
                     if (!isProcessingTag.compareAndSet(false, true)) return
@@ -737,7 +739,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     isTriggerDown = false
 
                     val exec = miraExecutor
-                    if (exec == null) {
+                    val ctx = appContext
+                    if (exec == null || ctx == null) {
                         stopRfidScanningMode()
                         restorePowerForEncoding()
                         isProcessingTag.set(false)
@@ -747,7 +750,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     exec.backgroundExecutor.execute {
                         var tid: String? = null
                         try {
-                            tid = MiraRfidService.getInstance(appContext).readTid(null)
+                            tid = MiraRfidService.getInstance(ctx).readTid(null)
                         } catch (e: Exception) {
                             Log.w(TAG, "readTid failed", e)
                         }
@@ -783,7 +786,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 }
             }
 
-            mgr.addListener(encodingRfidListener)
+            encodingRfidListener = listener
+            mgr.addListener(listener)
 
             mgr.startScan(object : RFIDManager.ReadyCallback {
                 override fun onReady(reader: MiraIRFIDReader) {
@@ -816,6 +820,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             stopRfidScanningMode()
         }
     }
+
 
     private fun scheduleScanRetry(gen: Int, mgr: RFIDManager) {
         scanRetryRunnable?.let { handler.removeCallbacks(it) }
@@ -943,7 +948,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     //  Tag Processing
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun processReceivedTagWithTid(
+        private fun processReceivedTagWithTid(
         epc: String?,
         preReadTid: String?,
         source: String
@@ -965,6 +970,10 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             isProcessingTag.set(false)
             return
         }
+        val ctx = appContext ?: run {
+            isProcessingTag.set(false)
+            return
+        }
 
         exec.backgroundExecutor.execute {
             var isTagAllowed = false
@@ -974,7 +983,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             var idForDuplicateCheck = cleanEpc
 
             try {
-                val rfidService = MiraRfidService.getInstance(appContext)
+                val rfidService = MiraRfidService.getInstance(ctx)
 
                 if ("DESKTOP_RFID" == source && preReadTid.isNullOrBlank()) {
                     actualTid = "DESKTOP_SKIP_TID"
@@ -1105,6 +1114,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             }
         }
     }
+
 
     fun onRfidScanned(epc: String?) {
         if (!isAdded || activity == null || epc.isNullOrBlank()) return
@@ -2244,13 +2254,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         )
     }
 
-    private fun showErrorDialog(title: String, message: String) {
+        protected override fun showErrorDialog(title: String, message: String): AlertDialog? {
         alertDialogState = AlertDialogPayload(
             title = title,
             message = message,
             isError = true
         )
+        return null
     }
+
 
     private fun playSuccessSound() {
         try {
