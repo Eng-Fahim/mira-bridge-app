@@ -2353,15 +2353,21 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         } catch (_: Exception) {
         }
     }
+    
+    
 
     private fun getCurrentUserId(): Int {
-        val ctx = appContext ?: context?.applicationContext ?: return -1
-        appContext = ctx
-        val userId = SecureSessionManager.getInstance(ctx).userId
-        if (userId > 0) return userId
-        val legacyId = ctx.getSharedPreferences("session", Context.MODE_PRIVATE).getInt("user_id", -1)
-        return if (legacyId > 0) legacyId else -1
-    }
+    val ctx = appContext ?: context?.applicationContext ?: return -1
+    appContext = ctx
+    
+    // ✅ التصحيح: استدعاء getUserId() كدالة لأن SecureSessionManager أصبح مكتوباً بـ Kotlin
+    val userId = SecureSessionManager.getInstance(ctx).getUserId()
+    
+    if (userId > 0) return userId
+    val legacyId = ctx.getSharedPreferences("session", Context.MODE_PRIVATE).getInt("user_id", -1)
+    return if (legacyId > 0) legacyId else -1
+}
+
 
     private fun safeRun(r: () -> Unit) {
         if (isAdded && activity != null && !isRemoving && !isDetached) {
