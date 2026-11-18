@@ -434,13 +434,11 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         } catch (e: Exception) {
             Log.e(TAG, "PrintManager error", e)
         }
-
         try {
-            snapshotManager = InventorySnapshotManager(requireContext(), ioExecutor)
+            snapshotManager = InventorySnapshotManager(requireContext(), sharedPool)
         } catch (e: Exception) {
             Log.e(TAG, "SnapshotManager error", e)
         }
-
         // 5) Core: Engine + API + Branches + Permissions
         try {
             val sessionId = "SESS-" + UUID.randomUUID().toString().substring(0, 8).uppercase(Locale.US)
@@ -1436,7 +1434,7 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         }
         
       }
-    }
+    
 
     override fun onDuplicateTag(epc: String?) {
         // يُعالج عبر MiraScanSessionController.Decision.ACCEPT_DUPLICATE في processValidEpc
