@@ -340,21 +340,20 @@ class MiraInventoryProFragment : KeyDwonFragment(),
 
         isFragmentDestroyed = false
 
-        // 1) Executors
-        try {
+               // 1) Executors
+        val sharedPool: ExecutorService = try {
             miraExecutor = MiraExecutorService.getInstance()
-            val sharedPool = if (miraExecutor != null && miraExecutor!!.isHealthy) {
+            if (miraExecutor != null && miraExecutor!!.isHealthy) {
                 miraExecutor!!.backgroundExecutor
             } else {
                 Executors.newSingleThreadExecutor()
             }
-            backgroundExecutor = sharedPool
-            ioExecutor = sharedPool
         } catch (e: Exception) {
             Log.e(TAG, "Executor init error", e)
-            val fallbackPool = Executors.newSingleThreadExecutor()
-            backgroundExecutor = fallbackPool
-            ioExecutor = fallbackPool
+            Executors.newSingleThreadExecutor()
+        }
+        backgroundExecutor = sharedPool
+        ioExecutor = sharedPool
         }
 
         // 2) Locale + RTL
@@ -472,13 +471,14 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         // 6) ScanController
         try {
             scanController = InventoryScanController(
-                requireContext(), isArabic, backgroundExecutor, ioExecutor
+            requireContext(), isArabic, sharedPool, sharedPool
             ).apply {
-                setCallback(this@MiraInventoryProFragment)
-                setSoundManager(soundManager)
-                setCurrentPowerDbm(currentPowerDbm)
-                inventoryEngine?.let { setInventoryEngine(it) }
-            }
+            setCallback(this@MiraInventoryProFragment)
+            setSoundManager(soundManager)
+            setCurrentPowerDbm(currentPowerDbm)
+            inventoryEngine?.let { setInventoryEngine(it) }
+        }
+
         } catch (e: Exception) {
             Log.e(TAG, "ScanController error", e)
         }
@@ -1404,9 +1404,10 @@ class MiraInventoryProFragment : KeyDwonFragment(),
             if (!catalogEpcs.contains(epc)) return
         }
 
-        val session = scanSession ?: return
+                val session = scanSession ?: return
         when (session.evaluateTag(epc)) {
-            MiraScanSessionController.Decision.REJECT_SESSION_OFF -> return
+            MiraScanSessionController.Decision.REJECT_SESSION_OFF,
+            MiraScanSessionController.Decision.REJECT_DUP_FILTER -> return
 
             MiraScanSessionController.Decision.REJECT_LIMIT -> {
                 session.confirmLimitReached()
@@ -1431,7 +1432,11 @@ class MiraInventoryProFragment : KeyDwonFragment(),
                 }
                 return
             }
+
+            else -> return
         }
+        
+      }
     }
 
     override fun onDuplicateTag(epc: String?) {
@@ -3305,16 +3310,14 @@ class MiraInventoryProFragment : KeyDwonFragment(),
         val branchName = branchesManager?.activeBranchDisplayName ?: "—"
         val userName = getCurrentUserName().ifEmpty { tSystemUser }
 
-        val dateOnly: String
-        val timeOnly: String
-        try {
-            val now = Date()
-            dateOnly = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now)
-            timeOnly = SimpleDateFormat("HH:mm:ss", Locale.US).format(now)
+        val (dateOnly, timeOnly) = try {
+        val now = Date()
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now) to
+                SimpleDateFormat("HH:mm:ss", Locale.US).format(now)
         } catch (_: Exception) {
-            dateOnly = "—"
-            timeOnly = "—"
+            "—" to "—"
         }
+
 
         val reportNumber = "RPT-" + (System.currentTimeMillis() % 1000000L)
         val modeLabel = when {
