@@ -205,7 +205,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     private val stoppingReader = AtomicBoolean(false)
 
     @Volatile private var isFormLocked = false
-    private var isArabic = true
+    internal var isArabic: Boolean = true
+
 
     @Volatile private var isEpcBound = false
     private var boundEpcValue: String = ""
