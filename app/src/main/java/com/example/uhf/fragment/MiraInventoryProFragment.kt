@@ -2716,4 +2716,26 @@ class MiraInventoryProFragment : KeyDwonFragment(),
     override fun onSessionShouldStop(reason: String?) {
         if (isScanning) pauseScanning()
     }
+
+        // ==================== Public Bridge Methods for UHFMainActivity ====================
+
+    fun showInventoryScannerSettings() {
+        showPowerControlSheet()
+    }
+
+    fun showInventorySessionSettings() {
+        showCategorySelectionDialog()
+    }
+
+    fun getScannedCount(): Int {
+        return scannedItemsDisplayList.size
+    }
+
+    fun isCurrentlyScanning(): Boolean {
+        return isScanning
+    }
+
+    fun showArchiveReportsPublic() {
+        showArchiveReports()
+    }
 }
