@@ -9,10 +9,12 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
+import android.view.View
 import android.view.Window
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentDialog
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -33,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
@@ -41,8 +44,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.ViewTreeViewModelStoreOwner
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.manager.MiraLocalItemCache
 import com.example.uhf.ui.theme.MiraJewelryTheme
@@ -94,7 +95,6 @@ class RefundDialog(
         val isScanned: Boolean,
         val isSelected: Boolean = !isRefunded,
         val condition: String = "in_stock",
-        // معرّفات الكاش — تُستخدم لإبطال MiraLocalItemCache
         val epc: String = "",
         val serialNo: String = "",
         val gtin: String = "",
@@ -106,7 +106,9 @@ class RefundDialog(
     private enum class ScreenState { EMPTY, LOADING, SALE }
 
     private val isArabic: Boolean =
-        context.resources.configuration.locales[0]?.language == "ar"
+        AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+            context.resources.configuration.locales[0]?.language == "ar"
+
     private val handler = Handler(Looper.getMainLooper())
 
     private var currentSale: JSONObject? = null
@@ -141,11 +143,8 @@ class RefundDialog(
         window?.apply {
             setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            decorView.let { decor ->
-                if (context is ViewModelStoreOwner) {
-                    ViewTreeViewModelStoreOwner.set(decor, context)
-                }
-            }
+            decorView.layoutDirection =
+                if (isArabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
         }
 
         val composeView = ComposeView(context).apply {
@@ -279,7 +278,7 @@ class RefundDialog(
                     itemRowsState.add(
                         ItemRow(
                             itemId = it.optInt("item_id", 0),
-                            title = it.optString("item_title", "قطعة"),
+                            title = it.optString("item_title", if (isArabic) "قطعة" else "Item"),
                             karat = it.optString("gold_karat", "21K"),
                             weight = it.optDouble("net_weight_grams", 0.0),
                             price = it.optDouble("line_total_local", 0.0),
@@ -407,10 +406,8 @@ class RefundDialog(
                                 result = result.optJSONObject("data")!!
                             }
 
-                            // إبطال الكاش المحلي للقطع المرتجعة قبل استدعاء callback
                             invalidateCacheForRefundedItems()
 
-                            // حقن items في النتيجة إن لم تكن موجودة لـ OfflineGateCache
                             try {
                                 val existingItems = result.optJSONArray("items")
                                 if (existingItems == null || existingItems.length() == 0) {
@@ -1004,7 +1001,7 @@ class RefundDialog(
         modifier: Modifier = Modifier,
         title: String,
         subtitle: String,
-        icon: androidx.compose.ui.graphics.vector.ImageVector,
+        icon: ImageVector,
         accentColor: Color,
         selected: Boolean,
         enabled: Boolean,
