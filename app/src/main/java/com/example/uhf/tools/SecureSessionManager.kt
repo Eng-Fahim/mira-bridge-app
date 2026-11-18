@@ -42,15 +42,8 @@ class SecureSessionManager private constructor(context: Context) {
     private var cachedLastActiveTime: Long? = null
     private var cachedSessionLocked: Boolean? = null
     
-    // ✅ ضع الخصائص التوافقية هنا في مستوى الكلاس مباشرة:
-    val userId: Int
-        get() = getUserId()
-
-    val branchId: Int
-        get() = getBranchId()
-
-    val username: String
-        get() = getUsername()
+    // ✅ تم إزالة الخصائص المتعارضة (userId, branchId, username) 
+    // لأن الدوال getUserId(), getBranchId(), getUsername() موجودة بالفعل وتؤدي الغرض بالكامل بدون تعارض في توقيع جافا.
 
     enum class Role {
         SYSTEM_ADMIN,
