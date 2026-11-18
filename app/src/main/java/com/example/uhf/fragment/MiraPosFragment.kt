@@ -1945,7 +1945,7 @@ class MiraPosFragment : MiraBaseFragment() {
         try {
             isRefundDialogHiddenForScan = false
             refundDialog = RefundDialog(requireContext(), object : RefundDialog.RefundCallback {
-                override fun onRefundSuccess(result: JSONObject) {
+                override fun onRefundSuccess(result: JSONObject?) {
                     handleRefundSuccessV2(result)
                 }
 
