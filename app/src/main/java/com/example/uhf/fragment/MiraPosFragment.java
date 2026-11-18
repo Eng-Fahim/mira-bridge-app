@@ -1,3472 +1,3647 @@
-package com.example.uhf.fragment;
+package com.example.uhf.fragment
 
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Typeface;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.TextUtils;
-import android.util.Log;
-import android.view.KeyEvent;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.inputmethod.EditorInfo;
-import android.widget.EditText;
-import android.widget.FrameLayout;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import androidx.activity.OnBackPressedCallback;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.fragment.app.FragmentManager;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
-import com.example.uhf.MiraRfid.MiraIRFIDReader;
-import com.example.uhf.MiraRfid.RFIDManager;
-import com.example.uhf.R;
-import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.adapter.CartAdapter;
-import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.dialog.POSCheckoutDialog;
-import com.example.uhf.dialog.RefundDialog;
-import com.example.uhf.manager.GateSaleBridge;
-import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.manager.PosCartManager;
-import com.example.uhf.manager.PosHeroController;
-import com.example.uhf.manager.PosPriceResolver;
-import com.example.uhf.manager.PosUIManager;
-import com.example.uhf.manager.SmartScaleManager;
-import com.example.uhf.manager.MiraItemSyncManager;
-import com.example.uhf.manager.MiraLocalItemCache;
-import com.example.uhf.manager.MiraPriceManager;
-import com.example.uhf.manager.PendingSalesQueue;
-import com.example.uhf.manager.PendingSale;
-import com.example.uhf.manager.OfflineSalesSyncer;
-import com.example.uhf.manager.OfflineGateCache;
-import com.example.uhf.model.CartItem;
-import com.example.uhf.navigation.NavigationManager;
-import com.example.uhf.tools.DeviceDetector;
-import com.example.uhf.tools.SessionManager;
-import com.example.uhf.tools.UIHelper;
-import com.example.uhf.utils.MiraExecutorService;
-import com.example.uhf.utils.ScaleSimulationHelper;
-import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.textfield.TextInputLayout;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.KeyEvent
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.example.uhf.MiraRfid.MiraIRFIDReader
+import com.example.uhf.MiraRfid.MiraReaderSettings
+import com.example.uhf.MiraRfid.MiraRfidService
+import com.example.uhf.MiraRfid.RFIDManager
+import com.example.uhf.R
+import com.example.uhf.activity.BaseTabFragmentActivity
+import com.example.uhf.activity.UHFMainActivity
+import com.example.uhf.api.MiraApiClient
+import com.example.uhf.dialog.POSCheckoutDialog
+import com.example.uhf.dialog.PendingSalesBottomSheet
+import com.example.uhf.dialog.PosPowerSettingsDialog
+import com.example.uhf.dialog.RefundDialog
+import com.example.uhf.manager.*
+import com.example.uhf.model.CartItem
+import com.example.uhf.tools.DeviceDetector
+import com.example.uhf.tools.SessionManager
+import com.example.uhf.tools.UIHelper
+import com.example.uhf.ui.theme.MiraJewelryTheme
+import com.example.uhf.ui.theme.MiraTheme
+import com.example.uhf.utils.MiraExecutorService
+import com.example.uhf.utils.ScaleSimulationHelper
+import kotlinx.coroutines.delay
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.regex.Pattern
+import kotlin.math.abs
 
 /**
- * MiraPosFragment v6.8 — إدارة الديالوج أثناء الفشل (لا تفقد الإدخالات)
+ * MiraPosFragment (Jetpack Compose Edition)
+ * يحافظ على كامل التوافق مع UHFMainActivity، قارئ RFID، الميزان الذكي، الدفع، الاسترجاع، والمزامنة بدون إنترنت.
  */
-public class MiraPosFragment extends MiraBaseFragment {
+class MiraPosFragment : MiraBaseFragment() {
 
-    private static final String TAG = "MiraPosFragment";
+    companion object {
+        private const val TAG = "MiraPosFragment"
 
-    private static final int  KEYCODE_RFID_TRIGGER_1 = 139;
-    private static final int  KEYCODE_RFID_TRIGGER_2 = 280;
-    private static final int  KEYCODE_RFID_TRIGGER_3 = 293;
+        private const val KEYCODE_RFID_TRIGGER_1 = 139
+        private const val KEYCODE_RFID_TRIGGER_2 = 280
+        private const val KEYCODE_RFID_TRIGGER_3 = 293
 
-    private static final long PENDING_EPC_TIMEOUT_MS  = 10_000;
-    private static final long SCAN_COOLDOWN_MS        = 1500;
-    private static final long REFUND_MAX_DAYS         = 30;
-    private static final long LAST_SALE_VALIDITY_MS   = 5 * 60 * 1000;
-    private static final long ITEM_ADDED_DISPLAY_MS   = 1000;
-    private static final long AUTO_ADD_DELAY_MS       = 350;
-    private static final long SHORT_CODE_DELAY_MS     = 800L;
-    private static final long COOLDOWN_CLEANUP_MS     = 60_000L;
+        private const val PENDING_EPC_TIMEOUT_MS = 10_000L
+        private const val SCAN_COOLDOWN_MS = 1500L
+        private const val LAST_SALE_VALIDITY_MS = 5 * 60 * 1000L
+        private const val ITEM_ADDED_DISPLAY_MS = 1000L
+        private const val AUTO_ADD_DELAY_MS = 350L
+        private const val SHORT_CODE_DELAY_MS = 800L
+        private const val COOLDOWN_CLEANUP_MS = 60_000L
 
-    private static final int  AUTO_ADD_MIN_LEN        = 6;
-    private static final int  PARTIAL_SERIAL_MIN_LEN  = 3;
-    private static final int  PARTIAL_SERIAL_MAX_LEN  = 8;
+        private const val AUTO_ADD_MIN_LEN = 6
+        private const val PARTIAL_SERIAL_MIN_LEN = 3
+        private const val PARTIAL_SERIAL_MAX_LEN = 8
+        private const val TRIGGER_GRACE_MS = 2000L
 
-    private static final long TRIGGER_GRACE_MS        = 2000;
-
-    private static final String[] SERIAL_PREFIXES = {
+        private val SERIAL_PREFIXES = arrayOf(
             "MIRA-SN-", "MIRA-SN", "MIRASN-", "MIRASN",
             "MIRA-", "MIRA", "SN-", "SN", "JG-", "GOLD-", "GLD-"
-    };
-
-    private enum ScanMode { NONE, RFID, MANUAL, GS1 }
-    private volatile ScanMode currentScanMode = ScanMode.NONE;
-
-    private volatile boolean stopAfterFirstRead = false;
-    private final AtomicBoolean oneShotConsumed = new AtomicBoolean(false);
-
-    private final ExecutorService sdkExecutor =
-            Executors.newSingleThreadExecutor(r -> {
-                Thread t = new Thread(r, "POS-SDK");
-                t.setDaemon(true);
-                return t;
-            });
-
-    private SessionManager sessionManager;
-    private SmartScaleManager scaleManager;
-    private ScaleSimulationHelper simulationHelper;
-    private RefundDialog refundDialog;
-    private boolean isRefundDialogHiddenForScan = false;
-    private MiraExecutorService miraExecutor;
-    private MiraApiClient apiClient;
-    private MiraPriceManager priceManager;
-    private MiraBranchesManager branchesManager;
-    private PermissionManager permissionManager;
-
-    private PosCartManager cartManager;
-    private PosPriceResolver priceResolver;
-    private PosHeroController heroController;
-
-    private RFIDManager rfidManager;
-
-    @Nullable private PosCartManager.OnCartChangedListener cartListener;
-    @Nullable private MiraIRFIDReader.OnTagReadListener rfidListener;
-
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    @Nullable private Runnable cooldownCleanupRunnable;
-
-    private volatile boolean isCheckoutDialogShowing = false;
-    private volatile double  liveScaleWeight = 0.0;
-    private volatile int     savedPowerBeforePos = -1;
-    private volatile String  currentSaleUuid = null;
-
-    // ✅ جديد: مرجع للديالوج النشط
-    @Nullable private POSCheckoutDialog activeCheckoutDialog = null;
-
-    private PendingSalesQueue pendingSalesQueue;
-    private OfflineSalesSyncer offlineSyncer;
-
-    private final Set<String> pendingEpcs = ConcurrentHashMap.newKeySet();
-    private final Map<String, Long> lastScannedTimes = new ConcurrentHashMap<>();
-
-    private volatile MiraApiClient.ApiResponse lastSaleResponse = null;
-    private volatile long lastSaleResponseTime = 0;
-
-    private final AtomicBoolean isRefundInProgress = new AtomicBoolean(false);
-    private final AtomicReference<RefundItem> selectedRefundItem =
-            new AtomicReference<>(null);
-    private final AtomicInteger refundSearchSeq = new AtomicInteger(0);
-
-    private ImageButton btnPosRefund;
-    private ImageButton btnPosLastReceipt;
-    private ImageButton btnPosClose;
-    private OnBackPressedCallback backPressedCallback;
-
-    private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
-    private TextInputLayout tilManualEpc;
-    private EditText etManualEpc;
-    private TextView btnAddManual;
-    private TextView btnCheckout;
-    private TextView btnClearCart;
-
-    private RecyclerView rvCartItems;
-    private View layoutCartEmptyState;
-    private View posHeroContainer;
-    private View posManualInputContainer;
-    private View posSummaryStrip;
-    private View posFooterSticky;
-
-    private View btnPosScanGs1;
-    private View btnPosScanRfid;
-    private View btnPosScanManual;
-
-    @Nullable private View pendingSalesBadge;
-    @Nullable private TextView tvPendingBadgeCount;
-    private CartAdapter cartAdapter;
-
-    @Nullable private View scanFeedbackOverlay;
-    @Nullable private MaterialCardView scanFeedbackCard;
-    @Nullable private ImageView ivFeedbackIcon;
-    @Nullable private TextView tvFeedbackTitle;
-    @Nullable private TextView tvFeedbackDetails;
-    @Nullable private TextView tvFeedbackPrice;
-    @Nullable private View vFeedbackAccent;
-    @Nullable private Runnable pendingHideFeedback;
-
-    @Nullable private volatile String pendingBarcodeFromScanner = null;
-    @Nullable private Runnable pendingStopRfid = null;
-
-    private static final class RefundItem {
-        final String epc, serialNo, title;
-        final int    itemId;
-        final long   saleId;
-        final double originalPrice;
-
-        RefundItem(String epc, String serialNo, int itemId, long saleId,
-                   double originalPrice, String title) {
-            this.epc = epc;
-            this.serialNo = serialNo;
-            this.itemId = itemId;
-            this.saleId = saleId;
-            this.originalPrice = originalPrice;
-            this.title = title;
-        }
+        )
     }
 
-    private static final class RefundEligibility {
-        final boolean isEligible;
-        final String  reason;
-        final long    saleId;
-        final int     itemId;
-        final double  originalPrice;
-        final String  originalSaleDate;
+    private enum class ScanMode { NONE, RFID, MANUAL, GS1 }
 
-        private RefundEligibility(boolean isEligible, String reason, long saleId,
-                                  int itemId, double originalPrice, String originalSaleDate) {
-            this.isEligible = isEligible;
-            this.reason = reason;
-            this.saleId = saleId;
-            this.itemId = itemId;
-            this.originalPrice = originalPrice;
-            this.originalSaleDate = originalSaleDate;
-        }
-
-        static RefundEligibility eligible(long saleId, int itemId,
-                                          double price, String date) {
-            return new RefundEligibility(true, null, saleId, itemId, price, date);
-        }
-
-        static RefundEligibility notEligible(String reason) {
-            return new RefundEligibility(false, reason, 0, 0, 0, "");
-        }
+    private enum class HeroVisualState {
+        IDLE, GS1_SCANNING, RFID_LISTENING, MANUAL_ENTRY, ITEM_ADDED, ERROR
     }
 
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        try {
-            return inflater.inflate(R.layout.fragment_mira_pos, container, false);
-        } catch (Exception e) {
-            Log.e(TAG, "onCreateView error", e);
-            return null;
-        }
+    private data class ScanFeedbackBanner(
+        val id: Long = System.currentTimeMillis(),
+        val title: String,
+        val details: String?,
+        val price: String?,
+        val accentColor: Color,
+        val isError: Boolean = false,
+        val isWarning: Boolean = false
+    )
+
+    @Volatile
+    private var currentScanMode = ScanMode.NONE
+
+    @Volatile
+    private var stopAfterFirstRead = false
+    private val oneShotConsumed = AtomicBoolean(false)
+
+    private val sdkExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "POS-SDK").apply { isDaemon = true }
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    private var sessionManager: SessionManager? = null
+    private var scaleManager: SmartScaleManager? = null
+    private var simulationHelper: ScaleSimulationHelper? = null
+    private var refundDialog: RefundDialog? = null
+    private var isRefundDialogHiddenForScan = false
+    private var miraExecutor: MiraExecutorService? = null
+    private var apiClient: MiraApiClient? = null
+    private var priceManager: MiraPriceManager? = null
+    private var branchesManager: MiraBranchesManager? = null
+    private var permissionManager: PermissionManager? = null
 
-        try {
-            Context ctx = requireContext().getApplicationContext();
+    private var cartManager: PosCartManager? = null
+    private var priceResolver: PosPriceResolver? = null
+    private var rfidManager: RFIDManager? = null
 
-            branchesManager     = MiraBranchesManager.getInstance(ctx);
-            priceManager        = MiraPriceManager.getInstance(ctx);
-            permissionManager   = PermissionManager.getInstance(ctx);
-            sessionManager      = new SessionManager(ctx);
+    private var cartListener: PosCartManager.OnCartChangedListener? = null
+    private var rfidListener: MiraIRFIDReader.OnTagReadListener? = null
 
-            miraExecutor = MiraExecutorService.getInstance();
-            if (miraExecutor == null || !miraExecutor.isHealthy()) {
-                Log.e(TAG, "MiraExecutorService unhealthy");
-                showToast(getString(R.string.pos_msg_engine_error));
-                return;
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var cooldownCleanupRunnable: Runnable? = null
+
+    @Volatile
+    private var isCheckoutDialogShowing = false
+
+    @Volatile
+    private var liveScaleWeight = 0.0
+
+    @Volatile
+    private var savedPowerBeforePos = -1
+
+    @Volatile
+    private var currentSaleUuid: String? = null
+
+    @Volatile
+    private var activeCheckoutDialog: POSCheckoutDialog? = null
+
+    private var pendingSalesQueue: PendingSalesQueue? = null
+    private var offlineSyncer: OfflineSalesSyncer? = null
+
+    private val pendingEpcs: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val lastScannedTimes = ConcurrentHashMap<String, Long>()
+
+    @Volatile
+    private var lastSaleResponse: MiraApiClient.ApiResponse? = null
+
+    @Volatile
+    private var lastSaleResponseTime = 0L
+
+    private var backPressedCallback: OnBackPressedCallback? = null
+
+    @Volatile
+    private var pendingBarcodeFromScanner: String? = null
+    private var pendingStopRfid: Runnable? = null
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Jetpack Compose Reactive States
+    // ═══════════════════════════════════════════════════════════════════
+
+    private var cartItemsState by mutableStateOf<List<CartItem>>(emptyList())
+    private var cartCountState by mutableIntStateOf(0)
+    private var cartTotalUsdState by mutableDoubleStateOf(0.0)
+    private var cartHasUnavailableState by mutableStateOf(false)
+
+    private var heroState by mutableStateOf(HeroVisualState.IDLE)
+    private var rfidReadCountState by mutableIntStateOf(0)
+    private var isRfidConnectedState by mutableStateOf(true)
+    private var hasRfidHardwareState by mutableStateOf(true)
+
+    private var isManualInputVisibleState by mutableStateOf(false)
+    private var manualCodeInputState by mutableStateOf("")
+
+    private var scaleStatusTextState by mutableStateOf("")
+    private var isScaleConnectedState by mutableStateOf(false)
+
+    private var statusMessageState by mutableStateOf("")
+    private var pendingSalesCountState by mutableIntStateOf(0)
+    private var activeBranchNameState by mutableStateOf("")
+
+    private var canUsePosState by mutableStateOf(true)
+    private var canPerformRefundState by mutableStateOf(false)
+    private var isButtonsBusyState by mutableStateOf(false)
+
+    private var scanFeedbackState by mutableStateOf<ScanFeedbackBanner?>(null)
+    private var showExitDialogState by mutableStateOf(false)
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ═══════════════════════════════════════════════════════════════════
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                MiraJewelryTheme {
+                    MiraPosScreen()
+                }
             }
-            priceResolver     = new PosPriceResolver(priceManager);
-            cartManager       = PosCartManager.getInstance();
-            apiClient         = MiraApiClient.getInstance(ctx);
-            pendingSalesQueue = PendingSalesQueue.getInstance(ctx);
-            offlineSyncer     = OfflineSalesSyncer.getInstance(ctx);
+        }
+    }
 
-            rfidManager = RFIDManager.getInstance(ctx);
-            if (rfidManager != null) {
-                rfidListener = new MiraIRFIDReader.OnTagReadListener() {
-                    @Override
-                    public void onTagRead(String epc, int rssi) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        try {
+            val ctx = requireContext().applicationContext
+
+            branchesManager = MiraBranchesManager.getInstance(ctx)
+            priceManager = MiraPriceManager.getInstance(ctx)
+            permissionManager = PermissionManager.getInstance(ctx)
+            sessionManager = SessionManager(ctx)
+
+            miraExecutor = MiraExecutorService.getInstance()
+            if (miraExecutor == null || miraExecutor?.isHealthy != true) {
+                Log.e(TAG, "MiraExecutorService unhealthy")
+                showToast(getString(R.string.pos_msg_engine_error))
+                return
+            }
+
+            priceResolver = PosPriceResolver(priceManager)
+            cartManager = PosCartManager.getInstance()
+            apiClient = MiraApiClient.getInstance(ctx)
+            pendingSalesQueue = PendingSalesQueue.getInstance(ctx)
+            offlineSyncer = OfflineSalesSyncer.getInstance(ctx)
+
+            scaleStatusTextState = getString(R.string.pos_scale_offline)
+            statusMessageState = getString(R.string.pos_cart_empty)
+            activeBranchNameState = branchesManager?.activeBranchDisplayName ?: ""
+
+            hasRfidHardwareState = try {
+                DeviceDetector.isRfidHardwareSupported()
+            } catch (_: Exception) {
+                false
+            }
+
+            rfidManager = RFIDManager.getInstance(ctx)
+            rfidManager?.let { manager ->
+                rfidListener = object : MiraIRFIDReader.OnTagReadListener {
+                    override fun onTagRead(epc: String, rssi: Int) {
                         if (currentScanMode == ScanMode.RFID) {
-                            safeRun(() -> onRingScanned(epc));
+                            safeRun { onRingScanned(epc) }
                         }
                     }
-                    @Override public void onScanStarted() {}
-                    @Override public void onScanStopped() {}
-                    @Override
-                    public void onConnectionChanged(boolean connected) {
-                        safeRun(() -> {
-                            if (btnPosScanRfid != null
-                                    && currentScanMode == ScanMode.RFID) {
-                                btnPosScanRfid.setAlpha(connected ? 1.0f : 0.5f);
-                            }
-                        });
+
+                    override fun onScanStarted() {}
+                    override fun onScanStopped() {}
+
+                    override fun onConnectionChanged(connected: Boolean) {
+                        safeRun {
+                            isRfidConnectedState = connected
+                        }
                     }
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "RFID Error: " + error);
+
+                    override fun onError(error: String) {
+                        Log.e(TAG, "RFID Error: $error")
                     }
-                };
-                rfidManager.addListener(rfidListener);
-            }
-
-            bindViews(view);
-            setupHeroController(view);
-            initScanFeedbackCard(view);
-            setupRecyclerView();
-            setupCartListener();
-            setupListeners();
-            applyPermissions();
-            hideRfidButtonIfUnsupported();
-
-            initSmartScale();
-            requestScalePermissions();
-
-            renderCart(cartManager.snapshot(), null, -1);
-
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-            setupBackPressedHandler();
-            checkAutoOpenRefundIntent();
-
-        } catch (Exception e) {
-            Log.e(TAG, "onViewCreated error", e);
-        }
-    }
-
-    private void requestScalePermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ContextCompat.checkSelfPermission(requireContext(),
-                    android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(requireContext(),
-                    android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-
-                ActivityCompat.requestPermissions(requireActivity(),
-                        new String[]{
-                                android.Manifest.permission.BLUETOOTH_SCAN,
-                                android.Manifest.permission.BLUETOOTH_CONNECT
-                        }, 1002);
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(requireContext(),
-                    android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(requireActivity(),
-                        new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 1002);
-            }
-        }
-    }
-
-    private void updatePendingSalesBadge() {
-        try {
-            if (pendingSalesBadge == null || pendingSalesQueue == null) return;
-            int pending = pendingSalesQueue.countPending();
-            if (pending > 0) {
-                pendingSalesBadge.setVisibility(View.VISIBLE);
-                if (tvPendingBadgeCount != null) {
-                    tvPendingBadgeCount.setText(String.valueOf(pending));
                 }
-            } else {
-                pendingSalesBadge.setVisibility(View.GONE);
+                manager.addListener(rfidListener)
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updatePendingSalesBadge error", e);
+
+            setupCartListener()
+            applyPermissions()
+            initSmartScale()
+            requestScalePermissions()
+
+            cartManager?.let { syncCartState(it.snapshot()) }
+            heroState = HeroVisualState.IDLE
+
+            setupBackPressedHandler()
+            checkAutoOpenRefundIntent()
+        } catch (e: Exception) {
+            Log.e(TAG, "onViewCreated error", e)
         }
     }
 
-    private void openPendingSalesSheet() {
+    override fun onStart() {
+        super.onStart()
         try {
-            if (!isFragmentAlive()) return;
-            com.example.uhf.dialog.PendingSalesBottomSheet sheet =
-                    new com.example.uhf.dialog.PendingSalesBottomSheet();
-            sheet.show(getParentFragmentManager(), "PendingSalesSheet");
-        } catch (Exception e) {
-            Log.e(TAG, "openPendingSalesSheet error", e);
+            (activity as? UHFMainActivity)?.setBottomNavVisible(false)
+        } catch (_: Exception) {
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
+    override fun onResume() {
+        super.onResume()
         try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-                View fab = getActivity().findViewById(R.id.fabActionCenter);
-                if (fab != null) fab.setVisibility(View.GONE);
+            (activity as? UHFMainActivity)?.let { act ->
+                act.setActivePOSFragment(this)
+                act.findViewById<View>(R.id.fabActionCenter)?.visibility = View.GONE
             }
 
-            isCheckoutDialogShowing = false;
-            currentScanMode = ScanMode.NONE;
-            stopAfterFirstRead = false;
-            oneShotConsumed.set(false);
-            cancelPendingStopIfAny();
+            isCheckoutDialogShowing = false
+            currentScanMode = ScanMode.NONE
+            stopAfterFirstRead = false
+            oneShotConsumed.set(false)
+            cancelPendingStopIfAny()
 
-            if (sdkExecutor.isShutdown()) {
-                Log.w(TAG, "onResume: sdkExecutor shutdown — cannot recover");
-            }
+            scaleManager?.connect()
+            applyLowPowerForPos()
 
-            if (scaleManager != null) scaleManager.connect();
-            applyLowPowerForPos();
+            cartManager?.let { syncCartState(it.snapshot()) }
+            activeBranchNameState = branchesManager?.activeBranchDisplayName ?: ""
 
-            if (cartManager != null) {
-                renderCart(cartManager.snapshot(), null, -1);
-            }
-
-            processPendingBarcodeIfAny();
-            updatePendingSalesBadge();
-            triggerOfflineSyncIfNeeded();
-
-            startCooldownCleanup();
-
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error", e);
+            processPendingBarcodeIfAny()
+            updatePendingSalesBadge()
+            triggerOfflineSyncIfNeeded()
+            startCooldownCleanup()
+        } catch (e: Exception) {
+            Log.e(TAG, "onResume error", e)
         }
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
+    override fun onPause() {
+        super.onPause()
         try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setBottomNavVisible(false);
-            }
-        } catch (Exception ignored) {}
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        try {
-            cancelPendingStopIfAny();
-            stopCooldownCleanup();
+            cancelPendingStopIfAny()
+            stopCooldownCleanup()
 
             if (currentScanMode != ScanMode.NONE) {
-                switchScanMode(ScanMode.NONE);
+                switchScanMode(ScanMode.NONE)
             }
 
-            isCheckoutDialogShowing = false;
+            isCheckoutDialogShowing = false
+            heroState = HeroVisualState.IDLE
 
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
+            (activity as? UHFMainActivity)?.let { act ->
+                act.setActivePOSFragment(null)
+                act.findViewById<View>(R.id.fabActionCenter)?.visibility = View.VISIBLE
             }
-
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-                View fab = getActivity().findViewById(R.id.fabActionCenter);
-                if (fab != null) fab.setVisibility(View.VISIBLE);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onPause error", e);
+        } catch (e: Exception) {
+            Log.e(TAG, "onPause error", e)
         }
     }
 
-    @Override
-    public void onStop() {
-        super.onStop();
+    override fun onStop() {
+        super.onStop()
         try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).setBottomNavVisible(true);
-            }
-        } catch (Exception ignored) {}
+            (activity as? UHFMainActivity)?.setBottomNavVisible(true)
+        } catch (_: Exception) {
+        }
     }
 
-    @Override
-    public void onHiddenChanged(boolean hidden) {
-        super.onHiddenChanged(hidden);
-
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
         if (!hidden) {
-            processPendingBarcodeIfAny();
-
+            processPendingBarcodeIfAny()
             if (isRefundDialogHiddenForScan) {
-                isRefundDialogHiddenForScan = false;
-                if (refundDialog != null && !refundDialog.isShowing()) {
-                    refundDialog.show();
+                isRefundDialogHiddenForScan = false
+                if (refundDialog != null && refundDialog?.isShowing == false) {
+                    refundDialog?.show()
                 }
             }
         }
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-
+    override fun onDestroyView() {
+        super.onDestroyView()
         try {
-            stopRFIDScan();
+            stopRFIDScan()
 
-            if (backPressedCallback != null) {
-                backPressedCallback.setEnabled(false);
-                backPressedCallback.remove();
-                backPressedCallback = null;
+            backPressedCallback?.let {
+                it.isEnabled = false
+                it.remove()
             }
+            backPressedCallback = null
 
             if (rfidManager != null && rfidListener != null) {
-                rfidManager.removeListener(rfidListener);
-                rfidListener = null;
+                rfidManager?.removeListener(rfidListener)
+                rfidListener = null
             }
 
             if (cartManager != null && cartListener != null) {
-                cartManager.removeListener(cartListener);
-                cartListener = null;
+                cartManager?.removeListener(cartListener)
+                cartListener = null
             }
 
-            restoreOriginalPower();
+            restoreOriginalPower()
 
-            if (scaleManager != null) scaleManager.cleanup();
-            if (simulationHelper != null) simulationHelper.cleanup();
+            scaleManager?.cleanup()
+            simulationHelper?.cleanup()
 
-            if (heroController != null) {
-                heroController.cleanup();
-                heroController = null;
-            }
+            cancelPendingStopIfAny()
+            stopCooldownCleanup()
 
-            if (rvCartItems != null) {
-                rvCartItems.setAdapter(null);
-                rvCartItems.setLayoutManager(null);
-            }
-            cartAdapter = null;
+            pendingEpcs.clear()
+            lastScannedTimes.clear()
+            currentScanMode = ScanMode.NONE
+            stopAfterFirstRead = false
+            oneShotConsumed.set(false)
+            currentSaleUuid = null
+            activeCheckoutDialog = null
 
-            if (pendingHideFeedback != null && mainHandler != null) {
-                mainHandler.removeCallbacks(pendingHideFeedback);
-                pendingHideFeedback = null;
-            }
-
-            cancelPendingStopIfAny();
-            stopCooldownCleanup();
-
-            scanFeedbackOverlay = null;
-            scanFeedbackCard = null;
-            ivFeedbackIcon = null;
-            tvFeedbackTitle = null;
-            tvFeedbackDetails = null;
-            tvFeedbackPrice = null;
-            vFeedbackAccent = null;
-
-            pendingEpcs.clear();
-            lastScannedTimes.clear();
-            selectedRefundItem.set(null);
-            currentScanMode = ScanMode.NONE;
-            stopAfterFirstRead = false;
-            oneShotConsumed.set(false);
-            currentSaleUuid = null;
-            refundSearchSeq.incrementAndGet();
-
-            // ✅ نظّف مرجع الديالوج
-            activeCheckoutDialog = null;
-
-            if (mainHandler != null) {
-                mainHandler.removeCallbacksAndMessages(null);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroyView error", e);
+            mainHandler.removeCallbacksAndMessages(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "onDestroyView error", e)
         }
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
+    override fun onDestroy() {
+        super.onDestroy()
         try {
-            stopRFIDScan();
+            stopRFIDScan()
+            scaleManager?.cleanup()
+            scaleManager = null
 
-            if (scaleManager != null) {
-                scaleManager.cleanup();
-                scaleManager = null;
+            if (!sdkExecutor.isShutdown) {
+                sdkExecutor.shutdownNow()
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "onDestroy error", e)
+        }
+    }
 
-            if (sdkExecutor != null && !sdkExecutor.isShutdown()) {
-                try {
-                    sdkExecutor.shutdownNow();
-                } catch (Exception e) {
-                    Log.w(TAG, "sdkExecutor.shutdownNow error", e);
+    // ═══════════════════════════════════════════════════════════════════
+    //  Cart State Sync
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun setupCartListener() {
+        val manager = cartManager ?: return
+        cartListener = PosCartManager.OnCartChangedListener { snapshot, _, _ ->
+            safeRun { syncCartState(snapshot) }
+        }
+        manager.addListener(cartListener)
+    }
+
+    private fun syncCartState(snapshot: PosCartManager.CartSnapshot) {
+        if (!isFragmentAlive()) return
+        cartItemsState = ArrayList(snapshot.items)
+        cartCountState = snapshot.count
+        cartTotalUsdState = snapshot.totalUsd
+        cartHasUnavailableState = snapshot.hasUnavailable
+
+        statusMessageState = when {
+            !canUsePosState -> if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied"
+            snapshot.count == 0 -> getString(R.string.pos_cart_empty)
+            snapshot.hasUnavailable -> getString(R.string.pos_cart_unavailable)
+            else -> getString(R.string.pos_cart_ready)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Permissions & Scale Setup
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun requestScalePermissions() {
+        val ctx = context ?: return
+        val act = activity ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    act,
+                    arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT),
+                    1002
+                )
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    act,
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    1002
+                )
+            }
+        }
+    }
+
+    private fun applyPermissions() {
+        canUsePosState = hasPosPermission()
+        canPerformRefundState = canPerformRefund()
+        if (!canUsePosState) {
+            statusMessageState = if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied"
+        }
+    }
+
+    private fun hasPosPermission(): Boolean {
+        return try {
+            permissionManager?.canUsePos() == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun canPerformCheckout(): Boolean {
+        val pm = permissionManager ?: return false
+        return try {
+            pm.canUsePos() && (pm.isPosOperator() || pm.isManager() || pm.isAdmin())
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun canPerformRefund(): Boolean {
+        val pm = permissionManager ?: return false
+        return try {
+            pm.isManager() || pm.isAdmin() || pm.isFinanceManager()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun initSmartScale() {
+        try {
+            scaleManager = SmartScaleManager(requireContext(), object : SmartScaleManager.ScaleCallback {
+                override fun onWeightReceived(weight: Double) {
+                    liveScaleWeight = weight
+                    safeRun {
+                        isScaleConnectedState = true
+                        scaleStatusTextState = String.format(Locale.US, "⚖️ %.2fg", weight)
+                        updateTopCartItemScaleWeight(weight)
+                    }
                 }
-                Log.d(TAG, "✅ sdkExecutor shutdown (Fragment destroyed)");
-            }
 
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroy error", e);
+                override fun onScaleConnected(name: String) {
+                    safeRun {
+                        isScaleConnectedState = true
+                        scaleStatusTextState = "⚖️ $name"
+                        showToast(getString(R.string.pos_msg_scale_connected, name))
+                    }
+                }
+
+                override fun onScaleDisconnected() {
+                    liveScaleWeight = 0.0
+                    safeRun {
+                        isScaleConnectedState = false
+                        scaleStatusTextState = getString(R.string.pos_scale_offline)
+                    }
+                }
+
+                override fun onScaleError(error: String) {
+                    Log.e(TAG, "Scale Error: $error")
+                }
+            })
+
+            simulationHelper = ScaleSimulationHelper(requireContext()) { weight, _ ->
+                safeRun {
+                    liveScaleWeight = weight
+                    isScaleConnectedState = true
+                    scaleStatusTextState = String.format(Locale.US, "⚖️ %.2fg", weight)
+                    updateTopCartItemScaleWeight(weight)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "initSmartScale error", e)
+        }
+    }
+
+    private fun updateTopCartItemScaleWeight(currentScaleWeight: Double) {
+        val manager = cartManager ?: return
+        if (manager.isEmpty || currentScaleWeight <= 0) return
+        try {
+            val items = manager.items
+            if (items.isEmpty()) return
+            val topItem = items[0] ?: return
+            if (topItem.scaleWeight == currentScaleWeight) return
+            topItem.scaleWeight = currentScaleWeight
+            manager.updateItemAt(0, topItem)
+        } catch (e: Exception) {
+            Log.e(TAG, "updateTopCartItemScaleWeight error", e)
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Cooldown cleanup
+    //  Cooldown & Power Management
     // ═══════════════════════════════════════════════════════════════════
 
-    private void startCooldownCleanup() {
-        stopCooldownCleanup();
-        cooldownCleanupRunnable = new Runnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-                lastScannedTimes.entrySet().removeIf(
-                        e -> (now - e.getValue()) > COOLDOWN_CLEANUP_MS);
-                mainHandler.postDelayed(this, COOLDOWN_CLEANUP_MS);
+    private fun startCooldownCleanup() {
+        stopCooldownCleanup()
+        cooldownCleanupRunnable = object : Runnable {
+            override fun run() {
+                val now = System.currentTimeMillis()
+                lastScannedTimes.entries.removeIf { (now - it.value) > COOLDOWN_CLEANUP_MS }
+                mainHandler.postDelayed(this, COOLDOWN_CLEANUP_MS)
             }
-        };
-        mainHandler.postDelayed(cooldownCleanupRunnable, COOLDOWN_CLEANUP_MS);
-    }
-
-    private void stopCooldownCleanup() {
-        if (cooldownCleanupRunnable != null) {
-            mainHandler.removeCallbacks(cooldownCleanupRunnable);
-            cooldownCleanupRunnable = null;
         }
+        mainHandler.postDelayed(cooldownCleanupRunnable!!, COOLDOWN_CLEANUP_MS)
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Power Management
-    // ═══════════════════════════════════════════════════════════════════
+    private fun stopCooldownCleanup() {
+        cooldownCleanupRunnable?.let { mainHandler.removeCallbacks(it) }
+        cooldownCleanupRunnable = null
+    }
 
-    private void applyLowPowerForPos() {
-        if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
-
-        sdkExecutor.execute(() -> {
+    private fun applyLowPowerForPos() {
+        if (sdkExecutor.isShutdown) return
+        sdkExecutor.execute {
             try {
-                Context appCtx = getSafeAppContext();
-                if (appCtx == null) return;
+                val appCtx = getSafeAppContext() ?: return@execute
+                val settings = MiraReaderSettings.getInstance(appCtx)
+                savedPowerBeforePos = settings.powerDbm
+                val posPower = settings.posPowerDbm
+                if (savedPowerBeforePos == posPower) return@execute
 
-                com.example.uhf.MiraRfid.MiraReaderSettings settings =
-                        com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appCtx);
-
-                savedPowerBeforePos = settings.getPowerDbm();
-                int posPower = settings.getPosPowerDbm();
-
-                if (savedPowerBeforePos == posPower) return;
-
-                settings.setPowerDbm(posPower);
-
-                com.rscja.deviceapi.RFIDWithUHFUART reader =
-                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-                if (reader != null) {
+                settings.powerDbm = posPower
+                BaseTabFragmentActivity.getSharedReader()?.let { reader ->
                     try {
-                        reader.setPower(posPower);
-                    } catch (Exception e) {
-                        Log.w(TAG, "setPower failed", e);
+                        reader.setPower(posPower)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "setPower failed", e)
                     }
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "applyLowPowerForPos error", e);
+            } catch (e: Exception) {
+                Log.e(TAG, "applyLowPowerForPos error", e)
             }
-        });
+        }
     }
 
-    private void applyPosPowerImmediate(int newPowerDbm) {
-        if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
-
-        sdkExecutor.execute(() -> {
+    private fun applyPosPowerImmediate(newPowerDbm: Int) {
+        if (sdkExecutor.isShutdown) return
+        sdkExecutor.execute {
             try {
-                com.rscja.deviceapi.RFIDWithUHFUART reader =
-                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-                if (reader != null) {
-                    try {
-                        reader.setPower(newPowerDbm);
-                    } catch (Exception e) {
-                        Log.w(TAG, "setPower failed", e);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "applyPosPowerImmediate error", e);
+                BaseTabFragmentActivity.getSharedReader()?.setPower(newPowerDbm)
+            } catch (e: Exception) {
+                Log.w(TAG, "applyPosPowerImmediate failed", e)
             }
-        });
+        }
     }
 
-    private void restoreOriginalPower() {
-        if (savedPowerBeforePos <= 0) return;
-        if (sdkExecutor == null || sdkExecutor.isShutdown()) return;
+    private fun restoreOriginalPower() {
+        if (savedPowerBeforePos <= 0 || sdkExecutor.isShutdown) return
+        val target = savedPowerBeforePos
+        savedPowerBeforePos = -1
 
-        final int target = savedPowerBeforePos;
-        savedPowerBeforePos = -1;
-
-        sdkExecutor.execute(() -> {
+        sdkExecutor.execute {
             try {
-                Context appCtx = getSafeAppContext();
-                if (appCtx == null) return;
-
-                com.example.uhf.MiraRfid.MiraReaderSettings settings =
-                        com.example.uhf.MiraRfid.MiraReaderSettings.getInstance(appCtx);
-
-                settings.setPowerDbm(target);
-
-                com.rscja.deviceapi.RFIDWithUHFUART reader =
-                        com.example.uhf.activity.BaseTabFragmentActivity.getSharedReader();
-                if (reader != null) {
-                    try {
-                        reader.setPower(target);
-                    } catch (Exception ignored) {}
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "restoreOriginalPower error", e);
+                val appCtx = getSafeAppContext() ?: return@execute
+                val settings = MiraReaderSettings.getInstance(appCtx)
+                settings.powerDbm = target
+                BaseTabFragmentActivity.getSharedReader()?.setPower(target)
+            } catch (e: Exception) {
+                Log.e(TAG, "restoreOriginalPower error", e)
             }
-        });
+        }
     }
 
-    private boolean isFragmentAlive() {
-        return isAdded() && !isRemoving() && !isDetached()
-                && getActivity() != null && !getActivity().isFinishing()
-                && !getActivity().isDestroyed();
-    }
-
-    @Nullable
-    private Context getSafeAppContext() {
+    private fun openPosPowerSettings() {
+        if (!isFragmentAlive()) return
         try {
-            if (getContext() != null) return getContext().getApplicationContext();
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    private void bindViews(View view) {
-        tvScaleStatus   = view.findViewById(R.id.tvPosScaleStatus);
-        tvItemCount     = view.findViewById(R.id.tvPosItemCount);
-        tvTotalAmount   = view.findViewById(R.id.tvPosTotalAmount);
-        tvCartStatus    = view.findViewById(R.id.tvPosCartStatus);
-
-        tilManualEpc    = view.findViewById(R.id.tilPosManualEpc);
-        etManualEpc     = view.findViewById(R.id.etPosManualEpc);
-        btnAddManual    = view.findViewById(R.id.btnPosAddManual);
-        if (btnAddManual != null) btnAddManual.setVisibility(View.GONE);
-
-        btnCheckout     = view.findViewById(R.id.btnPosCheckout);
-        btnClearCart    = view.findViewById(R.id.btnPosClearCart);
-
-        btnPosRefund      = view.findViewById(R.id.btnPosRefund);
-        btnPosLastReceipt = view.findViewById(R.id.btnPosLastReceipt);
-        btnPosClose       = view.findViewById(R.id.btnPosClose);
-
-        rvCartItems             = view.findViewById(R.id.rvPosCartItems);
-        layoutCartEmptyState    = view.findViewById(R.id.layoutCartEmptyState);
-        posHeroContainer        = view.findViewById(R.id.posHeroContainer);
-        posManualInputContainer = view.findViewById(R.id.posManualInputContainer);
-        posSummaryStrip         = view.findViewById(R.id.posSummaryStrip);
-        posFooterSticky         = view.findViewById(R.id.posFooterSticky);
-
-        btnPosScanGs1    = view.findViewById(R.id.btnPosScanGs1);
-        btnPosScanRfid   = view.findViewById(R.id.btnPosScanRfid);
-        btnPosScanManual = view.findViewById(R.id.btnPosScanManual);
-
-        pendingSalesBadge   = view.findViewById(R.id.pendingSalesBadge);
-        tvPendingBadgeCount = view.findViewById(R.id.tvPendingBadgeCount);
-
-        if (pendingSalesBadge != null) {
-            pendingSalesBadge.setOnClickListener(v -> openPendingSalesSheet());
-        }
-        if (tvScaleStatus != null) {
-            tvScaleStatus.setOnClickListener(v -> {
-                if (scaleManager != null) scaleManager.showSettingsDialog();
-            });
-        }
-        if (etManualEpc != null) etManualEpc.clearFocus();
-    }
-
-    private void hideRfidButtonIfUnsupported() {
-        try {
-            boolean hasRfid = DeviceDetector.isRfidHardwareSupported();
-            if (btnPosScanRfid != null) {
-                btnPosScanRfid.setVisibility(hasRfid ? View.VISIBLE : View.GONE);
+            val ctx = getSafeAppContext() ?: return
+            PosPowerSettingsDialog.show(ctx, isArabic) { newPowerDbm ->
+                applyPosPowerImmediate(newPowerDbm)
+                showToast(
+                    if (isArabic) "✅ تم تحديث قوة القراءة إلى $newPowerDbm dBm"
+                    else "✅ Power updated to $newPowerDbm dBm"
+                )
             }
-        } catch (Exception e) {
-            Log.w(TAG, "hideRfidButtonIfUnsupported error", e);
-        }
-    }
-
-    private void setupHeroController(View view) {
-        try {
-            heroController = new PosHeroController(
-                    view.findViewById(R.id.posHeroGlow),
-                    view.findViewById(R.id.posHeroRing),
-                    view.findViewById(R.id.ivPosHeroIcon),
-                    view.findViewById(R.id.ivPosHeroSparkleTop),
-                    view.findViewById(R.id.ivPosHeroSparkleBottom),
-                    view.findViewById(R.id.tvPosHeroTitleAr),
-                    view.findViewById(R.id.tvPosHeroTitleEn),
-                    view.findViewById(R.id.posHeroDivider),
-                    view.findViewById(R.id.tvPosHeroMessage),
-                    view.findViewById(R.id.tvPosHeroHint),
-                    view.findViewById(R.id.tvPosRfidCount),
-                    view.findViewById(R.id.btnPosScanGs1),
-                    view.findViewById(R.id.btnPosScanRfid),
-                    view.findViewById(R.id.btnPosScanManual),
-                    view.findViewById(R.id.ivPosGs1Icon),
-                    view.findViewById(R.id.ivPosRfidIcon),
-                    view.findViewById(R.id.ivPosManualIcon),
-                    view.findViewById(R.id.tvPosGs1Label),
-                    view.findViewById(R.id.tvPosRfidLabel),
-                    view.findViewById(R.id.tvPosManualLabel)
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "setupHeroController error", e);
-        }
-    }
-
-    private void setupRecyclerView() {
-        try {
-            if (rvCartItems == null || cartManager == null) return;
-
-            rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
-            rvCartItems.setHasFixedSize(false);
-
-            cartAdapter = new CartAdapter(
-                    position -> {
-                        if (cartManager != null) cartManager.removeItemAt(position);
-                    },
-                    isArabic,
-                    priceManager
-            );
-
-            rvCartItems.setAdapter(cartAdapter);
-            cartAdapter.replaceItems(cartManager.getItems());
-            cartAdapter.notifyDataSetChanged();
-        } catch (Exception e) {
-            Log.e(TAG, "setupRecyclerView error", e);
-        }
-    }
-
-    private void setupCartListener() {
-        if (cartManager == null) return;
-
-        cartListener = (snapshot, type, position) -> {
-            safeRun(() -> renderCart(snapshot, type, position));
-        };
-
-        cartManager.addListener(cartListener);
-    }
-
-    private void renderCart(@NonNull PosCartManager.CartSnapshot snapshot,
-                            @Nullable PosCartManager.ChangeType type,
-                            int position) {
-        if (!isFragmentAlive()) return;
-
-        try {
-            final int count = snapshot.count;
-
-            if (cartAdapter != null) {
-                cartAdapter.replaceItems(snapshot.items);
-
-                if (type != null) {
-                    switch (type) {
-                        case ITEM_ADDED:
-                            cartAdapter.notifyItemInserted(0);
-                            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-                            break;
-                        case ITEM_REMOVED:
-                            if (position >= 0) cartAdapter.notifyItemRemoved(position);
-                            else cartAdapter.notifyDataSetChanged();
-                            break;
-                        case ITEM_UPDATED:
-                            if (position >= 0) cartAdapter.notifyItemChanged(position);
-                            break;
-                        case CART_CLEARED:
-                            cartAdapter.notifyDataSetChanged();
-                            break;
-                    }
-                } else {
-                    cartAdapter.notifyDataSetChanged();
-                }
-            }
-
-            if (posHeroContainer != null) {
-                posHeroContainer.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
-            }
-            if (rvCartItems != null) {
-                rvCartItems.setVisibility(count > 0 ? View.VISIBLE : View.GONE);
-            }
-            if (layoutCartEmptyState != null) {
-                layoutCartEmptyState.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
-            }
-
-            updateFooterVisibility(count > 0);
-
-            if (tvItemCount != null) tvItemCount.setText(String.valueOf(count));
-
-            if (tvTotalAmount != null) {
-                tvTotalAmount.setText(buildTotalText(count, snapshot.totalUsd));
-                tvTotalAmount.setVisibility(View.VISIBLE);
-            }
-
-            if (tvCartStatus != null) {
-                if (count == 0) tvCartStatus.setText(getString(R.string.pos_cart_empty));
-                else if (snapshot.hasUnavailable) tvCartStatus.setText(getString(R.string.pos_cart_unavailable));
-                else tvCartStatus.setText(getString(R.string.pos_cart_ready));
-            }
-
-            if (posSummaryStrip != null) posSummaryStrip.setSelected(count > 0);
-
-            if (btnCheckout != null) {
-                boolean enabled = count > 0
-                        && !snapshot.hasUnavailable
-                        && hasPosPermission();
-                btnCheckout.setEnabled(enabled);
-                btnCheckout.setAlpha(enabled ? 1f : 0.5f);
-            }
-            if (btnClearCart != null) {
-                btnClearCart.setEnabled(count > 0);
-                btnClearCart.setAlpha(count > 0 ? 1f : 0.5f);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "renderCart error", e);
-        }
-    }
-        private void updateFooterVisibility(boolean shouldBeVisible) {
-        if (posFooterSticky == null) return;
-        try {
-            int currentVisibility = posFooterSticky.getVisibility();
-            if (shouldBeVisible) {
-                if (currentVisibility == View.VISIBLE) return;
-                posFooterSticky.setVisibility(View.VISIBLE);
-                posFooterSticky.setAlpha(0f);
-                posFooterSticky.setTranslationY(
-                        posFooterSticky.getHeight() > 0 ? posFooterSticky.getHeight() : 300f);
-                posFooterSticky.animate().alpha(1f).translationY(0f).setDuration(250)
-                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
-            } else {
-                if (currentVisibility != View.VISIBLE) return;
-                posFooterSticky.animate().alpha(0f)
-                        .translationY(posFooterSticky.getHeight()).setDuration(200)
-                        .setInterpolator(new android.view.animation.AccelerateInterpolator())
-                        .withEndAction(() -> {
-                            if (posFooterSticky != null) {
-                                posFooterSticky.setVisibility(View.GONE);
-                                posFooterSticky.setAlpha(1f);
-                                posFooterSticky.setTranslationY(0f);
-                            }
-                        }).start();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "updateFooterVisibility error", e);
-        }
-    }
-
-    private String buildTotalText(int count, double totalUsd) {
-        if (count <= 0) {
-            String def = getString(R.string.pos_default_amount);
-            return (def == null || def.trim().isEmpty()) ? "0" : def;
-        }
-        if (priceManager != null) {
-            try {
-                String formatted = priceManager.formatPriceDefault(totalUsd);
-                if (formatted != null && !formatted.trim().isEmpty()
-                        && !"—".equals(formatted.trim()) && hasDigit(formatted)) {
-                    return formatted;
-                }
-            } catch (Exception ignored) {}
-        }
-        return String.format(Locale.US, "$%,.2f", totalUsd);
-    }
-
-    private static boolean hasDigit(String s) {
-        if (s == null) return false;
-        for (int i = 0; i < s.length(); i++) {
-            if (Character.isDigit(s.charAt(i))) return true;
-        }
-        return false;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Listeners
-    // ═══════════════════════════════════════════════════════════════════
-
-    private void setupListeners() {
-        try {
-            setupManualInputListeners();
-            setupScanButtonListeners();
-            setupActionButtonListeners();
-        } catch (Exception e) {
-            Log.e(TAG, "setupListeners error", e);
-        }
-    }
-
-    private void setupManualInputListeners() {
-        if (etManualEpc == null) return;
-
-        etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_DONE
-                    || actionId == EditorInfo.IME_ACTION_SEARCH
-                    || (event != null
-                        && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
-                        && event.getAction() == KeyEvent.ACTION_DOWN)) {
-                submitManualEpc();
-                return true;
-            }
-            return false;
-        });
-
-        final Runnable[] pendingAuto = new Runnable[1];
-        etManualEpc.addTextChangedListener(new android.text.TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
-
-            @Override
-            public void afterTextChanged(android.text.Editable s) {
-                if (pendingAuto[0] != null) {
-                    mainHandler.removeCallbacks(pendingAuto[0]);
-                    pendingAuto[0] = null;
-                }
-
-                final String code = s.toString().trim();
-                if (!shouldAutoSubmit(code)) return;
-
-                final long delay = looksLikePartialSerial(code)
-                        ? SHORT_CODE_DELAY_MS : AUTO_ADD_DELAY_MS;
-
-                pendingAuto[0] = () -> {
-                    pendingAuto[0] = null;
-                    if (etManualEpc != null
-                            && code.equals(etManualEpc.getText().toString().trim())
-                            && isFragmentAlive()) {
-                        submitManualEpc();
-                    }
-                };
-                mainHandler.postDelayed(pendingAuto[0], delay);
-            }
-        });
-    }
-
-    private void setupScanButtonListeners() {
-        if (btnPosScanGs1 != null) {
-            btnPosScanGs1.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                switchScanMode(ScanMode.GS1);
-            });
-        }
-
-        if (btnPosScanRfid != null) {
-            btnPosScanRfid.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                showToast(isArabic
-                        ? "🎯 استخدم زر الزناد في القارئ للمسح"
-                        : "🎯 Use the physical trigger to scan");
-            });
-
-            btnPosScanRfid.setOnLongClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                openPosPowerSettings();
-                return true;
-            });
-        }
-
-        if (btnPosScanManual != null) {
-            btnPosScanManual.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                switchScanMode(currentScanMode == ScanMode.MANUAL
-                        ? ScanMode.NONE : ScanMode.MANUAL);
-            });
-        }
-    }
-
-    private void openPosPowerSettings() {
-        if (!isFragmentAlive()) return;
-        try {
-            Context ctx = getSafeAppContext();
-            if (ctx == null) return;
-
-            com.example.uhf.dialog.PosPowerSettingsDialog.show(
-                    ctx,
-                    isArabic,
-                    newPowerDbm -> {
-                        applyPosPowerImmediate(newPowerDbm);
-                        showToast(isArabic
-                                ? "✅ تم تحديث قوة القراءة إلى " + newPowerDbm + " dBm"
-                                : "✅ Power updated to " + newPowerDbm + " dBm");
-                    }
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "openPosPowerSettings error", e);
-        }
-    }
-
-    private void setupActionButtonListeners() {
-        if (btnClearCart != null) {
-            btnClearCart.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                if (cartManager != null) cartManager.clear();
-                currentSaleUuid = null;
-            });
-        }
-
-        if (btnCheckout != null) {
-            btnCheckout.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                processCheckoutAndStockUpdate();
-            });
-        }
-
-        if (btnPosRefund != null) {
-            btnPosRefund.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                showRefundDialog();
-            });
-        }
-
-        if (btnPosLastReceipt != null) {
-            btnPosLastReceipt.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                showLastReceiptDialog();
-            });
-        }
-
-        if (btnPosClose != null) {
-            btnPosClose.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                handleCustomBack();
-            });
+        } catch (e: Exception) {
+            Log.e(TAG, "openPosPowerSettings error", e)
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Manual Input
+    //  Scan Mode & Hardware Trigger
     // ═══════════════════════════════════════════════════════════════════
 
-    private void showManualInput() {
-        try {
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.MANUAL_ENTRY);
-            }
-            if (posManualInputContainer != null) {
-                posManualInputContainer.setVisibility(View.VISIBLE);
-                posManualInputContainer.startAnimation(
-                        android.view.animation.AnimationUtils.loadAnimation(
-                                requireContext(), R.anim.pos_slide_up));
-            }
-            if (etManualEpc != null) {
-                etManualEpc.requestFocus();
-                showKeyboard(etManualEpc);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "showManualInput error", e);
-        }
-    }
+    override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
+        val isTrigger = keyCode == KEYCODE_RFID_TRIGGER_1 ||
+                keyCode == KEYCODE_RFID_TRIGGER_2 ||
+                keyCode == KEYCODE_RFID_TRIGGER_3
 
-    private void hideManualInput() {
-        try {
-            if (posManualInputContainer != null) {
-                posManualInputContainer.setVisibility(View.GONE);
-            }
-            if (etManualEpc != null) {
-                etManualEpc.setText("");
-                etManualEpc.clearFocus();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "hideManualInput error", e);
-        }
-    }
+        if (!isTrigger) return false
 
-    private void submitManualEpc() {
-        try {
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            cancelPendingStopIfAny()
+
+            if (isCheckoutDialogShowing) return true
+
             if (!hasPosPermission()) {
-                showToast(getString(R.string.pos_msg_no_permission));
-                return;
-            }
-            if (isCheckoutDialogShowing) return;
-
-            UIHelper.hideKeyboard(getActivity());
-
-            String epc = etManualEpc != null
-                    ? etManualEpc.getText().toString().trim() : "";
-
-            if (epc.isEmpty()) {
-                showToast(getString(R.string.pos_msg_not_found));
-                return;
+                showToast(getString(R.string.pos_msg_no_permission))
+                return true
             }
 
-            if (cartManager != null) {
-                boolean dup = cartManager.isIdScanned(epc);
-                if (!dup && looksLikePartialSerial(epc)) {
-                    for (String prefix : SERIAL_PREFIXES) {
-                        if (cartManager.isIdScanned(prefix + epc)) { dup = true; break; }
+            if (!hasRfidHardwareState) return true
+
+            if (currentScanMode != ScanMode.RFID) {
+                switchScanMode(ScanMode.RFID)
+            } else {
+                oneShotConsumed.set(false)
+                stopAfterFirstRead = true
+            }
+            return true
+        }
+
+        if (event.action == KeyEvent.ACTION_UP) {
+            if (currentScanMode == ScanMode.RFID) {
+                scheduleDelayedStopIfNeeded()
+            }
+            return true
+        }
+
+        return false
+    }
+
+    private fun scheduleDelayedStopIfNeeded() {
+        cancelPendingStopIfAny()
+        pendingStopRfid = Runnable {
+            pendingStopRfid = null
+            if (currentScanMode == ScanMode.RFID && stopAfterFirstRead) {
+                switchScanMode(ScanMode.NONE)
+            }
+        }
+        mainHandler.postDelayed(pendingStopRfid!!, TRIGGER_GRACE_MS)
+    }
+
+    private fun cancelPendingStopIfAny() {
+        pendingStopRfid?.let { mainHandler.removeCallbacks(it) }
+        pendingStopRfid = null
+    }
+
+    private fun switchScanMode(target: ScanMode) {
+        if (!isFragmentAlive()) return
+        if (currentScanMode == target) return
+
+        when (currentScanMode) {
+            ScanMode.RFID -> {
+                cancelPendingStopIfAny()
+                stopRFIDScan()
+            }
+            ScanMode.MANUAL -> {
+                isManualInputVisibleState = false
+                manualCodeInputState = ""
+            }
+            ScanMode.GS1, ScanMode.NONE -> {}
+        }
+
+        currentScanMode = target
+
+        when (target) {
+            ScanMode.GS1 -> {
+                heroState = HeroVisualState.GS1_SCANNING
+                openBarcodeScanner()
+            }
+            ScanMode.RFID -> {
+                rfidReadCountState = 0
+                heroState = HeroVisualState.RFID_LISTENING
+                startRFIDScan()
+            }
+            ScanMode.MANUAL -> {
+                heroState = HeroVisualState.MANUAL_ENTRY
+                isManualInputVisibleState = true
+            }
+            ScanMode.NONE -> {
+                heroState = HeroVisualState.IDLE
+            }
+        }
+    }
+
+    private fun startRFIDScan() {
+        val manager = rfidManager ?: return
+        if (sdkExecutor.isShutdown) return
+
+        oneShotConsumed.set(false)
+        stopAfterFirstRead = true
+
+        sdkExecutor.execute {
+            try {
+                manager.startScan(object : RFIDManager.ReadyCallback {
+                    override fun onReady(reader: MiraIRFIDReader) {}
+                    override fun onError(reason: String) {
+                        safeRun {
+                            if (!isFragmentAlive()) return@safeRun
+                            currentScanMode = ScanMode.NONE
+                            heroState = HeroVisualState.IDLE
+                        }
+                    }
+                })
+            } catch (e: Exception) {
+                Log.e(TAG, "startScan bg error", e)
+            }
+        }
+    }
+
+    private fun stopRFIDScan() {
+        val manager = rfidManager ?: return
+        if (sdkExecutor.isShutdown) {
+            try {
+                manager.stopScan()
+            } catch (_: Exception) {
+            }
+            return
+        }
+        sdkExecutor.execute {
+            try {
+                manager.stopScan()
+            } catch (e: Exception) {
+                Log.e(TAG, "stopScan bg error", e)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Scanning & Item Lookup
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun submitManualCode(rawCode: String) {
+        if (!hasPosPermission()) {
+            showToast(getString(R.string.pos_msg_no_permission))
+            return
+        }
+        if (isCheckoutDialogShowing) return
+
+        UIHelper.hideKeyboard(activity)
+        val epc = rawCode.trim()
+        if (epc.isEmpty()) {
+            showToast(getString(R.string.pos_msg_not_found))
+            return
+        }
+
+        cartManager?.let { cm ->
+            var dup = cm.isIdScanned(epc)
+            if (!dup && looksLikePartialSerial(epc)) {
+                for (prefix in SERIAL_PREFIXES) {
+                    if (cm.isIdScanned(prefix + epc)) {
+                        dup = true
+                        break
+                    }
+                }
+            }
+            if (dup) {
+                showToast(getString(R.string.pos_msg_already_in_cart))
+                playAlertSound(2)
+                return
+            }
+        }
+
+        processRingEpc(epc, "manual")
+        manualCodeInputState = ""
+        isManualInputVisibleState = false
+        currentScanMode = ScanMode.NONE
+        heroState = HeroVisualState.IDLE
+    }
+
+    fun onRingScanned(epc: String?) {
+        try {
+            if (!hasPosPermission()) return
+            if (epc.isNullOrBlank()) return
+
+            if (refundDialog != null && refundDialog?.isShowing == true) {
+                if (!canPerformRefund()) return
+                if (currentScanMode != ScanMode.NONE) {
+                    switchScanMode(ScanMode.NONE)
+                }
+                refundDialog?.setQueryFromScan(epc.trim())
+                heroState = HeroVisualState.IDLE
+                return
+            }
+
+            if (currentScanMode != ScanMode.RFID) return
+
+            val cleanEpc = epc.trim().uppercase(Locale.US)
+            val now = System.currentTimeMillis()
+            val lastTime = lastScannedTimes[cleanEpc]
+            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return
+            lastScannedTimes[cleanEpc] = now
+
+            if (stopAfterFirstRead) {
+                if (!oneShotConsumed.compareAndSet(false, true)) return
+                stopAfterFirstRead = false
+                cancelPendingStopIfAny()
+                switchScanMode(ScanMode.NONE)
+            }
+
+            val isValidEpc = cleanEpc.matches(Regex("^E2[0-9A-F]{22}$"))
+            if (!isValidEpc) {
+                readTidAndProcess(cleanEpc, "rfid")
+                return
+            }
+
+            if (cartManager?.isIdScanned(cleanEpc) == true) {
+                showToast(getString(R.string.pos_msg_already_in_cart))
+                playAlertSound(2)
+                return
+            }
+
+            processRingEpc(cleanEpc, "rfid")
+        } catch (e: Exception) {
+            Log.e(TAG, "onRingScanned error", e)
+        }
+    }
+
+    private fun readTidAndProcess(originalEpc: String, source: String) {
+        if (!hasPosPermission()) return
+        if (sdkExecutor.isShutdown) {
+            processRingEpc(originalEpc, source)
+            return
+        }
+
+        safeRun {
+            statusMessageState = getString(R.string.pos_msg_searching)
+        }
+
+        sdkExecutor.execute {
+            var tidRead: String? = null
+            try {
+                val ctx = getSafeAppContext()
+                if (ctx != null) {
+                    tidRead = MiraRfidService.getInstance(ctx).readTid(null)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "readTid error", e)
+            }
+
+            val cleanTid = if (!tidRead.isNullOrBlank()) tidRead.trim().uppercase(Locale.US) else null
+
+            safeRun {
+                if (!isFragmentAlive()) return@safeRun
+                if (cleanTid == null) {
+                    processRingEpc(originalEpc, source)
+                    return@safeRun
+                }
+                if (cartManager?.isIdScanned(cleanTid) == true) {
+                    showToast(getString(R.string.pos_msg_already_in_cart))
+                    playAlertSound(2)
+                    return@safeRun
+                }
+                processRingEpc(cleanTid, source)
+            }
+        }
+    }
+
+    fun onBarcodeScanned(rawData: String?) {
+        try {
+            if (!hasPosPermission() || rawData.isNullOrBlank()) return
+
+            val parsed = parseGs1OrQr(rawData.trim())
+            val data = parsed[0]
+            if (data.isBlank()) return
+
+            val now = System.currentTimeMillis()
+            val lastTime = lastScannedTimes[data]
+            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return
+            lastScannedTimes[data] = now
+
+            if (refundDialog != null && refundDialog?.isShowing == true) {
+                if (!canPerformRefund()) return
+                refundDialog?.setQueryFromScan(data)
+                return
+            }
+
+            cartManager?.let { cm ->
+                var dup = cm.isIdScanned(data)
+                if (!dup && looksLikePartialSerial(data)) {
+                    for (prefix in SERIAL_PREFIXES) {
+                        if (cm.isIdScanned(prefix + data)) {
+                            dup = true
+                            break
+                        }
                     }
                 }
                 if (dup) {
-                    showToast(getString(R.string.pos_msg_already_in_cart));
-                    playAlertSound(2);
-                    return;
+                    showToast(getString(R.string.pos_msg_already_in_cart))
+                    playAlertSound(2)
+                    return
                 }
             }
 
-            processRingEpc(epc, "manual");
-
-            if (etManualEpc != null) etManualEpc.setText("");
-            hideManualInput();
-
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "submitManualEpc error", e);
+            processRingEpc(data, "barcode")
+        } catch (e: Exception) {
+            Log.e(TAG, "onBarcodeScanned error", e)
         }
     }
 
-    private void processRingEpc(final String code, final String source) {
+    private fun processRingEpc(code: String?, source: String) {
         if (!hasPosPermission()) {
-            Log.w(TAG, "processRingEpc rejected: no POS permission (source=" + source + ")");
-            showToast(getString(R.string.pos_msg_no_permission));
-            playAlertSound(2);
-            return;
+            showToast(getString(R.string.pos_msg_no_permission))
+            playAlertSound(2)
+            return
+        }
+        if (isCheckoutDialogShowing || code.isNullOrBlank() || !isFragmentAlive()) return
+
+        val cleanCode = code.trim()
+        val candidates = buildSearchCandidates(cleanCode)
+        playAlertSound(1)
+
+        safeRun {
+            statusMessageState = getString(R.string.pos_msg_searching)
         }
 
-        if (isCheckoutDialogShowing) {
-            Log.d(TAG, "processRingEpc ignored: checkout dialog showing");
-            return;
-        }
-
-        if (code == null || code.trim().isEmpty() || !isFragmentAlive()) return;
-        final String cleanCode = code.trim();
-
-        final List<String> candidates = buildSearchCandidates(cleanCode);
-
-        playAlertSound(1);
-
-        safeRun(() -> {
-            if (tvCartStatus != null) {
-                tvCartStatus.setText(getString(R.string.pos_msg_searching));
-            }
-        });
-
-        processRingEpcWithCandidates(cleanCode, source, candidates, 0);
+        processRingEpcWithCandidates(cleanCode, source, candidates, 0)
     }
 
-    private void processRingEpcWithCandidates(
-            @NonNull final String originalCode,
-            @NonNull final String source,
-            @NonNull final List<String> candidates,
-            final int index) {
+    private fun processRingEpcWithCandidates(
+        originalCode: String,
+        source: String,
+        candidates: List<String>,
+        index: Int
+    ) {
+        if (!isFragmentAlive()) return
 
-        if (!isFragmentAlive()) return;
-
-        if (index >= candidates.size()) {
-            safeRun(() -> {
-                if (!isFragmentAlive()) return;
-                showToast(getString(R.string.pos_msg_not_found));
-                playAlertSound(2);
-                setHeroError();
-                resetHeroAfterDelay();
-                showScanFeedback(
-                        isArabic ? "❌ لم يتم العثور" : "❌ Not Found",
-                        originalCode, null,
-                        android.R.drawable.ic_dialog_alert, 0xFFDC2626);
-            });
-            return;
+        if (index >= candidates.size) {
+            safeRun {
+                if (!isFragmentAlive()) return@safeRun
+                showToast(getString(R.string.pos_msg_not_found))
+                playAlertSound(2)
+                heroState = HeroVisualState.ERROR
+                resetHeroAfterDelay()
+                showScanBanner(
+                    title = if (isArabic) "❌ لم يتم العثور" else "❌ Not Found",
+                    details = originalCode,
+                    price = null,
+                    accentColor = Color(0xFFEF4444),
+                    isError = true
+                )
+            }
+            return
         }
 
-        final String candidate = candidates.get(index);
+        val candidate = candidates[index]
+        if (!pendingEpcs.add(candidate)) return
 
-        if (!pendingEpcs.add(candidate)) return;
-
-        mainHandler.postDelayed(() -> pendingEpcs.remove(candidate),
-                PENDING_EPC_TIMEOUT_MS);
+        mainHandler.postDelayed({ pendingEpcs.remove(candidate) }, PENDING_EPC_TIMEOUT_MS)
 
         try {
-            miraExecutor.getNetworkExecutor().execute(() -> {
+            miraExecutor?.networkExecutor?.execute {
                 try {
-                    Context context = getSafeAppContext();
-                    if (context == null) return;
+                    val context = getSafeAppContext() ?: return@execute
+                    val syncManager = MiraItemSyncManager.getInstance(context)
+                    val branchId = getActiveBranchId()
 
-                    MiraItemSyncManager syncManager =
-                            MiraItemSyncManager.getInstance(context);
-                    final int branchId = getActiveBranchId();
-
-                    syncManager.findItem(candidate, branchId,
-                            new MiraItemSyncManager.ItemLookupCallback() {
-                        @Override
-                        public void onItemFound(JSONObject item, boolean fromServer) {
-                            safeRun(() -> {
-                                if (!isFragmentAlive()) return;
-
-                                if (!hasPosPermission()) {
-                                    Log.w(TAG, "Item found but no POS permission — rejected");
-                                    return;
-                                }
-
-                                int itemBranchId = item.optInt("branch_id", -1);
+                    syncManager.findItem(candidate, branchId, object : MiraItemSyncManager.ItemLookupCallback {
+                        override fun onItemFound(item: JSONObject, fromServer: Boolean) {
+                            safeRun {
+                                if (!isFragmentAlive() || !hasPosPermission()) return@safeRun
+                                val itemBranchId = item.optInt("branch_id", -1)
                                 if (itemBranchId > 0 && itemBranchId != branchId) {
-                                    showToast(getString(R.string.pos_msg_other_branch));
-                                    playAlertSound(2);
-                                    resetHeroAfterDelay();
-                                    return;
+                                    showToast(getString(R.string.pos_msg_other_branch))
+                                    playAlertSound(2)
+                                    resetHeroAfterDelay()
+                                    return@safeRun
                                 }
-                                parseItemResponse(candidate, item, source);
-                            });
+                                parseItemResponse(candidate, item, source)
+                            }
                         }
 
-                        @Override
-                        public void onItemNotFound() {
-                            safeRun(() -> processRingEpcWithCandidates(
-                                    originalCode, source, candidates, index + 1));
+                        override fun onItemNotFound() {
+                            safeRun {
+                                processRingEpcWithCandidates(originalCode, source, candidates, index + 1)
+                            }
                         }
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "processRingEpcWithCandidates network error", e);
-                    safeRun(() -> processRingEpcWithCandidates(
-                            originalCode, source, candidates, index + 1));
+                    })
+                } catch (e: Exception) {
+                    Log.e(TAG, "processRingEpcWithCandidates error", e)
+                    safeRun {
+                        processRingEpcWithCandidates(originalCode, source, candidates, index + 1)
+                    }
                 } finally {
-                    pendingEpcs.remove(candidate);
+                    pendingEpcs.remove(candidate)
                 }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "processRingEpcWithCandidates submit error", e);
-            pendingEpcs.remove(candidate);
-            safeRun(() -> processRingEpcWithCandidates(
-                    originalCode, source, candidates, index + 1));
+            }
+        } catch (e: Exception) {
+            pendingEpcs.remove(candidate)
+            safeRun {
+                processRingEpcWithCandidates(originalCode, source, candidates, index + 1)
+            }
         }
     }
 
-    private void parseItemResponse(String code, JSONObject data, String source) {
+    private fun parseItemResponse(code: String, data: JSONObject, source: String) {
         try {
-            if (!hasPosPermission()) {
-                Log.w(TAG, "parseItemResponse rejected: no POS permission");
-                return;
-            }
+            if (!hasPosPermission()) return
 
-            JSONObject item = data.has("item") ? data.optJSONObject("item") : data;
+            val item = if (data.has("item")) data.optJSONObject("item") else data
             if (item == null) {
-                showToast(getString(R.string.pos_msg_not_found));
-                playAlertSound(2);
-                setHeroError();
-                resetHeroAfterDelay();
-                return;
+                showToast(getString(R.string.pos_msg_not_found))
+                playAlertSound(2)
+                heroState = HeroVisualState.ERROR
+                resetHeroAfterDelay()
+                return
             }
 
             try {
-                MiraLocalItemCache cache = MiraLocalItemCache.getInstance(getSafeAppContext());
-                if (cache != null) {
-                    JSONObject cached = cache.findItemComprehensive(code);
-                    if (cached != null) {
-                        String cachedStatus = cached.optString(
-                                "vault_status",
-                                cached.optString("status", "")
-                        ).toLowerCase();
-                        if ("sold".equals(cachedStatus) || "exited".equals(cachedStatus)) {
-                            showToast(getString(R.string.pos_msg_already_sold));
-                            playAlertSound(2);
-                            setHeroError();
-                            resetHeroAfterDelay();
-                            showScanFeedback(
-                                    isArabic ? "❌ القطعة مباعة" : "❌ Already Sold",
-                                    extractString(item, "title", "item_title"),
-                                    null, android.R.drawable.ic_delete, 0xFFDC2626);
-                            return;
-                        }
+                val cache = MiraLocalItemCache.getInstance(getSafeAppContext())
+                val cached = cache?.findItemComprehensive(code)
+                if (cached != null) {
+                    val cachedStatus = cached.optString("vault_status", cached.optString("status", "")).lowercase()
+                    if (cachedStatus == "sold" || cachedStatus == "exited") {
+                        showToast(getString(R.string.pos_msg_already_sold))
+                        playAlertSound(2)
+                        heroState = HeroVisualState.ERROR
+                        resetHeroAfterDelay()
+                        showScanBanner(
+                            title = if (isArabic) "❌ القطعة مباعة" else "❌ Already Sold",
+                            details = extractString(item, "title", "item_title"),
+                            price = null,
+                            accentColor = Color(0xFFEF4444),
+                            isError = true
+                        )
+                        return
                     }
                 }
-            } catch (Exception ignored) {}
-
-            String vaultStatus = item.optString("status",
-                    item.optString("vault_status", "")).toLowerCase();
-
-            if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
-                showToast(getString(R.string.pos_msg_already_sold));
-                playAlertSound(2);
-                setHeroError();
-                resetHeroAfterDelay();
-                showScanFeedback(
-                        isArabic ? "❌ القطعة مباعة" : "❌ Already Sold",
-                        extractString(item, "title", "item_title"),
-                        null, android.R.drawable.ic_delete, 0xFFDC2626);
-                return;
+            } catch (_: Exception) {
             }
 
-            boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
-
-            String title = item.optString("title",
-                    item.optString("item_title", isArabic ? "قطعة" : "Item"));
-            String karat = item.optString("karat",
-                    item.optString("gold_karat", "21K"));
-            double weight = item.optDouble("weight",
-                    item.optDouble("gross_weight",
-                            item.optDouble("gross_weight_grams", 0)));
-
-            int karatNum = getKaratNumber(karat);
-
-            PosPriceResolver.PriceResult priceResult =
-                    priceResolver.resolve(item, karatNum, weight);
-            double price = priceResult.priceUsd;
-
-            CartItem cartItem = new CartItem(code, title, karat, weight,
-                    liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
-
-            cartItem.serialNo = extractString(item, "serial", "serial_number", "serialNo", "sn");
-            cartItem.gtin = extractString(item, "gtin", "gtin13", "barcode", "code");
-            cartItem.location = extractString(item, "location", "current_location", "zone");
-            cartItem.itemId = item.optInt("id",
-                    item.optInt("item_id", item.optInt("product_id", 0)));
-
-            String tid = extractString(item, "tid", "tag_tid", "rfid_tid");
-            if (!tid.isEmpty() && cartItem.serialNo.isEmpty()) {
-                cartItem.serialNo = tid;
-            }
-            cartItem.tid = tid;
-
-            String rfidEpcFromServer = extractString(item, "rfid_epc", "epc_final", "epc");
-            if (!rfidEpcFromServer.isEmpty()) {
-                cartItem.rfidEpc = rfidEpcFromServer;
-                cartItem.epc = rfidEpcFromServer;
-            } else {
-                cartItem.rfidEpc = cartItem.serialNo.isEmpty() ? code : cartItem.serialNo;
-                cartItem.epc = cartItem.serialNo.isEmpty() ? code : cartItem.serialNo;
+            val vaultStatus = item.optString("status", item.optString("vault_status", "")).lowercase()
+            if (vaultStatus == "sold" || vaultStatus == "exited") {
+                showToast(getString(R.string.pos_msg_already_sold))
+                playAlertSound(2)
+                heroState = HeroVisualState.ERROR
+                resetHeroAfterDelay()
+                showScanBanner(
+                    title = if (isArabic) "❌ القطعة مباعة" else "❌ Already Sold",
+                    details = extractString(item, "title", "item_title"),
+                    price = null,
+                    accentColor = Color(0xFFEF4444),
+                    isError = true
+                )
+                return
             }
 
-            boolean alreadyInCart = cartManager != null
-                    && cartManager.containsItem(cartItem.epc, cartItem.serialNo, cartItem.gtin);
+            val isAvailable = vaultStatus != "sold" && vaultStatus != "reserved"
+            val title = item.optString("title", item.optString("item_title", if (isArabic) "قطعة" else "Item"))
+            val karat = item.optString("karat", item.optString("gold_karat", "21K"))
+            val weight = item.optDouble(
+                "weight",
+                item.optDouble("gross_weight", item.optDouble("gross_weight_grams", 0.0))
+            )
 
+            val karatNum = getKaratNumber(karat)
+            val priceResult = priceResolver!!.resolve(item, karatNum, weight)
+            val price = priceResult.priceUsd
+
+            val cartItem = CartItem(
+                code, title, karat, weight, liveScaleWeight, price, isAvailable, vaultStatus.uppercase(Locale.US)
+            ).apply {
+                serialNo = extractString(item, "serial", "serial_number", "serialNo", "sn")
+                gtin = extractString(item, "gtin", "gtin13", "barcode", "code")
+                location = extractString(item, "location", "current_location", "zone")
+                itemId = item.optInt("id", item.optInt("item_id", item.optInt("product_id", 0)))
+
+                val extractedTid = extractString(item, "tid", "tag_tid", "rfid_tid")
+                if (extractedTid.isNotEmpty() && serialNo.isEmpty()) {
+                    serialNo = extractedTid
+                }
+                tid = extractedTid
+
+                val rfidEpcFromServer = extractString(item, "rfid_epc", "epc_final", "epc")
+                if (rfidEpcFromServer.isNotEmpty()) {
+                    rfidEpc = rfidEpcFromServer
+                    epc = rfidEpcFromServer
+                } else {
+                    val fallback = serialNo.ifEmpty { code }
+                    rfidEpc = fallback
+                    epc = fallback
+                }
+            }
+
+            val alreadyInCart = cartManager?.containsItem(cartItem.epc, cartItem.serialNo, cartItem.gtin) == true
             if (alreadyInCart) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                playAlertSound(2);
-                resetHeroAfterDelay();
-                showScanFeedback(
-                        isArabic ? "⚠️ مكررة في السلة" : "⚠️ Already in Cart",
-                        title, null, android.R.drawable.ic_dialog_alert, 0xFF3B82F6);
-                return;
+                showToast(getString(R.string.pos_msg_already_in_cart))
+                playAlertSound(2)
+                resetHeroAfterDelay()
+                showScanBanner(
+                    title = if (isArabic) "⚠️ مكررة في السلة" else "⚠️ Already in Cart",
+                    details = title,
+                    price = null,
+                    accentColor = Color(0xFF3B82F6),
+                    isWarning = true
+                )
+                return
             }
 
             if (!isAvailable) {
-                showToast(getString(R.string.pos_msg_unavailable));
-                resetHeroAfterDelay();
-                showScanFeedback(
-                        isArabic ? "⚠️ القطعة غير متاحة" : "⚠️ Item Unavailable",
-                        title, null, android.R.drawable.ic_dialog_alert, 0xFFF59E0B);
-                return;
+                showToast(getString(R.string.pos_msg_unavailable))
+                resetHeroAfterDelay()
+                showScanBanner(
+                    title = if (isArabic) "⚠️ القطعة غير متاحة" else "⚠️ Item Unavailable",
+                    details = title,
+                    price = null,
+                    accentColor = Color(0xFFF59E0B),
+                    isWarning = true
+                )
+                return
             }
 
-            int pos = cartManager.addItem(cartItem);
+            val pos = cartManager?.addItem(cartItem) ?: -1
             if (pos < 0) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                resetHeroAfterDelay();
-                return;
+                showToast(getString(R.string.pos_msg_already_in_cart))
+                resetHeroAfterDelay()
+                return
             }
 
-            playAlertSound(1);
-            showToast(getString(R.string.pos_msg_added, title));
+            playAlertSound(1)
+            showToast(getString(R.string.pos_msg_added, title))
 
-            showScanFeedback(
-                    title,
-                    karat + " • " + String.format(Locale.US, "%.2fg", weight),
-                    buildTotalText(1, price),
-                    R.drawable.ic_pos_cart_gold, 0xFF22C55E);
+            showScanBanner(
+                title = title,
+                details = "$karat • ${String.format(Locale.US, "%.2fg", weight)}",
+                price = buildTotalText(1, price),
+                accentColor = Color(0xFF10B981)
+            )
 
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.ITEM_ADDED);
-                if ("rfid".equals(source)) {
-                    heroController.incrementRfidCount();
-                }
+            heroState = HeroVisualState.ITEM_ADDED
+            if (source == "rfid") {
+                rfidReadCountState += 1
             }
-            resetHeroAfterDelay();
-
-        } catch (Exception e) {
-            Log.e(TAG, "parseItemResponse error", e);
-            safeRun(() -> {
-                if (!isFragmentAlive()) return;
-                showToast(getString(R.string.pos_msg_not_found));
-                resetHeroAfterDelay();
-            });
+            resetHeroAfterDelay()
+        } catch (e: Exception) {
+            Log.e(TAG, "parseItemResponse error", e)
+            safeRun {
+                if (!isFragmentAlive()) return@safeRun
+                showToast(getString(R.string.pos_msg_not_found))
+                resetHeroAfterDelay()
+            }
         }
     }
 
-    private void setHeroError() {
-        if (heroController != null) {
-            heroController.setState(PosHeroController.State.ERROR);
-        }
+    private fun resetHeroAfterDelay() {
+        mainHandler.postDelayed({
+            if (!isFragmentAlive()) return@postDelayed
+            if (heroState == HeroVisualState.ITEM_ADDED || heroState == HeroVisualState.ERROR) {
+                heroState = HeroVisualState.IDLE
+            }
+        }, ITEM_ADDED_DISPLAY_MS)
     }
 
-    private void resetHeroAfterDelay() {
-        mainHandler.postDelayed(() -> {
-            if (!isFragmentAlive() || heroController == null) return;
-            PosHeroController.State s = heroController.getState();
-            if (s == PosHeroController.State.ITEM_ADDED
-                    || s == PosHeroController.State.ERROR) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-        }, ITEM_ADDED_DISPLAY_MS);
+    private fun showScanBanner(
+        title: String,
+        details: String?,
+        price: String?,
+        accentColor: Color,
+        isError: Boolean = false,
+        isWarning: Boolean = false
+    ) {
+        scanFeedbackState = ScanFeedbackBanner(
+            id = System.currentTimeMillis(),
+            title = title,
+            details = details,
+            price = price,
+            accentColor = accentColor,
+            isError = isError,
+            isWarning = isWarning
+        )
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Scale
+    //  Barcode Scanner
     // ═══════════════════════════════════════════════════════════════════
 
-    private void initSmartScale() {
-        try {
-            scaleManager = new SmartScaleManager(requireContext(),
-                    new SmartScaleManager.ScaleCallback() {
-                @Override
-                public void onWeightReceived(double weight) {
-                    liveScaleWeight = weight;
-                    safeRun(() -> {
-                        if (tvScaleStatus != null) {
-                            tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", weight));
-                        }
-                        updateTopCartItemScaleWeight(weight);
-                    });
-                }
-
-                @Override
-                public void onScaleConnected(String name) {
-                    safeRun(() -> {
-                        if (tvScaleStatus != null) tvScaleStatus.setText("⚖️ " + name);
-                        showToast(getString(R.string.pos_msg_scale_connected, name));
-                    });
-                }
-
-                @Override
-                public void onScaleDisconnected() {
-                    liveScaleWeight = 0.0;
-                    safeRun(() -> {
-                        if (tvScaleStatus != null) {
-                            tvScaleStatus.setText(R.string.pos_scale_offline);
-                        }
-                    });
-                }
-
-                @Override
-                public void onScaleError(String error) {
-                    Log.e(TAG, "Scale Error: " + error);
-                }
-            });
-
-            simulationHelper = new ScaleSimulationHelper(requireContext(),
-                    new ScaleSimulationHelper.SimulationCallback() {
-                @Override
-                public void onWeightReceived(double weight, String label) {
-                    safeRun(() -> {
-                        liveScaleWeight = weight;
-                        if (tvScaleStatus != null) {
-                            tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", weight));
-                        }
-                        updateTopCartItemScaleWeight(weight);
-                    });
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "initSmartScale error", e);
-        }
-    }
-
-    private void updateTopCartItemScaleWeight(double currentScaleWeight) {
-        if (cartManager == null || cartManager.isEmpty() || currentScaleWeight <= 0) return;
-        try {
-            List<CartItem> items = cartManager.getItems();
-            if (items.isEmpty()) return;
-            CartItem topItem = items.get(0);
-            if (topItem == null) return;
-            if (topItem.scaleWeight == currentScaleWeight) return;
-
-            topItem.scaleWeight = currentScaleWeight;
-            cartManager.updateItemAt(0, topItem);
-        } catch (Exception e) {
-            Log.e(TAG, "updateTopCartItemScaleWeight error", e);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Scan Feedback Card
-    // ═══════════════════════════════════════════════════════════════════
-
-    private int dp(int value) {
-        try {
-            return Math.round(value * getResources().getDisplayMetrics().density);
-        } catch (Exception e) {
-            return value;
-        }
-    }
-
-    private void initScanFeedbackCard(@NonNull View fragmentRoot) {
-        try {
-            if (!(fragmentRoot instanceof ViewGroup)) return;
-            ViewGroup root = (ViewGroup) fragmentRoot;
-
-            FrameLayout overlay = new FrameLayout(requireContext());
-            overlay.setLayoutParams(new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT));
-            overlay.setClickable(false);
-            overlay.setFocusable(false);
-            overlay.setVisibility(View.GONE);
-
-            MaterialCardView card = new MaterialCardView(requireContext());
-            FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-            cardParams.setMargins(dp(16), dp(72), dp(16), 0);
-            cardParams.gravity = android.view.Gravity.TOP;
-            card.setLayoutParams(cardParams);
-            card.setRadius(dp(16));
-            card.setCardElevation(dp(8));
-            card.setCardBackgroundColor(0xFFFFFFFF);
-            card.setClickable(false);
-
-            LinearLayout row = new LinearLayout(requireContext());
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(dp(16), dp(14), dp(16), dp(14));
-            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
-            ImageView icon = new ImageView(requireContext());
-            LinearLayout.LayoutParams iconParams =
-                    new LinearLayout.LayoutParams(dp(44), dp(44));
-            icon.setLayoutParams(iconParams);
-            icon.setImageResource(R.drawable.ic_pos_cart_gold);
-            row.addView(icon);
-
-            LinearLayout textCol = new LinearLayout(requireContext());
-            textCol.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            textParams.setMargins(dp(14), 0, dp(14), 0);
-            textCol.setLayoutParams(textParams);
-
-            TextView title = new TextView(requireContext());
-            title.setTextSize(15);
-            title.setTypeface(null, Typeface.BOLD);
-            title.setTextColor(0xFF1A1A1A);
-            title.setMaxLines(1);
-            title.setEllipsize(TextUtils.TruncateAt.END);
-            textCol.addView(title);
-
-            TextView details = new TextView(requireContext());
-            details.setTextSize(12);
-            details.setTextColor(0xFF666666);
-            details.setMaxLines(1);
-            details.setEllipsize(TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams detParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-            detParams.topMargin = dp(3);
-            details.setLayoutParams(detParams);
-            textCol.addView(details);
-
-            TextView price = new TextView(requireContext());
-            price.setTextSize(17);
-            price.setTypeface(null, Typeface.BOLD);
-            price.setTextColor(0xFFB89456);
-            LinearLayout.LayoutParams priceParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-            priceParams.topMargin = dp(4);
-            price.setLayoutParams(priceParams);
-            textCol.addView(price);
-
-            row.addView(textCol);
-
-            View accent = new View(requireContext());
-            LinearLayout.LayoutParams accentParams = new LinearLayout.LayoutParams(
-                    dp(4), ViewGroup.LayoutParams.MATCH_PARENT);
-            accent.setLayoutParams(accentParams);
-            accent.setBackgroundColor(0xFF22C55E);
-            row.addView(accent);
-
-            card.addView(row);
-            overlay.addView(card);
-            root.addView(overlay);
-
-            this.scanFeedbackOverlay = overlay;
-            this.scanFeedbackCard = card;
-            this.ivFeedbackIcon = icon;
-            this.tvFeedbackTitle = title;
-            this.tvFeedbackDetails = details;
-            this.tvFeedbackPrice = price;
-            this.vFeedbackAccent = accent;
-        } catch (Exception e) {
-            Log.e(TAG, "initScanFeedbackCard error", e);
-        }
-    }
-
-    private void showScanFeedback(@NonNull String title,
-                                  @Nullable String details,
-                                  @Nullable String price,
-                                  int iconRes,
-                                  int accentColor) {
-        if (!isFragmentAlive() || scanFeedbackOverlay == null) return;
-
-        try {
-            if (pendingHideFeedback != null) {
-                mainHandler.removeCallbacks(pendingHideFeedback);
-                pendingHideFeedback = null;
-            }
-
-            if (tvFeedbackTitle != null) tvFeedbackTitle.setText(title);
-
-            if (tvFeedbackDetails != null) {
-                if (details == null || details.isEmpty()) {
-                    tvFeedbackDetails.setVisibility(View.GONE);
-                } else {
-                    tvFeedbackDetails.setVisibility(View.VISIBLE);
-                    tvFeedbackDetails.setText(details);
-                }
-            }
-
-            if (tvFeedbackPrice != null) {
-                if (price == null || price.isEmpty()) {
-                    tvFeedbackPrice.setVisibility(View.GONE);
-                } else {
-                    tvFeedbackPrice.setVisibility(View.VISIBLE);
-                    tvFeedbackPrice.setText(price);
-                    tvFeedbackPrice.setTextColor(accentColor);
-                }
-            }
-
-            if (ivFeedbackIcon != null) {
-                ivFeedbackIcon.setImageResource(iconRes);
-                ivFeedbackIcon.setColorFilter(accentColor);
-            }
-            if (vFeedbackAccent != null) {
-                vFeedbackAccent.setBackgroundColor(accentColor);
-            }
-
-            final View card = scanFeedbackCard;
-            final View overlay = scanFeedbackOverlay;
-
-            overlay.setVisibility(View.VISIBLE);
-            if (card != null) {
-                card.setAlpha(0f);
-                card.setTranslationY(-dp(20));
-                card.animate().alpha(1f).translationY(0f).setDuration(250)
-                        .setInterpolator(new android.view.animation.DecelerateInterpolator())
-                        .start();
-            }
-
-            pendingHideFeedback = () -> {
-                if (card == null || overlay == null) return;
-                card.animate().alpha(0f).translationY(-dp(20)).setDuration(200)
-                        .withEndAction(() -> {
-                            if (overlay != null) overlay.setVisibility(View.GONE);
-                        }).start();
-                pendingHideFeedback = null;
-            };
-            mainHandler.postDelayed(pendingHideFeedback, 2500);
-
-        } catch (Exception e) {
-            Log.e(TAG, "showScanFeedback error", e);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Partial Serial Helpers
-    // ═══════════════════════════════════════════════════════════════════
-
-    private boolean looksLikePartialSerial(@Nullable String code) {
-        if (code == null) return false;
-        int len = code.length();
-        if (len < PARTIAL_SERIAL_MIN_LEN || len > PARTIAL_SERIAL_MAX_LEN) return false;
-        for (int i = 0; i < len; i++) {
-            if (!Character.isDigit(code.charAt(i))) return false;
-        }
-        return true;
-    }
-
-    private boolean shouldAutoSubmit(@Nullable String code) {
-        if (code == null || code.isEmpty()) return false;
-        if (looksLikePartialSerial(code)) return code.length() >= 4;
-        if (code.length() < AUTO_ADD_MIN_LEN) return false;
-        if (code.length() < 10 && !code.contains("-")) return false;
-        return true;
-    }
-
-    @NonNull
-    private List<String> buildSearchCandidates(@NonNull String code) {
-        List<String> candidates = new ArrayList<>();
-        candidates.add(code);
-
-        if (looksLikePartialSerial(code)) {
-            for (String prefix : SERIAL_PREFIXES) {
-                String candidate = prefix + code;
-                if (!candidates.contains(candidate)) {
-                    candidates.add(candidate);
-                }
-            }
-        }
-
-        return candidates;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Utilities
-    // ═══════════════════════════════════════════════════════════════════
-
-    private void showToast(String msg) {
-        PosUIManager.toast(getContext(), msg);
-    }
-
-    private void safeRun(Runnable r) {
-        if (r == null) return;
-        try {
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (isFragmentAlive()) {
-                        try { r.run(); }
-                        catch (Exception e) { Log.e(TAG, "safeRun inner error", e); }
-                    }
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "safeRun error", e);
-        }
-    }
-
-    private void playAlertSound(int id) {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).playSound(id);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "playAlertSound error", e);
-        }
-    }
-
-    private int getActiveBranchId() {
-        try {
-            return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-        } catch (Exception e) {
-            return 1;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Permission Checkers
-    // ═══════════════════════════════════════════════════════════════════
-
-    private boolean hasPosPermission() {
-        if (permissionManager == null) return false;
-        try {
-            return permissionManager.canUsePos();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean canPerformCheckout() {
-        if (permissionManager == null) return false;
-        try {
-            return permissionManager.canUsePos()
-                    && (permissionManager.isPosOperator()
-                        || permissionManager.isManager()
-                        || permissionManager.isAdmin());
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean canPerformRefund() {
-        if (permissionManager == null) return false;
-        try {
-            return permissionManager.isManager()
-                    || permissionManager.isAdmin()
-                    || permissionManager.isFinanceManager();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private int getKaratNumber(String karat) {
-        if (karat == null) return 21;
-        String clean = karat.trim().toUpperCase(Locale.US).replace("K", "");
-        try {
-            int num = Integer.parseInt(clean);
-            if (num >= 10 && num <= 24) return num;
-        } catch (NumberFormatException ignored) {}
-        return 21;
-    }
-
-    private String extractString(JSONObject obj, String... keys) {
-        if (obj == null || keys == null) return "";
-        for (String key : keys) {
-            try {
-                String v = obj.optString(key, "");
-                if (v != null && !v.isEmpty() && !"null".equals(v)) return v;
-            } catch (Exception ignored) {}
-        }
-        return "";
-    }
-
-    private void UIKeyboardHide() {
-        try {
-            if (getActivity() != null) {
-                android.view.inputmethod.InputMethodManager imm =
-                        (android.view.inputmethod.InputMethodManager)
-                        getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null && getView() != null) {
-                    imm.hideSoftInputFromWindow(getView().getWindowToken(), 0);
-                }
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private void showKeyboard(View view) {
-        try {
-            if (view == null || getActivity() == null) return;
-            android.view.inputmethod.InputMethodManager imm =
-                    (android.view.inputmethod.InputMethodManager)
-                    getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.showSoftInput(view,
-                        android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "showKeyboard error", e);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Checkout — with active dialog management
-    // ═══════════════════════════════════════════════════════════════════
-
-    private void processCheckoutAndStockUpdate() {
-    try {
-        if (!hasPosPermission()) {
-            showToast(getString(R.string.pos_msg_no_permission));
-            return;
-        }
-        if (!canPerformCheckout()) {
-            showToast(isArabic ? "⛔ غير مصرح بإجراء البيع" : "⛔ Not authorized");
-            return;
-        }
-        if (cartManager == null || cartManager.isEmpty()) {
-            showToast(getString(R.string.pos_msg_cart_empty_toast));
-            return;
-        }
-        if (isCheckoutDialogShowing) return;
-        if (!isFragmentAlive()) return;
-
-        UIHelper.hideKeyboard(getActivity());
-
-        // ✅ 1) احفظ item_ids الحالية
-        final List<Integer> itemIds = new ArrayList<>();
-        for (CartItem item : cartManager.getItems()) {
-            if (item != null && item.itemId > 0) {
-                itemIds.add(item.itemId);
-            }
-        }
-
-        if (itemIds.isEmpty()) {
-            showToast(isArabic
-                    ? "لا يمكن تحديد معرّفات القطع"
-                    : "Cannot identify items");
-            return;
-        }
-
-        // ✅ 2) اجلب الأسعار الحقيقية من السيرفر أولاً
-        showToast(isArabic ? "🔍 جاري التحقق من الأسعار..." : "🔍 Checking prices...");
-        refreshPricesBeforeCheckout(itemIds);
-
-    } catch (Exception e) {
-        Log.e(TAG, "processCheckoutAndStockUpdate error", e);
-    }
-}
-
-private void refreshPricesBeforeCheckout(List<Integer> itemIds) {
-    final AlertDialog loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic);
-
-    miraExecutor.getNetworkExecutor().execute(() -> {
-        try {
-            Context ctx = getSafeAppContext();
-            if (ctx == null) return;
-
-            MiraApiClient client = MiraApiClient.getInstance(ctx);
-            MiraApiClient.ApiResponse resp = client.prepareCheckout(itemIds);
-
-            safeRun(() -> {
-                PosUIManager.dismissDialog(loadingDialog);
-
-                if (resp == null || !resp.isSuccess || resp.data == null) {
-                    String err = (resp != null && resp.error != null)
-                            ? resp.error
-                            : (isArabic ? "فشل التحقق من الأسعار" : "Price check failed");
-                    showToast("❌ " + err);
-                    return;
-                }
-
-                try {
-                    // ✅ 3) اقرأ الأسعار الحقيقية
-                    JSONArray freshItems = resp.data.optJSONArray("items");
-                    JSONArray unavailable = resp.data.optJSONArray("unavailable");
-                    double freshTotalUsd = resp.data.optDouble("total_usd", 0);
-                    double freshTotalYer = resp.data.optDouble("total_yer", 0);
-                    double cachedTotalUsd = cartManager.snapshot().totalUsd;
-
-                    boolean pricesChanged = Math.abs(freshTotalUsd - cachedTotalUsd) > 0.01;
-
-                    // ✅ 4) املأ القطع المتاحة (أو أزل غير المتاحة)
-                    if (freshItems != null) {
-                        for (int i = 0; i < freshItems.length(); i++) {
-                            JSONObject it = freshItems.getJSONObject(i);
-                            int id = it.optInt("id", 0);
-                            double newPrice = it.optDouble("retail_price_usd", 0);
-                            if (id > 0 && newPrice > 0) {
-                                cartManager.updateItemPrice(id, newPrice);
-                            }
-                        }
-                    }
-
-                    // 5) أزل القطع التي أصبحت غير متاحة (مباعة، إلخ)
-                    if (unavailable != null && unavailable.length() > 0) {
-                        StringBuilder names = new StringBuilder();
-                        for (int i = 0; i < unavailable.length(); i++) {
-                            JSONObject u = unavailable.getJSONObject(i);
-                            int id = u.optInt("id", 0);
-                            String serial = u.optString("serial", "");
-                            if (id > 0) {
-                                cartManager.removeItemByItemId(id);
-                                if (names.length() > 0) names.append(", ");
-                                names.append(serial.isEmpty() ? ("#" + id) : serial);
-                            }
-                        }
-                        showToast(isArabic
-                                ? "⚠️ تم إزالة قطع غير متاحة: " + names
-                                : "⚠️ Removed unavailable items: " + names);
-                    }
-
-                    // 6) إذا تغيّر الإجمالي → أعلم المستخدم
-                    if (pricesChanged) {
-                        String msg = isArabic
-                                ? "💰 تم تحديث الأسعار. الإجمالي الجديد: "
-                                  + String.format(Locale.US, "%,.0f", freshTotalYer) + " YER"
-                                : "💰 Prices updated. New total: "
-                                  + String.format(Locale.US, "%,.0f", freshTotalYer) + " YER";
-                        showToast(msg);
-                    }
-
-                    // 7) الآن افتح الديالوج بالإجمالي الصحيح
-                    // 6) استخرج أسعار الصرف من السيرفر
-JSONObject ratesObj = resp.data.optJSONObject("exchange_rates");
-String ratesJson = (ratesObj != null) ? ratesObj.toString() : "{}";
-Log.i(TAG, "📊 Server rates: " + ratesJson);
-
-// 7) افتح الديالوج بالإجمالي الصحيح + الأسعار
-openCheckoutDialogWithTotal(freshTotalUsd, ratesJson);
-
-                } catch (Exception e) {
-                    Log.e(TAG, "refreshPrices parse error", e);
-                    showToast("⚠️ " + e.getMessage());
-                }
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "refreshPricesBeforeCheckout error", e);
-            safeRun(() -> {
-                PosUIManager.dismissDialog(loadingDialog);
-                showToast("⚠️ " + e.getMessage());
-            });
-        }
-    });
-}
-
-private void openCheckoutDialogWithTotal(double totalUsd, String ratesJson) {
-    try {
-        if (!isFragmentAlive()) return;
-
-        isCheckoutDialogShowing = true;
-        PosCartManager.CartSnapshot snap = cartManager.snapshot();
-
-        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count, ratesJson);
-        activeCheckoutDialog = dialog;
-
-        dialog.setCheckoutListener(data -> {
-            if (data != null) executeCheckoutDirectly(data);
-        });
-
-        dialog.setOnDismissListener(() -> {
-            isCheckoutDialogShowing = false;
-            activeCheckoutDialog = null;
-        });
-
-        FragmentManager fm = getParentFragmentManager();
-        if (fm != null && !fm.isStateSaved()) {
-            dialog.show(fm, "POSCheckoutDialog");
-        } else {
-            isCheckoutDialogShowing = false;
-            activeCheckoutDialog = null;
-            Log.w(TAG, "Dialog not shown: FragmentManager state saved");
-        }
-    } catch (Exception e) {
-        isCheckoutDialogShowing = false;
-        activeCheckoutDialog = null;
-        Log.e(TAG, "openCheckoutDialogWithTotal error", e);
-    }
-}
-    private void executeCheckoutDirectly(final POSCheckoutDialog.POSCheckoutData data) {
-        if (data == null || !isFragmentAlive()) return;
-
-        if (!hasPosPermission() || !canPerformCheckout()) {
-            showToast(getString(R.string.pos_msg_no_permission));
-            return;
-        }
-
-        // ✅ نُعلن loadingDialog خارج try للوصول من catch
-        AlertDialog loadingDialog = null;
-
-        try {
-            setButtonsEnabled(false);
-            loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic);
-
-            final AlertDialog finalLoadingDialog = loadingDialog;
-
-            miraExecutor.getNetworkExecutor().execute(() -> {
-                try {
-                    Context ctx = getSafeAppContext();
-                    if (ctx == null) return;
-
-                    MiraApiClient client = MiraApiClient.getInstance(ctx);
-                    JSONObject payload = buildCheckoutPayload(client, data);
-
-                    MiraApiClient.ApiResponse response = client.checkout(payload);
-
-                    safeRun(() -> {
-                        PosUIManager.dismissDialog(finalLoadingDialog);
-                        setButtonsEnabled(true);
-
-                        if (response != null && response.isSuccess) {
-                            // ✅ نجاح: أغلق الديالوج
-                            if (activeCheckoutDialog != null && activeCheckoutDialog.isAdded()) {
-                                activeCheckoutDialog.onCheckoutSuccess();
-                            }
-                            handleSaleSuccess(response, data, false);
-
-                        } else if (response != null && response.isNetworkError) {
-                            // ✅ Offline: أغلق الديالوج
-                            if (activeCheckoutDialog != null && activeCheckoutDialog.isAdded()) {
-                                activeCheckoutDialog.onCheckoutSuccess();
-                            }
-                            saveOfflineSale(payload, data);
-                            handleSaleSuccess(response, data, true);
-
-                        } else {
-                            // ❌ فشل: أظهر الخطأ داخل الديالوج
-                            String errorMsg = (response != null && response.error != null)
-                                    ? response.error : "حدث خطأ غير معروف";
-
-                            if (response != null && response.errorCode != null) {
-                                switch (response.errorCode) {
-                                    case "RATE_MISMATCH":
-                                        currentSaleUuid = null;
-                                        if (activeCheckoutDialog != null && activeCheckoutDialog.isAdded()) {
-                                            activeCheckoutDialog.onCheckoutError(
-                                                    isArabic
-                                                        ? "⚠️ سعر الصرف غير محدّث — أغلق النافذة وافتحها مجدداً"
-                                                        : "⚠️ Exchange rate outdated — close and reopen");
-                                        } else {
-                                            showToast(isArabic
-                                                    ? "⚠️ سعر الصرف غير محدث — أعد فتح الشاشة"
-                                                    : "⚠️ Exchange rate outdated — reopen screen");
-                                        }
-                                        return;
-                                    case "UUID_REQUIRED":
-                                    case "INVALID_UUID":
-                                        currentSaleUuid = null;
-                                        if (activeCheckoutDialog != null && activeCheckoutDialog.isAdded()) {
-                                            activeCheckoutDialog.onCheckoutError(
-                                                    isArabic
-                                                        ? "⚠️ خطأ في معرف العملية — أعد المحاولة"
-                                                        : "⚠️ Transaction ID error — retry");
-                                        }
-                                        return;
-                                }
-                            }
-
-                            // ✅ عرض الخطأ داخل الديالوج (لا تُغلق — تبقى لتعديل الإدخال)
-                            if (activeCheckoutDialog != null && activeCheckoutDialog.isAdded()) {
-                                activeCheckoutDialog.onCheckoutError(errorMsg);
-                            } else {
-                                // fallback: Alert retry عادي
-                                PosUIManager.showRetryDialog(
-                                        requireContext(),
-                                        getString(R.string.pos_dialog_retry_title),
-                                        errorMsg,
-                                        () -> executeCheckoutDirectly(data),
-                                        isArabic
-                                );
-                            }
-                        }
-                    });
-
-                } catch (Exception e) {
-                    Log.e(TAG, "executeCheckoutDirectly error", e);
-                    safeRun(() -> {
-                        PosUIManager.dismissDialog(finalLoadingDialog);
-                        setButtonsEnabled(true);
-                        if (activeCheckoutDialog != null && activeCheckoutDialog.isAdded()) {
-                            activeCheckoutDialog.onCheckoutError(
-                                    isArabic ? "خطأ في الاتصال: " + e.getMessage()
-                                             : "Network error: " + e.getMessage());
-                        } else {
-                            PosUIManager.showRetryDialog(
-                                    requireContext(),
-                                    getString(R.string.pos_dialog_error_title),
-                                    e.getMessage(),
-                                    () -> executeCheckoutDirectly(data),
-                                    isArabic
-                            );
-                        }
-                    });
-                }
-            });
-
-        } catch (Exception e) {
-            if (loadingDialog != null) {
-                final AlertDialog dlg = loadingDialog;
-                safeRun(() -> PosUIManager.dismissDialog(dlg));
-            }
-            setButtonsEnabled(true);
-            Log.e(TAG, "executeCheckoutDirectly outer error", e);
-        }
-    }
-
-    private void saveOfflineSale(JSONObject payload,
-                                 POSCheckoutDialog.POSCheckoutData data) {
-        try {
-            if (payload == null || pendingSalesQueue == null) return;
-
-            String localUuid = payload.optString("local_uuid", "");
-            if (localUuid.isEmpty()) {
-                Log.w(TAG, "⚠️ No local_uuid — cannot enqueue offline sale");
-                return;
-            }
-
-            PendingSale sale = new PendingSale();
-            sale.localUuid   = localUuid;
-            sale.payloadJson = payload.toString();
-            sale.branchId    = getActiveBranchId();
-            sale.userId      = sessionManager != null ? sessionManager.getUserId() : 0;
-            sale.totalUsd    = data != null ? data.finalAmount : 0;
-            sale.itemCount   = cartManager != null ? cartManager.size() : 0;
-            sale.customerName = (data != null && data.customerName != null)
-                    ? data.customerName : "";
-            sale.createdAt   = System.currentTimeMillis();
-            sale.status      = PendingSale.STATUS_PENDING;
-
-            boolean ok = pendingSalesQueue.enqueue(sale);
-            if (ok) {
-                updatePendingSalesBadge();
-                showToast(isArabic
-                        ? "📥 سيُرسَل البيع تلقائياً عند عودة الاتصال"
-                        : "📥 Sale will be sent automatically when online");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "saveOfflineSale error", e);
-        }
-    }
-
-    private void updateCacheAfterSale(@NonNull List<CartItem> soldItems) {
-        if (soldItems.isEmpty()) return;
-
-        try {
-            MiraLocalItemCache cache = MiraLocalItemCache.getInstance(getSafeAppContext());
-            if (cache == null) return;
-
-            int marked = 0;
-            for (CartItem item : soldItems) {
-                if (item == null) continue;
-                if (item.epc != null && !item.epc.isEmpty()) {
-                    cache.markItemAsSold(item.epc);
-                    marked++;
-                }
-                if (item.rfidEpc != null && !item.rfidEpc.isEmpty()
-                        && !item.rfidEpc.equals(item.epc)) {
-                    cache.markItemAsSold(item.rfidEpc);
-                }
-                if (item.serialNo != null && !item.serialNo.isEmpty()) {
-                    cache.markItemAsSold(item.serialNo);
-                }
-                if (item.gtin != null && !item.gtin.isEmpty()) {
-                    cache.markItemAsSold(item.gtin);
-                }
-                if (item.tid != null && !item.tid.isEmpty()) {
-                    cache.markItemAsSold(item.tid);
-                }
-            }
-            Log.i(TAG, "✅ Cache updated: " + marked + " identifiers marked as sold");
-        } catch (Exception e) {
-            Log.e(TAG, "updateCacheAfterSale error", e);
-        }
-    }
-
-    private void handleSaleSuccess(final MiraApiClient.ApiResponse response,
-                                   final POSCheckoutDialog.POSCheckoutData data,
-                                   final boolean isOffline) {
-        if (!isFragmentAlive() || data == null) return;
-
-        try {
-            playAlertSound(1);
-            lastSaleResponse = response;
-            lastSaleResponseTime = System.currentTimeMillis();
-
-            currentSaleUuid = null;
-
-            final List<CartItem> soldItems = new ArrayList<>(cartManager.getItems());
-            final long saleId = isOffline ? 0L : extractSaleIdFromResponse(response);
-
-            Context appCtx = getSafeAppContext();
-            if (appCtx != null) {
-                GateSaleBridge.onSaleCompleted(
-                        appCtx, soldItems, saleId, data.finalAmount,
-                        getActiveBranchId(),
-                        sessionManager != null ? sessionManager.getUserId() : 0,
-                        isOffline);
-            }
-
-            updateCacheAfterSale(soldItems);
-            cartManager.clear();
-
-            if (!isOffline) {
-                showReceipt(response);
-                PosUIManager.notifyDataChanged(requireContext(), "sale", getActiveBranchId());
-                showToast(getString(R.string.pos_msg_sale_success));
-            } else {
-                showToast(getString(R.string.pos_msg_sale_offline));
-                PosUIManager.notifyDataChanged(requireContext(), "sale_offline", getActiveBranchId());
-            }
-
-            if (heroController != null) {
-                heroController.resetRfidCount();
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "handleSaleSuccess error", e);
-        }
-    }
-
-    private JSONObject buildCheckoutPayload(MiraApiClient client,
-                                            POSCheckoutDialog.POSCheckoutData data)
-            throws Exception {
-
-        JSONObject payload = new JSONObject();
-
-        payload.put("action", "COMPLETE_POS_SALE");
-        payload.put("gate_id", client != null ? client.getGateId() : "");
-        payload.put("branch_id", getActiveBranchId());
-        payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-
-        if (currentSaleUuid == null || currentSaleUuid.isEmpty()) {
-            currentSaleUuid = UUID.randomUUID().toString();
-        }
-        payload.put("local_uuid", currentSaleUuid);
-
-        payload.put("username", sessionManager != null ? sessionManager.getUsername() : "");
-
-        String customerName = (data.customerName != null && !data.customerName.trim().isEmpty())
-                ? data.customerName.trim()
-                : (isArabic ? "عميل نقدي" : "Cash Customer");
-
-        String customerPhone = (data.customerPhone != null && !data.customerPhone.trim().isEmpty()
-                && !"—".equals(data.customerPhone.trim()))
-                ? data.customerPhone.trim() : "";
-
-        payload.put("customer_name", customerName);
-        payload.put("customer_phone", customerPhone);
-
-        JSONObject customerObj = new JSONObject();
-        customerObj.put("name", customerName);
-        customerObj.put("phone", customerPhone);
-        customerObj.put("email", data.customerEmail != null ? data.customerEmail : "");
-        customerObj.put("address", data.customerAddress != null ? data.customerAddress : "");
-        customerObj.put("notes", data.customerNotes != null ? data.customerNotes : "");
-        customerObj.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
-        customerObj.put("discount_amount_usd", data.discountAmount);
-        payload.put("customer", customerObj);
-
-        // ✅ Trade-in (ذهب كسر)
-        if (data.tradeIns != null && data.tradeIns.length() > 0) {
-            JSONArray tradeInsArr = new JSONArray();
-            for (int i = 0; i < data.tradeIns.length(); i++) {
-                try {
-                    JSONObject src = data.tradeIns.getJSONObject(i);
-                    JSONObject obj = new JSONObject();
-                    obj.put("weight_grams", src.optDouble("weight_grams", 0));
-                    obj.put("karat", src.optString("karat", "21K"));
-                    obj.put("description", src.optString("description", "ذهب كسر"));
-                    tradeInsArr.put(obj);
-                } catch (Exception ignored) {}
-            }
-            payload.put("trade_ins", tradeInsArr);
-            Log.d(TAG, "✅ Trade-ins added: " + tradeInsArr.length() + " item(s)");
-        }
-
-        // ═══════ العناصر ═══════
-        JSONArray itemsArr = new JSONArray();
-        for (CartItem item : cartManager.getItems()) {
-            if (item == null) continue;
-
-            JSONObject obj = item.toJson();
-            if (obj.optString("serial_no", "").isEmpty()) {
-                String fallback = !item.tid.isEmpty() ? item.tid
-                        : !item.rfidEpc.isEmpty() ? item.rfidEpc
-                        : item.epc;
-                obj.put("serial_no", fallback != null ? fallback : "");
-            }
-            itemsArr.put(obj);
-        }
-        payload.put("items", itemsArr);
-        payload.put("item_count", cartManager.size());
-
-        // ═══════ المبالغ ═══════
-        double subtotalUsd = data.originalTotal;
-        double discountUsd = data.discountAmount;
-        double finalUsd    = data.finalAmount;
-
-        double yerRate = priceManager.getExchangeRate("YER");
-        if (yerRate <= 0) yerRate = 530.0;
-
-        payload.put("subtotal_usd", subtotalUsd);
-        payload.put("discount_usd", discountUsd);
-        payload.put("total_usd", finalUsd);
-        payload.put("total_amount_usd", finalUsd);
-        payload.put("subtotal", subtotalUsd * yerRate);
-        payload.put("discount", discountUsd * yerRate);
-        payload.put("total", finalUsd * yerRate);
-        payload.put("total_amount", finalUsd * yerRate);
-
-        // ═══════ المدفوعات المتعددة ═══════
-        JSONArray paymentsArray = new JSONArray();
-        if (data.payments != null && data.payments.length() > 0) {
-            paymentsArray = data.payments;
-        } else {
-            String defaultCurrency = priceManager.getDefaultCurrency();
-            double defaultRate = priceManager.getExchangeRate(defaultCurrency);
-            if (defaultRate <= 0) defaultRate = yerRate;
-
-            JSONObject pObj = new JSONObject();
-            pObj.put("currency", defaultCurrency);
-            pObj.put("amount", finalUsd * yerRate / defaultRate);
-            pObj.put("exchange_rate", defaultRate);
-            pObj.put("base_amount", finalUsd * yerRate);
-            pObj.put("method", data.paymentMethod != null ? data.paymentMethod : "cash");
-            paymentsArray.put(pObj);
-        }
-        payload.put("payments", paymentsArray);
-
-        // ═══════ payment (legacy) ═══════
-        JSONObject payment = new JSONObject();
-        payment.put("subtotal_usd", subtotalUsd);
-        payment.put("discount_amount_usd", discountUsd);
-        payment.put("final_amount_usd", finalUsd);
-        payment.put("subtotal", subtotalUsd * yerRate);
-        payment.put("discount_amount", discountUsd * yerRate);
-        payment.put("final_amount", finalUsd * yerRate);
-        payment.put("exchange_rate", yerRate);
-        payment.put("currency_code", "YER");
-        payment.put("payment_method", data.paymentMethod != null ? data.paymentMethod : "cash");
-        payload.put("payment", payment);
-
-        payload.put("notes", isArabic ? "بيع POS" : "POS Sale");
-        return payload;
-    }
-
-    private void showReceipt(MiraApiClient.ApiResponse response) {
-        try {
-            if (!isFragmentAlive()) return;
-
-            String receiptJson = "{}";
-            if (response != null) {
-                if (response.data != null) receiptJson = response.data.toString();
-                else if (response.getBody() != null && !response.getBody().isEmpty()) {
-                    receiptJson = response.getBody();
-                }
-            }
-
-            MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(receiptJson);
-            FragmentManager fm = getParentFragmentManager();
-            if (fm != null && !fm.isStateSaved()) {
-                receiptFragment.show(fm, "MiraReceiptFragment");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "showReceipt error", e);
-        }
-    }
-
-    private long extractSaleIdFromResponse(MiraApiClient.ApiResponse response) {
-        if (response == null || response.data == null) return 0L;
-        try {
-            long id = response.data.optLong("sale_id",
-                    response.data.optLong("saleId",
-                            response.data.optLong("id", 0L)));
-            if (id > 0) return id;
-
-            JSONObject sale = response.data.optJSONObject("sale");
-            if (sale != null) {
-                id = sale.optLong("id", sale.optLong("sale_id", 0L));
-                if (id > 0) return id;
-            }
-        } catch (Exception ignored) {}
-        return 0L;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Refund V2 (Sale-Centric)
-    // ═══════════════════════════════════════════════════════════════════
-
-    private void showRefundDialog() {
-        if (!isFragmentAlive()) return;
-
-        if (!canPerformRefund()) {
-            showToast(isArabic ? "⛔ غير مصرح بالاسترجاع" : "⛔ Not authorized to refund");
-            return;
-        }
-
-        try {
-            selectedRefundItem.set(null);
-            isRefundDialogHiddenForScan = false;
-
-            refundDialog = new RefundDialog(requireContext(), new RefundDialog.RefundCallback() {
-                @Override
-                public void onRefundSuccess(JSONObject result) {
-                    handleRefundSuccessV2(result);
-                }
-
-                @Override
-                public void onBarcodeScan() {
-                    isRefundDialogHiddenForScan = true;
-                    if (refundDialog != null) refundDialog.hide();
-                    openRefundBarcodeScanner();
-                }
-
-                @Override
-                public void onDialogClosed() {
-                    // لا شيء
-                }
-            });
-
-            refundDialog.setOnHardwareKeyListener((d, k, e) -> myOnKeyDwon(k, e));
-            refundDialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "showRefundDialog error", e);
-        }
-    }
-
-    /**
-     * معالجة نجاح الإرجاع:
-     * 1. إبطال Cache للقطع المُرجَعة (لكي تُباع مرة أخرى)
-     * 2. إظهار ملخص النجاح
-     * 3. إشعار باقي التطبيق
-     */
-    private void handleRefundSuccessV2(JSONObject result) {
-        try {
-            if (result == null) return;
-
-            String refundNumber = result.optString("refund_number", "");
-            double amountLocal = result.optDouble("amount_local", 0);
-            String method = result.optString("method", "cash");
-            boolean isFull = result.optBoolean("is_full", false);
-
-            // ✅ إبطال الـ Cache للقطع المُرجَعة
-            JSONArray items = result.optJSONArray("items");
-            if (items != null && items.length() > 0) {
-                Context appCtx = getSafeAppContext();
-                if (appCtx != null) {
-                    MiraLocalItemCache cache = MiraLocalItemCache.getInstance(appCtx);
-                    if (cache != null) {
-                        for (int i = 0; i < items.length(); i++) {
-                            try {
-                                JSONObject it = items.getJSONObject(i);
-                                String epc = it.optString("epc", "");
-                                String serial = it.optString("serial", "");
-                                String title = it.optString("title", "");
-
-                                if (!epc.isEmpty()) {
-                                    cache.markItemAsAvailable(epc);
-                                    Log.d(TAG, "✅ Cache invalidated (EPC): " + epc);
-                                }
-                                if (!serial.isEmpty() && !serial.equals(epc)) {
-                                    cache.markItemAsAvailable(serial);
-                                    Log.d(TAG, "✅ Cache invalidated (Serial): " + serial);
-                                }
-                                if (!title.isEmpty()) {
-                                    Log.d(TAG, "   Item: " + title);
-                                }
-                            } catch (Exception e) {
-                                Log.w(TAG, "cache invalidate error for item", e);
-                            }
-                        }
-                    }
-                }
-            }
-
-            String methodLabel = "credit".equalsIgnoreCase(method)
-                    ? (isArabic ? "رصيد دائن" : "Store Credit")
-                    : (isArabic ? "نقدي" : "Cash");
-
-            String msg = isArabic
-                    ? "✅ تم الإرجاع بنجاح!\n\n"
-                      + "رقم الإرجاع: " + refundNumber + "\n"
-                      + "المبلغ: " + String.format(Locale.US, "%,.2f", amountLocal) + " YER\n"
-                      + "الطريقة: " + methodLabel
-                      + (isFull ? "\n\n(إرجاع كامل)" : "\n\n(إرجاع جزئي)")
-                    : "✅ Refund successful!\n\n"
-                      + "Refund #: " + refundNumber + "\n"
-                      + "Amount: " + String.format(Locale.US, "%,.2f", amountLocal) + " YER\n"
-                      + "Method: " + methodLabel
-                      + (isFull ? "\n\n(Full refund)" : "\n\n(Partial refund)");
-
-            PosUIManager.showResultDialog(requireContext(),
-                    isArabic ? "تم الإرجاع" : "Refund Success",
-                    msg, true, isArabic);
-
-            PosUIManager.notifyDataChanged(requireContext(), "refund", getActiveBranchId());
-
-        } catch (Exception e) {
-            Log.e(TAG, "handleRefundSuccessV2 error", e);
-        }
-    }
-
-    private void openRefundBarcodeScanner() {
-        if (!isFragmentAlive()) return;
-
-        if (!hasPosPermission() || !canPerformRefund()) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Not authorized");
-            return;
-        }
-
-        FragmentManager fm = getParentFragmentManager();
-        if (fm == null || fm.isStateSaved()) {
-            if (refundDialog != null) refundDialog.show();
-            isRefundDialogHiddenForScan = false;
-            return;
-        }
-
-        MiraBarcodeScannerFragment scannerFragment = new MiraBarcodeScannerFragment();
-
-        scannerFragment.setOnBarcodeScannedListener((rawData, format) -> {
-            try {
-                if (rawData == null || rawData.isEmpty()) return;
-
-                String[] parsed = parseGs1OrQr(rawData);
-                final String data = parsed[0];
-
-                if (data == null || data.isEmpty()) return;
-
-                if (refundDialog != null && !refundDialog.isShowing()) {
-                    refundDialog.show();
-                    isRefundDialogHiddenForScan = false;
-                }
-
-                if (refundDialog != null) {
-                    // ✅ V2: البحث بالكود (فاتورة أو قطعة)
-                    refundDialog.setQueryFromScan(data);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Refund barcode callback error", e);
-            }
-        });
-
-        int containerId = android.R.id.content;
-        try {
-            View view = getView();
-            if (view != null && view.getParent() instanceof View) {
-                int parentId = ((View) view.getParent()).getId();
-                if (parentId != View.NO_ID) containerId = parentId;
-            }
-        } catch (Exception ignored) {}
-
-        fm.beginTransaction()
-                .hide(this)
-                .add(containerId, scannerFragment, "refund_barcode_scanner")
-                .addToBackStack("refund_barcode_scanner")
-                .commit();
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Public APIs
-    // ═══════════════════════════════════════════════════════════════════
-
-    public void showLastReceiptDialog() {
+    private fun openBarcodeScanner() {
         try {
             if (!hasPosPermission()) {
-                showToast(getString(R.string.pos_msg_no_permission));
-                return;
+                showToast(getString(R.string.pos_msg_no_permission))
+                currentScanMode = ScanMode.NONE
+                heroState = HeroVisualState.IDLE
+                return
+            }
+            if (!isFragmentAlive()) return
+
+            val fm = parentFragmentManager
+            if (fm.isStateSaved) {
+                currentScanMode = ScanMode.NONE
+                heroState = HeroVisualState.IDLE
+                return
             }
 
-            if (lastSaleResponse == null
-                    || (System.currentTimeMillis() - lastSaleResponseTime) > LAST_SALE_VALIDITY_MS) {
-                showToast(isArabic ? "لا يوجد إيصال حديث" : "No recent receipt");
-                return;
+            val scannerFragment = MiraBarcodeScannerFragment()
+            scannerFragment.setOnBarcodeScannedListener { data, _ ->
+                if (!data.isNullOrEmpty()) {
+                    pendingBarcodeFromScanner = data
+                }
             }
-            showReceipt(lastSaleResponse);
-        } catch (Exception e) {
-            Log.e(TAG, "showLastReceiptDialog error", e);
-        }
-    }
 
-    public void focusSearchField() {
-        try { showManualInput(); }
-        catch (Exception e) { Log.e(TAG, "focusSearchField error", e); }
-    }
-
-    private void setButtonsEnabled(boolean enabled) {
-        safeRun(() -> {
+            var containerId = android.R.id.content
             try {
-                boolean canUse = hasPosPermission();
-                if (btnCheckout != null) {
-                    boolean canCheckout = enabled && canUse
-                            && cartManager != null && !cartManager.isEmpty();
-                    btnCheckout.setEnabled(canCheckout);
-                    btnCheckout.setAlpha(canCheckout ? 1f : 0.5f);
+                val parent = view?.parent
+                if (parent is View && parent.id != View.NO_ID) {
+                    containerId = parent.id
                 }
-                if (btnClearCart != null) {
-                    btnClearCart.setEnabled(enabled && cartManager != null && !cartManager.isEmpty());
-                }
-                if (btnAddManual != null) btnAddManual.setEnabled(enabled && canUse);
-                if (btnPosScanGs1 != null) btnPosScanGs1.setEnabled(enabled && canUse);
-                if (btnPosScanRfid != null) btnPosScanRfid.setEnabled(enabled && canUse);
-                if (btnPosScanManual != null) btnPosScanManual.setEnabled(enabled && canUse);
-                if (etManualEpc != null) etManualEpc.setEnabled(enabled && canUse);
-            } catch (Exception e) {
-                Log.e(TAG, "setButtonsEnabled error", e);
+            } catch (_: Exception) {
             }
-        });
-    }
-
-    private void applyPermissions() {
-        try {
-            boolean canUse = hasPosPermission();
-
-            if (btnAddManual != null) btnAddManual.setEnabled(canUse);
-            if (btnPosScanGs1 != null) btnPosScanGs1.setEnabled(canUse);
-            if (btnPosScanRfid != null) btnPosScanRfid.setEnabled(canUse);
-            if (btnPosScanManual != null) btnPosScanManual.setEnabled(canUse);
-            if (etManualEpc != null) etManualEpc.setEnabled(canUse);
-
-            if (btnPosRefund != null) {
-                boolean canRefund = canPerformRefund();
-                btnPosRefund.setVisibility(canRefund ? View.VISIBLE : View.GONE);
-            }
-
-            if (!canUse && tvCartStatus != null) {
-                tvCartStatus.setText(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "applyPermissions error", e);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  RFID Trigger
-    // ═══════════════════════════════════════════════════════════════════
-
-    @Override
-    public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-        boolean isTrigger = (keyCode == KEYCODE_RFID_TRIGGER_1
-                || keyCode == KEYCODE_RFID_TRIGGER_2
-                || keyCode == KEYCODE_RFID_TRIGGER_3);
-
-        if (!isTrigger) return false;
-
-        if (event.getAction() == KeyEvent.ACTION_DOWN
-                && event.getRepeatCount() == 0) {
-
-            cancelPendingStopIfAny();
-
-            if (isCheckoutDialogShowing) {
-                Log.d(TAG, "Trigger ignored: checkout dialog showing");
-                return true;
-            }
-
-            if (!hasPosPermission()) {
-                showToast(getString(R.string.pos_msg_no_permission));
-                return true;
-            }
-
-            try {
-                if (!DeviceDetector.isRfidHardwareSupported()) return true;
-            } catch (Exception ignored) {}
-
-            if (currentScanMode != ScanMode.RFID) {
-                Log.i(TAG, "Trigger DOWN → starting RFID One-Shot");
-                switchScanMode(ScanMode.RFID);
-            } else {
-                oneShotConsumed.set(false);
-                stopAfterFirstRead = true;
-            }
-            return true;
-        }
-
-        if (event.getAction() == KeyEvent.ACTION_UP) {
-            if (currentScanMode == ScanMode.RFID) {
-                Log.i(TAG, "Trigger UP → grace period");
-                scheduleDelayedStopIfNeeded();
-            }
-            return true;
-        }
-
-        return false;
-    }
-
-    private void scheduleDelayedStopIfNeeded() {
-        cancelPendingStopIfAny();
-
-        pendingStopRfid = () -> {
-            pendingStopRfid = null;
-            if (currentScanMode == ScanMode.RFID && stopAfterFirstRead) {
-                switchScanMode(ScanMode.NONE);
-            }
-        };
-        mainHandler.postDelayed(pendingStopRfid, TRIGGER_GRACE_MS);
-    }
-
-    private void cancelPendingStopIfAny() {
-        if (pendingStopRfid != null) {
-            mainHandler.removeCallbacks(pendingStopRfid);
-            pendingStopRfid = null;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Scan Mode Switching
-    // ═══════════════════════════════════════════════════════════════════
-
-    private void switchScanMode(ScanMode target) {
-        if (!isFragmentAlive()) return;
-
-        if (currentScanMode == target) return;
-
-        Log.d(TAG, "Scan mode: " + currentScanMode + " → " + target);
-
-        switch (currentScanMode) {
-            case RFID: cancelPendingStopIfAny(); stopRFIDScan(); break;
-            case MANUAL: hideManualInput(); break;
-            case GS1: break;
-        }
-
-        currentScanMode = target;
-
-        switch (target) {
-            case GS1:
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.GS1_SCANNING);
-                }
-                openBarcodeScanner();
-                break;
-            case RFID:
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.RFID_LISTENING);
-                    heroController.resetRfidCount();
-                }
-                startRFIDScan();
-                break;
-            case MANUAL:
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.MANUAL_ENTRY);
-                }
-                showManualInput();
-                break;
-            case NONE:
-            default:
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
-                break;
-        }
-    }
-
-    private void startRFIDScan() {
-        try {
-            if (rfidManager == null) return;
-            if (sdkExecutor == null || sdkExecutor.isShutdown()) {
-                Log.e(TAG, "startRFIDScan: sdkExecutor unavailable");
-                return;
-            }
-
-            oneShotConsumed.set(false);
-            stopAfterFirstRead = true;
-
-            sdkExecutor.execute(() -> {
-                try {
-                    rfidManager.startScan(new RFIDManager.ReadyCallback() {
-                        @Override
-                        public void onReady(MiraIRFIDReader reader) {
-                            Log.d(TAG, "RFID started (async)");
-                        }
-
-                        @Override
-                        public void onError(String reason) {
-                            Log.w(TAG, "RFID start failed: " + reason);
-                            safeRun(() -> {
-                                if (!isFragmentAlive()) return;
-                                currentScanMode = ScanMode.NONE;
-                                if (heroController != null) {
-                                    heroController.setState(PosHeroController.State.IDLE);
-                                }
-                            });
-                        }
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "startScan bg error", e);
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "startRFIDScan error", e);
-        }
-    }
-
-    private void stopRFIDScan() {
-        try {
-            if (rfidManager == null) return;
-            if (sdkExecutor == null || sdkExecutor.isShutdown()) {
-                try { rfidManager.stopScan(); } catch (Exception ignored) {}
-                return;
-            }
-            sdkExecutor.execute(() -> {
-                try { rfidManager.stopScan(); }
-                catch (Exception e) { Log.e(TAG, "stopScan bg error", e); }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "stopRFIDScan error", e);
-        }
-    }
-
-    public void onRingScanned(String epc) {
-        try {
-            if (!hasPosPermission()) {
-                Log.w(TAG, "onRingScanned rejected: no POS permission");
-                return;
-            }
-
-            if (epc == null || epc.trim().isEmpty()) return;
-
-            if (refundDialog != null && refundDialog.isShowing()) {
-                if (!canPerformRefund()) {
-                    Log.w(TAG, "Refund scan rejected: no refund permission");
-                    return;
-                }
-                if (currentScanMode != ScanMode.NONE) {
-                    switchScanMode(ScanMode.NONE);
-                }
-                // ✅ V2: البحث بالكود
-                refundDialog.setQueryFromScan(epc.trim());
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
-                return;
-            }
-
-            if (currentScanMode != ScanMode.RFID) return;
-
-            final String cleanEpc = epc.trim().toUpperCase(Locale.US);
-
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(cleanEpc);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(cleanEpc, now);
-
-            if (stopAfterFirstRead) {
-                if (!oneShotConsumed.compareAndSet(false, true)) return;
-                stopAfterFirstRead = false;
-                cancelPendingStopIfAny();
-
-                switchScanMode(ScanMode.NONE);
-            }
-
-            boolean isValidEpc = cleanEpc.matches("^E2[0-9A-F]{22}$");
-
-            if (!isValidEpc) {
-                Log.w(TAG, "Invalid EPC '" + cleanEpc + "' → reading TID");
-                readTidAndProcess(cleanEpc, "rfid");
-                return;
-            }
-
-            if (cartManager != null && cartManager.isIdScanned(cleanEpc)) {
-                showToast(getString(R.string.pos_msg_already_in_cart));
-                playAlertSound(2);
-                return;
-            }
-
-            processRingEpc(cleanEpc, "rfid");
-
-        } catch (Exception e) {
-            Log.e(TAG, "onRingScanned error", e);
-        }
-    }
-
-    private void readTidAndProcess(final String originalEpc, final String source) {
-        if (!hasPosPermission()) {
-            Log.w(TAG, "readTidAndProcess rejected: no POS permission");
-            return;
-        }
-
-        if (sdkExecutor == null || sdkExecutor.isShutdown()) {
-            processRingEpc(originalEpc, source);
-            return;
-        }
-
-        safeRun(() -> {
-            if (tvCartStatus != null) {
-                tvCartStatus.setText(getString(R.string.pos_msg_searching));
-            }
-        });
-
-        sdkExecutor.execute(() -> {
-            String tidRead = null;
-            try {
-                Context ctx = getSafeAppContext();
-                if (ctx != null) {
-                    com.example.uhf.MiraRfid.MiraRfidService rfidService =
-                            com.example.uhf.MiraRfid.MiraRfidService.getInstance(ctx);
-                    tidRead = rfidService.readTid(null);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "readTidAndProcess: readTid error", e);
-            }
-
-            final String cleanTid = (tidRead != null && !tidRead.trim().isEmpty())
-                    ? tidRead.trim().toUpperCase(Locale.US) : null;
-
-            safeRun(() -> {
-                if (!isFragmentAlive()) return;
-
-                if (cleanTid == null) {
-                    processRingEpc(originalEpc, source);
-                    return;
-                }
-
-                if (cartManager != null && cartManager.isIdScanned(cleanTid)) {
-                    showToast(getString(R.string.pos_msg_already_in_cart));
-                    playAlertSound(2);
-                    return;
-                }
-
-                processRingEpc(cleanTid, source);
-            });
-        });
-    }
-
-    public void onBarcodeScanned(String rawData) {
-        try {
-            if (!hasPosPermission()) {
-                Log.w(TAG, "onBarcodeScanned rejected: no POS permission");
-                return;
-            }
-
-            if (rawData == null || rawData.trim().isEmpty()) return;
-
-            String[] parsed = parseGs1OrQr(rawData.trim());
-            final String data = parsed[0];
-
-            if (data == null || data.trim().isEmpty()) return;
-
-            long now = System.currentTimeMillis();
-            Long lastTime = lastScannedTimes.get(data);
-            if (lastTime != null && (now - lastTime < SCAN_COOLDOWN_MS)) return;
-            lastScannedTimes.put(data, now);
-
-            if (refundDialog != null && refundDialog.isShowing()) {
-                if (!canPerformRefund()) {
-                    Log.w(TAG, "Refund barcode rejected: no refund permission");
-                    return;
-                }
-                refundDialog.setQueryFromScan(data);
-                return;
-            }
-
-            if (cartManager != null) {
-                boolean dup = cartManager.isIdScanned(data);
-                if (!dup && looksLikePartialSerial(data)) {
-                    for (String prefix : SERIAL_PREFIXES) {
-                        if (cartManager.isIdScanned(prefix + data)) { dup = true; break; }
-                    }
-                }
-                if (dup) {
-                    showToast(getString(R.string.pos_msg_already_in_cart));
-                    playAlertSound(2);
-                    return;
-                }
-            }
-
-            processRingEpc(data, "barcode");
-
-        } catch (Exception e) {
-            Log.e(TAG, "onBarcodeScanned error", e);
-        }
-    }
-
-    private void openBarcodeScanner() {
-        try {
-            if (!hasPosPermission()) {
-                showToast(getString(R.string.pos_msg_no_permission));
-                currentScanMode = ScanMode.NONE;
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
-                return;
-            }
-
-            if (!isFragmentAlive()) return;
-
-            FragmentManager fm = getParentFragmentManager();
-            if (fm == null || fm.isStateSaved()) {
-                currentScanMode = ScanMode.NONE;
-                if (heroController != null) {
-                    heroController.setState(PosHeroController.State.IDLE);
-                }
-                return;
-            }
-
-            MiraBarcodeScannerFragment scannerFragment = new MiraBarcodeScannerFragment();
-
-            scannerFragment.setOnBarcodeScannedListener((data, format) -> {
-                try {
-                    if (data != null && !data.isEmpty()) {
-                        pendingBarcodeFromScanner = data;
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Barcode callback error", e);
-                }
-            });
-
-            int containerId = android.R.id.content;
-            try {
-                View view = getView();
-                if (view != null && view.getParent() instanceof View) {
-                    int parentId = ((View) view.getParent()).getId();
-                    if (parentId != View.NO_ID) containerId = parentId;
-                }
-            } catch (Exception ignored) {}
 
             fm.beginTransaction()
-                    .hide(this)
-                    .add(containerId, scannerFragment, "barcode_scanner")
-                    .addToBackStack("barcode_scanner")
-                    .commit();
-        } catch (Exception e) {
-            Log.e(TAG, "openBarcodeScanner error", e);
-            if (heroController != null) {
-                heroController.setState(PosHeroController.State.IDLE);
-            }
-            currentScanMode = ScanMode.NONE;
+                .hide(this)
+                .add(containerId, scannerFragment, "barcode_scanner")
+                .addToBackStack("barcode_scanner")
+                .commit()
+        } catch (e: Exception) {
+            Log.e(TAG, "openBarcodeScanner error", e)
+            heroState = HeroVisualState.IDLE
+            currentScanMode = ScanMode.NONE
         }
     }
 
-    private void processPendingBarcodeIfAny() {
-        final String code = pendingBarcodeFromScanner;
-        if (code == null || code.isEmpty()) return;
+    private fun processPendingBarcodeIfAny() {
+        val code = pendingBarcodeFromScanner ?: return
+        if (code.isEmpty()) return
 
-        pendingBarcodeFromScanner = null;
-        currentScanMode = ScanMode.NONE;
+        pendingBarcodeFromScanner = null
+        currentScanMode = ScanMode.NONE
+        heroState = HeroVisualState.IDLE
 
-        if (heroController != null) {
-            heroController.setState(PosHeroController.State.IDLE);
-        }
-
-        mainHandler.postDelayed(() -> {
-            if (!isFragmentAlive()) return;
-            String[] parsed = parseGs1OrQr(code);
-            String finalCode = parsed[0];
-            onBarcodeScanned(finalCode);
-        }, 150);
+        mainHandler.postDelayed({
+            if (!isFragmentAlive()) return@postDelayed
+            val parsed = parseGs1OrQr(code)
+            onBarcodeScanned(parsed[0])
+        }, 150)
     }
 
-    private String[] parseGs1OrQr(String raw) {
-        if (raw == null) return new String[]{"", "empty"};
-        String data = raw.trim();
-        if (data.isEmpty()) return new String[]{"", "empty"};
+    private fun parseGs1OrQr(raw: String?): Array<String> {
+        if (raw.isNullOrBlank()) return arrayOf("", "empty")
+        var data = raw.trim()
 
-        if (data.startsWith("]d") || data.startsWith("]Q")
-                || data.startsWith("]e") || data.startsWith("]C")
-                || data.startsWith("]D") || data.startsWith("]A")) {
-            data = data.substring(3).trim();
+        if (data.startsWith("]d") || data.startsWith("]Q") ||
+            data.startsWith("]e") || data.startsWith("]C") ||
+            data.startsWith("]D") || data.startsWith("]A")
+        ) {
+            data = data.substring(3).trim()
         }
 
         if (data.startsWith("http://") || data.startsWith("https://")) {
             try {
-                android.net.Uri uri = android.net.Uri.parse(data);
-                String serial = uri.getQueryParameter("serial");
-                if (serial == null) serial = uri.getQueryParameter("sn");
-                if (serial != null && !serial.isEmpty()) return new String[]{serial, "qr_url"};
-                String gtin = uri.getQueryParameter("gtin");
-                if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "qr_url"};
-                String last = uri.getLastPathSegment();
-                if (last != null && !last.isEmpty()) return new String[]{last, "qr_url"};
-            } catch (Exception ignored) {}
+                val uri = Uri.parse(data)
+                val serial = uri.getQueryParameter("serial") ?: uri.getQueryParameter("sn")
+                if (!serial.isNullOrEmpty()) return arrayOf(serial, "qr_url")
+                val gtin = uri.getQueryParameter("gtin")
+                if (!gtin.isNullOrEmpty()) return arrayOf(gtin, "qr_url")
+                val last = uri.lastPathSegment
+                if (!last.isNullOrEmpty()) return arrayOf(last, "qr_url")
+            } catch (_: Exception) {
+            }
         }
 
-        String gs1 = data.replace('\u001D', '|')
-                         .replace("(#)", "|")
-                         .replace("(21)", "|21")
-                         .replace("(01)", "|01");
+        val gs1 = data.replace('\u001D', '|')
+            .replace("(#)", "|")
+            .replace("(21)", "|21")
+            .replace("(01)", "|01")
 
-        java.util.regex.Matcher mSerial = java.util.regex.Pattern
-                .compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)")
-                .matcher(gs1);
+        val mSerial = Pattern.compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)").matcher(gs1)
         if (mSerial.find()) {
-            String serial = mSerial.group(1);
-            if (serial != null && !serial.isEmpty()) return new String[]{serial, "gs1_serial"};
+            val serial = mSerial.group(1)
+            if (!serial.isNullOrEmpty()) return arrayOf(serial, "gs1_serial")
         }
 
-        java.util.regex.Matcher mGtin = java.util.regex.Pattern
-                .compile("(?:^|\\|)01(\\d{14})")
-                .matcher(gs1);
+        val mGtin = Pattern.compile("(?:^|\\|)01(\\d{14})").matcher(gs1)
         if (mGtin.find()) {
-            String gtin = mGtin.group(1);
-            if (gtin != null && !gtin.isEmpty()) return new String[]{gtin, "gs1_gtin"};
+            val gtin = mGtin.group(1)
+            if (!gtin.isNullOrEmpty()) return arrayOf(gtin, "gs1_gtin")
         }
 
-        return new String[]{data, "raw"};
+        return arrayOf(data, "raw")
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Offline Sync
+    //  Checkout Flow (with live price verification & dialog retention)
     // ═══════════════════════════════════════════════════════════════════
 
-    private void triggerOfflineSyncIfNeeded() {
+    private fun processCheckoutAndStockUpdate() {
         try {
-            if (offlineSyncer == null || pendingSalesQueue == null) return;
-            if (offlineSyncer.isSyncing()) return;
+            if (!hasPosPermission()) {
+                showToast(getString(R.string.pos_msg_no_permission))
+                return
+            }
+            if (!canPerformCheckout()) {
+                showToast(if (isArabic) "⛔ غير مصرح بإجراء البيع" else "⛔ Not authorized")
+                return
+            }
+            val manager = cartManager
+            if (manager == null || manager.isEmpty) {
+                showToast(getString(R.string.pos_msg_cart_empty_toast))
+                return
+            }
+            if (isCheckoutDialogShowing || !isFragmentAlive()) return
 
-            int pending = pendingSalesQueue.countPending();
-            if (pending == 0) return;
+            UIHelper.hideKeyboard(activity)
 
-            offlineSyncer.syncAll(new OfflineSalesSyncer.SyncCallback() {
-                @Override public void onSyncStart(int total) {}
+            val itemIds = manager.items.mapNotNull { item ->
+                if (item != null && item.itemId > 0) item.itemId else null
+            }
 
-                @Override
-                public void onSaleSynced(PendingSale sale, boolean success,
-                                         @Nullable String error) {
-                    if (success) {
-                        try {
-                            if (sale.payloadJson != null) {
-                                JSONObject payload = new JSONObject(sale.payloadJson);
-                                JSONArray items = payload.optJSONArray("items");
-                                if (items != null) {
-                                    Context ctx = getSafeAppContext();
-                                    if (ctx != null) {
-                                        OfflineGateCache cache = OfflineGateCache.getInstance(ctx);
-                                        for (int i = 0; i < items.length(); i++) {
-                                            JSONObject item = items.getJSONObject(i);
-                                            String epc = item.optString("epc", "");
-                                            String tid = item.optString("tid", "");
-                                            if (!epc.isEmpty()) cache.markAsSynced(epc);
-                                            if (!tid.isEmpty() && !tid.equals(epc)) {
-                                                cache.markAsSynced(tid);
-                                            }
-                                        }
-                                    }
+            if (itemIds.isEmpty()) {
+                showToast(if (isArabic) "لا يمكن تحديد معرّفات القطع" else "Cannot identify items")
+                return
+            }
+
+            showToast(if (isArabic) "🔍 جاري التحقق من الأسعار..." else "🔍 Checking prices...")
+            refreshPricesBeforeCheckout(itemIds)
+        } catch (e: Exception) {
+            Log.e(TAG, "processCheckoutAndStockUpdate error", e)
+        }
+    }
+
+    private fun refreshPricesBeforeCheckout(itemIds: List<Int>) {
+        val loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic)
+
+        miraExecutor?.networkExecutor?.execute {
+            try {
+                val ctx = getSafeAppContext() ?: return@execute
+                val client = MiraApiClient.getInstance(ctx)
+                val resp = client.prepareCheckout(itemIds)
+
+                safeRun {
+                    PosUIManager.dismissDialog(loadingDialog)
+
+                    if (resp == null || !resp.isSuccess || resp.data == null) {
+                        val err = resp?.error
+                            ?: if (isArabic) "فشل التحقق من الأسعار" else "Price check failed"
+                        showToast("❌ $err")
+                        return@safeRun
+                    }
+
+                    try {
+                        val manager = cartManager ?: return@safeRun
+                        val freshItems = resp.data?.optJSONArray("items")
+                        val unavailable = resp.data?.optJSONArray("unavailable")
+                        val freshTotalUsd = resp.data?.optDouble("total_usd", 0.0) ?: 0.0
+                        val freshTotalYer = resp.data?.optDouble("total_yer", 0.0) ?: 0.0
+                        val cachedTotalUsd = manager.snapshot().totalUsd
+
+                        val pricesChanged = abs(freshTotalUsd - cachedTotalUsd) > 0.01
+
+                        if (freshItems != null) {
+                            for (i in 0 until freshItems.length()) {
+                                val it = freshItems.getJSONObject(i)
+                                val id = it.optInt("id", 0)
+                                val newPrice = it.optDouble("retail_price_usd", 0.0)
+                                if (id > 0 && newPrice > 0) {
+                                    manager.updateItemPrice(id, newPrice)
                                 }
                             }
-                        } catch (Exception ignored) {}
-                    }
-                }
+                        }
 
-                @Override
-                public void onSyncComplete(int synced, int failed, int remaining) {
-                    updatePendingSalesBadge();
-                    if (synced > 0 && isFragmentAlive()) {
-                        showToast(isArabic
-                                ? "✅ تمت مزامنة " + synced + " من البيوع المعلّقة"
-                                : "✅ Synced " + synced + " pending sales");
+                        if (unavailable != null && unavailable.length() > 0) {
+                            val names = StringBuilder()
+                            for (i in 0 until unavailable.length()) {
+                                val u = unavailable.getJSONObject(i)
+                                val id = u.optInt("id", 0)
+                                val serial = u.optString("serial", "")
+                                if (id > 0) {
+                                    manager.removeItemByItemId(id)
+                                    if (names.isNotEmpty()) names.append(", ")
+                                    names.append(serial.ifEmpty { "#$id" })
+                                }
+                            }
+                            showToast(
+                                if (isArabic) "⚠️ تم إزالة قطع غير متاحة: $names"
+                                else "⚠️ Removed unavailable items: $names"
+                            )
+                        }
+
+                        if (pricesChanged) {
+                            val msg = if (isArabic) {
+                                "💰 تم تحديث الأسعار. الإجمالي الجديد: ${String.format(Locale.US, "%,.0f", freshTotalYer)} YER"
+                            } else {
+                                "💰 Prices updated. New total: ${String.format(Locale.US, "%,.0f", freshTotalYer)} YER"
+                            }
+                            showToast(msg)
+                        }
+
+                        val ratesObj = resp.data?.optJSONObject("exchange_rates")
+                        val ratesJson = ratesObj?.toString() ?: "{}"
+
+                        openCheckoutDialogWithTotal(freshTotalUsd, ratesJson)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "refreshPrices parse error", e)
+                        showToast("⚠️ ${e.message}")
                     }
                 }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "triggerOfflineSyncIfNeeded error", e);
+            } catch (e: Exception) {
+                Log.e(TAG, "refreshPricesBeforeCheckout error", e)
+                safeRun {
+                    PosUIManager.dismissDialog(loadingDialog)
+                    showToast("⚠️ ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun openCheckoutDialogWithTotal(totalUsd: Double, ratesJson: String) {
+        try {
+            if (!isFragmentAlive()) return
+            val manager = cartManager ?: return
+
+            isCheckoutDialogShowing = true
+            val snap = manager.snapshot()
+
+            val dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count, ratesJson)
+            activeCheckoutDialog = dialog
+
+            dialog.setCheckoutListener { data ->
+                if (data != null) executeCheckoutDirectly(data)
+            }
+
+            dialog.setOnDismissListener {
+                isCheckoutDialogShowing = false
+                activeCheckoutDialog = null
+            }
+
+            val fm = parentFragmentManager
+            if (!fm.isStateSaved) {
+                dialog.show(fm, "POSCheckoutDialog")
+            } else {
+                isCheckoutDialogShowing = false
+                activeCheckoutDialog = null
+            }
+        } catch (e: Exception) {
+            isCheckoutDialogShowing = false
+            activeCheckoutDialog = null
+            Log.e(TAG, "openCheckoutDialogWithTotal error", e)
+        }
+    }
+
+    private fun executeCheckoutDirectly(data: POSCheckoutDialog.POSCheckoutData) {
+        if (!isFragmentAlive()) return
+        if (!hasPosPermission() || !canPerformCheckout()) {
+            showToast(getString(R.string.pos_msg_no_permission))
+            return
+        }
+
+        var loadingDialog: AlertDialog? = null
+        try {
+            isButtonsBusyState = true
+            loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic)
+            val finalLoadingDialog = loadingDialog
+
+            miraExecutor?.networkExecutor?.execute {
+                try {
+                    val ctx = getSafeAppContext() ?: return@execute
+                    val client = MiraApiClient.getInstance(ctx)
+                    val payload = buildCheckoutPayload(client, data)
+                    val response = client.checkout(payload)
+
+                    safeRun {
+                        PosUIManager.dismissDialog(finalLoadingDialog)
+                        isButtonsBusyState = false
+
+                        if (response != null && response.isSuccess) {
+                            if (activeCheckoutDialog != null && activeCheckoutDialog?.isAdded == true) {
+                                activeCheckoutDialog?.onCheckoutSuccess()
+                            }
+                            handleSaleSuccess(response, data, false)
+                        } else if (response != null && response.isNetworkError) {
+                            if (activeCheckoutDialog != null && activeCheckoutDialog?.isAdded == true) {
+                                activeCheckoutDialog?.onCheckoutSuccess()
+                            }
+                            saveOfflineSale(payload, data)
+                            handleSaleSuccess(response, data, true)
+                        } else {
+                            val errorMsg = response?.error ?: "حدث خطأ غير معروف"
+                            when (response?.errorCode) {
+                                "RATE_MISMATCH" -> {
+                                    currentSaleUuid = null
+                                    val msg = if (isArabic) {
+                                        "⚠️ سعر الصرف غير محدّث — أغلق النافذة وافتحها مجدداً"
+                                    } else {
+                                        "⚠️ Exchange rate outdated — close and reopen"
+                                    }
+                                    if (activeCheckoutDialog?.isAdded == true) {
+                                        activeCheckoutDialog?.onCheckoutError(msg)
+                                    } else {
+                                        showToast(msg)
+                                    }
+                                    return@safeRun
+                                }
+                                "UUID_REQUIRED", "INVALID_UUID" -> {
+                                    currentSaleUuid = null
+                                    val msg = if (isArabic) {
+                                        "⚠️ خطأ في معرف العملية — أعد المحاولة"
+                                    } else {
+                                        "⚠️ Transaction ID error — retry"
+                                    }
+                                    if (activeCheckoutDialog?.isAdded == true) {
+                                        activeCheckoutDialog?.onCheckoutError(msg)
+                                    }
+                                    return@safeRun
+                                }
+                            }
+
+                            if (activeCheckoutDialog != null && activeCheckoutDialog?.isAdded == true) {
+                                activeCheckoutDialog?.onCheckoutError(errorMsg)
+                            } else {
+                                PosUIManager.showRetryDialog(
+                                    requireContext(),
+                                    getString(R.string.pos_dialog_retry_title),
+                                    errorMsg,
+                                    { executeCheckoutDirectly(data) },
+                                    isArabic
+                                )
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "executeCheckoutDirectly error", e)
+                    safeRun {
+                        PosUIManager.dismissDialog(finalLoadingDialog)
+                        isButtonsBusyState = false
+                        if (activeCheckoutDialog != null && activeCheckoutDialog?.isAdded == true) {
+                            activeCheckoutDialog?.onCheckoutError(
+                                if (isArabic) "خطأ في الاتصال: ${e.message}" else "Network error: ${e.message}"
+                            )
+                        } else {
+                            PosUIManager.showRetryDialog(
+                                requireContext(),
+                                getString(R.string.pos_dialog_error_title),
+                                e.message,
+                                { executeCheckoutDirectly(data) },
+                                isArabic
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            loadingDialog?.let { dlg -> safeRun { PosUIManager.dismissDialog(dlg) } }
+            isButtonsBusyState = false
+            Log.e(TAG, "executeCheckoutDirectly outer error", e)
+        }
+    }
+
+    private fun buildCheckoutPayload(
+        client: MiraApiClient?,
+        data: POSCheckoutDialog.POSCheckoutData
+    ): JSONObject {
+        val payload = JSONObject()
+        val manager = cartManager!!
+        val pm = priceManager!!
+
+        payload.put("action", "COMPLETE_POS_SALE")
+        payload.put("gate_id", client?.gateId ?: "")
+        payload.put("branch_id", getActiveBranchId())
+        payload.put("user_id", sessionManager?.userId ?: 0)
+
+        if (currentSaleUuid.isNullOrEmpty()) {
+            currentSaleUuid = UUID.randomUUID().toString()
+        }
+        payload.put("local_uuid", currentSaleUuid)
+        payload.put("username", sessionManager?.username ?: "")
+
+        val customerName = if (!data.customerName.isNullOrBlank()) {
+            data.customerName.trim()
+        } else {
+            if (isArabic) "عميل نقدي" else "Cash Customer"
+        }
+
+        val customerPhone = if (!data.customerPhone.isNullOrBlank() && data.customerPhone.trim() != "—") {
+            data.customerPhone.trim()
+        } else {
+            ""
+        }
+
+        payload.put("customer_name", customerName)
+        payload.put("customer_phone", customerPhone)
+
+        val customerObj = JSONObject().apply {
+            put("name", customerName)
+            put("phone", customerPhone)
+            put("email", data.customerEmail ?: "")
+            put("address", data.customerAddress ?: "")
+            put("notes", data.customerNotes ?: "")
+            put("payment_method", data.paymentMethod ?: "cash")
+            put("discount_amount_usd", data.discountAmount)
+        }
+        payload.put("customer", customerObj)
+
+        if (data.tradeIns != null && data.tradeIns.length() > 0) {
+            val tradeInsArr = JSONArray()
+            for (i in 0 until data.tradeIns.length()) {
+                try {
+                    val src = data.tradeIns.getJSONObject(i)
+                    val obj = JSONObject().apply {
+                        put("weight_grams", src.optDouble("weight_grams", 0.0))
+                        put("karat", src.optString("karat", "21K"))
+                        put("description", src.optString("description", "ذهب كسر"))
+                    }
+                    tradeInsArr.put(obj)
+                } catch (_: Exception) {
+                }
+            }
+            payload.put("trade_ins", tradeInsArr)
+        }
+
+        val itemsArr = JSONArray()
+        for (item in manager.items) {
+            if (item == null) continue
+            val obj = item.toJson()
+            if (obj.optString("serial_no", "").isEmpty()) {
+                val fallback = when {
+                    item.tid.isNotEmpty() -> item.tid
+                    item.rfidEpc.isNotEmpty() -> item.rfidEpc
+                    else -> item.epc
+                }
+                obj.put("serial_no", fallback ?: "")
+            }
+            itemsArr.put(obj)
+        }
+        payload.put("items", itemsArr)
+        payload.put("item_count", manager.size())
+
+        val subtotalUsd = data.originalTotal
+        val discountUsd = data.discountAmount
+        val finalUsd = data.finalAmount
+
+        var yerRate = pm.getExchangeRate("YER")
+        if (yerRate <= 0) yerRate = 530.0
+
+        payload.put("subtotal_usd", subtotalUsd)
+        payload.put("discount_usd", discountUsd)
+        payload.put("total_usd", finalUsd)
+        payload.put("total_amount_usd", finalUsd)
+        payload.put("subtotal", subtotalUsd * yerRate)
+        payload.put("discount", discountUsd * yerRate)
+        payload.put("total", finalUsd * yerRate)
+        payload.put("total_amount", finalUsd * yerRate)
+
+        val paymentsArray = if (data.payments != null && data.payments.length() > 0) {
+            data.payments
+        } else {
+            val defaultCurrency = pm.defaultCurrency
+            var defaultRate = pm.getExchangeRate(defaultCurrency)
+            if (defaultRate <= 0) defaultRate = yerRate
+
+            JSONArray().apply {
+                put(JSONObject().apply {
+                    put("currency", defaultCurrency)
+                    put("amount", finalUsd * yerRate / defaultRate)
+                    put("exchange_rate", defaultRate)
+                    put("base_amount", finalUsd * yerRate)
+                    put("method", data.paymentMethod ?: "cash")
+                })
+            }
+        }
+        payload.put("payments", paymentsArray)
+
+        val payment = JSONObject().apply {
+            put("subtotal_usd", subtotalUsd)
+            put("discount_amount_usd", discountUsd)
+            put("final_amount_usd", finalUsd)
+            put("subtotal", subtotalUsd * yerRate)
+            put("discount_amount", discountUsd * yerRate)
+            put("final_amount", finalUsd * yerRate)
+            put("exchange_rate", yerRate)
+            put("currency_code", "YER")
+            put("payment_method", data.paymentMethod ?: "cash")
+        }
+        payload.put("payment", payment)
+        payload.put("notes", if (isArabic) "بيع POS" else "POS Sale")
+        return payload
+    }
+
+    private fun saveOfflineSale(payload: JSONObject, data: POSCheckoutDialog.POSCheckoutData) {
+        try {
+            val queue = pendingSalesQueue ?: return
+            val localUuid = payload.optString("local_uuid", "")
+            if (localUuid.isEmpty()) return
+
+            val sale = PendingSale().apply {
+                this.localUuid = localUuid
+                this.payloadJson = payload.toString()
+                this.branchId = getActiveBranchId()
+                this.userId = sessionManager?.userId ?: 0
+                this.totalUsd = data.finalAmount
+                this.itemCount = cartManager?.size() ?: 0
+                this.customerName = data.customerName ?: ""
+                this.createdAt = System.currentTimeMillis()
+                this.status = PendingSale.STATUS_PENDING
+            }
+
+            if (queue.enqueue(sale)) {
+                updatePendingSalesBadge()
+                showToast(
+                    if (isArabic) "📥 سيُرسَل البيع تلقائياً عند عودة الاتصال"
+                    else "📥 Sale will be sent automatically when online"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "saveOfflineSale error", e)
+        }
+    }
+
+    private fun updateCacheAfterSale(soldItems: List<CartItem>) {
+        if (soldItems.isEmpty()) return
+        try {
+            val cache = MiraLocalItemCache.getInstance(getSafeAppContext()) ?: return
+            for (item in soldItems) {
+                if (!item.epc.isNullOrEmpty()) cache.markItemAsSold(item.epc)
+                if (!item.rfidEpc.isNullOrEmpty() && item.rfidEpc != item.epc) {
+                    cache.markItemAsSold(item.rfidEpc)
+                }
+                if (!item.serialNo.isNullOrEmpty()) cache.markItemAsSold(item.serialNo)
+                if (!item.gtin.isNullOrEmpty()) cache.markItemAsSold(item.gtin)
+                if (!item.tid.isNullOrEmpty()) cache.markItemAsSold(item.tid)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "updateCacheAfterSale error", e)
+        }
+    }
+
+    private fun handleSaleSuccess(
+        response: MiraApiClient.ApiResponse,
+        data: POSCheckoutDialog.POSCheckoutData,
+        isOffline: Boolean
+    ) {
+        if (!isFragmentAlive()) return
+        try {
+            playAlertSound(1)
+            lastSaleResponse = response
+            lastSaleResponseTime = System.currentTimeMillis()
+            currentSaleUuid = null
+
+            val soldItems = ArrayList(cartManager?.items ?: emptyList())
+            val saleId = if (isOffline) 0L else extractSaleIdFromResponse(response)
+
+            getSafeAppContext()?.let { appCtx ->
+                GateSaleBridge.onSaleCompleted(
+                    appCtx,
+                    soldItems,
+                    saleId,
+                    data.finalAmount,
+                    getActiveBranchId(),
+                    sessionManager?.userId ?: 0,
+                    isOffline
+                )
+            }
+
+            updateCacheAfterSale(soldItems)
+            cartManager?.clear()
+
+            if (!isOffline) {
+                showReceipt(response)
+                PosUIManager.notifyDataChanged(requireContext(), "sale", getActiveBranchId())
+                showToast(getString(R.string.pos_msg_sale_success))
+            } else {
+                showToast(getString(R.string.pos_msg_sale_offline))
+                PosUIManager.notifyDataChanged(requireContext(), "sale_offline", getActiveBranchId())
+            }
+
+            rfidReadCountState = 0
+            heroState = HeroVisualState.IDLE
+        } catch (e: Exception) {
+            Log.e(TAG, "handleSaleSuccess error", e)
+        }
+    }
+
+    private fun showReceipt(response: MiraApiClient.ApiResponse?) {
+        try {
+            if (!isFragmentAlive()) return
+            var receiptJson = "{}"
+            if (response != null) {
+                if (response.data != null) {
+                    receiptJson = response.data.toString()
+                } else if (!response.body.isNullOrEmpty()) {
+                    receiptJson = response.body
+                }
+            }
+
+            val receiptFragment = MiraReceiptFragment.newInstance(receiptJson)
+            val fm = parentFragmentManager
+            if (!fm.isStateSaved) {
+                receiptFragment.show(fm, "MiraReceiptFragment")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "showReceipt error", e)
+        }
+    }
+
+    private fun extractSaleIdFromResponse(response: MiraApiClient.ApiResponse?): Long {
+        val data = response?.data ?: return 0L
+        return try {
+            var id = data.optLong("sale_id", data.optLong("saleId", data.optLong("id", 0L)))
+            if (id > 0) return id
+            val sale = data.optJSONObject("sale")
+            if (sale != null) {
+                id = sale.optLong("id", sale.optLong("sale_id", 0L))
+                if (id > 0) return id
+            }
+            0L
+        } catch (_: Exception) {
+            0L
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Back Press
+    //  Refund V2
     // ═══════════════════════════════════════════════════════════════════
 
-    private void setupBackPressedHandler() {
-        if (getActivity() == null) return;
+    private fun showRefundDialog() {
+        if (!isFragmentAlive()) return
+        if (!canPerformRefund()) {
+            showToast(if (isArabic) "⛔ غير مصرح بالاسترجاع" else "⛔ Not authorized to refund")
+            return
+        }
 
-        backPressedCallback = new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                handleCustomBack();
+        try {
+            isRefundDialogHiddenForScan = false
+            refundDialog = RefundDialog(requireContext(), object : RefundDialog.RefundCallback {
+                override fun onRefundSuccess(result: JSONObject) {
+                    handleRefundSuccessV2(result)
+                }
+
+                override fun onBarcodeScan() {
+                    isRefundDialogHiddenForScan = true
+                    refundDialog?.hide()
+                    openRefundBarcodeScanner()
+                }
+
+                override fun onDialogClosed() {}
+            }).apply {
+                setOnHardwareKeyListener { _, k, e -> myOnKeyDwon(k, e) }
+                show()
             }
-        };
-
-        requireActivity().getOnBackPressedDispatcher()
-                .addCallback(getViewLifecycleOwner(), backPressedCallback);
+        } catch (e: Exception) {
+            Log.e(TAG, "showRefundDialog error", e)
+        }
     }
 
-    private void handleCustomBack() {
+    private fun handleRefundSuccessV2(result: JSONObject?) {
+        if (result == null) return
         try {
-            if (isCheckoutDialogShowing) return;
+            val refundNumber = result.optString("refund_number", "")
+            val amountLocal = result.optDouble("amount_local", 0.0)
+            val method = result.optString("method", "cash")
+            val isFull = result.optBoolean("is_full", false)
+
+            val items = result.optJSONArray("items")
+            if (items != null && items.length() > 0) {
+                val appCtx = getSafeAppContext()
+                val cache = if (appCtx != null) MiraLocalItemCache.getInstance(appCtx) else null
+                if (cache != null) {
+                    for (i in 0 until items.length()) {
+                        try {
+                            val it = items.getJSONObject(i)
+                            val epc = it.optString("epc", "")
+                            val serial = it.optString("serial", "")
+                            if (epc.isNotEmpty()) cache.markItemAsAvailable(epc)
+                            if (serial.isNotEmpty() && serial != epc) cache.markItemAsAvailable(serial)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+
+            val methodLabel = if (method.equals("credit", ignoreCase = true)) {
+                if (isArabic) "رصيد دائن" else "Store Credit"
+            } else {
+                if (isArabic) "نقدي" else "Cash"
+            }
+
+            val msg = if (isArabic) {
+                "✅ تم الإرجاع بنجاح!\n\n" +
+                        "رقم الإرجاع: $refundNumber\n" +
+                        "المبلغ: ${String.format(Locale.US, "%,.2f", amountLocal)} YER\n" +
+                        "الطريقة: $methodLabel" +
+                        if (isFull) "\n\n(إرجاع كامل)" else "\n\n(إرجاع جزئي)"
+            } else {
+                "✅ Refund successful!\n\n" +
+                        "Refund #: $refundNumber\n" +
+                        "Amount: ${String.format(Locale.US, "%,.2f", amountLocal)} YER\n" +
+                        "Method: $methodLabel" +
+                        if (isFull) "\n\n(Full refund)" else "\n\n(Partial refund)"
+            }
+
+            PosUIManager.showResultDialog(
+                requireContext(),
+                if (isArabic) "تم الإرجاع" else "Refund Success",
+                msg,
+                true,
+                isArabic
+            )
+            PosUIManager.notifyDataChanged(requireContext(), "refund", getActiveBranchId())
+        } catch (e: Exception) {
+            Log.e(TAG, "handleRefundSuccessV2 error", e)
+        }
+    }
+
+    private fun openRefundBarcodeScanner() {
+        if (!isFragmentAlive()) return
+        if (!hasPosPermission() || !canPerformRefund()) {
+            showToast(if (isArabic) "⛔ غير مصرح" else "⛔ Not authorized")
+            return
+        }
+
+        val fm = parentFragmentManager
+        if (fm.isStateSaved) {
+            refundDialog?.show()
+            isRefundDialogHiddenForScan = false
+            return
+        }
+
+        val scannerFragment = MiraBarcodeScannerFragment()
+        scannerFragment.setOnBarcodeScannedListener { rawData, _ ->
+            try {
+                if (rawData.isNullOrEmpty()) return@setOnBarcodeScannedListener
+                val parsed = parseGs1OrQr(rawData)
+                val data = parsed[0]
+                if (data.isEmpty()) return@setOnBarcodeScannedListener
+
+                if (refundDialog != null && refundDialog?.isShowing == false) {
+                    refundDialog?.show()
+                    isRefundDialogHiddenForScan = false
+                }
+                refundDialog?.setQueryFromScan(data)
+            } catch (e: Exception) {
+                Log.e(TAG, "Refund barcode callback error", e)
+            }
+        }
+
+        var containerId = android.R.id.content
+        try {
+            val parent = view?.parent
+            if (parent is View && parent.id != View.NO_ID) {
+                containerId = parent.id
+            }
+        } catch (_: Exception) {
+        }
+
+        fm.beginTransaction()
+            .hide(this)
+            .add(containerId, scannerFragment, "refund_barcode_scanner")
+            .addToBackStack("refund_barcode_scanner")
+            .commit()
+    }
+
+    private fun checkAutoOpenRefundIntent() {
+        val args = arguments ?: return
+        if (args.getBoolean("auto_open_refund", false)) {
+            val jsonStr = args.getString("refund_data_json")
+            args.remove("auto_open_refund")
+            args.remove("refund_data_json")
+
+            if (!jsonStr.isNullOrEmpty()) {
+                try {
+                    val activityData = JSONObject(jsonStr)
+                    val code = extractCodeForRefund(activityData)
+                    if (code.isNotEmpty()) {
+                        mainHandler.postDelayed({
+                            if (!isFragmentAlive()) return@postDelayed
+                            showRefundDialog()
+                            if (refundDialog?.isShowing == true) {
+                                refundDialog?.setQueryFromScan(code)
+                            }
+                        }, 500)
+                    } else {
+                        showToast(if (isArabic) "⚠️ لم يتم العثور على رمز القطعة" else "⚠️ No item code found")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing auto refund data", e)
+                }
+            }
+        }
+    }
+
+    private fun extractCodeForRefund(data: JSONObject): String {
+        try {
+            val epc = data.optString("epc", data.optString("rfid_epc", ""))
+            if (epc.isNotEmpty()) return epc
+            val serial = data.optString("serial", data.optString("serial_number", ""))
+            if (serial.isNotEmpty()) return serial
+
+            val items = data.optJSONArray("items")
+            if (items != null && items.length() > 0) {
+                val firstItem = items.optJSONObject(0)
+                if (firstItem != null) {
+                    val itemEpc = firstItem.optString("epc", firstItem.optString("rfid_epc", ""))
+                    if (itemEpc.isNotEmpty()) return itemEpc
+                    val itemSerial = firstItem.optString("serial", firstItem.optString("serial_number", ""))
+                    if (itemSerial.isNotEmpty()) return itemSerial
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return ""
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Offline Queue & Sync
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun updatePendingSalesBadge() {
+        try {
+            pendingSalesCountState = pendingSalesQueue?.countPending() ?: 0
+        } catch (e: Exception) {
+            Log.e(TAG, "updatePendingSalesBadge error", e)
+        }
+    }
+
+    private fun openPendingSalesSheet() {
+        try {
+            if (!isFragmentAlive()) return
+            PendingSalesBottomSheet().show(parentFragmentManager, "PendingSalesSheet")
+        } catch (e: Exception) {
+            Log.e(TAG, "openPendingSalesSheet error", e)
+        }
+    }
+
+    private fun triggerOfflineSyncIfNeeded() {
+        try {
+            val syncer = offlineSyncer ?: return
+            val queue = pendingSalesQueue ?: return
+            if (syncer.isSyncing || queue.countPending() == 0) return
+
+            syncer.syncAll(object : OfflineSalesSyncer.SyncCallback {
+                override fun onSyncStart(total: Int) {}
+
+                override fun onSaleSynced(sale: PendingSale, success: Boolean, error: String?) {
+                    if (success && sale.payloadJson != null) {
+                        try {
+                            val payload = JSONObject(sale.payloadJson)
+                            val items = payload.optJSONArray("items") ?: return
+                            val ctx = getSafeAppContext() ?: return
+                            val cache = OfflineGateCache.getInstance(ctx)
+                            for (i in 0 until items.length()) {
+                                val item = items.getJSONObject(i)
+                                val epc = item.optString("epc", "")
+                                val tid = item.optString("tid", "")
+                                if (epc.isNotEmpty()) cache.markAsSynced(epc)
+                                if (tid.isNotEmpty() && tid != epc) cache.markAsSynced(tid)
+                            }
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+
+                override fun onSyncComplete(synced: Int, failed: Int, remaining: Int) {
+                    updatePendingSalesBadge()
+                    if (synced > 0 && isFragmentAlive()) {
+                        showToast(
+                            if (isArabic) "✅ تمت مزامنة $synced من البيوع المعلّقة"
+                            else "✅ Synced $synced pending sales"
+                        )
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "triggerOfflineSyncIfNeeded error", e)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Public APIs (UHFMainActivity Compatibility)
+    // ═══════════════════════════════════════════════════════════════════
+
+    fun showLastReceiptDialog() {
+        try {
+            if (!hasPosPermission()) {
+                showToast(getString(R.string.pos_msg_no_permission))
+                return
+            }
+            if (lastSaleResponse == null || (System.currentTimeMillis() - lastSaleResponseTime) > LAST_SALE_VALIDITY_MS) {
+                showToast(if (isArabic) "لا يوجد إيصال حديث" else "No recent receipt")
+                return
+            }
+            showReceipt(lastSaleResponse)
+        } catch (e: Exception) {
+            Log.e(TAG, "showLastReceiptDialog error", e)
+        }
+    }
+
+    fun focusSearchField() {
+        switchScanMode(ScanMode.MANUAL)
+    }
+
+    @Deprecated("Kept for backward compatibility")
+    fun showCartBottomSheet() {
+    }
+
+    @Deprecated("Kept for backward compatibility")
+    fun showDiscountDialog() {
+        processCheckoutAndStockUpdate()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Navigation & Back Handling
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun setupBackPressedHandler() {
+        if (activity == null) return
+        backPressedCallback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                handleCustomBack()
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback!!)
+    }
+
+    private fun handleCustomBack() {
+        try {
+            if (isCheckoutDialogShowing) return
 
             if (currentScanMode != ScanMode.NONE) {
-                cancelPendingStopIfAny();
-                switchScanMode(ScanMode.NONE);
-                return;
+                cancelPendingStopIfAny()
+                switchScanMode(ScanMode.NONE)
+                return
             }
 
-            if (cartManager != null && !cartManager.isEmpty()) {
-                showExitConfirmation();
-                return;
+            if (cartManager != null && cartManager?.isEmpty == false) {
+                showExitDialogState = true
+                return
             }
 
-            navigateAwayFromPos();
-        } catch (Exception e) {
-            Log.e(TAG, "handleCustomBack error", e);
+            navigateAwayFromPos()
+        } catch (e: Exception) {
+            Log.e(TAG, "handleCustomBack error", e)
         }
     }
 
-    private void showExitConfirmation() {
-    if (!isFragmentAlive()) return;
-
-    // 1. نفخ التصميم المخصص
-    View dialogView = getLayoutInflater().inflate(R.layout.dialog_exit_confirmation, null);
-    
-    TextView tvTitle = dialogView.findViewById(R.id.tvTitle);
-    TextView tvMessage = dialogView.findViewById(R.id.tvMessage);
-    com.google.android.material.button.MaterialButton btnStay = dialogView.findViewById(R.id.btnStay);
-    com.google.android.material.button.MaterialButton btnLeave = dialogView.findViewById(R.id.btnLeave);
-
-    // 2. تعيين النصوص بناءً على اللغة
-    int count = cartManager != null ? cartManager.size() : 0;
-    
-    if (isArabic) {
-        tvTitle.setText("مغادرة شاشة البيع؟");
-        tvMessage.setText("لديك " + count + " عنصر في السلة.\nهل تريد المغادرة؟ (سيتم الاحتفاظ بالسلة)");
-        btnStay.setText("البقاء");
-        btnLeave.setText("مغادرة");
-    } else {
-        tvTitle.setText("Leave POS?");
-        tvMessage.setText("You have " + count + " items in cart.\nLeave anyway? (Cart will be saved)");
-        btnStay.setText("Stay");
-        btnLeave.setText("Leave");
-    }
-
-    // 3. بناء النافذة
-    androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setView(dialogView)
-            .setCancelable(true)
-            .create();
-
-    if (dialog.getWindow() != null) {
-        dialog.getWindow().setBackgroundDrawableResource(R.drawable.rounded_dialog_bg);
-    }
-
-    // 4. معالجة الأزرار
-    btnStay.setOnClickListener(v -> dialog.dismiss());
-    btnLeave.setOnClickListener(v -> {
-        dialog.dismiss();
-        navigateAwayFromPos();
-    });
-
-    dialog.show();
-}
-
-    private void navigateAwayFromPos() {
+    private fun navigateAwayFromPos() {
         try {
-            cancelPendingStopIfAny();
-            try { stopRFIDScan(); } catch (Exception ignored) {}
-            try { UIKeyboardHide(); } catch (Exception ignored) {}
-
-            currentScanMode = ScanMode.NONE;
-            stopAfterFirstRead = false;
-            oneShotConsumed.set(false);
-
-            if (!isAdded() || isRemoving() || isDetached()) return;
-            if (getActivity() == null || getActivity().isFinishing()
-                    || getActivity().isDestroyed()) return;
-
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-            activity.setBottomNavVisible(true);
-            activity.setNavigationLocked(false);
-            activity.clearActiveListeners();
-
-            NavigationManager nav = activity.getNavigationManager();
-
-            if (nav != null) {
-                nav.goToDashboard();
-                activity.syncCurrentFragment();
-            } else {
-                forceRestartActivity(activity);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "navigateAwayFromPos error", e);
+            cancelPendingStopIfAny()
             try {
-                if (getActivity() instanceof UHFMainActivity) {
-                    forceRestartActivity((UHFMainActivity) getActivity());
-                }
-            } catch (Exception ignored) {}
+                stopRFIDScan()
+            } catch (_: Exception) {
+            }
+            try {
+                UIHelper.hideKeyboard(activity)
+            } catch (_: Exception) {
+            }
+
+            currentScanMode = ScanMode.NONE
+            stopAfterFirstRead = false
+            oneShotConsumed.set(false)
+
+            if (!isAdded || isRemoving || isDetached) return
+            val act = activity as? UHFMainActivity ?: return
+            if (act.isFinishing || act.isDestroyed) return
+
+            act.setBottomNavVisible(true)
+            act.setNavigationLocked(false)
+            act.clearActiveListeners()
+
+            val nav = act.navigationManager
+            if (nav != null) {
+                nav.goToDashboard()
+                act.syncCurrentFragment()
+            } else {
+                forceRestartActivity(act)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "navigateAwayFromPos error", e)
+            (activity as? UHFMainActivity)?.let { forceRestartActivity(it) }
         }
     }
 
-    private void forceRestartActivity(UHFMainActivity activity) {
+    private fun forceRestartActivity(activity: UHFMainActivity) {
         try {
-            Intent intent = new Intent(activity, UHFMainActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            activity.startActivity(intent);
-            activity.finish();
-        } catch (Exception e) {
-            Log.e(TAG, "forceRestartActivity error", e);
+            val intent = Intent(activity, UHFMainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            activity.startActivity(intent)
+            activity.finish()
+        } catch (e: Exception) {
+            Log.e(TAG, "forceRestartActivity error", e)
         }
     }
 
-        @Deprecated
-    public void showCartBottomSheet() {}
-
-    @Deprecated
-    public void showDiscountDialog() {
-        processCheckoutAndStockUpdate();
-    }
-
     // ═══════════════════════════════════════════════════════════════════
-    //  Auto-Open Refund Intent
+    //  Jetpack Compose UI Screen
     // ═══════════════════════════════════════════════════════════════════
 
-    private void checkAutoOpenRefundIntent() {
-        if (getArguments() != null && getArguments().getBoolean("auto_open_refund", false)) {
-            String jsonStr = getArguments().getString("refund_data_json");
+    @Composable
+    private fun MiraPosScreen() {
+        val colors = MiraTheme.colors
+        val isAr = isArabic
 
-            getArguments().remove("auto_open_refund");
-            getArguments().remove("refund_data_json");
+        // Auto-dismiss top scan feedback banner after 2.5s
+        LaunchedEffect(scanFeedbackState?.id) {
+            if (scanFeedbackState != null) {
+                delay(2500)
+                scanFeedbackState = null
+            }
+        }
 
-            if (jsonStr != null && !jsonStr.isEmpty()) {
-                try {
-                    JSONObject activityData = new JSONObject(jsonStr);
-                    String code = extractCodeForRefund(activityData);
+        // Auto-submit debounce for manual input
+        LaunchedEffect(manualCodeInputState, isManualInputVisibleState) {
+            if (!isManualInputVisibleState) return@LaunchedEffect
+            val code = manualCodeInputState.trim()
+            if (!shouldAutoSubmit(code)) return@LaunchedEffect
+            val delayMs = if (looksLikePartialSerial(code)) SHORT_CODE_DELAY_MS else AUTO_ADD_DELAY_MS
+            delay(delayMs)
+            if (isManualInputVisibleState && code == manualCodeInputState.trim() && isFragmentAlive()) {
+                submitManualCode(code)
+            }
+        }
 
-                    if (code != null && !code.isEmpty()) {
-                        mainHandler.postDelayed(() -> {
-                            if (!isFragmentAlive()) return;
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = colors.backgroundTop
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(colors.backgroundTop, colors.backgroundMid, colors.backgroundTop)
+                        )
+                    )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                ) {
+                    // 1. شريط الرأس (Top POS Header)
+                    PosTopHeaderBar(
+                        isArabic = isAr,
+                        branchName = activeBranchNameState,
+                        scaleText = scaleStatusTextState,
+                        isScaleConnected = isScaleConnectedState,
+                        pendingSalesCount = pendingSalesCountState,
+                        canRefund = canPerformRefundState,
+                        onScaleClick = { scaleManager?.showSettingsDialog() },
+                        onPendingSalesClick = { openPendingSalesSheet() },
+                        onLastReceiptClick = { showLastReceiptDialog() },
+                        onRefundClick = { showRefundDialog() },
+                        onCloseClick = { handleCustomBack() }
+                    )
 
-                            showRefundDialog();
+                    // 2. شريط ملخص السلة العلوي
+                    PosSummaryBar(
+                        isArabic = isAr,
+                        itemCount = cartCountState,
+                        statusText = statusMessageState,
+                        totalFormatted = buildTotalText(cartCountState, cartTotalUsdState),
+                        hasUnavailable = cartHasUnavailableState
+                    )
 
-                            if (refundDialog != null && refundDialog.isShowing()) {
-                                refundDialog.setQueryFromScan(code);
+                    // 3. شريط المسح السريع والإدخال اليدوي (عند وجود قطع في السلة)
+                    if (cartCountState > 0) {
+                        QuickScanActionStrip(
+                            isArabic = isAr,
+                            hasRfidHardware = hasRfidHardwareState,
+                            isRfidListening = currentScanMode == ScanMode.RFID,
+                            isManualOpen = isManualInputVisibleState,
+                            enabled = canUsePosState && !isButtonsBusyState,
+                            onGs1Click = { switchScanMode(ScanMode.GS1) },
+                            onRfidClick = {
+                                showToast(
+                                    if (isAr) "🎯 استخدم زر الزناد في القارئ للمسح"
+                                    else "🎯 Use the physical trigger to scan"
+                                )
+                            },
+                            onRfidLongClick = { openPosPowerSettings() },
+                            onManualClick = {
+                                switchScanMode(
+                                    if (currentScanMode == ScanMode.MANUAL) ScanMode.NONE else ScanMode.MANUAL
+                                )
                             }
-                        }, 500);
-                    } else {
-                        showToast(isArabic
-                                ? "⚠️ لم يتم العثور على رمز القطعة"
-                                : "⚠️ No item code found");
+                        )
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error parsing auto refund data", e);
+
+                    // 4. حقل الإدخال اليدوي المنبثق
+                    AnimatedVisibility(
+                        visible = isManualInputVisibleState,
+                        enter = fadeIn() + slideInVertically { -it / 2 },
+                        exit = fadeOut() + slideOutVertically { -it / 2 }
+                    ) {
+                        ManualCodeEntryCard(
+                            isArabic = isAr,
+                            code = manualCodeInputState,
+                            enabled = canUsePosState && !isButtonsBusyState,
+                            onCodeChange = { manualCodeInputState = it },
+                            onSubmit = { submitManualCode(manualCodeInputState) },
+                            onClose = { switchScanMode(ScanMode.NONE) }
+                        )
+                    }
+
+                    // 5. منطقة المحتوى الرئيسية: شاشة الترحيب التفاعلية أو قائمة السلة
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (cartCountState == 0) {
+                            PosEmptyHeroStage(
+                                isArabic = isAr,
+                                state = heroState,
+                                rfidCount = rfidReadCountState,
+                                hasRfidHardware = hasRfidHardwareState,
+                                isRfidConnected = isRfidConnectedState,
+                                enabled = canUsePosState && !isButtonsBusyState,
+                                onGs1Click = { switchScanMode(ScanMode.GS1) },
+                                onRfidClick = {
+                                    showToast(
+                                        if (isAr) "🎯 استخدم زر الزناد في القارئ للمسح"
+                                        else "🎯 Use the physical trigger to scan"
+                                    )
+                                },
+                                onRfidLongClick = { openPosPowerSettings() },
+                                onManualClick = {
+                                    switchScanMode(
+                                        if (currentScanMode == ScanMode.MANUAL) ScanMode.NONE else ScanMode.MANUAL
+                                    )
+                                }
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                itemsIndexed(
+                                    items = cartItemsState,
+                                    key = { index, item -> "${item.epc}_${item.serialNo}_$index" }
+                                ) { index, item ->
+                                    PosCartItemCard(
+                                        isArabic = isAr,
+                                        item = item,
+                                        formattedPrice = buildTotalText(1, item.price),
+                                        onRemove = { cartManager?.removeItemAt(index) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 6. شريط إتمام البيع السفلي (يظهر عند وجود عناصر في السلة)
+                    AnimatedVisibility(
+                        visible = cartCountState > 0,
+                        enter = fadeIn() + slideInVertically { it },
+                        exit = fadeOut() + slideOutVertically { it }
+                    ) {
+                        PosStickyCheckoutFooter(
+                            isArabic = isAr,
+                            itemCount = cartCountState,
+                            totalFormatted = buildTotalText(cartCountState, cartTotalUsdState),
+                            canCheckout = cartCountState > 0 && !cartHasUnavailableState && canUsePosState && !isButtonsBusyState,
+                            canClear = cartCountState > 0 && !isButtonsBusyState,
+                            onClearClick = {
+                                cartManager?.clear()
+                                currentSaleUuid = null
+                            },
+                            onCheckoutClick = { processCheckoutAndStockUpdate() }
+                        )
+                    }
+                }
+
+                // 7. بطاقة إشعار المسح العلوية العائمة (Scan Feedback Overlay)
+                AnimatedVisibility(
+                    visible = scanFeedbackState != null,
+                    enter = fadeIn() + slideInVertically { -it },
+                    exit = fadeOut() + slideOutVertically { -it },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 64.dp)
+                ) {
+                    scanFeedbackState?.let { banner ->
+                        ScanFeedbackToastCard(banner = banner)
+                    }
+                }
+            }
+        }
+
+        // نافذة تأكيد المغادرة عند وجود أصناف في السلة
+        if (showExitDialogState) {
+            AlertDialog(
+                onDismissRequest = { showExitDialogState = false },
+                containerColor = colors.cardSurface,
+                title = {
+                    Text(
+                        text = if (isAr) "مغادرة شاشة البيع؟" else "Leave POS?",
+                        color = colors.textPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (isAr) {
+                            "لديك $cartCountState عنصر في السلة.\nهل تريد المغادرة؟ (سيتم الاحتفاظ بالسلة)"
+                        } else {
+                            "You have $cartCountState items in cart.\nLeave anyway? (Cart will be saved)"
+                        },
+                        color = colors.textSecondary
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showExitDialogState = false
+                            navigateAwayFromPos()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF0A0F1D)
+                        )
+                    ) {
+                        Text(if (isAr) "مغادرة" else "Leave", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitDialogState = false }) {
+                        Text(if (isAr) "البقاء" else "Stay", color = colors.textSecondary)
+                    }
+                }
+            )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Compose UI Components
+    // ═══════════════════════════════════════════════════════════════════
+
+    @Composable
+    private fun PosTopHeaderBar(
+        isArabic: Boolean,
+        branchName: String,
+        scaleText: String,
+        isScaleConnected: Boolean,
+        pendingSalesCount: Int,
+        canRefund: Boolean,
+        onScaleClick: () -> Unit,
+        onPendingSalesClick: () -> Unit,
+        onLastReceiptClick: () -> Unit,
+        onRefundClick: () -> Unit,
+        onCloseClick: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // زر الإغلاق + العنوان
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clickable { onCloseClick() },
+                    shape = RoundedCornerShape(12.dp),
+                    color = colors.cardSurface,
+                    border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.18f))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = null,
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = if (isArabic) "نقطة البيع" else "MIRA POS",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (branchName.isNotEmpty()) {
+                        Text(
+                            text = branchName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.goldPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // الأدوات العلوية: شارة المزامنة المعلقة + حالة الميزان + الإيصال الأخير + الاسترجاع
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (pendingSalesCount > 0) {
+                    Surface(
+                        modifier = Modifier.clickable { onPendingSalesClick() },
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFFF59E0B).copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Rounded.CloudSync,
+                                contentDescription = null,
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = pendingSalesCount.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFF59E0B)
+                            )
+                        }
+                    }
+                }
+
+                // مؤشر الميزان الذكي
+                val scaleColor = if (isScaleConnected) Color(0xFF10B981) else colors.textSecondary
+                Surface(
+                    modifier = Modifier.clickable { onScaleClick() },
+                    shape = RoundedCornerShape(50),
+                    color = scaleColor.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, scaleColor.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = scaleText.ifEmpty { "⚖️" },
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scaleColor,
+                        maxLines = 1
+                    )
+                }
+
+                // آخر إيصال
+                Surface(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clickable { onLastReceiptClick() },
+                    shape = RoundedCornerShape(10.dp),
+                    color = colors.cardSurface,
+                    border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.3f))
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.ReceiptLong,
+                            contentDescription = null,
+                            tint = colors.goldPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // الاسترجاع (للمصرح لهم)
+                if (canRefund) {
+                    Surface(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clickable { onRefundClick() },
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFEF4444).copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f))
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Rounded.AssignmentReturn,
+                                contentDescription = null,
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
-    private String extractCodeForRefund(JSONObject data) {
+    @Composable
+    private fun PosSummaryBar(
+        isArabic: Boolean,
+        itemCount: Int,
+        statusText: String,
+        totalFormatted: String,
+        hasUnavailable: Boolean
+    ) {
+        val colors = MiraTheme.colors
+        val active = itemCount > 0
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(
+                1.dp,
+                if (active) colors.goldPrimary.copy(alpha = 0.45f)
+                else colors.textSecondary.copy(alpha = 0.14f)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.goldPrimary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = itemCount.toString(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.goldPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = if (isArabic) "إجمالي السلة" else "Cart Summary",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = statusText,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (hasUnavailable) Color(0xFFEF4444) else Color(0xFF10B981)
+                        )
+                    }
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = if (isArabic) "المبلغ الإجمالي" else "Total Amount",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.textSecondary
+                    )
+                    Text(
+                        text = totalFormatted,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (active) colors.goldPrimary else colors.textPrimary
+                    )
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun QuickScanActionStrip(
+        isArabic: Boolean,
+        hasRfidHardware: Boolean,
+        isRfidListening: Boolean,
+        isManualOpen: Boolean,
+        enabled: Boolean,
+        onGs1Click: () -> Unit,
+        onRfidClick: () -> Unit,
+        onRfidLongClick: () -> Unit,
+        onManualClick: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // GS1 / QR
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clickable(enabled = enabled) { onGs1Click() },
+                shape = RoundedCornerShape(12.dp),
+                color = colors.cardSurface,
+                border = BorderStroke(1.dp, Color(0xFF06B6D4).copy(alpha = 0.4f))
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color(0xFF06B6D4),
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isArabic) "باركود GS1" else "GS1 Scan",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // RFID Trigger
+            if (hasRfidHardware) {
+                val rfidColor = if (isRfidListening) Color(0xFF10B981) else colors.goldPrimary
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .combinedClickable(
+                            enabled = enabled,
+                            onClick = onRfidClick,
+                            onLongClick = onRfidLongClick
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isRfidListening) rfidColor.copy(alpha = 0.16f) else colors.cardSurface,
+                    border = BorderStroke(1.dp, rfidColor.copy(alpha = 0.45f))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Contactless,
+                            contentDescription = null,
+                            tint = rfidColor,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "RFID",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = rfidColor,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            // Manual Input
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clickable(enabled = enabled) { onManualClick() },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isManualOpen) colors.goldPrimary.copy(alpha = 0.16f) else colors.cardSurface,
+                border = BorderStroke(
+                    1.dp,
+                    if (isManualOpen) colors.goldPrimary else colors.textSecondary.copy(alpha = 0.25f)
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Keyboard,
+                        contentDescription = null,
+                        tint = if (isManualOpen) colors.goldPrimary else colors.textSecondary,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isArabic) "إدخال يدوي" else "Manual",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ManualCodeEntryCard(
+        isArabic: Boolean,
+        code: String,
+        enabled: Boolean,
+        onCodeChange: (String) -> Unit,
+        onSubmit: () -> Unit,
+        onClose: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+        val focusRequester = remember { FocusRequester() }
+        val keyboardController = LocalSoftwareKeyboardController.current
+
+        LaunchedEffect(Unit) {
+            try {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+            } catch (_: Exception) {
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.5f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = onCodeChange,
+                    enabled = enabled,
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = if (isArabic) "أدخل الرقم التسلسلي أو EPC..." else "Enter Serial or EPC...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary
+                        )
+                    },
+                    trailingIcon = {
+                        if (code.isNotEmpty()) {
+                            IconButton(onClick = { onCodeChange("") }) {
+                                Icon(
+                                    Icons.Rounded.Clear,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester)
+                )
+
+                Button(
+                    onClick = onSubmit,
+                    enabled = enabled && code.trim().isNotEmpty(),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.goldPrimary,
+                        contentColor = Color(0xFF0A0F1D)
+                    )
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+
+                IconButton(onClick = onClose) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun PosEmptyHeroStage(
+        isArabic: Boolean,
+        state: HeroVisualState,
+        rfidCount: Int,
+        hasRfidHardware: Boolean,
+        isRfidConnected: Boolean,
+        enabled: Boolean,
+        onGs1Click: () -> Unit,
+        onRfidClick: () -> Unit,
+        onRfidLongClick: () -> Unit,
+        onManualClick: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+
+        val infiniteTransition = rememberInfiniteTransition(label = "hero_pulse")
+        val pulseScale by infiniteTransition.animateFloat(
+            initialValue = 0.96f,
+            targetValue = 1.06f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_scale"
+        )
+
+        val ringColor = when (state) {
+            HeroVisualState.RFID_LISTENING -> Color(0xFF10B981)
+            HeroVisualState.GS1_SCANNING -> Color(0xFF06B6D4)
+            HeroVisualState.ITEM_ADDED -> Color(0xFF22C55E)
+            HeroVisualState.ERROR -> Color(0xFFEF4444)
+            HeroVisualState.MANUAL_ENTRY -> colors.goldPrimary
+            HeroVisualState.IDLE -> colors.goldPrimary
+        }
+
+        val heroIcon = when (state) {
+            HeroVisualState.RFID_LISTENING -> Icons.Rounded.Contactless
+            HeroVisualState.GS1_SCANNING -> Icons.Rounded.QrCodeScanner
+            HeroVisualState.ITEM_ADDED -> Icons.Rounded.CheckCircle
+            HeroVisualState.ERROR -> Icons.Rounded.ErrorOutline
+            HeroVisualState.MANUAL_ENTRY -> Icons.Rounded.Keyboard
+            HeroVisualState.IDLE -> Icons.Rounded.PointOfSale
+        }
+
+        val heroTitle = when (state) {
+            HeroVisualState.RFID_LISTENING -> if (isArabic) "جاري الاستماع لبطاقات RFID..." else "Listening for RFID Tags..."
+            HeroVisualState.GS1_SCANNING -> if (isArabic) "ماسح الباركود نشط" else "Barcode Scanner Active"
+            HeroVisualState.ITEM_ADDED -> if (isArabic) "تمت إضافة القطعة للسلة" else "Item Added to Cart"
+            HeroVisualState.ERROR -> if (isArabic) "تعذر إضافة القطعة" else "Could Not Add Item"
+            HeroVisualState.MANUAL_ENTRY -> if (isArabic) "الإدخال اليدوي السريع" else "Quick Manual Entry"
+            HeroVisualState.IDLE -> if (isArabic) "جاهز لبدء عملية البيع" else "Ready to Start Sale"
+        }
+
+        val heroSubtitle = when (state) {
+            HeroVisualState.RFID_LISTENING -> if (isArabic) "قرّب بطاقة المجوهرات من القارئ" else "Bring jewelry tag near reader"
+            HeroVisualState.MANUAL_ENTRY -> if (isArabic) "اكتب الرقم التسلسلي أعلاه للإضافة الفورية" else "Type serial number above to add"
+            else -> if (isArabic) "امسح بطاقة القطعة بالزناد أو الباركود أو أدخل الرقم يدوياً" else "Scan via RFID trigger, barcode, or manual entry"
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // الحلقة التفاعلية المركزية
+            Box(
+                modifier = Modifier
+                    .size(132.dp)
+                    .scale(if (state == HeroVisualState.RFID_LISTENING) pulseScale else 1f)
+                    .clip(CircleShape)
+                    .background(ringColor.copy(alpha = 0.12f))
+                    .border(2.dp, ringColor.copy(alpha = 0.45f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(92.dp)
+                        .clip(CircleShape)
+                        .background(ringColor.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = heroIcon,
+                        contentDescription = null,
+                        tint = ringColor,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+            }
+
+            if (state == HeroVisualState.RFID_LISTENING && rfidCount > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color(0xFF10B981).copy(alpha = 0.18f)
+                ) {
+                    Text(
+                        text = if (isArabic) "تمت قراءة: $rfidCount" else "Read: $rfidCount",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF10B981)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Text(
+                text = heroTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = heroSubtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(26.dp))
+
+            // بطاقات طرق المسح الثلاث
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // 1. GS1 / QR
+                ScanMethodTile(
+                    modifier = Modifier.weight(1f),
+                    title = if (isArabic) "باركود GS1" else "GS1 / QR",
+                    subtitle = if (isArabic) "كاميرا" else "Camera",
+                    icon = Icons.Rounded.QrCodeScanner,
+                    accentColor = Color(0xFF06B6D4),
+                    enabled = enabled,
+                    onClick = onGs1Click
+                )
+
+                // 2. UHF RFID (يخفى تلقائياً إذا الجهاز لا يدعم RFID)
+                if (hasRfidHardware) {
+                    ScanMethodTile(
+                        modifier = Modifier.weight(1f),
+                        title = "UHF RFID",
+                        subtitle = if (isArabic) "الزناد • مطول للطاقة" else "Trigger • Hold Power",
+                        icon = Icons.Rounded.Contactless,
+                        accentColor = if (isRfidConnected) colors.goldPrimary else colors.textSecondary,
+                        enabled = enabled,
+                        onClick = onRfidClick,
+                        onLongClick = onRfidLongClick
+                    )
+                }
+
+                // 3. الإدخال اليدوي
+                ScanMethodTile(
+                    modifier = Modifier.weight(1f),
+                    title = if (isArabic) "إدخال يدوي" else "Manual",
+                    subtitle = if (isArabic) "رقم تسلسلي" else "Serial / EPC",
+                    icon = Icons.Rounded.Keyboard,
+                    accentColor = Color(0xFF10B981),
+                    enabled = enabled,
+                    onClick = onManualClick
+                )
+            }
+        }
+    }
+
+    @OptIn(ExperimentalFoundationApi::class)
+    @Composable
+    private fun ScanMethodTile(
+        modifier: Modifier = Modifier,
+        title: String,
+        subtitle: String,
+        icon: ImageVector,
+        accentColor: Color,
+        enabled: Boolean,
+        onClick: () -> Unit,
+        onLongClick: (() -> Unit)? = null
+    ) {
+        val colors = MiraTheme.colors
+
+        Card(
+            modifier = modifier
+                .height(114.dp)
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                ),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(accentColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun PosCartItemCard(
+        isArabic: Boolean,
+        item: CartItem,
+        formattedPrice: String,
+        onRemove: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+        val borderColor = if (item.isAvailable) {
+            colors.textSecondary.copy(alpha = 0.16f)
+        } else {
+            Color(0xFFEF4444).copy(alpha = 0.6f)
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, borderColor)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // أيقونة العيار
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = colors.goldPrimary.copy(alpha = 0.16f),
+                    border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = item.karat.ifEmpty { "21K" },
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.goldPrimary
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // تفاصيل القطعة
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title.ifEmpty { if (isArabic) "قطعة مجوهرات" else "Jewelry Item" },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = String.format(Locale.US, "⚖️ %.2fg", item.weight),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary
+                        )
+
+                        if (item.scaleWeight > 0.0) {
+                            Text(
+                                text = String.format(Locale.US, "(ميزان: %.2fg)", item.scaleWeight),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF10B981)
+                            )
+                        }
+                    }
+
+                    val codeLabel = item.serialNo.ifEmpty { item.epc }
+                    if (codeLabel.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = codeLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    if (!item.isAvailable) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isArabic) "⚠️ غير متاحة للبيع (${item.status})" else "⚠️ Unavailable (${item.status})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFEF4444),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // السعر وزر الحذف
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = formattedPrice,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.goldPrimary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clickable { onRemove() },
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFEF4444).copy(alpha = 0.14f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Rounded.DeleteOutline,
+                                contentDescription = null,
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun PosStickyCheckoutFooter(
+        isArabic: Boolean,
+        itemCount: Int,
+        totalFormatted: String,
+        canCheckout: Boolean,
+        canClear: Boolean,
+        onClearClick: () -> Unit,
+        onCheckoutClick: () -> Unit
+    ) {
+        val colors = MiraTheme.colors
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = colors.cardSurface,
+            shadowElevation = 12.dp,
+            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.25f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // زر مسح السلة
+                OutlinedButton(
+                    onClick = onClearClick,
+                    enabled = canClear,
+                    modifier = Modifier.height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.45f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                ) {
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isArabic) "مسح" else "Clear",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                // زر إتمام البيع الرئيسي
+                Button(
+                    onClick = onCheckoutClick,
+                    enabled = canCheckout,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.goldPrimary,
+                        contentColor = Color(0xFF0A0F1D),
+                        disabledContainerColor = colors.goldPrimary.copy(alpha = 0.35f),
+                        disabledContentColor = Color(0xFF0A0F1D).copy(alpha = 0.5f)
+                    )
+                ) {
+                    Icon(Icons.Rounded.ShoppingBag, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isArabic) "إتمام البيع ($itemCount) • $totalFormatted"
+                        else "Checkout ($itemCount) • $totalFormatted",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun ScanFeedbackToastCard(banner: ScanFeedbackBanner) {
+        val colors = MiraTheme.colors
+        val icon = when {
+            banner.isError -> Icons.Rounded.ErrorOutline
+            banner.isWarning -> Icons.Rounded.WarningAmber
+            else -> Icons.Rounded.CheckCircle
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.5.dp, banner.accentColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(banner.accentColor.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = banner.accentColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = banner.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!banner.details.isNullOrEmpty()) {
+                        Text(
+                            text = banner.details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (!banner.price.isNullOrEmpty()) {
+                        Text(
+                            text = banner.price,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = banner.accentColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Helpers & Utilities
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun buildTotalText(count: Int, totalUsd: Double): String {
+        if (count <= 0) {
+            val def = getString(R.string.pos_default_amount)
+            return if (def.trim().isEmpty()) "0" else def
+        }
+        priceManager?.let { pm ->
+            try {
+                val formatted = pm.formatPriceDefault(totalUsd)
+                if (!formatted.isNullOrBlank() && formatted.trim() != "—" && formatted.any { it.isDigit() }) {
+                    return formatted
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return String.format(Locale.US, "$%,.2f", totalUsd)
+    }
+
+    private fun looksLikePartialSerial(code: String?): Boolean {
+        if (code == null) return false
+        val len = code.length
+        if (len < PARTIAL_SERIAL_MIN_LEN || len > PARTIAL_SERIAL_MAX_LEN) return false
+        return code.all { it.isDigit() }
+    }
+
+    private fun shouldAutoSubmit(code: String?): Boolean {
+        if (code.isNullOrEmpty()) return false
+        if (looksLikePartialSerial(code)) return code.length >= 4
+        if (code.length < AUTO_ADD_MIN_LEN) return false
+        if (code.length < 10 && !code.contains("-")) return false
+        return true
+    }
+
+    private fun buildSearchCandidates(code: String): List<String> {
+        val candidates = ArrayList<String>()
+        candidates.add(code)
+        if (looksLikePartialSerial(code)) {
+            for (prefix in SERIAL_PREFIXES) {
+                val candidate = prefix + code
+                if (!candidates.contains(candidate)) {
+                    candidates.add(candidate)
+                }
+            }
+        }
+        return candidates
+    }
+
+    private fun isFragmentAlive(): Boolean {
+        return isAdded && !isRemoving && !isDetached &&
+                activity != null && !requireActivity().isFinishing && !requireActivity().isDestroyed
+    }
+
+    private fun getSafeAppContext(): Context? {
+        return try {
+            context?.applicationContext
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun showToast(msg: String) {
+        PosUIManager.toast(context, msg)
+    }
+
+    private fun safeRun(r: Runnable?) {
+        if (r == null) return
         try {
-            String epc = data.optString("epc", data.optString("rfid_epc", ""));
-            if (!epc.isEmpty()) return epc;
-
-            String serial = data.optString("serial", data.optString("serial_number", ""));
-            if (!serial.isEmpty()) return serial;
-
-            JSONArray items = data.optJSONArray("items");
-            if (items != null && items.length() > 0) {
-                JSONObject firstItem = items.optJSONObject(0);
-                if (firstItem != null) {
-                    String itemEpc = firstItem.optString("epc", firstItem.optString("rfid_epc", ""));
-                    if (!itemEpc.isEmpty()) return itemEpc;
-
-                    String itemSerial = firstItem.optString("serial", firstItem.optString("serial_number", ""));
-                    if (!itemSerial.isEmpty()) return itemSerial;
+            activity?.runOnUiThread {
+                if (isFragmentAlive()) {
+                    try {
+                        r.run()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "safeRun inner error", e)
+                    }
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "extractCodeForRefund error", e);
+        } catch (e: Exception) {
+            Log.e(TAG, "safeRun error", e)
         }
-        return "";
     }
-} // ← هذا يجب أن يكون القوس الأخير الوحيد
+
+    private fun playAlertSound(id: Int) {
+        try {
+            (activity as? UHFMainActivity)?.playSound(id)
+        } catch (e: Exception) {
+            Log.e(TAG, "playAlertSound error", e)
+        }
+    }
+
+    private fun getActiveBranchId(): Int {
+        return try {
+            branchesManager?.activeBranchId ?: 1
+        } catch (_: Exception) {
+            1
+        }
+    }
+
+    private fun getKaratNumber(karat: String?): Int {
+        if (karat == null) return 21
+        val clean = karat.trim().uppercase(Locale.US).replace("K", "")
+        return try {
+            val num = clean.toInt()
+            if (num in 10..24) num else 21
+        } catch (_: NumberFormatException) {
+            21
+        }
+    }
+
+    private fun extractString(obj: JSONObject?, vararg keys: String): String {
+        if (obj == null) return ""
+        for (key in keys) {
+            try {
+                val v = obj.optString(key, "")
+                if (v.isNotEmpty() && v != "null") return v
+            } catch (_: Exception) {
+            }
+        }
+        return ""
+    }
+}
