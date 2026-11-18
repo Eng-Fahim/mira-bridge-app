@@ -118,11 +118,12 @@ import androidx.appcompat.app.AlertDialog
  */
 class MiraIdentityStudioFragment : MiraBaseFragment() {
 
-    companion object {
+    
+        companion object {
         private const val TAG = "MiraIdentityStudio"
+        private const val ENABLE_TEMP_MANUAL_EPC = true // ✅ أضف هذا السطر (اجعله false لإخفاء البطاقة لاحقاً)
 
-        private const val RFID_TIMEOUT_MS = 30000L
-        private const val MIN_TID_LENGTH = 12
+        private const val RFID_TIMEOUT_MS = 30000L       private const val MIN_TID_LENGTH = 12
         private const val MAX_TID_LENGTH = 32
         private const val MAX_PHOTOS = 5
         private const val ENABLE_TID_LENGTH_VALIDATION = true
@@ -923,6 +924,32 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             }
         }
     }
+
+    private fun applyManualTestEpc(rawEpc: String) {
+        if (!ENABLE_TEMP_MANUAL_EPC) return
+        val cleanEpc = rawEpc.trim().uppercase(Locale.US)
+        val testTid = ("E280117020000201" + cleanEpc).take(24)
+
+        isEpcBound = true
+        isEpcBoundState = true
+        boundEpcValue = cleanEpc
+        lastScannedEpc = cleanEpc
+        lastScannedTid = testTid
+        lastScanSource = "CHAINWAY"
+
+        epcTextState = cleanEpc
+        statusBadgeTextState = if (isArabic) "✅ موثّق (تجريبي)" else "✅ VERIFIED (TEST)"
+        statusBadgeColorState = Color(0xFF22C55E)
+
+        showScanFeedback(
+            title = if (isArabic) "🧪 تم اعتماد EPC تجريبي" else "🧪 Test EPC Applied",
+            details = "EPC: $cleanEpc\nTID: $testTid",
+            price = null,
+            accentColor = Color(0xFF22C55E),
+            isSuccess = true
+        )
+    }
+
 
     private fun onEpcInputChanged(newText: String) {
         epcTextState = newText
@@ -2013,39 +2040,38 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
     }
 
-    private fun performAutoSync() {
-    val sm = syncManager ?: return
-    val exec = miraExecutor ?: return
-    val pendingCount = sm.getPendingCount() // ✅ تم التصحيح
-    if (pendingCount == 0) return
+        private fun performAutoSync() {
+        val sm = syncManager ?: return
+        val exec = miraExecutor ?: return
+        val count = sm.pendingCount // ✅ خاصية Kotlin وليست getPendingCount()
+        if (count == 0) return
 
-    val branchId = branchesManager?.activeBranchId ?: 1
-    exec.networkExecutor.execute {
-        sm.syncPendingEncodes(branchId, object : IdentitySyncManager.SyncCallback {
-            override fun onSyncComplete(syncedCount: Int) {
-                if (syncedCount > 0) {
-                    safeRun {
-                        updatePendingSyncBadge()
-                        if (isAdded && context != null) {
-                            showToast(
-                                if (isArabic) "✅ تمت مزامنة $syncedCount تكويد"
-                                else "✅ Synced $syncedCount encodings"
-                            )
+        val branchId = branchesManager?.activeBranchId ?: 1
+        exec.networkExecutor.execute {
+            sm.syncPendingEncodes(branchId, object : IdentitySyncManager.SyncCallback {
+                override fun onSyncComplete(syncedCount: Int) {
+                    if (syncedCount > 0) {
+                        safeRun {
+                            updatePendingSyncBadge()
+                            if (isAdded && context != null) {
+                                showToast(
+                                    if (isArabic) "✅ تمت مزامنة $syncedCount تكويد"
+                                    else "✅ Synced $syncedCount encodings"
+                                )
+                            }
+                            notifyDashboardUpdate("sync_complete")
                         }
-                        notifyDashboardUpdate("sync_complete")
                     }
                 }
-            }
 
-            override fun onSyncError(error: String) {} // ✅ String بدون ?
-        })
+                override fun onSyncError(error: String?) {} // ✅ مع علامة ? لتطابق الواجهة
+            })
+        }
     }
-}
 
-private fun updatePendingSyncBadge() {
-    pendingSyncCountState = syncManager?.getPendingCount() ?: 0 // ✅ تم التصحيح
-}
-
+    private fun updatePendingSyncBadge() {
+        pendingSyncCountState = syncManager?.pendingCount ?: 0 // ✅ خاصية Kotlin
+    }
 
     private fun uploadItemImages(itemId: Int, imagePaths: List<String>) {
         val client = apiClient ?: return
@@ -2843,6 +2869,18 @@ private fun updatePendingSyncBadge() {
                                 }
                             }
                         }
+                        
+                        if (ENABLE_TEMP_MANUAL_EPC) {
+    TempManualEpcInputCard(
+        isArabic = isAr,
+        currentEpc = epcTextState,
+        enabled = formEditable,
+        onEpcConfirmed = { confirmedEpc ->
+            applyManualTestEpc(confirmedEpc)
+        }
+    )
+}
+
 
                         // ب. بطاقة التصنيف والوصف
                         Card(
@@ -3692,6 +3730,171 @@ private fun updatePendingSyncBadge() {
             }
         }
     }
+    
+    @Composable
+private fun TempManualEpcInputCard(
+    isArabic: Boolean,
+    currentEpc: String,
+    enabled: Boolean = true,
+    onEpcConfirmed: (String) -> Unit
+) {
+    if (!ENABLE_TEMP_MANUAL_EPC) return
+
+    val colors = MiraTheme.colors
+    var manualEpc by remember(currentEpc) { mutableStateOf(currentEpc) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.EditNote,
+                        contentDescription = null,
+                        tint = Color(0xFFF59E0B),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isArabic) "إدخال EPC يدوياً (للتجربة المؤقتة)"
+                        else "Manual EPC Input (Temp Test)",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFFF59E0B)
+                    )
+                }
+
+                // توليد EPC قياسي من 24 خانة Hex بضغطة واحدة
+                TextButton(
+                    onClick = {
+                        val hexChars = "0123456789ABCDEF"
+                        val randomHex = buildString(20) {
+                            repeat(20) { append(hexChars.random()) }
+                        }
+                        val generated = "E280$randomHex"
+                        manualEpc = generated
+                        validationError = null
+                        onEpcConfirmed(generated)
+                    },
+                    enabled = enabled,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color(0xFF06B6D4),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isArabic) "توليد تجريبي" else "Generate Test",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF06B6D4)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = manualEpc,
+                    onValueChange = { input ->
+                        manualEpc = input.uppercase(Locale.US).filter { !it.isWhitespace() }
+                        validationError = null
+                    },
+                    enabled = enabled,
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = "E280117000000201...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary
+                        )
+                    },
+                    trailingIcon = {
+                        if (manualEpc.isNotEmpty() && enabled) {
+                            IconButton(
+                                onClick = {
+                                    manualEpc = ""
+                                    validationError = null
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = null,
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f)
+                )
+
+                Button(
+                    onClick = {
+                        val clean = manualEpc.trim().uppercase(Locale.US)
+                        val isValidHex = clean.length in 16..32 && clean.all {
+                            it in '0'..'9' || it in 'A'..'F'
+                        }
+                        if (!isValidHex) {
+                            validationError = if (isArabic) {
+                                "أدخل رمز Hex صالح (من 16 إلى 32 خانة: 0-9, A-F)"
+                            } else {
+                                "Enter valid Hex EPC (16-32 chars: 0-9, A-F)"
+                            }
+                        } else {
+                            validationError = null
+                            onEpcConfirmed(clean)
+                        }
+                    },
+                    enabled = enabled,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.goldPrimary,
+                        contentColor = Color(0xFF0A0F1D)
+                    )
+                ) {
+                    Text(
+                        text = if (isArabic) "اعتماد" else "Apply",
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            validationError?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFEF4444)
+                )
+            }
+        }
+    }
+}
+
 
     @Composable
     private fun EncodingSuccessDialog(
