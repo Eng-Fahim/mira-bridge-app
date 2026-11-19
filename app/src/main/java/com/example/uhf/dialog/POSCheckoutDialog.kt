@@ -57,16 +57,6 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
 
-/**
- * POSCheckoutDialog (Jetpack Compose Edition) — Full Web & ERP Parity
- *
- * - اختيار طريقة الدفع من قائمة قابلة للبحث (code هو المصدر الموثوق)
- * - دعم تعدد العملات (YER / SAR / USD + عملات السيرفر) وأسعار الصرف اللحظية
- * - زر تعبئة "المتبقي" الذكي لكل سطر دفع
- * - دعم الدفع بالذهب الكسر (TradeInDialog)
- * - مطابقة محاسبية فورية (متطابق / ناقص / رصيد دائن)
- * - الاحتفاظ بكامل المدخلات وعرض الخطأ داخلياً عند رفض السيرفر
- */
 class POSCheckoutDialog : DialogFragment() {
 
     companion object {
@@ -126,10 +116,6 @@ class POSCheckoutDialog : DialogFragment() {
         val amountText: String = ""
     )
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  State & Dependencies
-    // ═══════════════════════════════════════════════════════════════════
-
     private var totalAmount: Double = 0.0
     private var itemCount: Int = 0
     private var listener: OnCheckoutListener? = null
@@ -142,21 +128,16 @@ class POSCheckoutDialog : DialogFragment() {
     private var currentTotalWithDiscountUsd: Double = 0.0
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Reactive Compose States
     private val paymentMethodsState = mutableStateListOf<PaymentMethodDto>()
     private val currenciesState = mutableStateListOf("YER", "SAR", "USD")
     private val paymentRowsState = mutableStateListOf<PaymentRowUiModel>()
 
     private var customerNameState by mutableStateOf("")
     private var customerPhoneState by mutableStateOf("")
-    private var phoneFieldErrorState by mutableStateOf<String?>(null)
 
     private var tradeInTotalState by mutableDoubleStateOf(0.0)
     private var inlineErrorState by mutableStateOf<String?>(null)
     private var isSubmittingState by mutableStateOf(false)
-    private var showStoreCreditConfirmState by mutableStateOf(false)
-    private var pendingCreditDiffState by mutableDoubleStateOf(0.0)
-    private var pendingCheckoutData: POSCheckoutData? = null
 
     fun setCheckoutListener(listener: OnCheckoutListener?) {
         this.listener = listener
@@ -211,7 +192,6 @@ class POSCheckoutDialog : DialogFragment() {
             priceManager = MiraPriceManager.getInstance(it)
         }
 
-        // تهيئة أولية فورية بالبدائل ريثما تكتمل استجابة السيرفر
         paymentMethodsState.clear()
         paymentMethodsState.addAll(getFallbackMethods())
         if (paymentRowsState.isEmpty()) {
@@ -267,10 +247,6 @@ class POSCheckoutDialog : DialogFragment() {
         loadCurrencies()
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Server Data Loading
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun loadPaymentMethods() {
         val appCtx = context?.applicationContext ?: return
         Thread {
@@ -324,7 +300,6 @@ class POSCheckoutDialog : DialogFragment() {
                 paymentMethodsState.clear()
                 paymentMethodsState.addAll(finalList)
 
-                // تحديث سطور الدفع بأول طريقة معتمدة من السيرفر إذا لم يغيرها المستخدم بعد
                 val defaultMethod = finalList.firstOrNull() ?: return@post
                 for (i in paymentRowsState.indices) {
                     val row = paymentRowsState[i]
@@ -357,6 +332,10 @@ class POSCheckoutDialog : DialogFragment() {
                             val r = arr.getJSONObject(i)
                             val from = r.optString("from_currency", "").uppercase(Locale.US)
                             if (from.isNotEmpty()) currencies.add(from)
+                            val rateVal = r.optDouble("rate", r.optDouble("exchange_rate", 0.0))
+                            if (from.isNotEmpty() && rateVal > 0 && !serverRates.containsKey(from)) {
+                                serverRates[from] = rateVal
+                            }
                         }
                     }
                 }
@@ -402,10 +381,6 @@ class POSCheckoutDialog : DialogFragment() {
         return list
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Financial Calculations & Exchange Rates
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun getRateToYER(currency: String?): Double {
         if (currency == null) return 1.0
         val curr = currency.uppercase(Locale.US).trim()
@@ -416,19 +391,10 @@ class POSCheckoutDialog : DialogFragment() {
 
         priceManager?.let { pm ->
             val currencyRate = pm.getExchangeRate(curr)
-            if (currencyRate > 10) return currencyRate
-
-            val yerRate = pm.getExchangeRate(MiraPriceManager.CURRENCY_YER)
-            if (yerRate > 0 && currencyRate > 0) {
-                return yerRate / currencyRate
-            }
+            if (currencyRate > 0) return currencyRate
         }
 
-        return when (curr) {
-            "SAR" -> 140.0
-            "USD" -> 530.0
-            else -> 1.0
-        }
+        return 1.0
     }
 
     private fun parseDouble(s: String?): Double {
@@ -467,10 +433,6 @@ class POSCheckoutDialog : DialogFragment() {
         return count.toString() + if (count == 1) " item" else " items"
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Trade-In, Validation & Submission
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun openTradeInDialog() {
         val maxValue = currentTotalWithDiscountUsd * getRateToYER("USD")
         val tradeDialog = TradeInDialog.newInstance(maxValue, tradeInLines)
@@ -482,43 +444,8 @@ class POSCheckoutDialog : DialogFragment() {
         tradeDialog.show(parentFragmentManager, "TradeInDialog")
     }
 
-    private fun validateAndSubmit() {
-        val requiredTotal = currentTotalWithDiscountUsd * getRateToYER("USD")
-        val paid = getTotalPaidYER()
-        val totalWithGold = paid + tradeInTotalState
-        val diff = totalWithGold - requiredTotal
-
-        if (diff < -1.0) {
-            inlineErrorState = if (isArabic) {
-                "⚠️ المبلغ ناقص ${String.format(Locale.US, "%,.0f", abs(diff))} YER"
-            } else {
-                "⚠️ Short by ${String.format(Locale.US, "%,.0f", abs(diff))} YER"
-            }
-            return
-        }
-
-        if (diff > 1.0) {
-            val phone = customerPhoneState.trim()
-            if (phone.isEmpty()) {
-                phoneFieldErrorState = if (isArabic) {
-                    "مطلوب لإنشاء رصيد دائن"
-                } else {
-                    "Required to create store credit"
-                }
-                inlineErrorState = if (isArabic) {
-                    "⚠️ الدفع الزائد يتطلب رقم هاتف العميل (لحفظ الرصيد الدائن)"
-                } else {
-                    "⚠️ Overpayment requires customer phone (to save credit)"
-                }
-                return
-            }
-
-            pendingCheckoutData = buildData()
-            pendingCreditDiffState = diff
-            showStoreCreditConfirmState = true
-            return
-        }
-
+    // إرسال البيانات إلى السيرفر ليكون هو صاحب القرار النهائي
+    private fun submitToServer() {
         dispatchCheckout(buildData())
     }
 
@@ -538,14 +465,15 @@ class POSCheckoutDialog : DialogFragment() {
             if (amt <= 0) continue
 
             val curr = row.currency
+            val rate = getRateToYER(curr)
             val methodCode = row.method.code?.takeIf { it.isNotEmpty() } ?: "CASH"
 
             try {
                 val pObj = JSONObject().apply {
                     put("currency", curr)
                     put("amount", amt)
-                    put("exchange_rate", getRateToYER(curr))
-                    put("base_amount", amt * getRateToYER(curr))
+                    put("exchange_rate", rate)
+                    put("base_amount", amt * rate)
                     put("method", methodCode)
                 }
                 paymentsArray.put(pObj)
@@ -592,10 +520,6 @@ class POSCheckoutDialog : DialogFragment() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose UI
-    // ═══════════════════════════════════════════════════════════════════
-
     @Composable
     private fun CheckoutDialogContent() {
         val colors = MiraTheme.colors
@@ -604,7 +528,7 @@ class POSCheckoutDialog : DialogFragment() {
         val requiredTotalYer = currentTotalWithDiscountUsd * getRateToYER("USD")
         val paidYer = getTotalPaidYER()
         val totalWithGoldYer = paidYer + tradeInTotalState
-        val remainingYer = requiredTotalYer - totalWithGoldYer
+        val diffYer = totalWithGoldYer - requiredTotalYer
 
         var pickerForRowIndex by remember { mutableIntStateOf(-1) }
 
@@ -618,7 +542,6 @@ class POSCheckoutDialog : DialogFragment() {
             elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // 1. Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -670,9 +593,8 @@ class POSCheckoutDialog : DialogFragment() {
                     }
                 }
 
-                Divider(color = colors.goldPrimary.copy(alpha = 0.2f))
+                HorizontalDivider(color = colors.goldPrimary.copy(alpha = 0.2f))
 
-                // 2. Scrollable Body
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
@@ -680,16 +602,14 @@ class POSCheckoutDialog : DialogFragment() {
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // بطاقة الإجمالي والمطابقة الفورية
                     TotalAndReconciliationCard(
                         isArabic = isAr,
                         finalTotalFormatted = formatFinalTotalDisplay(),
                         requiredYer = requiredTotalYer,
-                        remainingYer = remainingYer,
+                        diffYer = diffYer,
                         tradeInTotal = tradeInTotalState
                     )
 
-                    // رسالة الخطأ الداخلية (تظهر دون مسح الإدخالات)
                     AnimatedVisibility(visible = !inlineErrorState.isNullOrEmpty()) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -718,22 +638,18 @@ class POSCheckoutDialog : DialogFragment() {
                         }
                     }
 
-                    // بيانات العميل (اختياري إلا في حالة الرصيد الدائن)
                     CustomerInfoSection(
                         isArabic = isAr,
                         name = customerNameState,
                         phone = customerPhoneState,
-                        phoneError = phoneFieldErrorState,
                         enabled = !isSubmittingState,
                         onNameChange = { customerNameState = it },
                         onPhoneChange = {
                             customerPhoneState = it
-                            phoneFieldErrorState = null
                             if (inlineErrorState != null) inlineErrorState = null
                         }
                     )
 
-                    // قسم سطور الدفع المتعددة
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -747,7 +663,6 @@ class POSCheckoutDialog : DialogFragment() {
                         )
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // زر الدفع بالذهب الكسر (Trade-in)
                             OutlinedButton(
                                 onClick = { openTradeInDialog() },
                                 enabled = !isSubmittingState,
@@ -765,7 +680,6 @@ class POSCheckoutDialog : DialogFragment() {
                                 )
                             }
 
-                            // زر إضافة دفعة جديدة
                             OutlinedButton(
                                 onClick = {
                                     val defaultM = paymentMethodsState.firstOrNull()
@@ -796,7 +710,6 @@ class POSCheckoutDialog : DialogFragment() {
                         }
                     }
 
-                    // قائمة سطور الدفع
                     paymentRowsState.forEachIndexed { index, row ->
                         PaymentRowCard(
                             index = index,
@@ -841,9 +754,8 @@ class POSCheckoutDialog : DialogFragment() {
                     }
                 }
 
-                Divider(color = colors.textSecondary.copy(alpha = 0.14f))
+                HorizontalDivider(color = colors.textSecondary.copy(alpha = 0.14f))
 
-                // 3. Footer Actions
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -867,7 +779,7 @@ class POSCheckoutDialog : DialogFragment() {
                     }
 
                     Button(
-                        onClick = { validateAndSubmit() },
+                        onClick = { submitToServer() },
                         enabled = !isSubmittingState,
                         modifier = Modifier
                             .weight(1f)
@@ -903,7 +815,6 @@ class POSCheckoutDialog : DialogFragment() {
             }
         }
 
-        // نافذة اختيار طريقة الدفع القابلة للبحث
         if (pickerForRowIndex in paymentRowsState.indices) {
             PaymentMethodPickerDialog(
                 isArabic = isAr,
@@ -919,84 +830,36 @@ class POSCheckoutDialog : DialogFragment() {
                 }
             )
         }
-
-        // نافذة تأكيد إنشاء رصيد دائن عند الدفع الزائد
-        if (showStoreCreditConfirmState) {
-            AlertDialog(
-                onDismissRequest = { showStoreCreditConfirmState = false },
-                containerColor = colors.cardSurface,
-                title = {
-                    Text(
-                        text = if (isAr) "💰 سيُضاف رصيد دائن" else "💰 Store Credit",
-                        color = colors.textPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Text(
-                        text = if (isAr) {
-                            "المبلغ المدفوع أكثر من الفاتورة بـ ${String.format(Locale.US, "%,.2f", pendingCreditDiffState)} YER\n\nسيُحفظ هذا المبلغ كرصيد دائن للعميل (صالح 12 شهراً)."
-                        } else {
-                            "Overpaid by ${String.format(Locale.US, "%,.2f", pendingCreditDiffState)} YER\n\nThis will be saved as store credit (valid 12 months)."
-                        },
-                        color = colors.textSecondary
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showStoreCreditConfirmState = false
-                            pendingCheckoutData?.let { dispatchCheckout(it) }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.goldPrimary,
-                            contentColor = Color(0xFF0A0F1D)
-                        )
-                    ) {
-                        Text(if (isAr) "متابعة" else "Continue", fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showStoreCreditConfirmState = false }) {
-                        Text(if (isAr) "إلغاء" else "Cancel", color = colors.textSecondary)
-                    }
-                }
-            )
-        }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Sub-Components
-    // ═══════════════════════════════════════════════════════════════════
 
     @Composable
     private fun TotalAndReconciliationCard(
         isArabic: Boolean,
         finalTotalFormatted: String,
         requiredYer: Double,
-        remainingYer: Double,
+        diffYer: Double,
         tradeInTotal: Double
     ) {
         val colors = MiraTheme.colors
 
         val (statusColor, statusIcon, statusLabel, statusAmountText) = when {
-            abs(remainingYer) < 1.0 -> Quadruple(
+            abs(diffYer) < 1.0 -> Quadruple(
                 Color(0xFF10B981),
                 Icons.Rounded.CheckCircle,
                 if (isArabic) "متطابق" else "Matched",
                 "0 YER"
             )
-            remainingYer > 0 -> Quadruple(
+            diffYer < 0 -> Quadruple(
                 Color(0xFFEF4444),
                 Icons.Rounded.WarningAmber,
                 if (isArabic) "المتبقي" else "Remaining",
-                String.format(Locale.US, "%,.0f YER", remainingYer)
+                String.format(Locale.US, "%,.0f YER", abs(diffYer))
             )
             else -> Quadruple(
                 Color(0xFF3B82F6),
-                Icons.Rounded.AccountBalanceWallet,
-                if (isArabic) "سيُضاف رصيد دائن" else "Store Credit",
-                String.format(Locale.US, "+%,.0f YER", abs(remainingYer))
+                Icons.Rounded.SwapHoriz,
+                if (isArabic) "فارق العملية" else "Difference",
+                String.format(Locale.US, "+%,.0f YER", diffYer)
             )
         }
 
@@ -1035,7 +898,6 @@ class POSCheckoutDialog : DialogFragment() {
                     )
                 }
 
-                // ملخص الذهب الكسر إن وُجد
                 if (tradeInTotal > 0) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -1072,7 +934,6 @@ class POSCheckoutDialog : DialogFragment() {
                     }
                 }
 
-                // شريط حالة المطابقة (متطابق / ناقص / رصيد دائن)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -1116,7 +977,6 @@ class POSCheckoutDialog : DialogFragment() {
         isArabic: Boolean,
         name: String,
         phone: String,
-        phoneError: String?,
         enabled: Boolean,
         onNameChange: (String) -> Unit,
         onPhoneChange: (String) -> Unit
@@ -1148,10 +1008,9 @@ class POSCheckoutDialog : DialogFragment() {
                 onValueChange = onPhoneChange,
                 enabled = enabled,
                 singleLine = true,
-                isError = phoneError != null,
                 label = {
                     Text(
-                        text = phoneError ?: if (isArabic) "رقم الهاتف" else "Phone",
+                        text = if (isArabic) "رقم الهاتف" else "Phone",
                         fontSize = 12.sp
                     )
                 },
@@ -1202,7 +1061,6 @@ class POSCheckoutDialog : DialogFragment() {
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // الصف العلوي: رقم السطر + اختيار طريقة الدفع + حذف السطر
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1268,7 +1126,6 @@ class POSCheckoutDialog : DialogFragment() {
                     }
                 }
 
-                // الصف السفلي: المبلغ + العملة + زر تعبئة المتبقي
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1290,7 +1147,6 @@ class POSCheckoutDialog : DialogFragment() {
                         modifier = Modifier.weight(1f)
                     )
 
-                    // قائمة اختيار العملة
                     Box {
                         Surface(
                             modifier = Modifier
@@ -1340,7 +1196,6 @@ class POSCheckoutDialog : DialogFragment() {
                         }
                     }
 
-                    // زر تعبئة المتبقي
                     FilledTonalButton(
                         onClick = onFillRemaining,
                         enabled = enabled,
@@ -1360,7 +1215,6 @@ class POSCheckoutDialog : DialogFragment() {
                     }
                 }
 
-                // المعادل بالريال اليمني عند اختيار عملة أجنبية
                 if (rateToYer != 1.0 && parsedAmount > 0) {
                     Text(
                         text = String.format(Locale.US, "≈ %,.2f YER (سعر الصرف: %,.1f)", equivalentYer, rateToYer),
