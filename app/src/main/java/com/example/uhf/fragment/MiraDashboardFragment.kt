@@ -372,7 +372,7 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    private fun refreshAllDashboardData(forceNetwork: Boolean) {
+        private fun refreshAllDashboardData(forceNetwork: Boolean) {
         isOnlineState = isNetworkAvailable()
         if (!isOnlineState && !forceNetwork) return
         if (!ensureExecutor() || !isSessionValid()) return
@@ -387,10 +387,8 @@ class MiraDashboardFragment : Fragment() {
 
         localExecutor?.execute {
             try {
-                val summaryResp = invokeApiMethod("getDashboardSummary", branchSnapshot)
-                    ?: invokeApiMethod("getDashboardStats", branchSnapshot)
-                    ?: invokeApiMethod("getDashboardSummary")
-
+                val client = apiClient
+                val summaryResp = client?.getDashboardSummarySmart(branchSnapshot)
                 if (summaryResp != null && summaryResp.isSuccess && summaryResp.data != null) {
                     val dataJson = summaryResp.data!!
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
@@ -408,8 +406,7 @@ class MiraDashboardFragment : Fragment() {
                     }
                 }
 
-                val pricesResp = invokeApiMethod("getGoldPrices")
-                    ?: invokeApiMethod("getLatestGoldPrices")
+                val pricesResp = client?.getGoldPricesSmart(branchSnapshot)
                 if (pricesResp != null && pricesResp.isSuccess && pricesResp.data != null) {
                     val pJson = pricesResp.data!!
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
@@ -587,8 +584,8 @@ class MiraDashboardFragment : Fragment() {
         pricesLastUpdatedState = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
     }
 
-    private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
-        if (!forceOverride && todayInvoicesCountState > 0) return
+        private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
+        if (!forceOverride && todayInvoicesCountState > 0 && todaySoldWeightState > 0.0) return
         val todayPrefix = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         var count = 0
         var sumLocal = 0.0
@@ -602,16 +599,28 @@ class MiraDashboardFragment : Fragment() {
                 count++
                 sumLocal += op.optDouble("final_amount", op.optDouble("total_amount", 0.0))
                 sumUsd += op.optDouble("final_amount_usd", op.optDouble("total_amount_usd", 0.0))
-                sumWeight += op.optDouble("total_weight", op.optDouble("weight", 0.0))
+
+                var opWeight = op.optDouble("total_weight", op.optDouble("weight", 0.0))
+                if (opWeight <= 0.0) {
+                    val items = op.optJSONArray("items") ?: op.optJSONArray("sold_items")
+                    if (items != null) {
+                        for (i in 0 until items.length()) {
+                            val it = items.optJSONObject(i) ?: continue
+                            opWeight += it.optDouble("weight", it.optDouble("gross_weight_grams", 0.0))
+                        }
+                    }
+                }
+                sumWeight += opWeight
             }
         }
         if (forceOverride || count > 0) {
-            todayInvoicesCountState = count
-            todaySalesLocalState = sumLocal
-            todaySalesUsdState = sumUsd
-            todaySoldWeightState = sumWeight
+            if (count > 0 || forceOverride) todayInvoicesCountState = count
+            if (sumLocal > 0.0 || forceOverride) todaySalesLocalState = sumLocal
+            if (sumUsd > 0.0 || forceOverride) todaySalesUsdState = sumUsd
+            if (sumWeight > 0.0 || forceOverride) todaySoldWeightState = sumWeight
         }
     }
+
 
     private fun extractActivitiesArray(root: JSONObject?): JSONArray? {
         if (root == null) return null
