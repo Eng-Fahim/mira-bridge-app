@@ -41,13 +41,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import com.example.uhf.R
 import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
 import com.example.uhf.manager.MiraBranchesManager
+import com.example.uhf.ui.dashboard.UnifiedOperationCard
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import org.json.JSONArray
@@ -64,8 +64,7 @@ class MiraAllActivitiesFragment : Fragment() {
 
     companion object {
         private const val TAG = "MiraAllActivities"
-        private const val PAGE_SIZE = 20
-        private const val MAX_PAGE_SIZE = 200
+        private const val PAGE_SIZE = 30
     }
 
     private data class ActivityCategorySpec(
@@ -74,17 +73,6 @@ class MiraAllActivitiesFragment : Fragment() {
         val labelEn: String,
         val icon: ImageVector,
         val color: Color
-    )
-
-    private data class FormattedActivityDisplay(
-        val title: String,
-        val details: String,
-        val user: String,
-        val timestamp: String,
-        val amountText: String?,
-        val badgeText: String?,
-        val status: String,
-        val visualSpec: ActivityCategorySpec
     )
 
     private val allActivities = ArrayList<JSONObject>()
@@ -158,12 +146,10 @@ class MiraAllActivitiesFragment : Fragment() {
 
     override fun onDestroyView() {
         isDestroyed = true
-
         if (!executor.isShutdown) {
             executor.shutdownNow()
         }
         mainHandler.removeCallbacksAndMessages(null)
-
         super.onDestroyView()
     }
 
@@ -175,7 +161,6 @@ class MiraAllActivitiesFragment : Fragment() {
         }
 
         if (!isRequestInFlight.compareAndSet(false, true)) {
-            Log.d(TAG, "loadActivities skipped — request already in flight")
             isRefreshingState = false
             return
         }
@@ -197,15 +182,22 @@ class MiraAllActivitiesFragment : Fragment() {
         }
 
         val pageToLoad = currentPage
-        val requestLimit = minOf(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE)
+        val searchSnapshot = currentSearchState.trim()
+        val filterSnapshot = currentFilterState
 
         executor.execute {
             try {
                 val branchId = branchesManager?.activeBranchId ?: 0
-                val response = client.getUnifiedActivity(branchId, requestLimit)
+                val response = client.getUnifiedOperations(
+                    branchId,
+                    pageToLoad,
+                    PAGE_SIZE,
+                    searchSnapshot,
+                    filterSnapshot
+                )
 
                 postToMain {
-                    handleResponse(response, reset, pageToLoad, requestLimit)
+                    handleResponse(response, reset)
                 }
             } catch (e: Throwable) {
                 Log.e(TAG, "loadActivities exception", e)
@@ -219,38 +211,19 @@ class MiraAllActivitiesFragment : Fragment() {
         }
     }
 
-    private fun handleResponse(
-        response: MiraApiClient.ApiResponse?,
-        reset: Boolean,
-        pageToLoad: Int,
-        requestLimit: Int
-    ) {
+    private fun handleResponse(response: MiraApiClient.ApiResponse?, reset: Boolean) {
         if (isDestroyed) return
         finishLoading()
 
-        if (response == null) {
-            showError(if (isArabic) "فشل الاتصال بالخادم" else "Server connection failed")
-            return
-        }
-
-        if (!response.isSuccess) {
-            val err = if (!response.error.isNullOrEmpty()) response.error else "HTTP ${response.code}"
+        if (response == null || !response.isSuccess || response.data == null) {
+            val err = response?.error?.takeIf { it.isNotBlank() }
+                ?: (if (isArabic) "فشل الاتصال بالخادم" else "Server connection failed")
             showError(err)
             return
         }
 
-        val dataObj = response.data
-        if (dataObj == null) {
-            showError(if (isArabic) "استجابة غير صالحة من الخادم" else "Invalid server response")
-            return
-        }
-
-        val activities = extractActivitiesArray(dataObj)
-        if (activities == null) {
-            showError(if (isArabic) "بنية الاستجابة غير متوقعة" else "Unexpected response structure")
-            return
-        }
-
+        val dataObj = response.data!!
+        val activities = dataObj.optJSONArray("activities") ?: JSONArray()
         errorMessageState = null
 
         if (reset) {
@@ -258,46 +231,21 @@ class MiraAllActivitiesFragment : Fragment() {
         }
 
         for (i in 0 until activities.length()) {
-            try {
-                activities.optJSONObject(i)?.let { allActivities.add(it) }
-            } catch (_: Throwable) {
-                Log.w(TAG, "skip malformed activity at index $i")
-            }
+            activities.optJSONObject(i)?.let { allActivities.add(it) }
         }
 
         totalCountState = allActivities.size
-
         val serverTotal = dataObj.optInt("total", -1)
         if (serverTotal >= 0) {
             totalOnServerState = serverTotal
-            hasMorePages = allActivities.size < serverTotal
-        } else {
-            hasMorePages = activities.length() >= minOf(PAGE_SIZE * pageToLoad, MAX_PAGE_SIZE)
         }
+        hasMorePages = dataObj.optBoolean("has_more", false)
 
-        applyFilters()
-    }
-
-    private fun extractActivitiesArray(top: JSONObject): JSONArray? {
-        top.optJSONArray("activities")?.let { return it }
-        top.optJSONArray("data")?.let { return it }
-        top.optJSONArray("items")?.let { return it }
-        top.optJSONArray("logs")?.let { return it }
-        top.optJSONArray("result")?.let { return it }
-
-        val dataObj = top.optJSONObject("data")
-        if (dataObj != null) {
-            dataObj.optJSONArray("activities")?.let { return it }
-            dataObj.optJSONArray("items")?.let { return it }
-            dataObj.optJSONArray("logs")?.let { return it }
-        }
-        return null
+        applyLocalFilters()
     }
 
     private fun loadMore() {
-        if (isLoadingMore || !hasMorePages) return
-        if (isRequestInFlight.get()) return
-
+        if (isLoadingMore || !hasMorePages || isRequestInFlight.get()) return
         isLoadingMore = true
         currentPage++
         loadActivities(reset = false)
@@ -311,23 +259,30 @@ class MiraAllActivitiesFragment : Fragment() {
     }
 
     private fun selectFilter(filter: String) {
-        currentFilterState = filter
-        applyFilters()
+        if (currentFilterState != filter) {
+            currentFilterState = filter
+            loadActivities(reset = true)
+        }
     }
 
     private fun onSearchChanged(query: String) {
         currentSearchState = query
-        applyFilters()
+        applyLocalFilters()
     }
 
-    private fun applyFilters() {
+    private fun applyLocalFilters() {
         val searchLower = currentSearchState.trim().lowercase(Locale.ROOT)
         val filterLower = currentFilterState.lowercase(Locale.ROOT)
 
         val result = ArrayList<JSONObject>()
         for (act in allActivities) {
-            if (!matchesType(act, filterLower)) continue
-            if (!matchesSearch(act, searchLower)) continue
+            if (filterLower != "all") {
+                val t = act.optString("type", "").lowercase(Locale.ROOT)
+                if (!t.contains(filterLower)) continue
+            }
+            if (searchLower.isNotEmpty() && !act.toString().lowercase(Locale.ROOT).contains(searchLower)) {
+                continue
+            }
             result.add(act)
         }
 
@@ -335,45 +290,15 @@ class MiraAllActivitiesFragment : Fragment() {
         filteredActivitiesState.addAll(result)
     }
 
-    private fun matchesType(act: JSONObject, filterLower: String): Boolean {
-        if (filterLower == "all") return true
-        val type = (
-            act.optString("type", "") + " " +
-                act.optString("action", "") + " " +
-                act.optString("event", "")
-            ).lowercase(Locale.ROOT)
-        return type.contains(filterLower)
-    }
-
-    private fun matchesSearch(act: JSONObject, searchLower: String): Boolean {
-        if (searchLower.isEmpty()) return true
-        val display = formatActivity(act, isArabic)
-        val combined = listOf(
-            display.title,
-            display.details,
-            display.user,
-            display.status,
-            display.badgeText ?: "",
-            act.toString()
-        ).joinToString(" ").lowercase(Locale.ROOT)
-        return combined.contains(searchLower)
-    }
-
     private fun showError(message: String?) {
         if (isDestroyed) return
-        val msg = if (message.isNullOrBlank()) {
-            if (isArabic) "تعذّر تحميل العمليات" else "Failed to load activities"
-        } else {
-            message.trim()
-        }
+        val msg = message?.trim()?.takeIf { it.isNotEmpty() }
+            ?: (if (isArabic) "تعذّر تحميل العمليات" else "Failed to load activities")
 
-        allActivities.clear()
-        filteredActivitiesState.clear()
-        totalCountState = 0
-        errorMessageState = msg
-
-        if (isAdded && context != null) {
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+        if (allActivities.isEmpty()) {
+            filteredActivitiesState.clear()
+            totalCountState = 0
+            errorMessageState = msg
         }
     }
 
@@ -381,6 +306,36 @@ class MiraAllActivitiesFragment : Fragment() {
         try {
             if (!isAdded) return
             val sheet = ActivityDetailsBottomSheet.newInstance(activity, isArabic)
+            sheet.setOnActionClickListener(object : ActivityDetailsBottomSheet.OnActionClickListener {
+                override fun onPrintInvoice(activityData: JSONObject) {
+                    if (!isAdded || context == null) return
+                    try {
+                        val receiptFragment = MiraReceiptFragment.newInstance(activityData.toString())
+                        val fm = parentFragmentManager
+                        if (!fm.isStateSaved) receiptFragment.show(fm, "MiraReceiptFragment")
+                    } catch (_: Exception) {
+                        Toast.makeText(
+                            context,
+                            if (isArabic) "تعذر فتح الفاتورة" else "Unable to open receipt",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+
+                override fun onOpenRefund(activityData: JSONObject) {
+                    if (!isAdded) return
+                    try {
+                        val salesFragment = MiraPosFragment().apply {
+                            arguments = Bundle().apply {
+                                putString("refund_data_json", activityData.toString())
+                                putBoolean("auto_open_refund", true)
+                            }
+                        }
+                        (getActivity() as? UHFMainActivity)?.loadFragment(salesFragment, "Sales")
+                    } catch (_: Exception) {
+                    }
+                }
+            })
             sheet.show(parentFragmentManager, "ActivityDetails")
         } catch (e: Throwable) {
             Log.e(TAG, "details error", e)
@@ -390,13 +345,11 @@ class MiraAllActivitiesFragment : Fragment() {
     private fun exportActivities() {
         val snapshot = ArrayList(filteredActivitiesState)
         if (snapshot.isEmpty()) {
-            if (isAdded && context != null) {
-                Toast.makeText(
-                    requireContext(),
-                    if (isArabic) "⚠️ لا توجد عمليات للتصدير" else "⚠️ No activities to export",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+            Toast.makeText(
+                requireContext(),
+                if (isArabic) "⚠️ لا توجد عمليات للتصدير" else "⚠️ No activities to export",
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
 
@@ -406,26 +359,22 @@ class MiraAllActivitiesFragment : Fragment() {
         executor.execute {
             try {
                 val dir = File(ctx.getExternalFilesDir(null), "exports")
-                if (!dir.exists() && !dir.mkdirs()) {
-                    Log.w(TAG, "could not create exports dir")
-                }
+                if (!dir.exists()) dir.mkdirs()
 
-                val fileName = "activities_" +
-                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) +
-                    ".csv"
+                val fileName = "operations_" +
+                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".csv"
                 val file = File(dir, fileName)
 
                 FileWriter(file).use { writer ->
-                    writer.append("Timestamp,Type,Title,Details,User,Amount,Status\n")
+                    writer.append("Date,Type,Reference,Customer_User,Amount,Currency,Status\n")
                     for (act in snapshot) {
-                        val formatted = formatActivity(act, isArabic)
-                        writer.append(escapeCsv(formatted.timestamp)).append(",")
-                        writer.append(escapeCsv(act.optString("type", act.optString("action", "")))).append(",")
-                        writer.append(escapeCsv(formatted.title)).append(",")
-                        writer.append(escapeCsv(formatted.details)).append(",")
-                        writer.append(escapeCsv(formatted.user)).append(",")
-                        writer.append(escapeCsv(formatted.amountText ?: "")).append(",")
-                        writer.append(escapeCsv(formatted.status)).append("\n")
+                        writer.append(escapeCsv(act.optString("created_at", act.optString("timestamp", "")))).append(",")
+                        writer.append(escapeCsv(act.optString("type", ""))).append(",")
+                        writer.append(escapeCsv(act.optString("sale_number", act.optString("id", "")))).append(",")
+                        writer.append(escapeCsv(act.optString("customer_name", act.optString("user", "")))).append(",")
+                        writer.append(escapeCsv(act.optString("final_amount", act.optString("amount", "")))).append(",")
+                        writer.append(escapeCsv(act.optString("currency", "YER"))).append(",")
+                        writer.append(escapeCsv(act.optString("refund_status", act.optString("status", "completed")))).append("\n")
                     }
                     writer.flush()
                 }
@@ -460,9 +409,7 @@ class MiraAllActivitiesFragment : Fragment() {
         if (value == null) return ""
         return if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             "\"${value.replace("\"", "\"\"")}\""
-        } else {
-            value
-        }
+        } else value
     }
 
     private fun postToMain(block: () -> Unit) {
@@ -475,176 +422,6 @@ class MiraAllActivitiesFragment : Fragment() {
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  تنسيق العملية ومنع ظهور نصوص JSON الخام
-    // ═══════════════════════════════════════════════════════════════════
-
-    private fun formatActivity(act: JSONObject, isArabic: Boolean): FormattedActivityDisplay {
-        val actionKey = act.optString("action", "")
-            .ifBlank { act.optString("type", "") }
-            .ifBlank { act.optString("event", "") }
-            .uppercase(Locale.US)
-
-        val visualSpec = resolveVisualSpecForType(actionKey.lowercase(Locale.ROOT))
-
-        val nestedDetails = extractNestedJson(act, "details")
-            ?: extractNestedJson(act, "meta")
-            ?: extractNestedJson(act, "payload")
-            ?: act
-
-        val explicitTitle = if (isArabic) {
-            act.optString("title_ar", "").ifBlank { act.optString("title", "") }
-        } else {
-            act.optString("title_en", "").ifBlank { act.optString("title", "") }
-        }
-
-        val title = if (explicitTitle.isNotBlank() && !isRawEventKey(explicitTitle)) {
-            explicitTitle
-        } else {
-            resolveFriendlyTitle(actionKey, isArabic)
-        }
-
-        val saleNumber = nestedDetails.optString("sale_number")
-            .ifBlank { act.optString("sale_number") }
-            .ifBlank { nestedDetails.optString("invoice_number") }
-
-        val entryId = nestedDetails.optString("entry_id")
-            .ifBlank { act.optString("entry_id") }
-
-        val rawAmount = firstNonZeroDouble(
-            act.optDouble("amount", Double.NaN),
-            nestedDetails.optDouble("amount", Double.NaN),
-            nestedDetails.optDouble("total_debit", Double.NaN),
-            nestedDetails.optDouble("total_amount", Double.NaN)
-        )
-
-        val pureWeight = firstNonZeroDouble(
-            nestedDetails.optDouble("pure_weight", Double.NaN),
-            nestedDetails.optDouble("weight", Double.NaN),
-            act.optDouble("weight", Double.NaN)
-        )
-
-        val currency = act.optString("currency")
-            .ifBlank { nestedDetails.optString("currency") }
-            .trim()
-
-        val summaryParts = mutableListOf<String>()
-        if (saleNumber.isNotBlank()) {
-            summaryParts.add(if (isArabic) "فاتورة: $saleNumber" else "Invoice: $saleNumber")
-        }
-        if (entryId.isNotBlank()) {
-            summaryParts.add(if (isArabic) "قيد #$entryId" else "Entry #$entryId")
-        }
-        if (!rawAmount.isNaN()) {
-            val amtFormatted = String.format(Locale.US, "%,.2f %s", rawAmount, currency).trim()
-            summaryParts.add(if (isArabic) "القيمة: $amtFormatted" else "Amount: $amtFormatted")
-        }
-        if (!pureWeight.isNaN()) {
-            val wtFormatted = String.format(Locale.US, "%.2f", pureWeight)
-            summaryParts.add(if (isArabic) "الوزن الصافي: $wtFormatted جم" else "Pure: ${wtFormatted}g")
-        }
-
-        val rawDetailsStr = if (isArabic) {
-            act.optString("details_ar", "").ifBlank { act.optString("details", "") }
-        } else {
-            act.optString("details_en", "").ifBlank { act.optString("details", "") }
-        }.trim()
-
-        val details = when {
-            summaryParts.isNotEmpty() -> summaryParts.joinToString("  •  ")
-            rawDetailsStr.isNotEmpty() && !looksLikeRawJson(rawDetailsStr) -> rawDetailsStr
-            else -> if (isArabic) "عملية مسجلة في النظام" else "System recorded activity"
-        }
-
-        val amountText = if (!rawAmount.isNaN()) {
-            String.format(Locale.US, "%,.2f %s", rawAmount, currency).trim()
-        } else {
-            null
-        }
-
-        val badgeText = when {
-            saleNumber.isNotBlank() -> saleNumber
-            entryId.isNotBlank() -> "#$entryId"
-            else -> null
-        }
-
-        val user = act.optString("user", "").ifBlank { act.optString("username", "") }
-        val timestamp = act.optString("timestamp", "").ifBlank { act.optString("created_at", "") }
-        val status = act.optString("status", "")
-
-        return FormattedActivityDisplay(
-            title = title,
-            details = details,
-            user = user,
-            timestamp = timestamp,
-            amountText = amountText,
-            badgeText = badgeText,
-            status = status,
-            visualSpec = visualSpec
-        )
-    }
-
-    private fun isRawEventKey(value: String): Boolean {
-        val trimmed = value.trim()
-        return trimmed.uppercase(Locale.US) == trimmed && trimmed.contains("_")
-    }
-
-    private fun looksLikeRawJson(text: String): Boolean {
-        val t = text.trim()
-        return t.startsWith("{") || t.startsWith("[") || t.contains("\":")
-    }
-
-    private fun extractNestedJson(parent: JSONObject, key: String): JSONObject? {
-        parent.optJSONObject(key)?.let { return it }
-        val str = parent.optString(key, "").trim()
-        if (str.startsWith("{")) {
-            return try {
-                JSONObject(str)
-            } catch (_: Exception) {
-                null
-            }
-        }
-        return null
-    }
-
-    private fun firstNonZeroDouble(vararg values: Double): Double {
-        for (v in values) {
-            if (!v.isNaN() && v != 0.0) return v
-        }
-        return Double.NaN
-    }
-
-    private fun resolveFriendlyTitle(actionKey: String, isArabic: Boolean): String {
-        return when {
-            actionKey.contains("REFUND") && actionKey.contains("JOURNAL") ->
-                if (isArabic) "قيد يومية لمرتجع مبيعات" else "Sales Refund Journal Entry"
-            actionKey.contains("REFUND") ->
-                if (isArabic) "مرتجع فاتورة مبيعات" else "Sales Refund"
-            actionKey.contains("SALE") && actionKey.contains("JOURNAL") ->
-                if (isArabic) "قيد يومية لفاتورة بيع" else "Sales Journal Entry"
-            actionKey.contains("SALE_COMPLETED") || actionKey.contains("POS_SALE") ->
-                if (isArabic) "إتمام عملية بيع" else "Sale Completed"
-            actionKey.contains("SCRAP") ->
-                if (isArabic) "عملية شراء كسر ذهب" else "Scrap Gold Operation"
-            actionKey.contains("TRANSFER") ->
-                if (isArabic) "تحويل قطع بين الفروع" else "Branch Transfer"
-            actionKey.contains("INVENTORY") || actionKey.contains("AUDIT") ->
-                if (isArabic) "عملية جرد ومطابقة" else "Inventory Audit"
-            actionKey.contains("RFID") || actionKey.contains("ENCODE") ->
-                if (isArabic) "تكويد وقراءة شرائح RFID" else "RFID Tag Operation"
-            actionKey.isBlank() ->
-                if (isArabic) "عملية في النظام" else "System Activity"
-            else -> {
-                val cleaned = actionKey.replace('_', ' ').lowercase(Locale.US).trim()
-                cleaned.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose UI
-    // ═══════════════════════════════════════════════════════════════════
 
     @Composable
     private fun AllActivitiesScreen() {
@@ -672,10 +449,10 @@ class MiraAllActivitiesFragment : Fragment() {
             listOf(
                 ActivityCategorySpec("all", "الكل", "All", Icons.Rounded.Apps, Color(0xFFD4AF37)),
                 ActivityCategorySpec("sale", "المبيعات", "Sales", Icons.Rounded.PointOfSale, Color(0xFF10B981)),
-                ActivityCategorySpec("inventory", "الجرد", "Inventory", Icons.Rounded.Inventory2, Color(0xFF06B6D4)),
-                ActivityCategorySpec("transfer", "التحويلات", "Transfers", Icons.Rounded.SwapHoriz, Color(0xFFF59E0B)),
-                ActivityCategorySpec("rfid", "RFID", "RFID", Icons.Rounded.Contactless, Color(0xFF3B82F6)),
-                ActivityCategorySpec("system", "النظام", "System", Icons.Rounded.SettingsSuggest, Color(0xFFA855F7))
+                ActivityCategorySpec("refund", "المرتجعات", "Refunds", Icons.Rounded.AssignmentReturn, Color(0xFFEF4444)),
+                ActivityCategorySpec("scrap", "شراء كسر", "Scrap Gold", Icons.Rounded.Scale, Color(0xFFF59E0B)),
+                ActivityCategorySpec("transfer", "التحويلات", "Transfers", Icons.Rounded.SwapHoriz, Color(0xFFA855F7)),
+                ActivityCategorySpec("inventory", "الجرد", "Inventory", Icons.Rounded.Inventory2, Color(0xFF06B6D4))
             )
         }
 
@@ -713,9 +490,7 @@ class MiraAllActivitiesFragment : Fragment() {
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clickable {
-                                        if (isAdded) {
-                                            parentFragmentManager.popBackStack()
-                                        }
+                                        if (isAdded) parentFragmentManager.popBackStack()
                                     },
                                 shape = RoundedCornerShape(12.dp),
                                 color = colors.cardSurface,
@@ -735,7 +510,7 @@ class MiraAllActivitiesFragment : Fragment() {
 
                             Column {
                                 Text(
-                                    text = if (isAr) "سجل جميع العمليات" else "All Activities Log",
+                                    text = if (isAr) "سجل جميع العمليات" else "All Operations Log",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = colors.textPrimary,
@@ -745,15 +520,15 @@ class MiraAllActivitiesFragment : Fragment() {
                                 val subtitle = when {
                                     totalOnServerState > 0 -> {
                                         if (isAr) "معروض ${filteredActivitiesState.size} من أصل $totalOnServerState عملية"
-                                        else "Showing ${filteredActivitiesState.size} of $totalOnServerState activities"
+                                        else "Showing ${filteredActivitiesState.size} of $totalOnServerState operations"
                                     }
                                     totalCountState > 0 -> {
-                                        if (isAr) "إجمالي العمليات المحملة: $totalCountState"
-                                        else "Loaded activities: $totalCountState"
+                                        if (isAr) "إجمالي العمليات: $totalCountState"
+                                        else "Total operations: $totalCountState"
                                     }
                                     else -> {
-                                        if (isAr) "مراقبة العمليات اللحظية للفرع"
-                                        else "Real-time branch activity feed"
+                                        if (isAr) "السجل الموحد للمبيعات والعمليات"
+                                        else "Unified sales & operations feed"
                                     }
                                 }
                                 Text(
@@ -833,8 +608,8 @@ class MiraAllActivitiesFragment : Fragment() {
                         singleLine = true,
                         placeholder = {
                             Text(
-                                text = if (isAr) "ابحث بالعنوان، التفاصيل، الموظف، أو الحالة..."
-                                else "Search by title, details, user, or status...",
+                                text = if (isAr) "ابحث برقم الفاتورة، اسم العميل، أو العملية..."
+                                else "Search by invoice #, customer, or operation...",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary
                             )
@@ -853,6 +628,7 @@ class MiraAllActivitiesFragment : Fragment() {
                                     onClick = {
                                         onSearchChanged("")
                                         keyboardController?.hide()
+                                        loadActivities(reset = true)
                                     }
                                 ) {
                                     Icon(
@@ -865,7 +641,10 @@ class MiraAllActivitiesFragment : Fragment() {
                             }
                         },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            keyboardController?.hide()
+                            loadActivities(reset = true)
+                        }),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = colors.cardSurface,
@@ -939,7 +718,7 @@ class MiraAllActivitiesFragment : Fragment() {
                                     CircularProgressIndicator(color = colors.goldPrimary)
                                     Text(
                                         text = if (isAr) "جاري تحميل سجل العمليات..."
-                                        else "Loading activities...",
+                                        else "Loading operations...",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = colors.textSecondary
                                     )
@@ -955,7 +734,7 @@ class MiraAllActivitiesFragment : Fragment() {
                                     onClearFilters = {
                                         currentFilterState = "all"
                                         currentSearchState = ""
-                                        applyFilters()
+                                        loadActivities(reset = true)
                                     }
                                 )
                             }
@@ -975,16 +754,18 @@ class MiraAllActivitiesFragment : Fragment() {
                                     items(
                                         items = filteredActivitiesState,
                                         key = { act ->
+                                            val saleNo = act.optString("sale_number", "")
                                             val id = act.optString("id", "")
-                                            val ts = act.optString("timestamp", "")
-                                            val type = act.optString("type", act.optString("action", ""))
-                                            if (id.isNotEmpty()) "${type}_$id"
-                                            else "${type}_${ts}_${act.hashCode()}"
+                                            val ts = act.optString("created_at", act.optString("timestamp", ""))
+                                            if (saleNo.isNotEmpty()) "sale_$saleNo"
+                                            else if (id.isNotEmpty()) "op_${id}_$ts"
+                                            else "row_${ts}_${act.hashCode()}"
                                         }
                                     ) { activity ->
-                                        ActivityItemCard(
-                                            activity = activity,
+                                        UnifiedOperationCard(
+                                            item = activity,
                                             isArabic = isAr,
+                                            maskAmount = false,
                                             onClick = { showActivityDetails(activity) }
                                         )
                                     }
@@ -1017,180 +798,6 @@ class MiraAllActivitiesFragment : Fragment() {
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun ActivityItemCard(
-        activity: JSONObject,
-        isArabic: Boolean,
-        onClick: () -> Unit
-    ) {
-        val colors = MiraTheme.colors
-        val formatted = remember(activity, isArabic) { formatActivity(activity, isArabic) }
-        val visualSpec = formatted.visualSpec
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onClick() },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-            border = BorderStroke(1.dp, visualSpec.color.copy(alpha = 0.28f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(visualSpec.color.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = visualSpec.icon,
-                        contentDescription = null,
-                        tint = visualSpec.color,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = formatted.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        if (formatted.amountText != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFF10B981).copy(alpha = 0.16f)
-                            ) {
-                                Text(
-                                    text = formatted.amountText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color(0xFF10B981),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        } else if (formatted.badgeText != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = colors.goldPrimary.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    text = formatted.badgeText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.goldPrimary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (formatted.details.isNotEmpty()) {
-                        Text(
-                            text = formatted.details,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            if (formatted.user.isNotEmpty()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Person,
-                                        contentDescription = null,
-                                        tint = colors.goldPrimary,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = formatted.user,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = colors.textSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            if (formatted.timestamp.isNotEmpty()) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Schedule,
-                                        contentDescription = null,
-                                        tint = colors.textSecondary,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = formatted.timestamp,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = colors.textSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-
-                        if (formatted.status.isNotEmpty()) {
-                            val statusColor = resolveStatusColor(formatted.status)
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = statusColor.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    text = formatted.status.uppercase(Locale.US),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = statusColor,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
                             }
                         }
                     }
@@ -1239,9 +846,9 @@ class MiraAllActivitiesFragment : Fragment() {
 
             Text(
                 text = when {
-                    isError -> if (isArabic) "تعذّر تحميل العمليات" else "Unable to Load Activities"
-                    hasActiveFilter -> if (isArabic) "لا توجد نتائج مطابقة" else "No Matching Activities"
-                    else -> if (isArabic) "لا توجد عمليات مسجلة بعد" else "No Recorded Activities Yet"
+                    isError -> if (isArabic) "تعذّر تحميل العمليات" else "Unable to Load Operations"
+                    hasActiveFilter -> if (isArabic) "لا توجد نتائج مطابقة" else "No Matching Operations"
+                    else -> if (isArabic) "لا توجد عمليات مسجلة بعد" else "No Recorded Operations Yet"
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
@@ -1256,8 +863,8 @@ class MiraAllActivitiesFragment : Fragment() {
                     isError -> errorMessage!!
                     hasActiveFilter -> if (isArabic) "جرّب تغيير كلمة البحث أو نوع الفلتر المحدد"
                     else "Try adjusting your search query or selected filter"
-                    else -> if (isArabic) "ستظهر هنا جميع عمليات البيع والجرد والتكويد فور تنفيذها"
-                    else "Sales, inventory, and encoding operations will appear here"
+                    else -> if (isArabic) "ستظهر هنا جميع عمليات البيع والمرتجعات والتحويلات فور تنفيذها"
+                    else "Sales, refunds, and transfers will appear here"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textSecondary,
@@ -1297,45 +904,6 @@ class MiraAllActivitiesFragment : Fragment() {
                     )
                 }
             }
-        }
-    }
-
-    private fun resolveVisualSpecForType(type: String): ActivityCategorySpec {
-        return when {
-            type.contains("refund") -> ActivityCategorySpec(
-                "refund", "مرتجع", "Refund", Icons.Rounded.AssignmentReturn, Color(0xFFF59E0B)
-            )
-            type.contains("sale") || type.contains("pos") -> ActivityCategorySpec(
-                "sale", "مبيعات", "Sale", Icons.Rounded.PointOfSale, Color(0xFF10B981)
-            )
-            type.contains("scrap") || type.contains("buy") -> ActivityCategorySpec(
-                "scrap", "شراء كسر", "Scrap Buy", Icons.Rounded.Scale, Color(0xFFF59E0B)
-            )
-            type.contains("inventory") || type.contains("audit") -> ActivityCategorySpec(
-                "inventory", "جرد", "Inventory", Icons.Rounded.Inventory2, Color(0xFF06B6D4)
-            )
-            type.contains("transfer") || type.contains("move") -> ActivityCategorySpec(
-                "transfer", "تحويل", "Transfer", Icons.Rounded.SwapHoriz, Color(0xFFF97316)
-            )
-            type.contains("rfid") || type.contains("encode") || type.contains("tag") -> ActivityCategorySpec(
-                "rfid", "RFID", "RFID", Icons.Rounded.Contactless, Color(0xFFD4AF37)
-            )
-            else -> ActivityCategorySpec(
-                "system", "النظام", "System", Icons.Rounded.SettingsSuggest, Color(0xFFA855F7)
-            )
-        }
-    }
-
-    private fun resolveStatusColor(status: String): Color {
-        val s = status.lowercase(Locale.ROOT)
-        return when {
-            s.contains("success") || s.contains("complete") || s.contains("done") || s.contains("approved") ->
-                Color(0xFF22C55E)
-            s.contains("pending") || s.contains("wait") || s.contains("sync") ->
-                Color(0xFFF59E0B)
-            s.contains("fail") || s.contains("error") || s.contains("reject") || s.contains("cancel") ->
-                Color(0xFFEF4444)
-            else -> Color(0xFF3B82F6)
         }
     }
 }
