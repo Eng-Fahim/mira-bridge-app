@@ -595,11 +595,7 @@ private fun looksLikeJson(text: String): Boolean {
     return trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.contains("\":")
 }
 
-private fun extractTime(raw: String): String {
-    if (raw.isBlank()) return ""
-    val match = Regex("""\b(\d{2}:\d{2})(?::\d{2})?\b""").find(raw)
-    return match?.groupValues?.getOrNull(1) ?: raw
-}
+
 
 @Composable
 private fun ActivityTimelineRow(
