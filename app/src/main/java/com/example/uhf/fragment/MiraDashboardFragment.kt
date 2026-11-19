@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -65,7 +64,7 @@ class MiraDashboardFragment : Fragment() {
 
     companion object {
         private const val TAG = "MiraDashboardFragment"
-        private const val DASHBOARD_CACHE_PREFS = "mira_dashboard_summary_cache"
+        private const val DASHBOARD_CACHE_PREFS = "mira_dashboard_summary_cache_v2"
     }
 
     private data class BranchChipOption(
@@ -80,6 +79,7 @@ class MiraDashboardFragment : Fragment() {
     @Volatile private var isDestroyed = false
     private var isArabic = true
     private var currentBranchId = 1
+    private var currentUserId = 0
 
     private var apiClient: MiraApiClient? = null
     private var sessionManager: SecureSessionManager? = null
@@ -90,11 +90,12 @@ class MiraDashboardFragment : Fragment() {
     private var orgTitleState by mutableStateOf("MIRA JEWELRY")
     private var userNameState by mutableStateOf("")
     private var userRoleState by mutableStateOf("")
+    private var isManagerState by mutableStateOf(false)
     private var isOnlineState by mutableStateOf(true)
     private var isRefreshingState by mutableStateOf(false)
     private var maskAmountsState by mutableStateOf(false)
 
-    // الفروع
+    // الفروع (تُعرض للمدراء فقط)
     private var branchesListState by mutableStateOf<List<BranchChipOption>>(emptyList())
     private var selectedBranchIdState by mutableIntStateOf(1)
 
@@ -168,14 +169,17 @@ class MiraDashboardFragment : Fragment() {
 
         isOnlineState = isNetworkAvailable()
         val latestBranch = resolveActiveBranchId()
-        if (latestBranch != currentBranchId) {
-            currentBranchId = latestBranch
-            selectedBranchIdState = latestBranch
+        val latestUser = readIntProp(sessionManager, "userId", "id")
+
+        if (latestBranch != currentBranchId || latestUser != currentUserId) {
+            initSessionAndBranchState()
+            recentActivitiesState = emptyList()
             loadOfflineData()
             refreshAllDashboardData(forceNetwork = true)
         } else {
             val cache = activityCache
-            if (cache != null && !cache.isValid(currentBranchId)) {
+            val cacheUserKey = if (isManagerState) 0 else currentUserId
+            if (cache != null && !cache.isValid(currentBranchId, cacheUserKey)) {
                 fetchRecentActivity()
             }
         }
@@ -215,9 +219,10 @@ class MiraDashboardFragment : Fragment() {
         val sm = sessionManager
         val bm = branchesManager
 
+        currentUserId = readIntProp(sm, "userId", "id")
         userNameState = readStringProp(sm, "username", "fullName", "name")
-
-        userRoleState = readStringProp(sm, "role", "userRole").lowercase(Locale.ROOT)
+        userRoleState = readStringProp(sm, "role", "userRole", "position").lowercase(Locale.ROOT)
+        isManagerState = resolveIsManagerOrAdmin(sm, userRoleState)
 
         val orgName = readStringProp(sm, "orgName", "organizationName", "companyName")
             .ifBlank { if (isArabic) "ميرا للمجوهرات" else "MIRA JEWELRY" }
@@ -225,7 +230,41 @@ class MiraDashboardFragment : Fragment() {
 
         currentBranchId = resolveActiveBranchId()
         selectedBranchIdState = currentBranchId
-        loadBranchesList(bm)
+
+        if (isManagerState) {
+            loadBranchesList(bm)
+        } else {
+            branchesListState = emptyList()
+        }
+    }
+
+    /**
+     * تحديد ما إذا كان المستخدم مديراً/مشرفاً (يرى عمليات الفرع بالكامل)
+     * أو موظف مبيعات/كاشير (يرى عملياته الشخصية فقط)
+     */
+    private fun resolveIsManagerOrAdmin(sm: SecureSessionManager?, roleRaw: String): Boolean {
+        val managerKeywords = setOf(
+            "admin", "super_admin", "superadmin", "owner", "manager",
+            "branch_manager", "general_manager", "supervisor", "director",
+            "accountant", "auditor", "مدير", "مشرف", "مالك", "محاسب"
+        )
+        if (roleRaw.isNotBlank() && managerKeywords.any { roleRaw.contains(it) }) {
+            return true
+        }
+        if (sm != null) {
+            val boolFlags = listOf("isAdmin", "isManager", "isOwner", "isSupervisor", "canViewAllSales")
+            for (flag in boolFlags) {
+                try {
+                    val m = sm.javaClass.methods.firstOrNull {
+                        it.name.equals(flag, ignoreCase = true) && it.parameterCount == 0
+                    }
+                    val res = m?.invoke(sm)
+                    if (res is Boolean && res) return true
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return false
     }
 
     private fun resolveActiveBranchId(): Int {
@@ -284,6 +323,7 @@ class MiraDashboardFragment : Fragment() {
     }
 
     private fun switchBranch(branchId: Int) {
+        if (!isManagerState) return
         if (branchId <= 0 || branchId == currentBranchId) return
         currentBranchId = branchId
         selectedBranchIdState = branchId
@@ -300,11 +340,15 @@ class MiraDashboardFragment : Fragment() {
         refreshAllDashboardData(forceNetwork = true)
     }
 
+    private fun summaryCacheKey(branchId: Int): String {
+        return if (isManagerState) "summary_b${branchId}_all" else "summary_b${branchId}_u${currentUserId}"
+    }
+
     private fun loadOfflineData() {
         val ctx = context ?: return
         try {
             val prefs = ctx.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
-            val savedSummary = prefs.getString("summary_b$currentBranchId", null)
+            val savedSummary = prefs.getString(summaryCacheKey(currentBranchId), null)
             if (!savedSummary.isNullOrBlank()) {
                 applyDashboardSummaryJson(JSONObject(savedSummary))
             }
@@ -313,14 +357,15 @@ class MiraDashboardFragment : Fragment() {
                 applyGoldPricesJson(JSONObject(savedPrices))
             }
 
-            val cachedActs = activityCache?.load(currentBranchId)
+            val cacheUserKey = if (isManagerState) 0 else currentUserId
+            val cachedActs = activityCache?.load(currentBranchId, cacheUserKey)
             if (cachedActs != null && cachedActs.length() > 0 && recentActivitiesState.isEmpty()) {
                 val cachedList = mutableListOf<JSONObject>()
                 for (i in 0 until cachedActs.length()) {
                     cachedActs.optJSONObject(i)?.let { cachedList.add(it) }
                 }
                 recentActivitiesState = cachedList
-                recomputeTodayFallbackFromOperations(cachedList)
+                recomputeTodaySalesFromOperations(cachedList, forceOverride = !isManagerState)
             }
         } catch (e: Exception) {
             Log.e(TAG, "loadOfflineData error: ${e.message}")
@@ -335,6 +380,8 @@ class MiraDashboardFragment : Fragment() {
 
         isRefreshingState = true
         val branchSnapshot = currentBranchId
+        val managerSnapshot = isManagerState
+        val userSnapshot = currentUserId
 
         fetchRecentActivity()
 
@@ -348,12 +395,15 @@ class MiraDashboardFragment : Fragment() {
                     val dataJson = summaryResp.data!!
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
                         ?.edit()
-                        ?.putString("summary_b$branchSnapshot", dataJson.toString())
+                        ?.putString(summaryCacheKey(branchSnapshot), dataJson.toString())
                         ?.apply()
 
                     mainHandler.post {
                         if (!isDestroyed && isAdded && currentBranchId == branchSnapshot) {
                             applyDashboardSummaryJson(dataJson)
+                            if (!managerSnapshot && currentUserId == userSnapshot) {
+                                recomputeTodaySalesFromOperations(recentActivitiesState, forceOverride = true)
+                            }
                         }
                     }
                 }
@@ -391,14 +441,27 @@ class MiraDashboardFragment : Fragment() {
         if (!isAdded || isDestroyed || !isSessionValid() || !ensureExecutor()) return
 
         val branchId = if (currentBranchId > 0) currentBranchId else resolveActiveBranchId()
+        val managerSnapshot = isManagerState
+        val userIdSnapshot = currentUserId
+        val usernameSnapshot = userNameState
+        val cacheUserKey = if (managerSnapshot) 0 else userIdSnapshot
 
         localExecutor?.execute {
             try {
-                val response = client.getUnifiedOperations(branchId, 1, 10, null, "all")
+                val response = client.getUnifiedOperations(
+                    branchId,
+                    userIdSnapshot,
+                    usernameSnapshot,
+                    managerSnapshot,
+                    1,
+                    10,
+                    null,
+                    "all"
+                )
                 if (response != null && response.isSuccess && response.data != null) {
                     val activities = extractActivitiesArray(response.data)
                     if (activities != null) {
-                        activityCache?.save(branchId, activities)
+                        activityCache?.save(branchId, cacheUserKey, activities)
                         val itemsList = mutableListOf<JSONObject>()
                         for (i in 0 until activities.length()) {
                             activities.optJSONObject(i)?.let { itemsList.add(it) }
@@ -406,7 +469,10 @@ class MiraDashboardFragment : Fragment() {
                         mainHandler.post {
                             if (!isDestroyed && isAdded && currentBranchId == branchId) {
                                 recentActivitiesState = itemsList
-                                recomputeTodayFallbackFromOperations(itemsList)
+                                recomputeTodaySalesFromOperations(
+                                    itemsList,
+                                    forceOverride = !managerSnapshot
+                                )
                             }
                         }
                     }
@@ -420,29 +486,44 @@ class MiraDashboardFragment : Fragment() {
     private fun applyDashboardSummaryJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
 
-        val salesObj = data.optJSONObject("today_sales") ?: data.optJSONObject("sales") ?: data
-        val sLocal = salesObj.optDouble(
-            "today_total_local",
-            salesObj.optDouble("total_local", salesObj.optDouble("today_sales_local", 0.0))
-        )
-        val sUsd = salesObj.optDouble(
-            "today_total_usd",
-            salesObj.optDouble("total_usd", salesObj.optDouble("today_sales_usd", 0.0))
-        )
-        val sCount = salesObj.optInt(
-            "today_count",
-            salesObj.optInt("invoices_count", salesObj.optInt("sales_count", 0))
-        )
-        val sWeight = salesObj.optDouble(
-            "today_weight",
-            salesObj.optDouble("sold_weight", 0.0)
-        )
+        // للمدراء: تُعرض إجماليات الفرع كاملة
+        // للموظفين: نبحث أولاً عن الحقول الشخصية (my_today_sales) وإلا تُحسب من مبيعات الموظف
+        if (isManagerState) {
+            val salesObj = data.optJSONObject("today_sales") ?: data.optJSONObject("sales") ?: data
+            val sLocal = salesObj.optDouble(
+                "today_total_local",
+                salesObj.optDouble("total_local", salesObj.optDouble("today_sales_local", 0.0))
+            )
+            val sUsd = salesObj.optDouble(
+                "today_total_usd",
+                salesObj.optDouble("total_usd", salesObj.optDouble("today_sales_usd", 0.0))
+            )
+            val sCount = salesObj.optInt(
+                "today_count",
+                salesObj.optInt("invoices_count", salesObj.optInt("sales_count", 0))
+            )
+            val sWeight = salesObj.optDouble(
+                "today_weight",
+                salesObj.optDouble("sold_weight", 0.0)
+            )
 
-        if (sLocal > 0.0) todaySalesLocalState = sLocal
-        if (sUsd > 0.0) todaySalesUsdState = sUsd
-        if (sCount > 0) todayInvoicesCountState = sCount
-        if (sWeight > 0.0) todaySoldWeightState = sWeight
+            if (sLocal > 0.0) todaySalesLocalState = sLocal
+            if (sUsd > 0.0) todaySalesUsdState = sUsd
+            if (sCount > 0) todayInvoicesCountState = sCount
+            if (sWeight > 0.0) todaySoldWeightState = sWeight
+        } else {
+            val mySalesObj = data.optJSONObject("my_today_sales") ?: data.optJSONObject("user_sales")
+            if (mySalesObj != null) {
+                todaySalesLocalState = mySalesObj.optDouble("total_local", 0.0)
+                todaySalesUsdState = mySalesObj.optDouble("total_usd", 0.0)
+                todayInvoicesCountState = mySalesObj.optInt("count", 0)
+                todaySoldWeightState = mySalesObj.optDouble("weight", 0.0)
+            } else {
+                recomputeTodaySalesFromOperations(recentActivitiesState, forceOverride = true)
+            }
+        }
 
+        // الخزينة والمخزون
         val vaultObj = data.optJSONObject("vault") ?: data.optJSONObject("inventory") ?: data
         val pieces = vaultObj.optInt(
             "total_pieces",
@@ -460,13 +541,18 @@ class MiraDashboardFragment : Fragment() {
         if (weight > 0.0) totalVaultWeightState = weight
         if (pure24 > 0.0) pure24kWeightState = pure24
 
-        val alertsObj = data.optJSONObject("alerts")
-        val aCount = alertsObj?.optInt("count", 0) ?: data.optInt("alerts_count", 0)
-        alertsCountState = aCount
-        if (aCount > 0) {
-            alertsMessageState = alertsObj?.optString("latest_message", "")
-                ?.takeIf { it.isNotBlank() }
-                ?: (if (isArabic) "يوجد $aCount تنبيهات تتطلب مراجعتك" else "$aCount alerts require attention")
+        // التنبيهات (للمدراء)
+        if (isManagerState) {
+            val alertsObj = data.optJSONObject("alerts")
+            val aCount = alertsObj?.optInt("count", 0) ?: data.optInt("alerts_count", 0)
+            alertsCountState = aCount
+            if (aCount > 0) {
+                alertsMessageState = alertsObj?.optString("latest_message", "")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: (if (isArabic) "يوجد $aCount تنبيهات تتطلب مراجعتك" else "$aCount alerts require attention")
+            }
+        } else {
+            alertsCountState = 0
         }
 
         if (data.has("gold_prices") || data.has("prices")) {
@@ -501,12 +587,13 @@ class MiraDashboardFragment : Fragment() {
         pricesLastUpdatedState = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
     }
 
-    private fun recomputeTodayFallbackFromOperations(ops: List<JSONObject>) {
-        if (todayInvoicesCountState > 0 || ops.isEmpty()) return
+    private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
+        if (!forceOverride && todayInvoicesCountState > 0) return
         val todayPrefix = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         var count = 0
         var sumLocal = 0.0
         var sumUsd = 0.0
+        var sumWeight = 0.0
 
         for (op in ops) {
             val type = op.optString("type", "")
@@ -515,12 +602,14 @@ class MiraDashboardFragment : Fragment() {
                 count++
                 sumLocal += op.optDouble("final_amount", op.optDouble("total_amount", 0.0))
                 sumUsd += op.optDouble("final_amount_usd", op.optDouble("total_amount_usd", 0.0))
+                sumWeight += op.optDouble("total_weight", op.optDouble("weight", 0.0))
             }
         }
-        if (count > 0) {
+        if (forceOverride || count > 0) {
             todayInvoicesCountState = count
-            if (sumLocal > 0.0) todaySalesLocalState = sumLocal
-            if (sumUsd > 0.0) todaySalesUsdState = sumUsd
+            todaySalesLocalState = sumLocal
+            todaySalesUsdState = sumUsd
+            todaySoldWeightState = sumWeight
         }
     }
 
@@ -765,7 +854,14 @@ class MiraDashboardFragment : Fragment() {
                         onRefresh = { refreshAllDashboardData(forceNetwork = true) }
                     )
 
-                    if (branchesListState.size > 1) {
+                    // شارة توضيح نطاق الصلاحية (للمدير: جميع عمليات الفرع | للموظف: عملياتي فقط)
+                    RoleVisibilityScopeBadge(
+                        isArabic = isAr,
+                        isManager = isManagerState
+                    )
+
+                    // مبدّل الفروع للمدراء فقط
+                    if (isManagerState && branchesListState.size > 1) {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -816,7 +912,10 @@ class MiraDashboardFragment : Fragment() {
 
                     LiveGoldRatesCard(isArabic = isAr)
 
-                    ExecutiveSummaryAndVaultCard(isArabic = isAr)
+                    ExecutiveSummaryAndVaultCard(
+                        isArabic = isAr,
+                        isManager = isManagerState
+                    )
 
                     QuickActionsSection(
                         isArabic = isAr,
@@ -834,6 +933,45 @@ class MiraDashboardFragment : Fragment() {
 
                     Spacer(modifier = Modifier.height(24.dp))
                 }
+            }
+        }
+    }
+
+    @Composable
+    private fun RoleVisibilityScopeBadge(
+        isArabic: Boolean,
+        isManager: Boolean
+    ) {
+        val accent = if (isManager) Color(0xFFD4AF37) else Color(0xFF06B6D4)
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = accent.copy(alpha = 0.12f),
+            border = BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+            ) {
+                Icon(
+                    imageVector = if (isManager) Icons.Rounded.AdminPanelSettings else Icons.Rounded.PersonPin,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isManager) {
+                        if (isArabic) "صلاحية الإدارة: عرض جميع عمليات ومبيعات الفرع"
+                        else "Manager View: Showing all branch operations & sales"
+                    } else {
+                        if (isArabic) "نطاق الموظف: عرض مبيعاتك وعملياتك الشخصية فقط"
+                        else "Staff View: Showing your personal sales & operations only"
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accent
+                )
             }
         }
     }
@@ -976,7 +1114,10 @@ class MiraDashboardFragment : Fragment() {
     }
 
     @Composable
-    private fun ExecutiveSummaryAndVaultCard(isArabic: Boolean) {
+    private fun ExecutiveSummaryAndVaultCard(
+        isArabic: Boolean,
+        isManager: Boolean
+    ) {
         val colors = MiraTheme.colors
         val curr = localCurrencyState
         val masked = maskAmountsState
@@ -999,7 +1140,11 @@ class MiraDashboardFragment : Fragment() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isArabic) "ملخص اليوم والخزينة" else "Today's Performance & Vault",
+                        text = if (isManager) {
+                            if (isArabic) "ملخص الفرع والخزينة اليوم" else "Branch Today & Vault"
+                        } else {
+                            if (isArabic) "ملخص مبيعاتك اليوم" else "Your Sales Today"
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.textPrimary
@@ -1030,7 +1175,11 @@ class MiraDashboardFragment : Fragment() {
                     }
 
                     SalesMetricBox(
-                        label = if (isArabic) "مبيعات اليوم" else "Today Sales",
+                        label = if (isManager) {
+                            if (isArabic) "مبيعات اليوم" else "Today Sales"
+                        } else {
+                            if (isArabic) "مبيعاتي اليوم" else "My Sales"
+                        },
                         value = salesMainDisplay,
                         accent = Color(0xFF10B981),
                         modifier = Modifier.weight(1.35f)
@@ -1049,29 +1198,32 @@ class MiraDashboardFragment : Fragment() {
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    VaultStatChip(
-                        label = if (isArabic) "قطع المخزون" else "Stock Pieces",
-                        value = if (masked) "•••" else "$totalVaultPiecesState",
-                        icon = Icons.Rounded.Diamond,
-                        modifier = Modifier.weight(1f)
-                    )
-                    VaultStatChip(
-                        label = if (isArabic) "إجمالي الوزن" else "Vault Weight",
-                        value = if (masked) "•••" else String.format(Locale.US, "%.1f g", totalVaultWeightState),
-                        icon = Icons.Rounded.Scale,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (pure24kWeightState > 0.0) {
+                // رصيد الخزينة الكلي يظهر للمدراء
+                if (isManager && (totalVaultPiecesState > 0 || totalVaultWeightState > 0.0)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         VaultStatChip(
-                            label = if (isArabic) "صافي 24K" else "Pure 24K",
-                            value = if (masked) "•••" else String.format(Locale.US, "%.1f g", pure24kWeightState),
-                            icon = Icons.Rounded.Verified,
+                            label = if (isArabic) "قطع المخزون" else "Stock Pieces",
+                            value = if (masked) "•••" else "$totalVaultPiecesState",
+                            icon = Icons.Rounded.Diamond,
                             modifier = Modifier.weight(1f)
                         )
+                        VaultStatChip(
+                            label = if (isArabic) "إجمالي الوزن" else "Vault Weight",
+                            value = if (masked) "•••" else String.format(Locale.US, "%.1f g", totalVaultWeightState),
+                            icon = Icons.Rounded.Scale,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (pure24kWeightState > 0.0) {
+                            VaultStatChip(
+                                label = if (isArabic) "صافي 24K" else "Pure 24K",
+                                value = if (masked) "•••" else String.format(Locale.US, "%.1f g", pure24kWeightState),
+                                icon = Icons.Rounded.Verified,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
