@@ -49,6 +49,7 @@ import com.example.uhf.fragment.MiraAccountingSetupFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
 
+import com.example.uhf.security.SessionLockManager;
 import com.example.uhf.fragment.QuickActionsBottomSheetFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
@@ -1699,140 +1700,35 @@ if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         }
     }
 
-    private void showAutoLockDialog() {
-        if (isFinishing() || isDestroyed()) return;
-        if (!isActivityAlive()) return;
 
-        if (justUnlockedWithBiometric) {
-            Log.d(TAG, "⏭️ Skipping showAutoLockDialog (just unlocked)");
-            justUnlockedWithBiometric = false;
-            return;
-        }
+// 2. استبدل showAutoLockDialog() و triggerBiometricUnlock() بهذه الدالة الواحدة فقط:
+private void showAutoLockDialog() {
+    if (!isActivityAlive() || sessionManager == null) return;
 
-        try {
-            BottomSheetDialog lockDialog = new BottomSheetDialog(
-                    this, R.style.TransparentBottomSheetDialog);
-
-            View view = getLayoutInflater().inflate(
-                    R.layout.dialog_session_locked, null);
-            lockDialog.setContentView(view);
-
-            lockDialog.setCancelable(false);
-            lockDialog.setCanceledOnTouchOutside(false);
-
-            MaterialButton btnBiometricUnlock = view.findViewById(R.id.btnBiometricUnlock);
-            MaterialButton btnLogout = view.findViewById(R.id.btnLogout);
-            TextView tvLockTitle = view.findViewById(R.id.tvLockTitle);
-            TextView tvLockMessage = view.findViewById(R.id.tvLockMessage);
-
-            if (isArabic) {
-                tvLockTitle.setText("🔒 تم قفل الجلسة مؤقتاً");
-                tvLockMessage.setText(
-                        "لحماية بياناتك، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط.\n\n" +
-                                "يرجى التحقق من هويتك للمتابعة بأمان.");
-                btnBiometricUnlock.setText("فتح بالبصمة");
-                btnLogout.setText("تسجيل الخروج");
-            } else {
-                tvLockTitle.setText("🔒 Session Locked");
-                tvLockMessage.setText(
-                        "For your security, your session has been locked due to inactivity.\n\n" +
-                                "Please verify your identity to continue.");
-                btnBiometricUnlock.setText("Unlock with Fingerprint");
-                btnLogout.setText("Logout");
-            }
-
-            btnBiometricUnlock.setOnClickListener(v -> {
-                lockDialog.dismiss();
-                triggerBiometricUnlock();
-            });
-
-            btnLogout.setOnClickListener(v -> {
-                lockDialog.dismiss();
-                performFullLogout();
-            });
-
-            lockDialog.show();
-
-        } catch (Exception e) {
-            Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
-        }
+    if (justUnlockedWithBiometric) {
+        Log.d(TAG, "⏭️ Skipping lock screen (just unlocked)");
+        justUnlockedWithBiometric = false;
+        return;
     }
 
-        private void triggerBiometricUnlock() {
-        try {
-            BiometricManager bm = BiometricManager.from(this);
-            int canAuth = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+    SessionLockManager.show(
+            this,
+            sessionManager,
+            isArabic,
+            new SessionLockManager.LockCallback() {
+                @Override
+                public void onSessionUnlocked() {
+                    justUnlockedWithBiometric = true;
+                }
 
-            if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
-                Log.w(TAG, "Biometric not available, using password");
-                performFullLogout();
-                return;
+                @Override
+                public void onLogoutRequested() {
+                    performFullLogout();
+                }
             }
+    );
+}
 
-            Executor executor = ContextCompat.getMainExecutor(this);
-
-            BiometricPrompt prompt = new BiometricPrompt(this, executor,
-                    new BiometricPrompt.AuthenticationCallback() {
-                        @Override
-                        public void onAuthenticationSucceeded(
-                                @NonNull BiometricPrompt.AuthenticationResult result) {
-                            Log.d(TAG, "✅ Biometric unlock success");
-                            justUnlockedWithBiometric = true;
-                            sessionManager.unlockSession();
-                            Toast.makeText(UHFMainActivity.this,
-                                    isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-
-                        @Override
-                        public void onAuthenticationError(int code, @NonNull CharSequence msg) {
-                            Log.e(TAG, "Biometric error: " + code + " - " + msg);
-
-                            if (code == BiometricPrompt.ERROR_USER_CANCELED
-                                    || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                                    || code == BiometricPrompt.ERROR_CANCELED) {
-
-                                if (justUnlockedWithBiometric) {
-                                    Log.d(TAG, "⏭️ Skip reopening dialog (biometric already succeeded)");
-                                    return;
-                                }
-
-                                mainHandler.postDelayed(() -> {
-                                    if (isActivityAlive()) {
-                                        showAutoLockDialog();
-                                    }
-                                }, 300);
-                            }
-                        }
-
-                        @Override
-                        public void onAuthenticationFailed() {
-                            Log.w(TAG, "Biometric failed");
-                            Toast.makeText(UHFMainActivity.this,
-                                    isArabic ? "❌ لم يتم التعرف على البصمة" : "❌ Fingerprint not recognized",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    });
-
-            BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-                    .setTitle(isArabic ? "التحقق من الهوية" : "Identity Verification")
-                    .setSubtitle(isArabic
-                            ? "استخدم بصمة الإصبع للمتابعة بأمان"
-                            : "Use fingerprint to continue securely")
-                    .setDescription(isArabic
-                            ? "بياناتك محمية بتشفير AES-256"
-                            : "Your data is protected with AES-256 encryption")
-                    .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
-                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                    .build();
-
-            prompt.authenticate(info);
-
-        } catch (Exception e) {
-            Log.e(TAG, "triggerBiometricUnlock error: " + e.getMessage(), e);
-            performFullLogout();
-        }
-    }
 
 
     private void performFullLogout() {
