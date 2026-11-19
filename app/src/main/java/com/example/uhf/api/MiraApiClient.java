@@ -3303,29 +3303,125 @@ public class MiraApiClient {
     /**
  * جلب تنبيهات الفرع (المعلّقة والمحلولة)
  */
-public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
-    String endpoint = "alerts?branch_id=" + branchId + "&include_resolved=" + (includeResolved ? 1 : 0);
-    // استبدل executeGet بالاسم الفعلي لدالة GET الداخلية في MiraApiClient لديك
-    return executeGet(endpoint);
-}
-
-/**
- * حل تنبيه محدد أو حل جميع تنبيهات الفرع وتوثيق إجراء المعالجة
- */
-public ApiResponse resolveAlert(int branchId, String alertId, String resolutionNote, boolean resolveAll) {
-    try {
-        JSONObject payload = new JSONObject();
-        payload.put("branch_id", branchId);
-        payload.put("alert_id", alertId != null ? alertId : "");
-        payload.put("resolution_note", resolutionNote != null ? resolutionNote : "");
-        payload.put("resolve_all", resolveAll);
-
-        // استبدل executePost بالاسم الفعلي لدالة POST الداخلية في MiraApiClient لديك
-        return executePost("alerts/resolve", payload);
-    } catch (Exception e) {
-        return new ApiResponse(false, null, e.getMessage());
+    public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
+        String endpoint = "alerts?branch_id=" + branchId + "&include_resolved=" + (includeResolved ? 1 : 0);
+        return executeAlertsHttp("GET", endpoint, null);
     }
-}
+
+    public ApiResponse resolveAlert(int branchId, String alertId, String note, boolean resolveAll) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("branch_id", branchId);
+            payload.put("alert_id", alertId != null ? alertId : "");
+            payload.put("resolution_note", note != null ? note : "");
+            payload.put("resolve_all", resolveAll);
+            return executeAlertsHttp("POST", "alerts/resolve", payload);
+        } catch (Exception e) {
+            return new ApiResponse(0, null, e.getMessage() != null ? e.getMessage() : "Payload error");
+        }
+    }
+
+    private ApiResponse executeAlertsHttp(String method, String endpoint, JSONObject body) {
+        java.net.HttpURLConnection conn = null;
+        try {
+            String resolvedBase = "";
+            String resolvedToken = "";
+            android.content.Context foundCtx = null;
+
+            for (java.lang.reflect.Field f : this.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object val = f.get(this);
+                if (val instanceof String) {
+                    String s = ((String) val).trim();
+                    String fname = f.getName().toLowerCase(java.util.Locale.US);
+                    if (s.startsWith("http") && (fname.contains("url") || fname.contains("base") || resolvedBase.isEmpty())) {
+                        resolvedBase = s;
+                    } else if (!s.isEmpty() && fname.contains("token")) {
+                        resolvedToken = s;
+                    }
+                } else if (val instanceof android.content.Context) {
+                    foundCtx = (android.content.Context) val;
+                }
+            }
+
+            if (resolvedToken.isEmpty() && foundCtx != null) {
+                try {
+                    com.example.uhf.tools.SecureSessionManager sm =
+                            com.example.uhf.tools.SecureSessionManager.getInstance(foundCtx);
+                    for (java.lang.reflect.Method m : sm.getClass().getMethods()) {
+                        if ((m.getName().equals("getToken") || m.getName().equals("getAuthToken"))
+                                && m.getParameterCount() == 0) {
+                            Object t = m.invoke(sm);
+                            if (t != null && !t.toString().isEmpty()) {
+                                resolvedToken = t.toString();
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            if (resolvedBase.isEmpty()) {
+                return new ApiResponse(0, null, "Base URL not configured");
+            }
+
+            String cleanBase = resolvedBase.endsWith("/")
+                    ? resolvedBase.substring(0, resolvedBase.length() - 1)
+                    : resolvedBase;
+            if (!cleanBase.endsWith("/api/v1")) {
+                cleanBase = cleanBase + "/api/v1";
+            }
+            String fullUrl = cleanBase + "/" + (endpoint.startsWith("/") ? endpoint.substring(1) : endpoint);
+
+            java.net.URL url = new java.net.URL(fullUrl);
+            conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(method);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            if (!resolvedToken.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + resolvedToken);
+            }
+
+            if ("POST".equals(method) && body != null) {
+                conn.setDoOutput(true);
+                byte[] out = body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                try (java.io.OutputStream os = conn.getOutputStream()) {
+                    os.write(out);
+                }
+            }
+
+            int statusCode = conn.getResponseCode();
+            java.io.InputStream is = (statusCode >= 200 && statusCode < 300)
+                    ? conn.getInputStream()
+                    : conn.getErrorStream();
+
+            StringBuilder sb = new StringBuilder();
+            if (is != null) {
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        sb.append(line);
+                    }
+                }
+            }
+
+            String raw = sb.toString().trim();
+            JSONObject json = raw.startsWith("{") ? new JSONObject(raw) : new JSONObject();
+            String msg = json.optString("message", (statusCode >= 200 && statusCode < 300) ? "OK" : "HTTP " + statusCode);
+            return new ApiResponse(statusCode, json, msg);
+        } catch (Exception e) {
+            return new ApiResponse(0, null, e.getMessage() != null ? e.getMessage() : "Network error");
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
 
 
     // ==================== نماذج الاستجابة والخيوط ====================
