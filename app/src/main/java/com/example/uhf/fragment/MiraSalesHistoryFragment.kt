@@ -135,10 +135,6 @@ class MiraSalesHistoryFragment : Fragment() {
 
     private var isArabic: Boolean = true
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose Reactive States
-    // ═══════════════════════════════════════════════════════════════════
-
     private var filteredSalesState by mutableStateOf<List<MiraSaleItem>>(emptyList())
     private var searchQueryState by mutableStateOf("")
     private var currentFilterState by mutableStateOf("ALL")
@@ -163,10 +159,6 @@ class MiraSalesHistoryFragment : Fragment() {
         return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
             resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Lifecycle & BroadcastReceiver
-    // ═══════════════════════════════════════════════════════════════════
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -286,10 +278,6 @@ class MiraSalesHistoryFragment : Fragment() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Permissions & Branch Setup
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun hasSalesViewPermission(): Boolean {
         val pm = permissionManager ?: return false
         return pm.canViewSalesHistory() || pm.canViewPos() || pm.isManager()
@@ -328,10 +316,6 @@ class MiraSalesHistoryFragment : Fragment() {
             branchOptionsState = emptyList()
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Offline Cache & API Data Loading
-    // ═══════════════════════════════════════════════════════════════════
 
     private fun loadSalesOffline() {
         try {
@@ -575,18 +559,7 @@ class MiraSalesHistoryFragment : Fragment() {
                 rawCurrency.uppercase(Locale.US)
             }
 
-            var rate = sale.optDouble("exchange_rate", 0.0)
-            if (rate <= 1.0 && priceManager != null) {
-                try {
-                    val pmRate = priceManager!!.getExchangeRate(if (currency == "USD") "YER" else currency)
-                    if (pmRate > 1.0) rate = pmRate
-                } catch (_: Exception) {
-                }
-            }
-            if (rate <= 1.0) {
-                rate = if (currency == "SAR") 3.75 else 530.0
-            }
-
+            val rate = sale.optDouble("exchange_rate", 0.0)
             val amountUsdRaw = sale.optDouble("final_amount_usd", sale.optDouble("total_amount_usd", 0.0))
             val amountLocalRaw = sale.optDouble(
                 "final_amount",
@@ -597,13 +570,14 @@ class MiraSalesHistoryFragment : Fragment() {
                 amountUsdRaw > 0 -> amountUsdRaw
                 currency == "USD" -> amountLocalRaw
                 rate > 0 -> amountLocalRaw / rate
-                else -> amountLocalRaw
+                else -> 0.0
             }
 
             val resolvedLocal = when {
                 amountLocalRaw > 0 -> amountLocalRaw
                 currency == "USD" -> resolvedUsd
-                else -> resolvedUsd * rate
+                rate > 0 -> resolvedUsd * rate
+                else -> 0.0
             }
 
             val tradeInsArr = sale.optJSONArray("trade_ins")
@@ -745,113 +719,14 @@ class MiraSalesHistoryFragment : Fragment() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Open Receipt Navigation (Enriched JSON for MiraReceiptFragment)
-    // ═══════════════════════════════════════════════════════════════════
-
-    private fun hasCompleteReceiptDetails(rawJson: String): Boolean {
-        return try {
-            val obj = JSONObject(rawJson)
-            val target = obj.optJSONObject("sale") ?: obj.optJSONObject("data") ?: obj
-            val items = target.optJSONArray("items")
-                ?: target.optJSONArray("sold_items")
-                ?: target.optJSONArray("products")
-                ?: target.optJSONArray("invoice_items")
-            items != null && items.length() > 0
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private fun buildEnrichedReceiptJson(sale: MiraSaleItem): String {
-        return try {
-            val obj = JSONObject(sale.rawJson)
-            if (obj.optString("sale_number", "").isEmpty()) {
-                obj.put("sale_number", sale.saleId)
-            }
-            if (obj.optDouble("exchange_rate", 0.0) <= 1.0 && sale.exchangeRate > 1.0) {
-                obj.put("exchange_rate", sale.exchangeRate)
-            }
-            if (obj.optString("branch_name", "").isEmpty() && sale.branchId > 0) {
-                val bName = branchesManager?.allBranches?.firstOrNull { it.id == sale.branchId }?.name
-                if (!bName.isNullOrBlank()) {
-                    obj.put("branch_name", bName)
-                }
-            }
-            obj.toString()
-        } catch (_: Exception) {
-            sale.rawJson
-        }
-    }
-
-    private fun launchReceiptDialog(jsonPayload: String) {
-        if (!isAdded) return
-        val act = activity
-        if (act is UHFMainActivity) {
-            act.openReceiptFragment(jsonPayload)
-        } else {
-            MiraReceiptFragment.newInstance(jsonPayload)
-                .show(parentFragmentManager, "mira_receipt")
-        }
-    }
-
     private fun openReceipt(sale: MiraSaleItem) {
         try {
-            val fallbackJson = buildEnrichedReceiptJson(sale)
-            if (hasCompleteReceiptDetails(fallbackJson)) {
-                launchReceiptDialog(fallbackJson)
-                return
-            }
-
-            // محاولة جلب تفاصيل الفاتورة الكاملة إذا كانت عناصر القائمة مختصرة
-            val client = apiClient
-            val numericId = sale.saleId.removePrefix("#").trim()
-            if (client != null && numericId.isNotEmpty() && !networkExecutor.isShutdown) {
-                val ctx = context
-                if (ctx != null) {
-                    Toast.makeText(
-                        ctx,
-                        if (isArabic) "⏳ جاري تحميل تفاصيل الفاتورة..." else "⏳ Loading invoice details...",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                networkExecutor.execute {
-                    var finalJson = fallbackJson
-                    try {
-                        val method = client.javaClass.methods.firstOrNull { m ->
-                            (m.name == "getSaleDetails" || m.name == "getSaleById" || m.name == "getInvoiceDetails") &&
-                                m.parameterTypes.size == 1
-                        }
-                        if (method != null) {
-                            val arg: Any = if (method.parameterTypes[0] == Int::class.java ||
-                                method.parameterTypes[0] == Integer::class.java
-                            ) {
-                                numericId.toIntOrNull() ?: numericId
-                            } else {
-                                numericId
-                            }
-                            val res = method.invoke(client, arg)
-                            if (res != null) {
-                                val resJsonStr = res.toString()
-                                val extracted = JSONObject(resJsonStr).optJSONObject("data")
-                                    ?: JSONObject(resJsonStr).optJSONObject("sale")
-                                if (extracted != null && extracted.length() > 0) {
-                                    finalJson = extracted.toString()
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Optional sale details fetch fallback: ${e.message}")
-                    }
-
-                    mainHandler.post {
-                        if (isAdded) {
-                            launchReceiptDialog(finalJson)
-                        }
-                    }
-                }
-            } else {
-                launchReceiptDialog(fallbackJson)
+            val act = activity
+            if (act is UHFMainActivity) {
+                act.openReceiptFragment(sale.rawJson)
+            } else if (isAdded) {
+                MiraReceiptFragment.newInstance(sale.rawJson)
+                    .show(parentFragmentManager, "mira_receipt")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening receipt", e)
@@ -864,10 +739,6 @@ class MiraSalesHistoryFragment : Fragment() {
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose UI
-    // ═══════════════════════════════════════════════════════════════════
 
     @Composable
     private fun SalesHistoryScreen() {
