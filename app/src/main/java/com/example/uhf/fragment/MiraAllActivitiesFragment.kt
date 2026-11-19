@@ -50,6 +50,7 @@ import com.example.uhf.manager.MiraBranchesManager
 import com.example.uhf.ui.dashboard.UnifiedOperationCard
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
+import com.example.uhf.tools.SecureSessionManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -153,7 +154,7 @@ class MiraAllActivitiesFragment : Fragment() {
         super.onDestroyView()
     }
 
-    private fun loadActivities(reset: Boolean) {
+        private fun loadActivities(reset: Boolean) {
         val client = apiClient
         if (client == null) {
             showError(if (isArabic) "العميل غير مهيأ" else "Client not initialized")
@@ -185,11 +186,26 @@ class MiraAllActivitiesFragment : Fragment() {
         val searchSnapshot = currentSearchState.trim()
         val filterSnapshot = currentFilterState
 
+        // قراءة بيانات المستخدم ودوره لضمان تطبيق العزل للموظفين والشمولية للمدراء
+        val sm = context?.let { SecureSessionManager.getInstance(it) }
+        val userId = readIntPropSafe(sm, "userId", "id")
+        val username = readStringPropSafe(sm, "username", "fullName", "name")
+        val role = readStringPropSafe(sm, "role", "userRole", "position").lowercase(Locale.ROOT)
+        val managerKeywords = setOf(
+            "admin", "super_admin", "superadmin", "owner", "manager",
+            "branch_manager", "general_manager", "supervisor", "director",
+            "accountant", "auditor", "مدير", "مشرف", "مالك", "محاسب"
+        )
+        val isManager = role.isNotBlank() && managerKeywords.any { role.contains(it) }
+
         executor.execute {
             try {
                 val branchId = branchesManager?.activeBranchId ?: 0
                 val response = client.getUnifiedOperations(
                     branchId,
+                    userId,
+                    username,
+                    isManager,
                     pageToLoad,
                     PAGE_SIZE,
                     searchSnapshot,
@@ -210,6 +226,39 @@ class MiraAllActivitiesFragment : Fragment() {
             }
         }
     }
+
+    private fun readStringPropSafe(target: Any?, vararg names: String): String {
+        if (target == null) return ""
+        for (name in names) {
+            try {
+                val getter = "get" + name.replaceFirstChar { it.uppercaseChar() }
+                val m = target.javaClass.methods.firstOrNull {
+                    (it.name == getter || it.name == name) && it.parameterCount == 0
+                }
+                val v = m?.invoke(target)?.toString()?.trim()
+                if (!v.isNullOrEmpty() && v != "null") return v
+            } catch (_: Exception) {
+            }
+        }
+        return ""
+    }
+
+    private fun readIntPropSafe(target: Any?, vararg names: String): Int {
+        if (target == null) return 0
+        for (name in names) {
+            try {
+                val getter = "get" + name.replaceFirstChar { it.uppercaseChar() }
+                val m = target.javaClass.methods.firstOrNull {
+                    (it.name == getter || it.name == name) && it.parameterCount == 0
+                }
+                val v = m?.invoke(target)
+                if (v is Number) return v.toInt()
+            } catch (_: Exception) {
+            }
+        }
+        return 0
+    }
+
 
     private fun handleResponse(response: MiraApiClient.ApiResponse?, reset: Boolean) {
         if (isDestroyed) return
