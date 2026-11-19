@@ -1,6 +1,8 @@
 package com.example.uhf.fragment
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -21,19 +23,19 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog as AppCompatAlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -58,7 +60,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -97,33 +98,33 @@ import com.example.uhf.utils.BarcodeGenerator
 import com.example.uhf.utils.MiraExecutorService
 import com.example.uhf.utils.PricingCalculator
 import com.example.uhf.utils.TagPrinter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.security.SecureRandom
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.Random
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
-import androidx.appcompat.app.AlertDialog
-
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraIdentityStudioFragment v6.5 — Jetpack Compose Luxury Edition
+ *  MiraIdentityStudioFragment v7.0 — Hardened Enterprise Luxury Edition
  * ═══════════════════════════════════════════════════════════════════════════
  */
 class MiraIdentityStudioFragment : MiraBaseFragment() {
 
-    
-        companion object {
+    companion object {
         private const val TAG = "MiraIdentityStudio"
-        private const val ENABLE_TEMP_MANUAL_EPC = true // ✅ أضف هذا السطر (اجعله false لإخفاء البطاقة لاحقاً)
+        private const val ENABLE_TEMP_MANUAL_EPC = true
 
-        private const val RFID_TIMEOUT_MS = 30000L       
+        private const val RFID_TIMEOUT_MS = 30000L
         private const val MIN_TID_LENGTH = 12
         private const val MAX_TID_LENGTH = 32
         private const val MAX_PHOTOS = 5
@@ -135,6 +136,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         private const val KEYCODE_TRIGGER_1 = 139
         private const val KEYCODE_TRIGGER_2 = 280
         private const val KEYCODE_TRIGGER_3 = 293
+
+        private val EPC_REGEX = Regex("^[0-9A-F]{16,32}$")
+        private val STANDARD_EPC_REGEX = Regex("^E2[0-9A-F]{22}$")
+        private val HEX_24_REGEX = Regex("^[0-9A-F]{24}$")
+        private val SERIAL_REGEX = Regex("^MIRA-SN-\\d+$")
+        private val GS1_SERIAL_PATTERN = Pattern.compile("(?:^|\\|)21(MIRA-SN-\\d+)")
     }
 
     private data class ScanFeedbackData(
@@ -192,7 +199,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     private var pendingHideFeedback: Runnable? = null
 
     // ═══════════════════════════════════════════════════════════════════
-    //  حالة المسح الفيزيائي والـ Trigger (v6.5 Trigger-Safe)
+    //  حالة المسح الفيزيائي والـ Trigger والتزامن الآمن
     // ═══════════════════════════════════════════════════════════════════
     @Volatile private var isTriggerDown = false
     @Volatile private var savedPowerBeforeScan = -1
@@ -203,21 +210,21 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     @Volatile private var tagReceivedThisScan = false
     private val isProcessingTag = AtomicBoolean(false)
     private val stoppingReader = AtomicBoolean(false)
+    private val isEncodingInProgress = AtomicBoolean(false)
 
-    @Volatile private var isFormLocked = false
-    
     private var isArabic: Boolean = true
 
-
-
     @Volatile private var isEpcBound = false
-    private var boundEpcValue: String = ""
+    @Volatile private var boundEpcValue: String = ""
     @Volatile private var lastScannedEpc = ""
     @Volatile private var lastScannedTid = ""
     @Volatile private var lastScanSource = "CHAINWAY"
 
-    private var encodingRfidListener: MiraIRFIDReader.OnTagReadListener? = null
+    @Volatile private var encodingRfidListener: MiraIRFIDReader.OnTagReadListener? = null
     @Volatile private var pendingBarcodeFromScanner: String? = null
+
+    private val activeUploadPaths = ConcurrentHashMap.newKeySet<String>()
+    private val secureRandom = SecureRandom()
 
     // ═══════════════════════════════════════════════════════════════════
     //  Photo Launchers
@@ -288,14 +295,13 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        if (context != null) {
-            appContext = requireContext().applicationContext
-        }
+        context?.applicationContext?.let { appContext = it }
 
         try {
             if (savedInstanceState != null) {
-                isFormLocked = savedInstanceState.getBoolean("is_form_locked", false)
-                isFormLockedState = isFormLocked
+                val locked = savedInstanceState.getBoolean("is_form_locked", false)
+                isEncodingInProgress.set(locked)
+                isFormLockedState = locked
                 currentPhotoPath = savedInstanceState.getString("camera_photo_path", null)
             }
 
@@ -316,12 +322,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 exec.singleThreadExecutor.execute {
                     formManager?.cleanupOldDrafts()
                     formManager?.checkAndNotifyDraft()
-                    photoManager?.cleanupOrphanFiles(null)
+                    cleanupSafeOrphanFiles(null)
                     safeRun { updatePendingSyncBadge() }
                 }
             }
 
-            Log.d(TAG, "✅ IdentityStudio v6.5 (Compose) initialization complete")
+            secureLog("✅ IdentityStudio v7.0 initialization complete")
         } catch (e: Exception) {
             Log.e(TAG, "onViewCreated error: ${e.message}", e)
         }
@@ -361,8 +367,21 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         permissionManager = PermissionManager.getInstance(ctx)
         miraExecutor = MiraExecutorService.getInstance()
         formManager = IdentityFormManager(ctx)
-        photoManager = IdentityPhotoManager(ctx, miraExecutor!!.backgroundExecutor)
-        syncManager = IdentitySyncManager(ctx, miraExecutor!!.backgroundExecutor)
+        val bgExecutor = miraExecutor!!.backgroundExecutor
+        photoManager = IdentityPhotoManager(ctx, bgExecutor)
+        syncManager = IdentitySyncManager(ctx, bgExecutor)
+    }
+
+    private fun cleanupSafeOrphanFiles(activeFormPaths: List<String>?) {
+        val pm = photoManager ?: return
+        val protectedPaths = HashSet<String>()
+        if (!activeFormPaths.isNullOrEmpty()) {
+            protectedPaths.addAll(activeFormPaths)
+        }
+        if (activeUploadPaths.isNotEmpty()) {
+            protectedPaths.addAll(activeUploadPaths)
+        }
+        pm.cleanupOrphanFiles(if (protectedPaths.isEmpty()) null else ArrayList(protectedPaths))
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -370,6 +389,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     private fun setupDraftNotificationCallback() {
+        val isAr = isArabic
         formManager?.setNotificationCallback(object : IdentityFormManager.DraftNotificationCallback {
             override fun onDraftFound(info: IdentityFormManager.DraftInfo, ageText: String) {
                 safeRun {
@@ -379,7 +399,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
             override fun onDraftRestored(info: IdentityFormManager.DraftInfo) {
                 safeRun {
-                    showToast(if (isArabic) "📝 تم استعادة المسودة" else "📝 Draft restored")
+                    showToast(if (isAr) "📝 تم استعادة المسودة" else "📝 Draft restored")
                     syncPhotosFromManager()
                 }
             }
@@ -387,7 +407,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             override fun onDraftExpired(info: IdentityFormManager.DraftInfo) {
                 safeRun {
                     if (isAdded) {
-                        showToast(if (isArabic) "🧹 تم حذف مسودة قديمة" else "🧹 Old draft removed")
+                        showToast(if (isAr) "🧹 تم حذف مسودة قديمة" else "🧹 Old draft removed")
                     }
                 }
             }
@@ -396,7 +416,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     private fun restoreDraftIfExists() {
         val fm = formManager ?: return
-        if (isFormLocked) return
+        if (isEncodingInProgress.get()) return
+        val isAr = isArabic
 
         try {
             val photoPaths = ArrayList<String>()
@@ -462,10 +483,10 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     if (epcTextState.isNotEmpty()) {
                         isEpcBound = false
                         isEpcBoundState = false
-                        statusBadgeTextState = if (isArabic) "⚠️ أعد مسح الشريحة" else "⚠️ Rescan tag"
+                        statusBadgeTextState = if (isAr) "⚠️ أعد مسح الشريحة" else "⚠️ Rescan tag"
                         statusBadgeColorState = Color(0xFFF59E0B)
                         showToast(
-                            if (isArabic) "⚠️ المسودة استُعيدت — أعد مسح الشريحة قبل الحفظ"
+                            if (isAr) "⚠️ المسودة استُعيدت — أعد مسح الشريحة قبل الحفظ"
                             else "⚠️ Draft restored — rescan tag before saving"
                         )
                     }
@@ -478,7 +499,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     private fun saveCurrentDraftAsync() {
         val fm = formManager ?: return
-        val paths = photoManager?.photoPaths ?: ArrayList()
+        val paths = ArrayList(photoManager?.photoPaths ?: emptyList())
 
         fm.saveDraft(object : IdentityFormManager.FormData {
             override fun getEpc(): String = epcTextState
@@ -526,11 +547,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun setupPhotoLaunchers() {
+        val isAr = isArabic
         requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted ->
             if (isGranted) openCamera()
-            else showToast(if (isArabic) "صلاحية الكاميرا مطلوبة" else "Camera permission required")
+            else showToast(if (isAr) "صلاحية الكاميرا مطلوبة" else "Camera permission required")
         }
 
         takePhotoLauncher = registerForActivityResult(
@@ -551,7 +573,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             val remaining = MAX_PHOTOS - currentCount
             if (remaining <= 0) {
                 showToast(
-                    if (isArabic) "⚠️ وصلت للحد الأقصى ($MAX_PHOTOS صور)"
+                    if (isAr) "⚠️ وصلت للحد الأقصى ($MAX_PHOTOS صور)"
                     else "⚠️ Max photos reached ($MAX_PHOTOS)"
                 )
                 return@registerForActivityResult
@@ -563,7 +585,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             }
             if (uris.size > remaining) {
                 showToast(
-                    if (isArabic) "⚠️ أضيفت $toAdd فقط (الحد $MAX_PHOTOS)"
+                    if (isAr) "⚠️ أضيفت $toAdd فقط (الحد $MAX_PHOTOS)"
                     else "⚠️ Added $toAdd only (max $MAX_PHOTOS)"
                 )
             }
@@ -621,7 +643,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  🎯 Physical RFID Trigger (v6.5 Trigger-Safe)
+    //  🎯 Physical RFID Trigger (Trigger-Safe & Leak-Free)
     // ═══════════════════════════════════════════════════════════════════
 
     override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
@@ -630,27 +652,29 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             keyCode == KEYCODE_TRIGGER_3
         if (!isTrigger) return false
 
+        val isAr = isArabic
+
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             if (isTriggerDown) return true
 
             val pm = permissionManager
             if (pm == null || (!pm.canEdit("identity") && !pm.isManager)) {
-                showToast(if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied")
+                showToast(if (isAr) "⛔ غير مصرح" else "⛔ Access Denied")
                 return true
             }
 
             if (isProcessingTag.get()) {
-                showToast(if (isArabic) "⏳ جاري معالجة الشريحة..." else "⏳ Processing tag...")
+                showToast(if (isAr) "⏳ جاري معالجة الشريحة..." else "⏳ Processing tag...")
                 return true
             }
 
-            if (isFormLocked) {
-                showToast(if (isArabic) "⛔ العملية قيد التنفيذ" else "⛔ Operation in progress")
+            if (isEncodingInProgress.get()) {
+                showToast(if (isAr) "⛔ العملية قيد التنفيذ" else "⛔ Operation in progress")
                 return true
             }
 
             isTriggerDown = true
-            Log.i(TAG, "🎯 Trigger DOWN — starting scan")
+            secureLog("🎯 Trigger DOWN — starting scan")
             activateRFIDModeForEncoding()
             return true
         }
@@ -658,10 +682,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         if (event.action == KeyEvent.ACTION_UP) {
             if (!isTriggerDown) return true
             isTriggerDown = false
-            Log.i(TAG, "🎯 Trigger UP — stopping scan immediately")
-            if (isRfidScanning) {
-                stopRfidScanningMode()
-            }
+            secureLog("🎯 Trigger UP — stopping scan immediately")
+            stopRfidScanningMode()
             return true
         }
 
@@ -669,9 +691,10 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun activateRFIDModeForEncoding() {
+        val isAr = isArabic
         val pm = permissionManager ?: return
         if (!(pm.canEdit("identity") || pm.isManager)) {
-            showToast(if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied")
+            showToast(if (isAr) "⛔ غير مصرح" else "⛔ Access Denied")
             return
         }
         val ctx = appContext ?: return
@@ -685,7 +708,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         applyScanPowerForReading()
 
         if (!mgr.isReady) {
-            showToast(if (isArabic) "⏳ جاري تهيئة القارئ..." else "⏳ Initializing reader...")
+            showToast(if (isAr) "⏳ جاري تهيئة القارئ..." else "⏳ Initializing reader...")
             mgr.ensureReady(object : RFIDManager.ReadyCallback {
                 override fun onReady(reader: MiraIRFIDReader) {
                     safeRun { onReaderReadyForScan(myGen, mgr) }
@@ -704,12 +727,11 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     private fun onReaderReadyForScan(gen: Int, mgr: RFIDManager) {
         if (scanGeneration.get() != gen) return
         if (!isTriggerDown) {
-            isRfidScanning = false
-            updateScanningUI(false)
+            stopRfidScanningMode()
             return
         }
         if (!isAdded) {
-            isRfidScanning = false
+            stopRfidScanningMode()
             return
         }
         startScanWithManager(gen, mgr)
@@ -717,23 +739,33 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     private fun onReaderInitError(gen: Int, reason: String?) {
         if (scanGeneration.get() != gen) return
-        isRfidScanning = false
-        updateScanningUI(false)
+        val isAr = isArabic
+        stopRfidScanningMode()
         showErrorDialog(
-            if (isArabic) "⚠️ القارئ غير متاح" else "⚠️ Reader unavailable",
+            if (isAr) "⚠️ القارئ غير متاح" else "⚠️ Reader unavailable",
             reason ?: "Unknown error"
         )
     }
 
-        private fun startScanWithManager(gen: Int, mgr: RFIDManager) {
+    private fun startScanWithManager(gen: Int, mgr: RFIDManager) {
         if (scanGeneration.get() != gen) return
         if (!isTriggerDown) {
-            isRfidScanning = false
-            updateScanningUI(false)
+            stopRfidScanningMode()
             return
         }
 
+        val isAr = isArabic
+
         try {
+            // إزالة أي مستمع سابق عالق قبل تسجيل مستمع جديد
+            encodingRfidListener?.let { old ->
+                try {
+                    mgr.removeListener(old)
+                } catch (_: Exception) {
+                }
+                encodingRfidListener = null
+            }
+
             val listener = object : MiraIRFIDReader.OnTagReadListener {
                 override fun onTagRead(epc: String?, rssi: Int) {
                     if (!isRfidScanning || epc.isNullOrBlank()) return
@@ -747,7 +779,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     val ctx = appContext
                     if (exec == null || ctx == null) {
                         stopRfidScanningMode()
-                        restorePowerForEncoding()
                         isProcessingTag.set(false)
                         return
                     }
@@ -761,15 +792,14 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         }
 
                         stopRfidScanningMode()
-                        restorePowerForEncoding()
 
                         if (tid.isNullOrBlank()) {
                             isProcessingTag.set(false)
                             safeRun {
                                 playErrorSound()
                                 showErrorDialog(
-                                    if (isArabic) "❌ فشل قراءة TID" else "❌ TID Read Failed",
-                                    if (isArabic) "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
+                                    if (isAr) "❌ فشل قراءة TID" else "❌ TID Read Failed",
+                                    if (isAr) "لا يمكن قراءة TID الشريحة.\n\n💡 قرّب الشريحة وأعد المحاولة."
                                     else "Cannot read tag TID.\n\n💡 Move tag closer and retry."
                                 )
                             }
@@ -796,14 +826,14 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
             mgr.startScan(object : RFIDManager.ReadyCallback {
                 override fun onReady(reader: MiraIRFIDReader) {
-                    Log.i(TAG, "✅ Encoding scan started")
+                    secureLog("✅ Encoding scan started")
                 }
 
                 override fun onError(reason: String?) {
                     safeRun {
                         stopRfidScanningMode()
                         showErrorDialog(
-                            if (isArabic) "❌ فشل بدء المسح" else "❌ Scan start failed",
+                            if (isAr) "❌ فشل بدء المسح" else "❌ Scan start failed",
                             reason ?: "Reader not ready"
                         )
                     }
@@ -811,7 +841,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             })
 
             showToast(
-                if (isArabic) "📡 جاري البحث عن شريحة RFID..."
+                if (isAr) "📡 جاري البحث عن شريحة RFID..."
                 else "📡 Searching for RFID tag..."
             )
 
@@ -825,7 +855,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             stopRfidScanningMode()
         }
     }
-
 
     private fun scheduleScanRetry(gen: Int, mgr: RFIDManager) {
         scanRetryRunnable?.let { handler.removeCallbacks(it) }
@@ -845,7 +874,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
         handler.postDelayed(scanRetryRunnable!!, SCAN_RETRY_INTERVAL_MS)
     }
-        private fun stopRfidScanningMode() {
+
+    private fun stopRfidScanningMode() {
         scanGeneration.incrementAndGet()
 
         val wasScanning = isRfidScanning
@@ -862,18 +892,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
 
         updateScanningUI(false)
-        restorePowerForEncoding() // ✅ خفض الطاقة فوراً حتى لو أُفلت الزناد دون قراءة شريحة
-
-        if (!wasScanning) return
-        val ctx = appContext ?: return
-        val exec = miraExecutor ?: return
-
-        if (!stoppingReader.compareAndSet(false, true)) {
-            stoppingReader.set(true)
-        }
+        restorePowerForEncoding()
 
         val toRemove = encodingRfidListener
         encodingRfidListener = null
+
+        val ctx = appContext ?: return
+        val exec = miraExecutor ?: return
+
+        if (!wasScanning && toRemove == null) return
+
+        if (!stoppingReader.compareAndSet(false, true)) return
 
         try {
             exec.backgroundExecutor.execute {
@@ -885,15 +914,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         } catch (_: Exception) {
                         }
                     }
-                    try {
-                        mgr.stopScan()
-                    } catch (_: Exception) {
+                    if (wasScanning) {
+                        try {
+                            mgr.stopScan()
+                        } catch (_: Exception) {
+                        }
                     }
                 } finally {
                     stoppingReader.set(false)
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             stoppingReader.set(false)
         }
     }
@@ -911,6 +942,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun refreshBadgeFromCurrentText() {
+        val isAr = isArabic
         when {
             epcTextState.isEmpty() -> {
                 statusBadgeTextState = "WAITING"
@@ -919,11 +951,11 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 isEpcBoundState = false
             }
             isEpcBound -> {
-                statusBadgeTextState = if (isArabic) "✅ موثّق" else "✅ VERIFIED"
+                statusBadgeTextState = if (isAr) "✅ موثّق" else "✅ VERIFIED"
                 statusBadgeColorState = Color(0xFF22C55E)
             }
             else -> {
-                statusBadgeTextState = if (isArabic) "⚠️ كتابة يدوية" else "⚠️ TYPED"
+                statusBadgeTextState = if (isAr) "⚠️ كتابة يدوية" else "⚠️ TYPED"
                 statusBadgeColorState = Color(0xFFF59E0B)
             }
         }
@@ -931,8 +963,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     private fun applyManualTestEpc(rawEpc: String) {
         if (!ENABLE_TEMP_MANUAL_EPC) return
+        val isAr = isArabic
         val cleanEpc = rawEpc.trim().uppercase(Locale.US)
-        val testTid = ("E280117020000201" + cleanEpc).take(24)
+        val testTid = ("E280117020000201" + cleanEpc).padEnd(24, '0').take(24)
 
         isEpcBound = true
         isEpcBoundState = true
@@ -942,11 +975,11 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         lastScanSource = "CHAINWAY"
 
         epcTextState = cleanEpc
-        statusBadgeTextState = if (isArabic) "✅ موثّق (تجريبي)" else "✅ VERIFIED (TEST)"
+        statusBadgeTextState = if (isAr) "✅ موثّق (تجريبي)" else "✅ VERIFIED (TEST)"
         statusBadgeColorState = Color(0xFF22C55E)
 
         showScanFeedback(
-            title = if (isArabic) "🧪 تم اعتماد EPC تجريبي" else "🧪 Test EPC Applied",
+            title = if (isAr) "🧪 تم اعتماد EPC تجريبي" else "🧪 Test EPC Applied",
             details = "EPC: $cleanEpc\nTID: $testTid",
             price = null,
             accentColor = Color(0xFF22C55E),
@@ -954,8 +987,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         )
     }
 
-
     private fun onEpcInputChanged(newText: String) {
+        val isAr = isArabic
         epcTextState = newText
         if (newText.isEmpty()) {
             isEpcBound = false
@@ -967,10 +1000,10 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             isEpcBound = false
             isEpcBoundState = false
             boundEpcValue = ""
-            statusBadgeTextState = if (isArabic) "⚠️ كتابة يدوية" else "⚠️ TYPED"
+            statusBadgeTextState = if (isAr) "⚠️ كتابة يدوية" else "⚠️ TYPED"
             statusBadgeColorState = Color(0xFFF59E0B)
         } else if (!isEpcBound) {
-            statusBadgeTextState = if (isArabic) "⚠️ كتابة يدوية" else "⚠️ TYPED"
+            statusBadgeTextState = if (isAr) "⚠️ كتابة يدوية" else "⚠️ TYPED"
             statusBadgeColorState = Color(0xFFF59E0B)
         }
     }
@@ -979,7 +1012,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     //  Tag Processing
     // ═══════════════════════════════════════════════════════════════════
 
-        private fun processReceivedTagWithTid(
+    private fun processReceivedTagWithTid(
         epc: String?,
         preReadTid: String?,
         source: String
@@ -993,6 +1026,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             return
         }
 
+        val isAr = isArabic
         val cleanEpc = epc.trim().uppercase(Locale.US)
         lastScannedEpc = cleanEpc
         lastScanSource = source
@@ -1055,8 +1089,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     safeRun {
                         playErrorSound()
                         showErrorDialog(
-                            if (isArabic) "⚠️ TID غير صالح" else "⚠️ Invalid TID",
-                            if (isArabic) "طول TID غير متوقع: ${finalTid.length} حرف"
+                            if (isAr) "⚠️ TID غير صالح" else "⚠️ Invalid TID",
+                            if (isAr) "طول TID غير متوقع: ${finalTid.length} حرف"
                             else "Unexpected TID length: ${finalTid.length} chars"
                         )
                     }
@@ -1076,16 +1110,16 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     if (!fAllowed) {
                         playErrorSound()
                         showScanFeedback(
-                            if (isArabic) "❌ شريحة غير معتمدة" else "❌ Unauthorized Tag",
-                            if (isArabic) "TID: $finalTid\nليست من الموردين المعتمدين"
+                            if (isAr) "❌ شريحة غير معتمدة" else "❌ Unauthorized Tag",
+                            if (isAr) "TID: $finalTid\nليست من الموردين المعتمدين"
                             else "TID: $finalTid\nNot from approved suppliers",
                             null,
                             Color(0xFFEF4444),
                             false
                         )
                         showErrorDialog(
-                            if (isArabic) "⛔ شريحة غير معتمدة" else "⛔ Unauthorized Tag",
-                            if (isArabic) "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n🔹 TID: $finalTid\n\n💡 استخدم شريحة من مورد معتمد."
+                            if (isAr) "⛔ شريحة غير معتمدة" else "⛔ Unauthorized Tag",
+                            if (isAr) "هذه الشريحة ليست من مخزون الشرائح المعتمدة:\n\n🔹 TID: $finalTid\n\n💡 استخدم شريحة من مورد معتمد."
                             else "This tag is not from approved inventory:\n\n🔹 TID: $finalTid\n\n💡 Use a tag from an approved supplier."
                         )
                         return@safeRun
@@ -1094,16 +1128,16 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     if (fDuplicate) {
                         playErrorSound()
                         showScanFeedback(
-                            if (isArabic) "⚠️ شريحة مكررة" else "⚠️ Duplicate Tag",
-                            if (isArabic) "ID: $displayEpcValue\nمسجلة بالفعل في النظام"
+                            if (isAr) "⚠️ شريحة مكررة" else "⚠️ Duplicate Tag",
+                            if (isAr) "ID: $displayEpcValue\nمسجلة بالفعل في النظام"
                             else "ID: $displayEpcValue\nAlready registered",
                             null,
                             Color(0xFF3B82F6),
                             false
                         )
                         showErrorDialog(
-                            if (isArabic) "شريحة مكررة" else "Duplicate Tag",
-                            if (isArabic) "هذه الشريحة مسجلة بالفعل في النظام:\n\n🔹 ID: $displayEpcValue\n\n💡 استخدم شريحة جديدة."
+                            if (isAr) "شريحة مكررة" else "Duplicate Tag",
+                            if (isAr) "هذه الشريحة مسجلة بالفعل في النظام:\n\n🔹 ID: $displayEpcValue\n\n💡 استخدم شريحة جديدة."
                             else "This tag is already registered:\n\n🔹 ID: $displayEpcValue\n\n💡 Use a new tag."
                         )
                         return@safeRun
@@ -1116,24 +1150,24 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     isEpcBoundState = true
                     boundEpcValue = displayEpcValue
                     epcTextState = displayEpcValue
-                    statusBadgeTextState = if (isArabic) "✅ موثّق" else "✅ VERIFIED"
+                    statusBadgeTextState = if (isAr) "✅ موثّق" else "✅ VERIFIED"
                     statusBadgeColorState = Color(0xFF22C55E)
 
                     val titleText = if (wasReplacing) {
-                        if (isArabic) "🔄 تم استبدال الوسم" else "🔄 Tag Replaced"
+                        if (isAr) "🔄 تم استبدال الوسم" else "🔄 Tag Replaced"
                     } else {
-                        if (isArabic) "✅ شريحة صالحة" else "✅ Valid Tag"
+                        if (isAr) "✅ شريحة صالحة" else "✅ Valid Tag"
                     }
 
                     val tidDisplay = if (fTidSkipped) {
-                        if (isArabic) "غير متوفر (قارئ مكتبي)" else "N/A (Desktop)"
+                        if (isAr) "غير متوفر (قارئ مكتبي)" else "N/A (Desktop)"
                     } else finalTid
 
                     val detailsText = if (wasReplacing) {
-                        if (isArabic) "TID جديد: $tidDisplay\nجاهز للتكويد"
+                        if (isAr) "TID جديد: $tidDisplay\nجاهز للتكويد"
                         else "New TID: $tidDisplay\nReady for encoding"
                     } else {
-                        if (isArabic) "TID: $tidDisplay\nجاهزة للتكويد"
+                        if (isAr) "TID: $tidDisplay\nجاهزة للتكويد"
                         else "TID: $tidDisplay\nReady for encoding"
                     }
 
@@ -1146,15 +1180,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
     }
 
-
     fun onRfidScanned(epc: String?) {
         if (!isAdded || activity == null || epc.isNullOrBlank()) return
         val ctx = appContext ?: return
         val exec = miraExecutor ?: return
+        val isAr = isArabic
 
         val pm = permissionManager
         if (pm == null || (!pm.canEdit("identity") && !pm.isManager)) return
-        if (isFormLocked) return
+        if (isEncodingInProgress.get()) return
 
         val scannedEpc = epc.trim().uppercase(Locale.US)
         lastScannedEpc = scannedEpc
@@ -1175,8 +1209,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     isProcessingTag.set(false)
                     playErrorSound()
                     showErrorDialog(
-                        if (isArabic) "❌ فشل قراءة TID" else "❌ TID Read Failed",
-                        if (isArabic) "أعد المحاولة مع تقريب الشريحة."
+                        if (isAr) "❌ فشل قراءة TID" else "❌ TID Read Failed",
+                        if (isAr) "أعد المحاولة مع تقريب الشريحة."
                         else "Retry with tag closer to reader."
                     )
                     return@safeRun
@@ -1191,22 +1225,25 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     private fun activateDesktopScannerMode() {
+        val isAr = isArabic
         isDesktopScanModeState = true
         try {
             val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             view?.let { imm?.hideSoftInputFromWindow(it.windowToken, 0) }
         } catch (_: Exception) {
         }
-        showToast(if (isArabic) "🖥️ جاهز للمسح بالقارئ المكتبي" else "🖥️ Desktop Reader Ready")
+        showToast(if (isAr) "🖥️ جاهز للمسح بالقارئ المكتبي" else "🖥️ Desktop Reader Ready")
     }
 
     private fun handleDesktopScanSubmit() {
         val raw = epcTextState.trim().uppercase(Locale.US)
         if (raw.isEmpty()) return
+        if (!isProcessingTag.compareAndSet(false, true)) return
         processReceivedTagWithTid(raw, null, "DESKTOP_RFID")
     }
 
     private fun openBarcodeScannerForEPC() {
+        val isAr = isArabic
         try {
             if (!isAdded || activity == null) return
             val fm = parentFragmentManager
@@ -1238,27 +1275,28 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 .commit()
         } catch (e: Exception) {
             Log.e(TAG, "Barcode scanner error: ${e.message}", e)
-            showToast(if (isArabic) "❌ خطأ في فتح الماسح" else "❌ Scanner error")
+            showToast(if (isAr) "❌ خطأ في فتح الماسح" else "❌ Scanner error")
         }
     }
 
     private fun processPendingBarcode() {
         val scannedCode = pendingBarcodeFromScanner ?: return
         pendingBarcodeFromScanner = null
+        val isAr = isArabic
 
         val extractedIdentifier = extractIdentifierFromBarcode(scannedCode)
         if (extractedIdentifier.isEmpty() || extractedIdentifier.length < 2 || extractedIdentifier.length > 128) {
             playErrorSound()
             showScanFeedback(
-                if (isArabic) "❌ باركود غير صالح" else "❌ Invalid Barcode",
-                if (isArabic) "الطول: ${extractedIdentifier.length} حرف" else "Length: ${extractedIdentifier.length} chars",
+                if (isAr) "❌ باركود غير صالح" else "❌ Invalid Barcode",
+                if (isAr) "الطول: ${extractedIdentifier.length} حرف" else "Length: ${extractedIdentifier.length} chars",
                 null,
                 Color(0xFFEF4444),
                 false
             )
             showErrorDialog(
-                if (isArabic) "❌ باركود غير صالح" else "❌ Invalid Barcode",
-                if (isArabic) "طول الباركود غير منطقي أو غير معروف" else "Barcode length unreasonable or unknown"
+                if (isAr) "❌ باركود غير صالح" else "❌ Invalid Barcode",
+                if (isAr) "طول الباركود غير منطقي أو غير معروف" else "Barcode length unreasonable or unknown"
             )
             return
         }
@@ -1271,15 +1309,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 if (isDuplicate) {
                     playErrorSound()
                     showScanFeedback(
-                        if (isArabic) "⚠️ باركود مكرر" else "⚠️ Duplicate Barcode",
-                        "$extractedIdentifier\n" + if (isArabic) "مسجل بالفعل" else "Already registered",
+                        if (isAr) "⚠️ باركود مكرر" else "⚠️ Duplicate Barcode",
+                        "$extractedIdentifier\n" + if (isAr) "مسجل بالفعل" else "Already registered",
                         null,
                         Color(0xFF3B82F6),
                         false
                     )
                     showErrorDialog(
-                        if (isArabic) "باركود مكرر" else "Duplicate Barcode",
-                        (if (isArabic) "هذا الكود مسجل بالفعل:\n" else "This code is already registered:\n") + extractedIdentifier
+                        if (isAr) "باركود مكرر" else "Duplicate Barcode",
+                        (if (isAr) "هذا الكود مسجل بالفعل:\n" else "This code is already registered:\n") + extractedIdentifier
                     )
                     return@safeRun
                 }
@@ -1288,12 +1326,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 isEpcBoundState = false
                 boundEpcValue = ""
                 epcTextState = extractedIdentifier
-                statusBadgeTextState = if (isArabic) "⚠️ باركود (للبحث فقط)" else "⚠️ Barcode (lookup only)"
+                statusBadgeTextState = if (isAr) "⚠️ باركود (للبحث فقط)" else "⚠️ Barcode (lookup only)"
                 statusBadgeColorState = Color(0xFFF59E0B)
 
                 showScanFeedback(
-                    if (isArabic) "🔍 باركود للبحث فقط" else "🔍 Barcode (Lookup)",
-                    if (isArabic) "الباركود يحدد القطعة، لكن يجب مسح شريحة RFID للتكويد"
+                    if (isAr) "🔍 باركود للبحث فقط" else "🔍 Barcode (Lookup)",
+                    if (isAr) "الباركود يحدد القطعة، لكن يجب مسح شريحة RFID للتكويد"
                     else "Barcode identifies item, but RFID scan is required to encode",
                     null,
                     Color(0xFF3B82F6),
@@ -1301,8 +1339,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 )
 
                 showErrorDialog(
-                    if (isArabic) "⚠️ الباركود لا يكفي" else "⚠️ Barcode is not sufficient",
-                    if (isArabic) "لتكويد القطعة:\n\n1. استخدم زر مسح RFID\n2. قرّب الشريحة من القارئ\n3. اضغط الزناد"
+                    if (isAr) "⚠️ الباركود لا يكفي" else "⚠️ Barcode is not sufficient",
+                    if (isAr) "لتكويد القطعة:\n\n1. استخدم زر مسح RFID\n2. قرّب الشريحة من القارئ\n3. اضغط الزناد"
                     else "To encode:\n\n1. Use RFID scan button\n2. Move tag near reader\n3. Press trigger"
                 )
             }
@@ -1317,11 +1355,11 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             return try {
                 val uri = Uri.parse(clean)
                 val lastSegment = uri.lastPathSegment
-                if (lastSegment != null && lastSegment.matches(Regex("^MIRA-SN-\\d+$"))) {
+                if (lastSegment != null && SERIAL_REGEX.matches(lastSegment)) {
                     return lastSegment
                 }
                 val serial = uri.getQueryParameter("serial") ?: uri.getQueryParameter("sn")
-                if (serial != null && serial.matches(Regex("^MIRA-SN-\\d+$"))) {
+                if (serial != null && SERIAL_REGEX.matches(serial)) {
                     return serial
                 }
                 ""
@@ -1331,15 +1369,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
 
         val gs1 = clean.replace('\u001D', '|').replace("(#)", "|")
-        val mSerial = Pattern.compile("(?:^|\\|)21(MIRA-SN-\\d+)").matcher(gs1)
+        val mSerial = GS1_SERIAL_PATTERN.matcher(gs1)
         if (mSerial.find()) {
             val serial = mSerial.group(1)
-            if (serial != null && serial.matches(Regex("^MIRA-SN-\\d+$"))) {
+            if (serial != null && SERIAL_REGEX.matches(serial)) {
                 return serial
             }
         }
 
-        if (clean.matches(Regex("^MIRA-SN-\\d+$"))) {
+        if (SERIAL_REGEX.matches(clean)) {
             return clean
         }
 
@@ -1347,20 +1385,41 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Calculations & Helpers
+    //  Calculations & Numeric Normalization Helpers
     // ═══════════════════════════════════════════════════════════════════
+
+    private fun normalizeNumberString(raw: String): String {
+        if (raw.isEmpty()) return ""
+        val sb = StringBuilder(raw.length)
+        for (ch in raw.trim()) {
+            when (ch) {
+                in '٠'..'٩' -> sb.append((ch.code - '٠'.code + '0'.code).toChar())
+                in '۰'..'۹' -> sb.append((ch.code - '۰'.code + '0'.code).toChar())
+                ',', '٫' -> sb.append('.')
+                '٬', ' ' -> Unit
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun parseLocalizedDouble(raw: String): Double? {
+        val normalized = normalizeNumberString(raw)
+        if (normalized.isEmpty()) return null
+        return normalized.toDoubleOrNull()
+    }
+
+    private fun parseLocalizedInt(raw: String): Int? {
+        val normalized = normalizeNumberString(raw)
+        if (normalized.isEmpty()) return null
+        return normalized.toIntOrNull()
+    }
 
     private fun calculateEstimatedGoldValue() {
         try {
             val pm = priceManager ?: return
-            val weightStr = grossWeightTextState.trim()
-            if (weightStr.isEmpty()) {
-                resetCalculatedDisplay()
-                return
-            }
-
-            val grossWeight = weightStr.toDoubleOrNull() ?: 0.0
-            if (grossWeight <= 0) {
+            val grossWeight = parseLocalizedDouble(grossWeightTextState) ?: 0.0
+            if (grossWeight <= 0.0) {
                 resetCalculatedDisplay()
                 return
             }
@@ -1369,8 +1428,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             var stoneValue = 0.0
 
             if (hasStonesState) {
-                stoneWeightCarats = stoneWeightTextState.trim().toDoubleOrNull() ?: 0.0
-                stoneValue = stoneValueTextState.trim().toDoubleOrNull() ?: 0.0
+                stoneWeightCarats = (parseLocalizedDouble(stoneWeightTextState) ?: 0.0).coerceAtLeast(0.0)
+                stoneValue = (parseLocalizedDouble(stoneValueTextState) ?: 0.0).coerceAtLeast(0.0)
             }
 
             val pricing = PricingCalculator.calculatePricingDetails(
@@ -1379,7 +1438,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             val totalPrice = pricing[5]
             netGoldWeightState = pricing[6]
             estimatedPriceTextState = pm.formatPriceDefault(totalPrice)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             resetCalculatedDisplay()
         }
     }
@@ -1391,18 +1450,18 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         netGoldWeightState = 0.0
     }
 
-    private fun getSelectedCategoryLabel(): String {
+    private fun getSelectedCategoryLabel(isAr: Boolean = isArabic): String {
         return when (selectedCategoryKeyState) {
-            "rings" -> if (isArabic) "خواتم" else "Rings"
-            "sets" -> if (isArabic) "أطقم" else "Sets"
-            "bracelets" -> if (isArabic) "أساور" else "Bracelets"
-            "necklaces" -> if (isArabic) "عقود" else "Necklaces"
-            else -> if (isArabic) "مجوهرات" else "Jewelry"
+            "rings" -> if (isAr) "خواتم" else "Rings"
+            "sets" -> if (isAr) "أطقم" else "Sets"
+            "bracelets" -> if (isAr) "أساور" else "Bracelets"
+            "necklaces" -> if (isAr) "عقود" else "Necklaces"
+            else -> if (isAr) "مجوهرات" else "Jewelry"
         }
     }
 
-    private fun getSuggestions(typeKey: String): List<String> {
-        return if (isArabic) {
+    private fun getSuggestions(typeKey: String, isAr: Boolean = isArabic): List<String> {
+        return if (isAr) {
             when (typeKey) {
                 "rings" -> listOf("خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي", "خاتم خطوبة مميز")
                 "sets" -> listOf("طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس", "طقم سهرة فاخر")
@@ -1425,21 +1484,21 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     //  Save & Encode — finalizeItemIdentity
     // ═══════════════════════════════════════════════════════════════════
 
-        private fun finalizeItemIdentity() {
-        val isAr = isArabic // ✅ التقاط محلي لتجنب IllegalAccessError داخل lambdas
+    private fun finalizeItemIdentity() {
+        val isAr = isArabic
 
-        if (isFormLocked) {
+        if (!isEncodingInProgress.compareAndSet(false, true)) {
             showToast(if (isAr) "⛔ العملية قيد التنفيذ..." else "⛔ Operation in progress...")
             return
         }
 
-        val pm = permissionManager ?: return
-        if (!(pm.canEdit("identity") || pm.isManager)) {
+        val pm = permissionManager
+        if (pm == null || !(pm.canEdit("identity") || pm.isManager)) {
+            unlockFormFast()
             showToast(if (isAr) "⛔ غير مصرح" else "⛔ Access Denied")
             return
         }
 
-        isFormLocked = true
         isFormLockedState = true
 
         try {
@@ -1452,9 +1511,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 return
             }
 
-            val identifier = epcTextState.trim()
+            val identifier = epcTextState.trim().uppercase(Locale.US)
             val title = titleTextState.trim()
-            val weightStr = grossWeightTextState.trim()
+            val weightStr = normalizeNumberString(grossWeightTextState)
 
             if (!validateInputData(identifier, title, weightStr, isAr)) {
                 unlockFormFast()
@@ -1469,9 +1528,45 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
             if (hasStonesState) {
                 stoneType = stoneTypeTextState.trim()
-                stoneWeightCarats = stoneWeightTextState.trim().toDoubleOrNull() ?: 0.0
-                stoneCount = stoneCountTextState.trim().toIntOrNull() ?: 0
-                stoneValue = stoneValueTextState.trim().toDoubleOrNull() ?: 0.0
+                val rawStoneWeight = stoneWeightTextState.trim()
+                val rawStoneCount = stoneCountTextState.trim()
+                val rawStoneValue = stoneValueTextState.trim()
+
+                if (rawStoneWeight.isNotEmpty()) {
+                    val parsedW = parseLocalizedDouble(rawStoneWeight)
+                    if (parsedW == null || parsedW < 0.0) {
+                        showValidationError(
+                            if (isAr) "❌ وزن الأحجار غير صالح" else "❌ Invalid stone weight"
+                        )
+                        unlockFormFast()
+                        return
+                    }
+                    stoneWeightCarats = parsedW
+                }
+
+                if (rawStoneCount.isNotEmpty()) {
+                    val parsedC = parseLocalizedInt(rawStoneCount)
+                    if (parsedC == null || parsedC < 0) {
+                        showValidationError(
+                            if (isAr) "❌ عدد الأحجار غير صالح" else "❌ Invalid stone count"
+                        )
+                        unlockFormFast()
+                        return
+                    }
+                    stoneCount = parsedC
+                }
+
+                if (rawStoneValue.isNotEmpty()) {
+                    val parsedV = parseLocalizedDouble(rawStoneValue)
+                    if (parsedV == null || parsedV < 0.0) {
+                        showValidationError(
+                            if (isAr) "❌ قيمة الأحجار غير صالحة" else "❌ Invalid stone value"
+                        )
+                        unlockFormFast()
+                        return
+                    }
+                    stoneValue = parsedV
+                }
             }
 
             val stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats)
@@ -1505,7 +1600,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             )
 
             val selectedKarat = "${selectedKaratNum}K"
-            val selectedCategory = getSelectedCategoryLabel()
+            val selectedCategory = getSelectedCategoryLabel(isAr)
             val location = if (isAr) "المعرض الرئيسي" else "Main Showroom"
             val branchId = branchesManager?.activeBranchId ?: 1
             val finalPhotoPaths = ArrayList(photoManager?.photoPaths ?: emptyList())
@@ -1527,21 +1622,25 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 return
             }
 
+            val scanSourceSnapshot = lastScanSource
+            val scannedTidSnapshot = lastScannedTid
+            val scannedEpcSnapshot = lastScannedEpc
+
             exec.backgroundExecutor.execute {
                 var tidFromTagWorking = ""
                 var epcFromTagWorking = ""
                 var isSim = false
-                val isDesktopScan = "DESKTOP_RFID" == lastScanSource
+                val isDesktopScan = "DESKTOP_RFID" == scanSourceSnapshot
 
                 try {
                     val rfidSvc = MiraRfidService.getInstance(ctx)
                     if (isDesktopScan) {
                         tidFromTagWorking = ""
-                        epcFromTagWorking = lastScannedEpc
+                        epcFromTagWorking = scannedEpcSnapshot.ifEmpty { identifier }
                         isSim = false
                     } else {
-                        tidFromTagWorking = lastScannedTid
-                        epcFromTagWorking = lastScannedEpc.ifEmpty { identifier }
+                        tidFromTagWorking = scannedTidSnapshot
+                        epcFromTagWorking = scannedEpcSnapshot.ifEmpty { identifier }
                         isSim = try {
                             rfidSvc.isSimulationMode
                         } catch (_: Exception) {
@@ -1568,7 +1667,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 val tid = tidFromTagWorking.trim().uppercase(Locale.US)
                 val originalEpc = epcFromTagWorking.trim().uppercase(Locale.US)
 
-                val verifyError = verifyTagWithServerBeforeEncodingSync(tid, originalEpc, lastScanSource, isAr)
+                val verifyError = verifyTagWithServerBeforeEncodingSync(
+                    tid = tid,
+                    epc = originalEpc,
+                    source = scanSourceSnapshot,
+                    isAr = isAr
+                )
                 if (verifyError != null) {
                     safeRun {
                         loadingDialogState = null
@@ -1584,12 +1688,30 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
                 try {
                     val payload = buildPayload(
-                        tid, title, selectedKarat, grossWeight, netGoldWeight,
-                        stoneWeightCarats, stoneCount, stoneValue, stoneType,
-                        details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
-                        localCurrency, exchangeRate, selectedCategory, location,
-                        branchId, currentUserId, tid, originalEpc,
-                        isSim, finalPhotoPaths, ""
+                        epc = tid,
+                        title = title,
+                        karat = selectedKarat,
+                        grossWeight = grossWeight,
+                        netWeight = netGoldWeight,
+                        stoneWeightCarats = stoneWeightCarats,
+                        stoneCount = stoneCount,
+                        stoneValue = stoneValue,
+                        stoneType = stoneType,
+                        details = details,
+                        karatNum = selectedKaratNum,
+                        priceUSD = finalPriceUSD,
+                        priceLocal = finalPriceLocal,
+                        currency = localCurrency,
+                        exchangeRate = exchangeRate,
+                        category = selectedCategory,
+                        location = location,
+                        branchId = branchId,
+                        userId = currentUserId,
+                        tid = tid,
+                        originalEpc = originalEpc,
+                        isSim = isSim,
+                        photoPathsList = finalPhotoPaths,
+                        gtin = ""
                     )
 
                     var apiSuccess = false
@@ -1598,7 +1720,11 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     var isNetworkError = false
                     var responseDataObj: JSONObject? = null
 
-                    apiClient?.let { client ->
+                    val client = apiClient
+                    if (client == null) {
+                        isNetworkError = true
+                        errorMessage = if (isAr) "خدمة الاتصال غير مهيأة" else "API client unavailable"
+                    } else {
                         try {
                             val response = client.encodeItem(payload)
                             if (response != null) {
@@ -1610,6 +1736,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                     errorMessage = extractErrorMessage(response, isAr)
                                     isNetworkError = response.isNetworkError
                                 }
+                            } else {
+                                isNetworkError = true
                             }
                         } catch (e: Exception) {
                             errorMessage = e.message
@@ -1652,9 +1780,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     val miraId = miraIdWorking
 
                     val serverEpc = responseDataObj?.optString("epc", "") ?: ""
-                    val existingEpc = (serverEpc.ifEmpty { lastScannedEpc }).trim().uppercase(Locale.US)
+                    val existingEpc = (serverEpc.ifEmpty { scannedEpcSnapshot }).trim().uppercase(Locale.US)
 
-                    val hasValidEpc = existingEpc.matches(Regex("^E2[0-9A-F]{22}$")) &&
+                    val hasValidEpc = STANDARD_EPC_REGEX.matches(existingEpc) &&
                         !existingEpc.startsWith("3008") &&
                         existingEpc != "300800000000000000000000"
 
@@ -1679,6 +1807,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             try {
                                 Thread.sleep(150)
                             } catch (_: InterruptedException) {
+                                Thread.currentThread().interrupt()
                             }
                             try {
                                 readBackEpcWorking = rfidService.readEpc(null)?.trim()?.uppercase(Locale.US)
@@ -1716,7 +1845,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     try {
                         val updatePayload = JSONObject().apply {
                             put("item_id", serverItemId)
-                            if (finalNewEpc.matches(Regex("^[0-9A-F]{24}$"))) {
+                            if (HEX_24_REGEX.matches(finalNewEpc)) {
                                 put("rfid_epc_final", finalNewEpc)
                             }
                             if (tid.isNotEmpty()) {
@@ -1726,7 +1855,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             put("rfid_verified", verifyOk)
                             put("rfid_pre_encoded", !wasWritten)
                         }
-                        apiClient?.postWithAuth("/items/update-rfid", updatePayload)
+                        client?.postWithAuth("/items/update-rfid", updatePayload)
                     } catch (_: Exception) {
                     }
 
@@ -1745,27 +1874,28 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     }
                     val finalServerSerial = serialTemp
 
+                    if (finalPhotoPaths.isNotEmpty() && serverItemId > 0) {
+                        uploadItemImages(serverItemId, finalPhotoPaths, isAr)
+                    }
+
                     safeRun {
                         loadingDialogState = null
                         playSuccessSound()
 
                         exec.singleThreadExecutor.execute {
                             syncManager?.removePendingEncode(identifier)
+                            safeRun { updatePendingSyncBadge() }
                         }
                         formManager?.clearDraft()
 
                         notifyDashboardUpdate("encode_success")
-
-                        if (finalPhotoPaths.isNotEmpty() && serverItemId > 0) {
-                            uploadItemImages(serverItemId, finalPhotoPaths)
-                        }
 
                         val displayEpc = serverEpc.ifEmpty { finalNewEpc }
                         var shortBarcode = finalServerSerial
                         if (shortBarcode.isBlank() ||
                             (shortBarcode.startsWith("E2") && shortBarcode.length == 24)
                         ) {
-                            val randomNum = Random().nextInt(9000) + 1000
+                            val randomNum = secureRandom.nextInt(9000) + 1000
                             shortBarcode = "TMP-$randomNum"
                         }
 
@@ -1835,9 +1965,13 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
     }
 
-
-    private fun verifyTagWithServerBeforeEncodingSync(tid: String, epc: String, source: String?): String? {
-        val client = apiClient ?: return if (isArabic) "❌ لا اتصال بالسيرفر" else "❌ No server connection"
+    private fun verifyTagWithServerBeforeEncodingSync(
+        tid: String,
+        epc: String,
+        source: String?,
+        isAr: Boolean
+    ): String? {
+        val client = apiClient ?: return if (isAr) "❌ لا اتصال بالسيرفر" else "❌ No server connection"
         return try {
             val payload = JSONObject().apply {
                 put("source", source ?: "CHAINWAY")
@@ -1849,70 +1983,74 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 }
             }
             val response = client.postWithAuth("/verify-encoding-tag", payload)
-                ?: return if (isArabic) "❌ لم يتم استلام رد من السيرفر" else "❌ No response from server"
+                ?: return if (isAr) "❌ لم يتم استلام رد من السيرفر" else "❌ No response from server"
 
             if (!response.isSuccess) {
-                val errorMsg = extractErrorMessage(response)
-                return errorMsg ?: if (isArabic) "الشريحة غير معتمدة" else "Tag not authorized"
+                val errorMsg = extractErrorMessage(response, isAr)
+                return errorMsg ?: if (isAr) "الشريحة غير معتمدة" else "Tag not authorized"
             }
             null
         } catch (e: Exception) {
-            if (isArabic) "❌ خطأ في التحقق: ${e.message}" else "❌ Verification error: ${e.message}"
+            if (isAr) "❌ خطأ في التحقق: ${e.message}" else "❌ Verification error: ${e.message}"
         }
     }
 
-    private fun validateInputData(epc: String?, title: String, weightStr: String): Boolean {
+    private fun validateInputData(
+        epc: String?,
+        title: String,
+        weightStr: String,
+        isAr: Boolean
+    ): Boolean {
         if (epc.isNullOrBlank()) {
             showValidationError(
-                if (isArabic) "❌ يجب مسح شريحة RFID قبل الحفظ"
+                if (isAr) "❌ يجب مسح شريحة RFID قبل الحفظ"
                 else "❌ Must scan RFID tag before saving"
             )
             return false
         }
         if (!isEpcBound) {
             showValidationError(
-                if (isArabic) "❌ لم يتم التحقق من الشريحة عبر RFID\nاستخدم زر المسح"
+                if (isAr) "❌ لم يتم التحقق من الشريحة عبر RFID\nاستخدم زر المسح"
                 else "❌ Tag not verified via RFID\nUse the scan button"
             )
             return false
         }
 
-        val epcClean = epc.trim()
-        val validFormat = epcClean.matches(Regex("^[0-9A-F]{16,32}$")) ||
-            epcClean.matches(Regex("^E2[0-9A-F]{22}$"))
+        val epcClean = epc.trim().uppercase(Locale.US)
+        val validFormat = EPC_REGEX.matches(epcClean) || STANDARD_EPC_REGEX.matches(epcClean)
 
         if (!validFormat) {
             showValidationError(
-                if (isArabic) "❌ صيغة الشريحة غير صالحة\nاستخدم المسح بدل الكتابة اليدوية"
+                if (isAr) "❌ صيغة الشريحة غير صالحة\nاستخدم المسح بدل الكتابة اليدوية"
                 else "❌ Invalid tag format\nUse scan instead of manual typing"
             )
             return false
         }
 
         if (title.isEmpty()) {
-            showValidationError(if (isArabic) "يرجى كتابة عنوان القطعة" else "Please enter item title")
+            showValidationError(if (isAr) "يرجى كتابة عنوان القطعة" else "Please enter item title")
             return false
         }
         if (title.length < 3) {
-            showValidationError(if (isArabic) "العنوان قصير جداً" else "Title is too short")
+            showValidationError(if (isAr) "العنوان قصير جداً" else "Title is too short")
             return false
         }
         if (weightStr.isEmpty()) {
-            showValidationError(if (isArabic) "يرجى تحديد وزن القطعة" else "Please specify item weight")
+            showValidationError(if (isAr) "يرجى تحديد وزن القطعة" else "Please specify item weight")
             return false
         }
 
         val weight = weightStr.toDoubleOrNull()
         if (weight == null) {
-            showValidationError(if (isArabic) "صيغة الوزن غير صحيحة" else "Invalid weight format")
+            showValidationError(if (isAr) "صيغة الوزن غير صحيحة" else "Invalid weight format")
             return false
         }
-        if (weight <= 0) {
-            showValidationError(if (isArabic) "يجب أن يكون الوزن أكبر من صفر" else "Weight must be greater than zero")
+        if (weight <= 0.0) {
+            showValidationError(if (isAr) "يجب أن يكون الوزن أكبر من صفر" else "Weight must be greater than zero")
             return false
         }
-        if (weight > 10000) {
-            showValidationError(if (isArabic) "الوزن كبير جداً" else "Weight is too large")
+        if (weight > 10000.0) {
+            showValidationError(if (isAr) "الوزن كبير جداً" else "Weight is too large")
             return false
         }
 
@@ -1920,12 +2058,30 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun buildPayload(
-        epc: String, title: String, karat: String, grossWeight: Double, netWeight: Double,
-        stoneWeightCarats: Double, stoneCount: Int, stoneValue: Double, stoneType: String,
-        details: MiraPriceManager.PricingDetails, karatNum: Int, priceUSD: Double,
-        priceLocal: Double, currency: String, exchangeRate: Double, category: String,
-        location: String, branchId: Int, userId: Int, tid: String, originalEpc: String,
-        isSim: Boolean, photoPathsList: List<String>, gtin: String
+        epc: String,
+        title: String,
+        karat: String,
+        grossWeight: Double,
+        netWeight: Double,
+        stoneWeightCarats: Double,
+        stoneCount: Int,
+        stoneValue: Double,
+        stoneType: String,
+        details: MiraPriceManager.PricingDetails,
+        karatNum: Int,
+        priceUSD: Double,
+        priceLocal: Double,
+        currency: String,
+        exchangeRate: Double,
+        category: String,
+        location: String,
+        branchId: Int,
+        userId: Int,
+        tid: String,
+        originalEpc: String,
+        isSim: Boolean,
+        photoPathsList: List<String>,
+        gtin: String
     ): JSONObject {
         val pm = priceManager!!
         return JSONObject().apply {
@@ -1984,16 +2140,19 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun unlockFormFast() {
-        isFormLocked = false
+        isEncodingInProgress.set(false)
         isFormLockedState = false
     }
 
-    private fun extractErrorMessage(response: MiraApiClient.ApiResponse?): String? {
-        if (response == null) return if (isArabic) "❌ خطأ غير معروف" else "❌ Unknown error"
+    private fun extractErrorMessage(
+        response: MiraApiClient.ApiResponse?,
+        isAr: Boolean
+    ): String? {
+        if (response == null) return if (isAr) "❌ خطأ غير معروف" else "❌ Unknown error"
         response.data?.optJSONObject("error")?.let { errorObj ->
             val message = errorObj.optString("message", "")
             val messageEn = errorObj.optString("message_en", "")
-            var displayMessage = if (isArabic) message else messageEn
+            var displayMessage = if (isAr) message else messageEn
             if (displayMessage.isEmpty()) displayMessage = message.ifEmpty { messageEn }
 
             errorObj.optJSONObject("details")?.optString("suggestion", "")?.let { suggestion ->
@@ -2005,7 +2164,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
         if (!response.message.isNullOrEmpty()) return response.message
         if (!response.error.isNullOrEmpty()) return response.error
-        return if (isArabic) "❌ فشل العملية" else "❌ Operation failed"
+        return if (isAr) "❌ فشل العملية" else "❌ Operation failed"
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2013,6 +2172,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     private fun openSyncLogFragment() {
+        val isAr = isArabic
         try {
             if (!isAdded || activity == null) return
             val fm = parentFragmentManager
@@ -2029,8 +2189,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 .replace(cid, SyncLogFragment(), "sync_log_tag")
                 .addToBackStack("sync_log")
                 .commit()
-        } catch (e: Exception) {
-            showToast(if (isArabic) "❌ خطأ في فتح السجل" else "❌ Error opening log")
+        } catch (_: Exception) {
+            showToast(if (isAr) "❌ خطأ في فتح السجل" else "❌ Error opening log")
         }
     }
 
@@ -2049,12 +2209,13 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
     }
 
-        private fun performAutoSync() {
+    private fun performAutoSync() {
         val sm = syncManager ?: return
         val exec = miraExecutor ?: return
-        val count = sm.pendingCount // ✅ خاصية Kotlin وليست getPendingCount()
+        val count = sm.pendingCount
         if (count == 0) return
 
+        val isAr = isArabic
         val branchId = branchesManager?.activeBranchId ?: 1
         exec.networkExecutor.execute {
             sm.syncPendingEncodes(branchId, object : IdentitySyncManager.SyncCallback {
@@ -2064,7 +2225,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             updatePendingSyncBadge()
                             if (isAdded && context != null) {
                                 showToast(
-                                    if (isArabic) "✅ تمت مزامنة $syncedCount تكويد"
+                                    if (isAr) "✅ تمت مزامنة $syncedCount تكويد"
                                     else "✅ Synced $syncedCount encodings"
                                 )
                             }
@@ -2073,36 +2234,46 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     }
                 }
 
-                override fun onSyncError(error: String?) {} // ✅ مع علامة ? لتطابق الواجهة
+                override fun onSyncError(error: String?) {}
             })
         }
     }
 
     private fun updatePendingSyncBadge() {
-        pendingSyncCountState = syncManager?.pendingCount ?: 0 // ✅ خاصية Kotlin
+        pendingSyncCountState = syncManager?.pendingCount ?: 0
     }
 
-    private fun uploadItemImages(itemId: Int, imagePaths: List<String>) {
+    private fun uploadItemImages(itemId: Int, imagePaths: List<String>, isAr: Boolean) {
         val client = apiClient ?: return
         val exec = miraExecutor ?: return
         if (imagePaths.isEmpty() || itemId <= 0) return
 
+        activeUploadPaths.addAll(imagePaths)
+
         exec.imageExecutor.execute {
             var uploaded = 0
-            for (i in imagePaths.indices) {
-                val imageFile = File(imagePaths[i])
-                if (!imageFile.exists()) continue
-                try {
-                    val response = client.uploadItemImage(itemId, imageFile, i == 0, "Image")
-                    if (response != null && response.isSuccess) uploaded++
-                } catch (_: Exception) {
+            try {
+                for (i in imagePaths.indices) {
+                    val path = imagePaths[i]
+                    val imageFile = File(path)
+                    if (!imageFile.exists()) continue
+                    try {
+                        val response = client.uploadItemImage(itemId, imageFile, i == 0, "Image")
+                        if (response != null && response.isSuccess) {
+                            uploaded++
+                        }
+                    } catch (_: Exception) {
+                    }
                 }
+            } finally {
+                activeUploadPaths.removeAll(imagePaths.toSet())
             }
+
             val fUploaded = uploaded
             safeRun {
                 if (fUploaded > 0) {
                     showToast(
-                        if (isArabic) "📷 تم رفع $fUploaded صورة"
+                        if (isAr) "📷 تم رفع $fUploaded صورة"
                         else "📷 $fUploaded images uploaded"
                     )
                 }
@@ -2149,10 +2320,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             selectedKaratState = 21
 
             currentPhotoPath?.let { path ->
-                try {
-                    val f = File(path)
-                    if (f.exists()) f.delete()
-                } catch (_: Exception) {
+                if (!activeUploadPaths.contains(path)) {
+                    try {
+                        val f = File(path)
+                        if (f.exists()) f.delete()
+                    } catch (_: Exception) {
+                    }
                 }
                 currentPhotoPath = null
             }
@@ -2170,12 +2343,13 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     private fun applyPermissions() {
+        val isAr = isArabic
         val pm = permissionManager ?: return
         val allowed = pm.canEdit("identity") || pm.isManager
         canEditState = allowed
         if (!allowed) {
             showToast(
-                if (isArabic) "⛔ وضع القراءة فقط - غير مصرح بالتعديل"
+                if (isAr) "⛔ وضع القراءة فقط - غير مصرح بالتعديل"
                 else "⛔ Read only mode - Access Denied"
             )
         }
@@ -2248,8 +2422,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     private fun openEncodingPowerSettings() {
         if (!isAdded || context == null) return
+        val isAr = isArabic
         try {
-            PosPowerSettingsDialog.show(requireContext().applicationContext, isArabic) { newPowerDbm ->
+            PosPowerSettingsDialog.show(requireContext().applicationContext, isAr) { newPowerDbm ->
                 miraExecutor?.singleThreadExecutor?.execute {
                     try {
                         BaseTabFragmentActivity.getSharedReader()?.setPower(newPowerDbm)
@@ -2257,7 +2432,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     }
                 }
                 showToast(
-                    if (isArabic) "✅ تم تحديث قوة القراءة إلى $newPowerDbm dBm"
+                    if (isAr) "✅ تم تحديث قوة القراءة إلى $newPowerDbm dBm"
                     else "✅ Power updated to $newPowerDbm dBm"
                 )
             }
@@ -2283,14 +2458,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     }
 
     private fun showValidationError(message: String) {
+        val isAr = isArabic
         alertDialogState = AlertDialogPayload(
-            title = if (isArabic) "⚠️ تنبيه الحماية" else "⚠️ Validation Alert",
+            title = if (isAr) "⚠️ تنبيه الحماية" else "⚠️ Validation Alert",
             message = message,
             isError = false
         )
     }
 
-        protected override fun showErrorDialog(title: String, message: String): AlertDialog? {
+    override fun showErrorDialog(title: String, message: String): AppCompatAlertDialog? {
         alertDialogState = AlertDialogPayload(
             title = title,
             message = message,
@@ -2298,7 +2474,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         )
         return null
     }
-
 
     private fun playSuccessSound() {
         try {
@@ -2310,6 +2485,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     private fun playErrorSound() {
         try {
             (activity as? UHFMainActivity)?.playSound(2)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun copyToClipboard(label: String, text: String) {
+        val isAr = isArabic
+        try {
+            val ctx = context ?: appContext ?: return
+            val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            clipboard?.setPrimaryClip(ClipData.newPlainText(label, text))
+            showToast(if (isAr) "📋 تم النسخ: $text" else "📋 Copied: $text")
         } catch (_: Exception) {
         }
     }
@@ -2360,31 +2546,25 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         } catch (_: Exception) {
         }
     }
-    
-    
 
     private fun getCurrentUserId(): Int {
-    val ctx = appContext ?: context?.applicationContext ?: return -1
-    appContext = ctx
-    
-    // ✅ التصحيح: استدعاء getUserId() كدالة لأن SecureSessionManager أصبح مكتوباً بـ Kotlin
-    val userId = SecureSessionManager.getInstance(ctx).getUserId()
-    
-    if (userId > 0) return userId
-    val legacyId = ctx.getSharedPreferences("session", Context.MODE_PRIVATE).getInt("user_id", -1)
-    return if (legacyId > 0) legacyId else -1
-}
+        val ctx = appContext ?: context?.applicationContext ?: return -1
+        appContext = ctx
 
+        val userId = SecureSessionManager.getInstance(ctx).getUserId()
+        if (userId > 0) return userId
+
+        val legacyId = ctx.getSharedPreferences("session", Context.MODE_PRIVATE).getInt("user_id", -1)
+        return if (legacyId > 0) legacyId else -1
+    }
 
     private fun safeRun(r: () -> Unit) {
-        if (isAdded && activity != null && !isRemoving && !isDetached) {
-            requireActivity().runOnUiThread {
-                if (isAdded && !isRemoving && !isDetached && view != null) {
-                    try {
-                        r()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "safeRun error: ${e.message}", e)
-                    }
+        handler.post {
+            if (isAdded && activity != null && !isRemoving && !isDetached && view != null) {
+                try {
+                    r()
+                } catch (e: Exception) {
+                    Log.e(TAG, "safeRun error: ${e.message}", e)
                 }
             }
         }
@@ -2411,6 +2591,10 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             handler.removeCallbacks(it)
             rfidTimeoutRunnable = null
         }
+        scanRetryRunnable?.let {
+            handler.removeCallbacks(it)
+            scanRetryRunnable = null
+        }
         pendingHideFeedback?.let {
             handler.removeCallbacks(it)
             pendingHideFeedback = null
@@ -2428,20 +2612,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
         miraExecutor?.takeIf { it.isHealthy }?.backgroundExecutor?.execute {
             formManager?.cleanupOldDrafts()
-            photoManager?.cleanupOrphanFiles(photoManager?.photoPaths)
+            cleanupSafeOrphanFiles(photoManager?.photoPaths)
         }
     }
 
     override fun onPause() {
         super.onPause()
-        restorePowerForEncoding()
 
         (activity as? UHFMainActivity)?.apply {
             setBottomNavVisible(true)
             setActiveEncodingFragment(null)
         }
-
-        restoreOriginalPowerEncoding()
 
         isTriggerDown = false
         isProcessingTag.set(false)
@@ -2450,12 +2631,18 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             handler.removeCallbacks(it)
             rfidTimeoutRunnable = null
         }
+        scanRetryRunnable?.let {
+            handler.removeCallbacks(it)
+            scanRetryRunnable = null
+        }
         pendingHideFeedback?.let {
             handler.removeCallbacks(it)
             pendingHideFeedback = null
         }
 
         stopRfidScanningMode()
+        restoreOriginalPowerEncoding()
+
         isDesktopScanModeState = false
         saveCurrentDraftAsync()
     }
@@ -2475,9 +2662,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         isProcessingTag.set(false)
         stopRfidScanningMode()
 
+        handler.removeCallbacksAndMessages(null)
+        rfidTimeoutRunnable = null
+        scanRetryRunnable = null
+        pendingHideFeedback = null
+
         loadingDialogState = null
-        rfidTimeoutRunnable?.let { handler.removeCallbacks(it) }
-        pendingHideFeedback?.let { handler.removeCallbacks(it) }
+        alertDialogState = null
+        draftDialogSummaryState = null
+        showScanMethodDialogState = false
+        scanFeedbackState = null
+        previewPhotoPathState = null
 
         (activity as? UHFMainActivity)?.setActiveEncodingFragment(null)
         formManager?.setNotificationCallback(null)
@@ -2488,7 +2683,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putBoolean("is_form_locked", isFormLocked)
+        outState.putBoolean("is_form_locked", isEncodingInProgress.get())
         outState.putBoolean("is_epc_bound", isEpcBound)
         if (boundEpcValue.isNotEmpty()) {
             outState.putString("epc_bound_value", boundEpcValue)
@@ -2884,18 +3079,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                 }
                             }
                         }
-                        
-                        if (ENABLE_TEMP_MANUAL_EPC) {
-    TempManualEpcInputCard(
-        isArabic = isAr,
-        currentEpc = epcTextState,
-        enabled = formEditable,
-        onEpcConfirmed = { confirmedEpc ->
-            applyManualTestEpc(confirmedEpc)
-        }
-    )
-}
 
+                        if (ENABLE_TEMP_MANUAL_EPC) {
+                            TempManualEpcInputCard(
+                                isArabic = isAr,
+                                currentEpc = epcTextState,
+                                enabled = formEditable,
+                                onEpcConfirmed = { confirmedEpc ->
+                                    applyManualTestEpc(confirmedEpc)
+                                }
+                            )
+                        }
 
                         // ب. بطاقة التصنيف والوصف
                         Card(
@@ -2924,7 +3118,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                     )
                                 }
 
-                                // رقائق التصنيف
                                 val categories = listOf(
                                     "rings" to (if (isAr) "خواتم" else "Rings"),
                                     "sets" to (if (isAr) "أطقم" else "Sets"),
@@ -2965,8 +3158,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                     }
                                 }
 
-                                // اقتراحات سريعة للعنوان
-                                val suggestions = getSuggestions(selectedCategoryKeyState)
+                                val suggestions = getSuggestions(selectedCategoryKeyState, isAr)
                                 if (suggestions.isNotEmpty()) {
                                     LazyRow(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -3453,7 +3645,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         //  Dialogs & Modals
         // ═══════════════════════════════════════════════════════════════════
 
-        // 1. اختيار طريقة المسح (يدوي / مكتبي)
         if (showScanMethodDialogState) {
             AlertDialog(
                 onDismissRequest = { showScanMethodDialogState = false },
@@ -3533,7 +3724,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             )
         }
 
-        // 2. نافذة استعادة المسودة
         draftDialogSummaryState?.let { summary ->
             AlertDialog(
                 onDismissRequest = {},
@@ -3567,7 +3757,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         onClick = {
                             draftDialogSummaryState = null
                             formManager?.clearDraft()
-                            showToast(if (isArabic) "🗑️ تم حذف المسودة" else "🗑️ Draft discarded")
+                            showToast(if (isAr) "🗑️ تم حذف المسودة" else "🗑️ Draft discarded")
                         }
                     ) {
                         Text(if (isAr) "تجاهل" else "Discard", color = Color(0xFFEF4444))
@@ -3576,7 +3766,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             )
         }
 
-        // 3. نافذة التحميل أثناء التكويد
         loadingDialogState?.let { (title, message) ->
             Dialog(
                 onDismissRequest = {},
@@ -3611,7 +3800,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             }
         }
 
-        // 4. نافذة التنبيهات والأخطاء
         alertDialogState?.let { payload ->
             AlertDialog(
                 onDismissRequest = { alertDialogState = null },
@@ -3640,11 +3828,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             )
         }
 
-        // 5. نافذة معاينة الصورة بحجم كامل
         previewPhotoPathState?.let { path ->
             Dialog(onDismissRequest = { previewPhotoPathState = null }) {
                 val bmp by produceState<ImageBitmap?>(initialValue = null, path) {
-                    value = loadScaledBitmap(path, 1024)
+                    value = withContext(Dispatchers.IO) {
+                        loadScaledBitmap(path, 1024)
+                    }
                 }
                 Card(
                     shape = RoundedCornerShape(20.dp),
@@ -3682,11 +3871,11 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             }
         }
 
-        // 6. بطاقة نجاح التكويد وتصدير MIRA ID (Success Summary Sheet/Dialog)
         encodingSuccessState?.let { summary ->
             EncodingSuccessDialog(
                 summary = summary,
                 isArabic = isAr,
+                onCopy = { label, value -> copyToClipboard(label, value) },
                 onCloseAndNext = {
                     encodingSuccessState = null
                     resetFormForNextScan()
@@ -3704,7 +3893,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     ) {
         val colors = MiraTheme.colors
         val thumb by produceState<ImageBitmap?>(initialValue = null, path) {
-            value = loadScaledBitmap(path, 220)
+            value = withContext(Dispatchers.IO) {
+                loadScaledBitmap(path, 220)
+            }
         }
 
         Box(
@@ -3745,197 +3936,209 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             }
         }
     }
-    
+
     @Composable
-private fun TempManualEpcInputCard(
-    isArabic: Boolean,
-    currentEpc: String,
-    enabled: Boolean = true,
-    onEpcConfirmed: (String) -> Unit
-) {
-    if (!ENABLE_TEMP_MANUAL_EPC) return
-
-    val colors = MiraTheme.colors
-    var manualEpc by remember(currentEpc) { mutableStateOf(currentEpc) }
-    var validationError by remember { mutableStateOf<String?>(null) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.55f))
+    private fun TempManualEpcInputCard(
+        isArabic: Boolean,
+        currentEpc: String,
+        enabled: Boolean = true,
+        onEpcConfirmed: (String) -> Unit
     ) {
-        Column(
+        if (!ENABLE_TEMP_MANUAL_EPC) return
+
+        val colors = MiraTheme.colors
+        var manualEpc by remember { mutableStateOf(currentEpc) }
+        var validationError by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(currentEpc) {
+            if (currentEpc.isEmpty()) {
+                manualEpc = ""
+                validationError = null
+            }
+        }
+
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(vertical = 4.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.55f))
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Rounded.EditNote,
-                        contentDescription = null,
-                        tint = Color(0xFFF59E0B),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isArabic) "إدخال EPC يدوياً (للتجربة المؤقتة)"
-                        else "Manual EPC Input (Temp Test)",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFFF59E0B)
-                    )
-                }
-
-                // توليد EPC قياسي من 24 خانة Hex بضغطة واحدة
-                TextButton(
-                    onClick = {
-                        val hexChars = "0123456789ABCDEF"
-                        val randomHex = buildString(20) {
-                            repeat(20) { append(hexChars.random()) }
-                        }
-                        val generated = "E280$randomHex"
-                        manualEpc = generated
-                        validationError = null
-                        onEpcConfirmed(generated)
-                    },
-                    enabled = enabled,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AutoAwesome,
-                        contentDescription = null,
-                        tint = Color(0xFF06B6D4),
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isArabic) "توليد تجريبي" else "Generate Test",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF06B6D4)
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = manualEpc,
-                    onValueChange = { input ->
-                        manualEpc = input.uppercase(Locale.US).filter { !it.isWhitespace() }
-                        validationError = null
-                    },
-                    enabled = enabled,
-                    singleLine = true,
-                    placeholder = {
-                        Text(
-                            text = "E280117000000201...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.EditNote,
+                            contentDescription = null,
+                            tint = Color(0xFFF59E0B),
+                            modifier = Modifier.size(20.dp)
                         )
-                    },
-                    trailingIcon = {
-                        if (manualEpc.isNotEmpty() && enabled) {
-                            IconButton(
-                                onClick = {
-                                    manualEpc = ""
-                                    validationError = null
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = null,
-                                    tint = colors.textSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f)
-                )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isArabic) "إدخال EPC يدوياً (للتجربة المؤقتة)"
+                            else "Manual EPC Input (Temp Test)",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFF59E0B)
+                        )
+                    }
 
-                Button(
-                    onClick = {
-                        val clean = manualEpc.trim().uppercase(Locale.US)
-                        val isValidHex = clean.length in 16..32 && clean.all {
-                            it in '0'..'9' || it in 'A'..'F'
-                        }
-                        if (!isValidHex) {
-                            validationError = if (isArabic) {
-                                "أدخل رمز Hex صالح (من 16 إلى 32 خانة: 0-9, A-F)"
-                            } else {
-                                "Enter valid Hex EPC (16-32 chars: 0-9, A-F)"
+                    TextButton(
+                        onClick = {
+                            val hexChars = "0123456789ABCDEF"
+                            val randomHex = buildString(20) {
+                                repeat(20) { append(hexChars[secureRandom.nextInt(hexChars.length)]) }
                             }
-                        } else {
+                            val generated = "E280$randomHex"
+                            manualEpc = generated
                             validationError = null
-                            onEpcConfirmed(clean)
-                        }
-                    },
-                    enabled = enabled,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.goldPrimary,
-                        contentColor = Color(0xFF0A0F1D)
-                    )
+                            onEpcConfirmed(generated)
+                        },
+                        enabled = enabled,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            tint = Color(0xFF06B6D4),
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isArabic) "توليد تجريبي" else "Generate Test",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF06B6D4)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    OutlinedTextField(
+                        value = manualEpc,
+                        onValueChange = { input ->
+                            manualEpc = input.uppercase(Locale.US).filter { !it.isWhitespace() }
+                            validationError = null
+                        },
+                        enabled = enabled,
+                        singleLine = true,
+                        placeholder = {
+                            Text(
+                                text = "E280117000000201...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary
+                            )
+                        },
+                        trailingIcon = {
+                            if (manualEpc.isNotEmpty() && enabled) {
+                                IconButton(
+                                    onClick = {
+                                        manualEpc = ""
+                                        validationError = null
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = null,
+                                        tint = colors.textSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Button(
+                        onClick = {
+                            val clean = manualEpc.trim().uppercase(Locale.US)
+                            val isValidHex = clean.length in 16..32 && clean.all {
+                                it in '0'..'9' || it in 'A'..'F'
+                            }
+                            if (!isValidHex) {
+                                validationError = if (isArabic) {
+                                    "أدخل رمز Hex صالح (من 16 إلى 32 خانة: 0-9, A-F)"
+                                } else {
+                                    "Enter valid Hex EPC (16-32 chars: 0-9, A-F)"
+                                }
+                            } else {
+                                validationError = null
+                                onEpcConfirmed(clean)
+                            }
+                        },
+                        enabled = enabled,
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF0A0F1D)
+                        )
+                    ) {
+                        Text(
+                            text = if (isArabic) "اعتماد" else "Apply",
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+
+                validationError?.let { err ->
                     Text(
-                        text = if (isArabic) "اعتماد" else "Apply",
-                        fontWeight = FontWeight.ExtraBold
+                        text = err,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFEF4444)
                     )
                 }
-            }
-
-            validationError?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFEF4444)
-                )
             }
         }
     }
-}
-
 
     @Composable
     private fun EncodingSuccessDialog(
         summary: EncodingSuccessSummary,
         isArabic: Boolean,
+        onCopy: (String, String) -> Unit,
         onCloseAndNext: () -> Unit
     ) {
         val colors = MiraTheme.colors
 
         val dmBitmap by produceState<ImageBitmap?>(initialValue = null, summary.gs1Code) {
-            value = if (summary.gs1Code.isNotEmpty()) {
-                BarcodeGenerator.generateGS1DataMatrix(summary.gs1Code, 250, 250)?.asImageBitmap()
-            } else null
+            value = withContext(Dispatchers.IO) {
+                if (summary.gs1Code.isNotEmpty()) {
+                    BarcodeGenerator.generateGS1DataMatrix(summary.gs1Code, 250, 250)?.asImageBitmap()
+                } else null
+            }
         }
 
         val qrBitmap by produceState<ImageBitmap?>(initialValue = null, summary.qrUrl) {
-            value = if (summary.qrUrl.isNotEmpty()) {
-                BarcodeGenerator.generateMicroQRCode(summary.qrUrl, 250, 250)?.asImageBitmap()
-            } else null
+            value = withContext(Dispatchers.IO) {
+                if (summary.qrUrl.isNotEmpty()) {
+                    BarcodeGenerator.generateMicroQRCode(summary.qrUrl, 250, 250)?.asImageBitmap()
+                } else null
+            }
         }
 
         val itemPhotoBitmap by produceState<ImageBitmap?>(initialValue = null, summary.photos) {
-            val firstPath = summary.photos.firstOrNull()
-            value = if (!firstPath.isNullOrEmpty() && File(firstPath).exists()) {
-                loadScaledBitmap(firstPath, 300)
-            } else null
+            value = withContext(Dispatchers.IO) {
+                val firstPath = summary.photos.firstOrNull()
+                if (!firstPath.isNullOrEmpty() && File(firstPath).exists()) {
+                    loadScaledBitmap(firstPath, 300)
+                } else null
+            }
         }
 
         Dialog(
@@ -3962,7 +4165,6 @@ private fun TempManualEpcInputCard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // شارة النجاح
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = Color(0xFF22C55E).copy(alpha = 0.16f)
@@ -3977,7 +4179,6 @@ private fun TempManualEpcInputCard(
                         )
                     }
 
-                    // صورة القطعة إن وجدت
                     itemPhotoBitmap?.let { bmp ->
                         Image(
                             bitmap = bmp,
@@ -3997,15 +4198,27 @@ private fun TempManualEpcInputCard(
                         textAlign = TextAlign.Center
                     )
 
-                    Text(
-                        text = if (isArabic) "الباركود: ${summary.shortBarcode} | EPC: ${summary.epc}"
-                        else "Barcode: ${summary.shortBarcode} | EPC: ${summary.epc}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.textSecondary,
-                        textAlign = TextAlign.Center
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.clickable { onCopy("EPC", summary.epc) }
+                    ) {
+                        Text(
+                            text = if (isArabic) "الباركود: ${summary.shortBarcode} | EPC: ${summary.epc}"
+                            else "Barcode: ${summary.shortBarcode} | EPC: ${summary.epc}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = null,
+                            tint = colors.goldPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
 
-                    // تفاصيل العيار والوزن والسعر
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -4033,12 +4246,12 @@ private fun TempManualEpcInputCard(
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = if (isArabic) "الوزن" else "Weight",
+                                    text = if (isArabic) "الوزن / الصافي" else "Gross / Net",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.textSecondary
                                 )
                                 Text(
-                                    text = "${summary.weight} g",
+                                    text = String.format(Locale.US, "%s / %.2f g", summary.weight, summary.netWeight),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = colors.textPrimary
@@ -4062,7 +4275,6 @@ private fun TempManualEpcInputCard(
                         }
                     }
 
-                    // معلومات الأحجار إن وجدت
                     if (summary.stoneWeightCarats > 0 || summary.stoneValue > 0 || summary.stoneCount > 0) {
                         val stonesLine = buildString {
                             if (isArabic) {
@@ -4085,7 +4297,6 @@ private fun TempManualEpcInputCard(
                         )
                     }
 
-                    // الأكواد المجهرية (GS1 DataMatrix + Micro QR)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -4137,17 +4348,21 @@ private fun TempManualEpcInputCard(
                         }
                     }
 
-                    // زر طباعة الملصق الحراري / الليزري
                     OutlinedButton(
                         onClick = {
                             miraExecutor?.imageExecutor?.execute {
-                                val tagToPrint: Bitmap = TagPrinter.generatePhysicalTagBitmap(
-                                    summary.shortBarcode,
-                                    summary.gs1Code,
-                                    summary.qrUrl
-                                )
-                                safeRun {
-                                    TagPrinter.printTagDirectly(requireContext(), tagToPrint)
+                                try {
+                                    val tagToPrint: Bitmap = TagPrinter.generatePhysicalTagBitmap(
+                                        summary.shortBarcode,
+                                        summary.gs1Code,
+                                        summary.qrUrl
+                                    )
+                                    safeRun {
+                                        val ctx = context ?: return@safeRun
+                                        TagPrinter.printTagDirectly(ctx, tagToPrint)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Print tag error: ${e.message}", e)
                                 }
                             }
                         },
@@ -4166,7 +4381,6 @@ private fun TempManualEpcInputCard(
                         )
                     }
 
-                    // زر الإغلاق وتجهيز قطعة جديدة
                     Button(
                         onClick = onCloseAndNext,
                         modifier = Modifier
