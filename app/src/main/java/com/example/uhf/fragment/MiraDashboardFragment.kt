@@ -1,12 +1,8 @@
 package com.example.uhf.fragment
 
-
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.content.SharedPreferences
-import android.content.res.Configuration
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,46 +11,46 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.Surface
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import com.example.uhf.R
 import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
-import com.example.uhf.manager.DashboardRoleController
 import com.example.uhf.manager.MiraBranchesManager
-import com.example.uhf.manager.MiraOrgProfileManager
-import com.example.uhf.manager.MiraPriceManager
-import com.example.uhf.manager.PermissionManager
-import com.example.uhf.model.ApiProvider
-import com.example.uhf.navigation.NavigationManager
 import com.example.uhf.tools.RecentActivityCache
-import com.example.uhf.tools.SessionManager
+import com.example.uhf.tools.SecureSessionManager
 import com.example.uhf.ui.dashboard.*
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
-import com.example.uhf.fragment.MiraInventoryDashboardFragment
-
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.NumberFormat
@@ -63,151 +59,70 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MiraDashboardFragment : Fragment() {
+
     companion object {
         private const val TAG = "MiraDashboardFragment"
-        private const val OFFLINE_PREFS_BASE = "dashboard_cache_u"
-        private const val OUNCE_TO_GRAM = 31.1035
-        private const val GOLD_CACHE_VALIDITY_MS = 12 * 60 * 60 * 1000L
-        private const val REFRESH_INTERVAL_MS = 5 * 60 * 1000L
-        private const val RESUME_REFETCH_THRESHOLD_MS = 2 * 60 * 1000L
+        private const val DASHBOARD_CACHE_PREFS = "mira_dashboard_summary_cache"
     }
+
+    private data class BranchChipOption(
+        val id: Int,
+        val name: String
+    )
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var localExecutor: ExecutorService? = null
+    private val isSyncingAll = AtomicBoolean(false)
+
+    @Volatile private var isDestroyed = false
+    private var isArabic = true
+    private var currentBranchId = 1
 
     private var apiClient: MiraApiClient? = null
-    private var sessionManager: SessionManager? = null
+    private var sessionManager: SecureSessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
-    private var orgProfile: MiraOrgProfileManager? = null
-    private var priceManager: MiraPriceManager? = null
-    private var permissionManager: PermissionManager? = null
-    private var roleController: DashboardRoleController? = null
     private var activityCache: RecentActivityCache? = null
 
-    private var profileListener: MiraOrgProfileManager.OnProfileChangedListener? = null
-    private var branchListener: MiraBranchesManager.OnBranchChangedListener? = null
-
-    private var localExecutor: ExecutorService? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var dataFuture: Future<*>? = null
-    private var goldPriceFuture: Future<*>? = null
-
-    private var offlineCache: SharedPreferences? = null
-    private var goldCachePrefs: SharedPreferences? = null
-
-    private var currentBranchId = -1
-    private var isViewInitialized = false
-    private var isReceiverRegistered = false
-    private val isLoading = AtomicBoolean(false)
-    private val isGoldRefreshing = AtomicBoolean(false)
-    private var lastDataFetchTime = 0L
-    private var lastGoldFetchTime = 0L
-
-    // حالات الخصوصية
-    private var isHeroHiddenState by mutableStateOf(true)
-    private var isSalesHiddenState by mutableStateOf(true)
-    private var isInventoryHiddenState by mutableStateOf(true)
-    private var isScrapHiddenState by mutableStateOf(true)
-    private var isPosDashboardHiddenState by mutableStateOf(true)
-
-    // حالات الواجهة التفاعلية
-    private var isArabicState by mutableStateOf(true)
+    // حالات واجهة المستخدم التفاعلية
+    private var orgTitleState by mutableStateOf("MIRA JEWELRY")
+    private var userNameState by mutableStateOf("")
+    private var userRoleState by mutableStateOf("")
     private var isOnlineState by mutableStateOf(true)
     private var isRefreshingState by mutableStateOf(false)
-    private var orgTitleState by mutableStateOf("MIRA Jewelry")
-    private var userGreetingNameState by mutableStateOf("")
+    private var maskAmountsState by mutableStateOf(false)
 
-    private var layoutModeState by mutableStateOf(DashboardLayoutMode.STANDARD)
-    private var showHeroCardState by mutableStateOf(false)
-    private var showGoldCardState by mutableStateOf(false)
-    private var showSalesCardState by mutableStateOf(false)
-    private var showInventoryCardState by mutableStateOf(false)
-    private var showScrapCardState by mutableStateOf(false)
-    private var showScrapAgingCardState by mutableStateOf(false)
-    private var showChartsCardState by mutableStateOf(false)
-    private var showRecentActivityState by mutableStateOf(false)
-    private var canRefreshGoldManuallyState by mutableStateOf(false)
+    // الفروع
+    private var branchesListState by mutableStateOf<List<BranchChipOption>>(emptyList())
+    private var selectedBranchIdState by mutableIntStateOf(1)
 
-    private var currentInventoryValueState by mutableDoubleStateOf(0.0)
-    private var currentTotalWeightState by mutableDoubleStateOf(0.0)
-    private var currentItemCountState by mutableIntStateOf(0)
-    private var inventoryByKaratState by mutableStateOf<List<KaratInventory>>(emptyList())
+    // التنبيهات
+    private var alertsCountState by mutableIntStateOf(0)
+    private var alertsMessageState by mutableStateOf("")
 
-    private var salesTodayState by mutableDoubleStateOf(0.0)
-    private var salesMonthState by mutableDoubleStateOf(0.0)
-    private var salesYearState by mutableDoubleStateOf(0.0)
-    private var posCashBalanceState by mutableDoubleStateOf(0.0)
+    // أسعار الذهب
+    private var price24kLocalState by mutableDoubleStateOf(0.0)
+    private var price21kLocalState by mutableDoubleStateOf(0.0)
+    private var price18kLocalState by mutableDoubleStateOf(0.0)
+    private var price24kUsdState by mutableDoubleStateOf(0.0)
+    private var exchangeRateState by mutableDoubleStateOf(0.0)
+    private var localCurrencyState by mutableStateOf("YER")
+    private var pricesLastUpdatedState by mutableStateOf("")
 
-    private var goldPrice24State by mutableDoubleStateOf(0.0)
-    private var goldPrice21State by mutableDoubleStateOf(0.0)
-    private var goldPrice18State by mutableDoubleStateOf(0.0)
-    private var ouncePriceState by mutableDoubleStateOf(0.0)
-    private var priceSourceTextState by mutableStateOf("📡 —")
-    private var goldChangePercentState by mutableDoubleStateOf(0.0)
-    private var hasGoldTrendState by mutableStateOf(false)
-    private var isGoldLoadingState by mutableStateOf(false)
+    // مؤشرات المبيعات اليومية والخزينة
+    private var todaySalesLocalState by mutableDoubleStateOf(0.0)
+    private var todaySalesUsdState by mutableDoubleStateOf(0.0)
+    private var todayInvoicesCountState by mutableIntStateOf(0)
+    private var todaySoldWeightState by mutableDoubleStateOf(0.0)
 
-    private var scrapWeightState by mutableDoubleStateOf(0.0)
-    private var scrapValueState by mutableDoubleStateOf(0.0)
-    private var agingTotalItemsState by mutableIntStateOf(0)
-    private var agingTotalWeightState by mutableDoubleStateOf(0.0)
-    private var agingOldCountState by mutableIntStateOf(0)
-    private var agingOldWeightState by mutableDoubleStateOf(0.0)
+    private var totalVaultPiecesState by mutableIntStateOf(0)
+    private var totalVaultWeightState by mutableDoubleStateOf(0.0)
+    private var pure24kWeightState by mutableDoubleStateOf(0.0)
 
-    private var gateScansTodayState by mutableIntStateOf(0)
-    private var gateAllowedTodayState by mutableIntStateOf(0)
-    private var gateDeniedTodayState by mutableIntStateOf(0)
-
-    private var alertCountState by mutableIntStateOf(0)
-    private var alertMessageState by mutableStateOf("")
-
-    private var sales7DaysState by mutableStateOf<List<SalesPoint>>(emptyList())
-    private var salesByKaratState by mutableStateOf<List<KaratSalesSlice>>(emptyList())
-    private var quickActionsState by mutableStateOf<List<QuickActionItem>>(emptyList())
+    // السجل الموحد لآخر العمليات
     private var recentActivitiesState by mutableStateOf<List<JSONObject>>(emptyList())
-
-    private val autoRefreshRunnable = object : Runnable {
-        override fun run() {
-            if (isAdded && isViewInitialized) {
-                val now = System.currentTimeMillis()
-                if (now - lastDataFetchTime >= REFRESH_INTERVAL_MS) {
-                    fetchData()
-                    if (currentBranchId > 0) {
-                        fetchScrapSummary(currentBranchId)
-                        fetchScrapAging(currentBranchId)
-                    }
-                }
-                mainHandler.postDelayed(this, REFRESH_INTERVAL_MS)
-            }
-        }
-    }
-
-    private val dataRefreshReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent == null || !isAdded || !isViewInitialized) return
-            val action = intent.action
-            if ("com.example.uhf.REFRESH_DASHBOARD" == action ||
-                "com.example.uhf.REFRESH_INVENTORY" == action ||
-                "com.example.uhf.REFRESH_SALES" == action
-            ) {
-                mainHandler.post {
-                    if (isAdded && isViewInitialized) {
-                        lastDataFetchTime = 0L
-                        isLoading.set(false)
-                        if (isResumed) {
-                            fetchData()
-                            fetchRecentActivity()
-                            if (currentBranchId > 0) {
-                                fetchScrapSummary(currentBranchId)
-                                fetchScrapAging(currentBranchId)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -217,10 +132,10 @@ class MiraDashboardFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                val layoutDirection = if (isArabicState) LayoutDirection.Rtl else LayoutDirection.Ltr
-                CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                val direction = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+                CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     MiraJewelryTheme {
-                        MiraDashboardScreen()
+                        DashboardScreenContent()
                     }
                 }
             }
@@ -229,634 +144,288 @@ class MiraDashboardFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        try {
-            initializeManagers()
-            refreshRoleAndPermissionsState()
-            setupProfileListener()
-            setupBranchListener()
+        isDestroyed = false
 
-            currentBranchId = if (branchesManager != null && branchesManager!!.activeBranchId > 0) {
-                branchesManager!!.activeBranchId
-            } else {
-                sessionManager?.branchId ?: 1
-            }
+        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+            Locale.getDefault().language == "ar"
+        view.layoutDirection = if (isArabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
 
-            initBranchCache(currentBranchId)
-            isViewInitialized = true
+        val ctx = requireContext()
+        apiClient = MiraApiClient.getInstance(ctx)
+        sessionManager = SecureSessionManager.getInstance(ctx)
+        branchesManager = MiraBranchesManager.getInstance(ctx)
+        activityCache = RecentActivityCache(ctx)
+
+        initSessionAndBranchState()
+        loadOfflineData()
+        refreshAllDashboardData(forceNetwork = true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (activity as? UHFMainActivity)?.setBottomNavVisible(true)
+        activity?.findViewById<View>(R.id.appBarLayout)?.visibility = View.VISIBLE
+
+        isOnlineState = isNetworkAvailable()
+        val latestBranch = resolveActiveBranchId()
+        if (latestBranch != currentBranchId) {
+            currentBranchId = latestBranch
+            selectedBranchIdState = latestBranch
             loadOfflineData()
-            startAutoRefresh()
-            lastDataFetchTime = 0L
-
-            fetchData()
-            fetchDashboardCharts()
-            fetchRecentActivity()
-            if (currentBranchId > 0) {
-                fetchScrapSummary(currentBranchId)
-                fetchScrapAging(currentBranchId)
+            refreshAllDashboardData(forceNetwork = true)
+        } else {
+            val cache = activityCache
+            if (cache != null && !cache.isValid(currentBranchId)) {
+                fetchRecentActivity()
             }
-        } catch (t: Throwable) {
-            Log.e(TAG, "onViewCreated error", t)
         }
     }
 
-    private fun initializeManagers() {
-        if (!isAdded) return
-        val context = requireContext()
-        ensureExecutor()
-
-        apiClient = MiraApiClient.getInstance(context)
-        sessionManager = SessionManager(context)
-        branchesManager = MiraBranchesManager.getInstance(context)
-        orgProfile = MiraOrgProfileManager.getInstance(context)
-        priceManager = MiraPriceManager.getInstance(context)
-        permissionManager = PermissionManager.getInstance(context)
-
-        isArabicState = Locale.getDefault().language == "ar"
-        roleController = DashboardRoleController(permissionManager, isArabicState)
-
-        goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE)
-        lastGoldFetchTime = goldCachePrefs?.getLong("last_gold_fetch_time", 0L) ?: 0L
-        activityCache = RecentActivityCache(context)
-
-        updateHeaderIdentity()
+    override fun onDestroyView() {
+        isDestroyed = true
+        mainHandler.removeCallbacksAndMessages(null)
+        localExecutor?.let { exec ->
+            if (!exec.isShutdown) {
+                exec.shutdownNow()
+            }
+        }
+        localExecutor = null
+        super.onDestroyView()
     }
-
-    private fun updateHeaderIdentity() {
-        val orgName = if (isArabicState) orgProfile?.orgNameAr else orgProfile?.orgNameEn
-        orgTitleState = if (!orgName.isNullOrEmpty()) orgName else "MIRA Jewelry"
-        val display = sessionManager?.displayName
-        val user = sessionManager?.username
-        userGreetingNameState = when {
-            !display.isNullOrEmpty() -> display
-            !user.isNullOrEmpty() -> user
-            else -> ""
-        }
-    }
-
-    private fun refreshRoleAndPermissionsState() {
-        val pm = permissionManager ?: return
-        val rc = DashboardRoleController(pm, isArabicState)
-        roleController = rc
-
-        layoutModeState = when {
-            rc.isPosOnlyLayout() -> DashboardLayoutMode.POS_ONLY
-            rc.isGateOnlyLayout() -> DashboardLayoutMode.GATE_ONLY
-            else -> DashboardLayoutMode.STANDARD
-        }
-
-        showHeroCardState = pm.canViewDashboardHero()
-        showGoldCardState = pm.canViewDashboardGoldPrices()
-        showSalesCardState = pm.canViewDashboardSales()
-        showInventoryCardState = pm.canViewDashboardInventoryByKarat()
-        showScrapCardState = pm.canViewDashboardScrap()
-        showScrapAgingCardState = pm.canViewDashboardScrapAging()
-        showChartsCardState = pm.canViewDashboardCharts()
-        showRecentActivityState = pm.canViewDashboardRecentActivity()
-        canRefreshGoldManuallyState = pm.canRefreshGoldManually()
-
-        buildQuickActionsList(pm)
-    }
-
-    private fun buildQuickActionsList(pm: PermissionManager) {
-        val list = mutableListOf<QuickActionItem>()
-
-        if (pm.canUsePos()) {
-            list.add(QuickActionItem("بيع", "POS Sale", Icons.Rounded.PointOfSale, Color(0xFFD4AF37), NavigationManager.TAG_POS) { MiraPosFragment() })
-        }
-        if (pm.canBuyScrapGold()) {
-            list.add(QuickActionItem("شراء كسر", "Buy Scrap", Icons.Rounded.Recycling, Color(0xFFF59E0B), NavigationManager.TAG_SCRAP_GOLD_BUY) { MiraScrapGoldBuyFragment() })
-        }
-        if (pm.canViewInventory()) {
-            list.add(QuickActionItem("الجرد", "Inventory", Icons.Rounded.Inventory2, Color(0xFF38BDF8), "InventoryDashboard") { MiraInventoryDashboardFragment() })
-        }
-        
-        if (pm.canUseIdentity()) {
-            list.add(QuickActionItem("التكويد", "Encoding", Icons.Rounded.QrCode2, Color(0xFF10B981), "IdentityStudio") { MiraIdentityStudioFragment() })
-        }
-        if (pm.canViewTransfers()) {
-            list.add(QuickActionItem("التحويلات", "Transfers", Icons.Rounded.SwapHoriz, Color(0xFFA855F7), "Transfers") { MiraTransferFragment() })
-        }
-        if (pm.canViewRadar()) {
-            list.add(QuickActionItem("الرادار", "Radar", Icons.Rounded.Radar, Color(0xFF06B6D4), "Radar") { MiraUHFRadarLocationFragment() })
-        }
-        if (pm.canViewGates()) {
-            list.add(QuickActionItem("البوابات", "Gates", Icons.Rounded.Shield, Color(0xFFEF4444), "SecureGate") { MiraSecureGateFragment() })
-        }
-        if (pm.canViewAccounting()) {
-            list.add(QuickActionItem("المحاسبة", "Accounting", Icons.Rounded.AccountBalance, Color(0xFF22C55E), "Accounting") { MiraAccountingFragment() })
-        }
-        if (pm.canViewSalesHistory()) {
-            list.add(QuickActionItem("سجل المبيعات", "Sales Log", Icons.Rounded.ReceiptLong, Color(0xFFEAB308), "SalesHistory") { MiraSalesHistoryFragment() })
-        }
-        if (pm.canViewReports()) {
-            list.add(QuickActionItem("التقارير", "Reports", Icons.Rounded.BarChart, Color(0xFF6366F1), NavigationManager.TAG_REPORTS) { MiraReportsProFragment() })
-        }
-        if (pm.canViewGoldRates()) {
-            list.add(QuickActionItem("أسعار الذهب", "Gold Rates", Icons.Rounded.MonetizationOn, Color(0xFFD4AF37), "GoldRates") { MiraGoldCurrencyFragment() })
-        }
-        if (pm.canViewAdminHub()) {
-            list.add(QuickActionItem("الإدارة", "Admin Hub", Icons.Rounded.AdminPanelSettings, Color(0xFFF43F5E), "AdminHub") { MiraAdminHubFragment() })
-        }
-        list.add(QuickActionItem("الملف الشخصي", "Profile", Icons.Rounded.AccountCircle, Color(0xFF94A3B8), "Profile") { MiraProfileFragment() })
-
-        quickActionsState = list
-    }
-
-    private fun isSessionValid(): Boolean = sessionManager != null && sessionManager!!.userId > 0
 
     private fun ensureExecutor(): Boolean {
-        if (localExecutor == null || localExecutor!!.isShutdown) {
-            if (!isAdded) return false
-            localExecutor = Executors.newFixedThreadPool(4)
+        if (isDestroyed || !isAdded) return false
+        val current = localExecutor
+        if (current == null || current.isShutdown || current.isTerminated) {
+            localExecutor = Executors.newFixedThreadPool(3)
         }
         return true
     }
 
-    private fun shutdownExecutor() {
-        try {
-            localExecutor?.shutdownNow()
-        } catch (_: Exception) {
-        }
-        localExecutor = null
-    }
-
-    private fun cancelFuture(future: Future<*>?) {
-        try {
-            if (future != null && !future.isDone) future.cancel(true)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun fetchData() {
-        try {
-            if (roleController != null && !roleController!!.canFetchFullDashboard()) {
-                isLoading.set(false)
-                isRefreshingState = false
-                return
-            }
-            if (apiClient == null || !isAdded || !isSessionValid() || !ensureExecutor()) {
-                isRefreshingState = false
-                return
-            }
-            if (!isLoading.compareAndSet(false, true)) return
-
-            val isGlobalAdmin = sessionManager?.isAnyAdmin == true
-            val finalBranchId = if (isGlobalAdmin) {
-                if (currentBranchId > 0) currentBranchId else 0
-            } else {
-                val fromSession = sessionManager?.branchId ?: 0
-                val fromManager = branchesManager?.activeBranchId ?: 0
-                when {
-                    fromSession > 0 -> fromSession
-                    fromManager > 0 -> fromManager
-                    else -> 1
-                }
-            }
-
-            if (finalBranchId <= 0 && !isGlobalAdmin) {
-                isLoading.set(false)
-                isRefreshingState = false
-                return
-            }
-
-            cancelFuture(dataFuture)
-            dataFuture = localExecutor!!.submit {
-                try {
-                    val response = apiClient?.getDashboardFull(finalBranchId)
-                    mainHandler.post {
-                        isLoading.set(false)
-                        isRefreshingState = false
-                        lastDataFetchTime = System.currentTimeMillis()
-                        if (!isAdded) return@post
-
-                        if (response != null && response.isSuccess && response.data != null) {
-                            val rootData = if (response.data.has("data")) response.data.optJSONObject("data") else response.data
-                            if (rootData != null) {
-                                saveOfflineData(rootData)
-                                processData(rootData)
-                                computeAndShowAlerts(rootData)
-                            }
-                            isOnlineState = true
-                        } else {
-                            isOnlineState = false
-                            loadOfflineData()
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "fetchData.thread error", e)
-                    mainHandler.post {
-                        isLoading.set(false)
-                        isRefreshingState = false
-                        isOnlineState = false
-                        loadOfflineData()
-                    }
-                }
-            }
-            fetchDashboardCharts()
-        } catch (e: Exception) {
-            Log.e(TAG, "fetchData error", e)
-            isLoading.set(false)
-            isRefreshingState = false
-        }
-    }
-
-    private fun processData(data: JSONObject) {
-        try {
-            if (roleController?.isGateOnlyLayout() == true) {
-                val gates = data.optJSONObject("gates")
-                if (gates != null) {
-                    gateScansTodayState = gates.optInt("scans_today", 0)
-                    gateAllowedTodayState = gates.optInt("allowed_today", 0)
-                    gateDeniedTodayState = gates.optInt("denied_today", 0)
-                }
-                return
-            }
-
-            val inv = data.optJSONObject("inventory") ?: data.optJSONObject("inventory_data")
-            if (inv != null) {
-                val itemCount = inv.optInt("total_items", 0)
-                var totalWeight = inv.optDouble("total_weight", inv.optDouble("weight", 0.0))
-                var totalValue = inv.optDouble("total_value", 0.0)
-
-                val byKarat = inv.optJSONArray("by_karat") ?: inv.optJSONArray("karats")
-                val karatItems = mutableListOf<KaratInventory>()
-                var calcWeight = 0.0
-                var calcValue = 0.0
-
-                if (byKarat != null) {
-                    for (i in 0 until byKarat.length()) {
-                        val k = byKarat.optJSONObject(i) ?: continue
-                        val karat = k.optInt("karat", 0)
-                        val weight = k.optDouble("weight", k.optDouble("total_weight", 0.0))
-                        val count = k.optInt("count", 0)
-                        if (karat > 0) {
-                            karatItems.add(KaratInventory(karat, count, weight))
-                            calcWeight += weight
-                            val price = priceManager?.getGoldPricePerGram(karat) ?: 0.0
-                            calcValue += (weight * price)
-                        }
-                    }
-                }
-
-                if (totalWeight == 0.0 && calcWeight > 0.0) totalWeight = calcWeight
-                if (totalValue == 0.0 && calcValue > 0.0) totalValue = calcValue
-
-                currentItemCountState = itemCount
-                currentTotalWeightState = totalWeight
-                currentInventoryValueState = totalValue
-                inventoryByKaratState = karatItems.sortedByDescending { it.karat }
-            }
-
-            val sales = data.optJSONObject("sales")
-            if (sales != null) {
-                salesTodayState = sales.optDouble("today", 0.0)
-                salesMonthState = sales.optDouble("month", 0.0)
-                salesYearState = sales.optDouble("year", 0.0)
-            }
-
-            val shiftObj = data.optJSONObject("shift_summary")
-            posCashBalanceState = shiftObj?.optDouble("total_cash", 0.0) ?: salesTodayState
-
-            val sales7Days = data.optJSONArray("my_sales_last_7_days")
-                ?: data.optJSONArray("sales_last_7_days")
-            if (sales7Days != null && sales7Days.length() > 0) {
-                sales7DaysState = parseSalesPoints(sales7Days)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "processData error", e)
-        }
-    }
-
-    private fun parseSalesPoints(array: JSONArray): List<SalesPoint> {
-        val points = mutableListOf<SalesPoint>()
-        for (i in 0 until array.length()) {
-            val day = array.optJSONObject(i) ?: continue
-            val amount = day.optDouble("amount", 0.0)
-            var dateStr = day.optString("date", "")
-            if (dateStr.length > 5) dateStr = dateStr.substring(5)
-            points.add(SalesPoint(dateStr, amount))
-        }
-        return points
-    }
-
-    private fun fetchDashboardCharts() {
-        if (roleController != null && !roleController!!.canFetchCharts()) return
-        if (apiClient == null || !isAdded || !isSessionValid() || !ensureExecutor()) return
-
-        localExecutor!!.execute {
-            try {
-                val response = apiClient?.getDashboardCharts(currentBranchId)
-                if (response != null && response.isSuccess && response.data != null) {
-                    val rootData = if (response.data.has("data")) response.data.optJSONObject("data") else response.data
-                    if (rootData != null) {
-                        val salesArr = rootData.optJSONArray("my_sales_last_7_days")
-                            ?: rootData.optJSONArray("sales_last_7_days")
-                            ?: rootData.optJSONArray("sales")
-                        val parsedPoints = if (salesArr != null) parseSalesPoints(salesArr) else emptyList()
-
-                        val karatArr = rootData.optJSONArray("sales_by_karat")
-                        val parsedSlices = mutableListOf<KaratSalesSlice>()
-                        if (karatArr != null) {
-                            for (i in 0 until karatArr.length()) {
-                                val k = karatArr.optJSONObject(i) ?: continue
-                                val amt = k.optDouble("amount", 0.0)
-                                val label = k.optString("karat", "")
-                                if (amt > 0) parsedSlices.add(KaratSalesSlice(label, amt))
-                            }
-                        }
-
-                        mainHandler.post {
-                            if (!isAdded) return@post
-                            if (parsedPoints.isNotEmpty()) sales7DaysState = parsedPoints
-                            if (parsedSlices.isNotEmpty()) salesByKaratState = parsedSlices
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "fetchDashboardCharts error", e)
-            }
-        }
-    }
-
-    private fun fetchScrapSummary(branchId: Int) {
-        if (roleController != null && !roleController!!.canFetchScrap()) return
-        if (apiClient == null || !ensureExecutor()) return
-
-        localExecutor!!.execute {
-            try {
-                val response = apiClient?.getScrapSummary(branchId)
-                if (response != null && response.isSuccess && response.data != null) {
-                    val data = response.data.optJSONObject("data") ?: response.data
-                    val weight = data.optDouble("total_weight", 0.0)
-                    val value = data.optDouble("total_value", 0.0)
-                    mainHandler.post {
-                        if (isAdded) {
-                            scrapWeightState = weight
-                            scrapValueState = value
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "fetchScrapSummary error", e)
-            }
-        }
-    }
-
-    private fun fetchScrapAging(branchId: Int) {
-        if (roleController != null && !roleController!!.canFetchScrapAging()) return
-        if (apiClient == null || !ensureExecutor()) return
-
-        localExecutor!!.execute {
-            try {
-                val response = apiClient?.getScrapAgingSummary(branchId)
-                if (response != null && response.isSuccess && response.data != null) {
-                    val data = response.data.optJSONObject("data") ?: return@execute
-                    val totalItems = data.optInt("total_items", 0)
-                    val totalWeight = data.optDouble("total_weight", 0.0)
-                    val oldCount = data.optInt("old_count", 0)
-                    val oldWeight = data.optDouble("old_weight", 0.0)
-                    mainHandler.post {
-                        if (isAdded) {
-                            agingTotalItemsState = totalItems
-                            agingTotalWeightState = totalWeight
-                            agingOldCountState = oldCount
-                            agingOldWeightState = oldWeight
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "fetchScrapAging error", e)
-            }
-        }
-    }
-
-    private fun computeAndShowAlerts(data: JSONObject?) {
-        if (roleController?.isGateOnlyLayout() == true) return
-        if (permissionManager != null && !permissionManager!!.canViewDashboardAlerts()) {
-            alertCountState = 0
-            return
-        }
-        if (data == null) {
-            alertCountState = 0
-            return
-        }
-        var count = 0
-        val sb = StringBuilder()
-        val inv = data.optJSONObject("inventory")
-        if (inv != null) {
-            val noWeight = inv.optInt("items_without_weight", -1)
-            val noPrice = inv.optInt("items_without_price", -1)
-            if (noWeight > 0) {
-                count += noWeight
-                sb.append(if (isArabicState) "$noWeight قطعة بدون وزن" else "$noWeight items without weight")
-            }
-            if (noPrice > 0) {
-                if (sb.isNotEmpty()) sb.append(" • ")
-                count += noPrice
-                sb.append(if (isArabicState) "$noPrice قطعة بدون سعر" else "$noPrice items without price")
-            }
-        }
-        alertCountState = count
-        alertMessageState = sb.toString()
-    }
-
-    private fun fetchLiveGoldPrices(forceRefresh: Boolean) {
-        try {
-            if (!canRefreshGoldManuallyState ||
-                permissionManager == null ||
-                !permissionManager!!.canAccessFragment("GoldRates") ||
-                apiClient == null ||
-                isGoldRefreshing.get() ||
-                !ensureExecutor()
-            ) {
-                isRefreshingState = false
-                return
-            }
-
-            val now = System.currentTimeMillis()
-            if (!forceRefresh && (now - lastGoldFetchTime) < GOLD_CACHE_VALIDITY_MS) {
-                displayGoldPricesFromCache()
-                isRefreshingState = false
-                return
-            }
-
-            isGoldRefreshing.set(true)
-            isGoldLoadingState = true
-            cancelFuture(goldPriceFuture)
-            val appCtx = requireContext().applicationContext
-
-            goldPriceFuture = localExecutor!!.submit {
-                try {
-                    val providers: List<ApiProvider>? = apiClient?.activeProviders
-                    val activeProvider = providers?.firstOrNull {
-                        it.isActive && !it.apiKey.isNullOrEmpty()
-                    } ?: providers?.firstOrNull()
-
-                    if (activeProvider == null) {
-                        mainHandler.post {
-                            isGoldRefreshing.set(false)
-                            isGoldLoadingState = false
-                            isRefreshingState = false
-                            if (isAdded) displayGoldPricesFromCache()
-                        }
-                        return@submit
-                    }
-
-                    val response = apiClient?.fetchGoldPriceWithProvider(activeProvider.id)
-                    val priceData = parseGoldPriceData(response)
-
-                    mainHandler.post {
-                        isGoldRefreshing.set(false)
-                        isGoldLoadingState = false
-                        isRefreshingState = false
-                        if (!isAdded) return@post
-
-                        if (priceData != null) {
-                            lastGoldFetchTime = System.currentTimeMillis()
-                            displayGoldPrices(priceData)
-                            goldCachePrefs?.edit()?.putLong("last_gold_fetch_time", lastGoldFetchTime)?.apply()
-                            if (forceRefresh) {
-                                Toast.makeText(
-                                    appCtx,
-                                    if (isArabicState) "✅ تم تحديث أسعار الذهب" else "✅ Gold prices updated",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        } else {
-                            displayGoldPricesFromCache()
-                        }
-                    }
-                } catch (_: Exception) {
-                    mainHandler.post {
-                        isGoldRefreshing.set(false)
-                        isGoldLoadingState = false
-                        isRefreshingState = false
-                        if (isAdded) displayGoldPricesFromCache()
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            isGoldRefreshing.set(false)
-            isGoldLoadingState = false
-            isRefreshingState = false
-        }
-    }
-
-    private fun parseGoldPriceData(response: MiraApiClient.ApiResponse?): GoldPriceData? {
+    private fun isSessionValid(): Boolean {
+        val sm = sessionManager ?: return false
         return try {
-            if (response == null || !response.isSuccess || response.data == null) return null
-            val data = response.data.optJSONObject("data") ?: response.data
-            val prices = data.optJSONObject("prices") ?: data
-            val p24 = prices.optDouble("24k", 0.0)
-            val p21 = prices.optDouble("21k", 0.0)
-            val p18 = prices.optDouble("18k", 0.0)
-            if (p24 <= 0.0 || p24 > 5000.0) return null
-            val ounce = data.optDouble("price_per_ounce", p24 * OUNCE_TO_GRAM)
-            GoldPriceData(p24, p21, p18, ounce, data.optString("source", "server"))
+            sm.isLoggedIn || sm.userId > 0
         } catch (_: Exception) {
-            null
+            true
         }
     }
 
-    private fun displayGoldPrices(data: GoldPriceData) {
-        goldPrice24State = data.price24
-        goldPrice21State = data.price21
-        goldPrice18State = data.price18
-        ouncePriceState = data.ouncePrice
-        priceSourceTextState = "📡 " + getSourceDisplayName(data.source)
-        calculateTrend(data.price24)
-    }
+    private fun initSessionAndBranchState() {
+        val sm = sessionManager
+        val bm = branchesManager
 
-    private fun displayGoldPricesFromCache() {
-        val pm = priceManager ?: return
-        val p24 = pm.getGoldPricePerGram(24)
-        val p21 = pm.getGoldPricePerGram(21)
-        val p18 = pm.getGoldPricePerGram(18)
-
-        goldPrice24State = p24
-        goldPrice21State = p21
-        goldPrice18State = p18
-        if (p24 > 0) ouncePriceState = p24 * OUNCE_TO_GRAM
-
-        val now = System.currentTimeMillis()
-        val remaining = GOLD_CACHE_VALIDITY_MS - (now - lastGoldFetchTime)
-        priceSourceTextState = if (remaining > 0) {
-            val hrs = remaining / 3600000
-            val mins = (remaining % 3600000) / 60000
-            if (isArabicState) "📡 كاش محلي ($hrs س $mins د)" else "📡 Cached ($hrs h $mins m)"
-        } else {
-            if (isArabicState) "📡 جاهز للتحديث" else "📡 Ready to update"
+        val resolvedUser = try {
+            sm?.username?.takeIf { it.isNotBlank() } ?: ""
+        } catch (_: Exception) {
+            ""
         }
+        userNameState = resolvedUser
+
+        userRoleState = try {
+            readStringProp(sm, "role", "userRole").lowercase(Locale.ROOT)
+        } catch (_: Exception) {
+            ""
+        }
+
+        val orgName = readStringProp(sm, "orgName", "organizationName", "companyName")
+            .ifBlank { if (isArabic) "ميرا للمجوهرات" else "MIRA JEWELRY" }
+        orgTitleState = orgName
+
+        currentBranchId = resolveActiveBranchId()
+        selectedBranchIdState = currentBranchId
+        loadBranchesList(bm)
     }
 
-    private fun fetchApprovedGoldPricesFromServer() {
-        if (roleController != null && !roleController!!.canFetchGoldPrices()) return
-        if (apiClient == null || !isAdded || !isSessionValid() || !ensureExecutor()) return
+    private fun resolveActiveBranchId(): Int {
+        val bmActive = try {
+            branchesManager?.activeBranchId ?: 0
+        } catch (_: Exception) {
+            0
+        }
+        if (bmActive > 0) return bmActive
 
-        localExecutor!!.execute {
-            try {
-                val response = apiClient?.dashboardGoldPrices
-                if (response != null && response.isSuccess && response.data != null) {
-                    val prices = response.data.optJSONObject("prices")
-                    if (prices != null) {
-                        val p24 = prices.optDouble("24k", 0.0)
-                        val p21 = prices.optDouble("21k", 0.0)
-                        val p18 = prices.optDouble("18k", 0.0)
-                        if (p24 > 0) {
-                            val pd = GoldPriceData(
-                                p24, p21, p18,
-                                p24 * OUNCE_TO_GRAM,
-                                response.data.optString("source", "server")
-                            )
-                            mainHandler.post { if (isAdded) displayGoldPrices(pd) }
-                        }
-                    }
-                }
-            } catch (_: Exception) {
+        val smBranch = try {
+            sessionManager?.branchId ?: 0
+        } catch (_: Exception) {
+            0
+        }
+        return if (smBranch > 0) smBranch else 1
+    }
+
+    private fun loadBranchesList(bm: MiraBranchesManager?) {
+        if (bm == null) return
+        try {
+            val method = bm.javaClass.methods.firstOrNull {
+                it.name in setOf("getBranches", "getAllBranches", "getCachedBranches") && it.parameterCount == 0
             }
-        }
-    }
-
-    private fun calculateTrend(currentPrice: Double) {
-        val cache = offlineCache ?: return
-        if (!ensureExecutor()) return
-        localExecutor!!.execute {
-            try {
-                val prevPrice = cache.getFloat("gold_price_24k_prev", 0f).toDouble()
-                if (prevPrice > 0 && currentPrice > 0) {
-                    val changePercent = ((currentPrice - prevPrice) / prevPrice) * 100.0
-                    mainHandler.post {
-                        if (isAdded) {
-                            goldChangePercentState = changePercent
-                            hasGoldTrendState = true
+            val raw = method?.invoke(bm) ?: return
+            val parsed = mutableListOf<BranchChipOption>()
+            when (raw) {
+                is JSONArray -> {
+                    for (i in 0 until raw.length()) {
+                        val obj = raw.optJSONObject(i) ?: continue
+                        val id = obj.optInt("id", 0)
+                        val name = if (isArabic) {
+                            obj.optString("name_ar", obj.optString("name", "فرع #$id"))
+                        } else {
+                            obj.optString("name_en", obj.optString("name", "Branch #$id"))
+                        }
+                        if (id > 0) parsed.add(BranchChipOption(id, name))
+                    }
+                }
+                is List<*> -> {
+                    for (entry in raw) {
+                        if (entry is JSONObject) {
+                            val id = entry.optInt("id", 0)
+                            val name = entry.optString("name", "Branch #$id")
+                            if (id > 0) parsed.add(BranchChipOption(id, name))
+                        } else if (entry != null) {
+                            val id = readIntProp(entry, "id", "branchId")
+                            val name = readStringProp(entry, "name", "branchName", "title")
+                            if (id > 0 && name.isNotBlank()) parsed.add(BranchChipOption(id, name))
                         }
                     }
                 }
-                if (currentPrice > 0) {
-                    cache.edit().putFloat("gold_price_24k_prev", currentPrice.toFloat()).apply()
+            }
+            if (parsed.isNotEmpty()) {
+                branchesListState = parsed
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "loadBranchesList optional skip: ${e.message}")
+        }
+    }
+
+    private fun switchBranch(branchId: Int) {
+        if (branchId <= 0 || branchId == currentBranchId) return
+        currentBranchId = branchId
+        selectedBranchIdState = branchId
+        try {
+            val setter = branchesManager?.javaClass?.methods?.firstOrNull {
+                it.name in setOf("setActiveBranchId", "selectBranch") && it.parameterCount == 1
+            }
+            setter?.invoke(branchesManager, branchId)
+        } catch (_: Exception) {
+        }
+
+        recentActivitiesState = emptyList()
+        loadOfflineData()
+        refreshAllDashboardData(forceNetwork = true)
+    }
+
+    private fun loadOfflineData() {
+        val ctx = context ?: return
+        try {
+            // 1) استرجاع ملخص الداشبورد وأسعار الذهب المحفوظة
+            val prefs = ctx.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
+            val savedSummary = prefs.getString("summary_b$currentBranchId", null)
+            if (!savedSummary.isNullOrBlank()) {
+                applyDashboardSummaryJson(JSONObject(savedSummary))
+            }
+            val savedPrices = prefs.getString("gold_prices_json", null)
+            if (!savedPrices.isNullOrBlank()) {
+                applyGoldPricesJson(JSONObject(savedPrices))
+            }
+
+            // 2) استرجاع آخر العمليات الموحدة للفرع من الكاش فوراً
+            val cachedActs = activityCache?.load(currentBranchId)
+            if (cachedActs != null && cachedActs.length() > 0 && recentActivitiesState.isEmpty()) {
+                val cachedList = mutableListOf<JSONObject>()
+                for (i in 0 until cachedActs.length()) {
+                    cachedActs.optJSONObject(i)?.let { cachedList.add(it) }
                 }
-            } catch (_: Exception) {
+                recentActivitiesState = cachedList
+                recomputeTodayFallbackFromOperations(cachedList)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "loadOfflineData error: ${e.message}")
+        }
+    }
+
+    private fun refreshAllDashboardData(forceNetwork: Boolean) {
+        isOnlineState = isNetworkAvailable()
+        if (!isOnlineState && !forceNetwork) return
+        if (!ensureExecutor() || !isSessionValid()) return
+        if (!isSyncingAll.compareAndSet(false, true)) return
+
+        isRefreshingState = true
+        val branchSnapshot = currentBranchId
+
+        // جلب العمليات الموحدة بالتوازي
+        fetchRecentActivity()
+
+        localExecutor?.execute {
+            try {
+                // جلب ملخص لوحة القيادة والخزينة
+                val summaryResp = invokeApiMethod("getDashboardSummary", branchSnapshot)
+                    ?: invokeApiMethod("getDashboardStats", branchSnapshot)
+                    ?: invokeApiMethod("getDashboardSummary")
+
+                if (summaryResp != null && summaryResp.isSuccess && summaryResp.data != null) {
+                    val dataJson = summaryResp.data!!
+                    context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
+                        ?.edit()
+                        ?.putString("summary_b$branchSnapshot", dataJson.toString())
+                        ?.apply()
+
+                    mainHandler.post {
+                        if (!isDestroyed && isAdded && currentBranchId == branchSnapshot) {
+                            applyDashboardSummaryJson(dataJson)
+                        }
+                    }
+                }
+
+                // جلب أسعار الذهب الحية
+                val pricesResp = invokeApiMethod("getGoldPrices")
+                    ?: invokeApiMethod("getLatestGoldPrices")
+                if (pricesResp != null && pricesResp.isSuccess && pricesResp.data != null) {
+                    val pJson = pricesResp.data!!
+                    context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
+                        ?.edit()
+                        ?.putString("gold_prices_json", pJson.toString())
+                        ?.apply()
+
+                    mainHandler.post {
+                        if (!isDestroyed && isAdded) {
+                            applyGoldPricesJson(pJson)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "refreshAllDashboardData error: ${e.message}")
+            } finally {
+                isSyncingAll.set(false)
+                mainHandler.post {
+                    if (!isDestroyed && isAdded) {
+                        isRefreshingState = false
+                    }
+                }
             }
         }
     }
 
     private fun fetchRecentActivity() {
-        if (roleController != null && !roleController!!.canFetchRecentActivity()) return
-        if (apiClient == null || !isAdded || !isSessionValid() || !ensureExecutor()) return
+        val client = apiClient ?: return
+        if (!isAdded || isDestroyed || !isSessionValid() || !ensureExecutor()) return
 
-        localExecutor!!.execute {
+        val branchId = if (currentBranchId > 0) currentBranchId else resolveActiveBranchId()
+
+        localExecutor?.execute {
             try {
-                val branchId = if (currentBranchId > 0) currentBranchId else (sessionManager?.branchId ?: 1)
-                val response = apiClient?.getUnifiedActivity(branchId, 15)
+                val response = client.getUnifiedOperations(branchId, 1, 10, null, "all")
                 if (response != null && response.isSuccess && response.data != null) {
                     val activities = extractActivitiesArray(response.data)
                     if (activities != null) {
+                        activityCache?.save(branchId, activities)
                         val itemsList = mutableListOf<JSONObject>()
                         for (i in 0 until activities.length()) {
                             activities.optJSONObject(i)?.let { itemsList.add(it) }
                         }
                         mainHandler.post {
-                            if (isAdded) recentActivitiesState = itemsList
+                            if (!isDestroyed && isAdded && currentBranchId == branchId) {
+                                recentActivitiesState = itemsList
+                                recomputeTodayFallbackFromOperations(itemsList)
+                            }
                         }
                     }
                 }
@@ -866,36 +435,172 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    private fun extractActivitiesArray(top: JSONObject): JSONArray? {
-        top.optJSONArray("activities")?.let { return it }
-        top.optJSONArray("data")?.let { return it }
-        top.optJSONArray("items")?.let { return it }
-        top.optJSONArray("logs")?.let { return it }
-        top.optJSONArray("result")?.let { return it }
-        val nested = top.optJSONObject("data")
+    private fun applyDashboardSummaryJson(root: JSONObject) {
+        val data = root.optJSONObject("data") ?: root
+
+        // المبيعات اليومية
+        val salesObj = data.optJSONObject("today_sales") ?: data.optJSONObject("sales") ?: data
+        val sLocal = salesObj.optDouble(
+            "today_total_local",
+            salesObj.optDouble("total_local", salesObj.optDouble("today_sales_local", 0.0))
+        )
+        val sUsd = salesObj.optDouble(
+            "today_total_usd",
+            salesObj.optDouble("total_usd", salesObj.optDouble("today_sales_usd", 0.0))
+        )
+        val sCount = salesObj.optInt(
+            "today_count",
+            salesObj.optInt("invoices_count", salesObj.optInt("sales_count", 0))
+        )
+        val sWeight = salesObj.optDouble(
+            "today_weight",
+            salesObj.optDouble("sold_weight", 0.0)
+        )
+
+        if (sLocal > 0.0) todaySalesLocalState = sLocal
+        if (sUsd > 0.0) todaySalesUsdState = sUsd
+        if (sCount > 0) todayInvoicesCountState = sCount
+        if (sWeight > 0.0) todaySoldWeightState = sWeight
+
+        // الخزينة والمخزون
+        val vaultObj = data.optJSONObject("vault") ?: data.optJSONObject("inventory") ?: data
+        val pieces = vaultObj.optInt(
+            "total_pieces",
+            vaultObj.optInt("in_stock_count", vaultObj.optInt("items_count", 0))
+        )
+        val weight = vaultObj.optDouble(
+            "total_weight",
+            vaultObj.optDouble("gross_weight", 0.0)
+        )
+        val pure24 = vaultObj.optDouble(
+            "pure_24k_weight",
+            vaultObj.optDouble("equivalent_24k", 0.0)
+        )
+        if (pieces > 0) totalVaultPiecesState = pieces
+        if (weight > 0.0) totalVaultWeightState = weight
+        if (pure24 > 0.0) pure24kWeightState = pure24
+
+        // التنبيهات
+        val alertsObj = data.optJSONObject("alerts")
+        val aCount = alertsObj?.optInt("count", 0) ?: data.optInt("alerts_count", 0)
+        alertsCountState = aCount
+        if (aCount > 0) {
+            alertsMessageState = alertsObj?.optString("latest_message", "")
+                ?.takeIf { it.isNotBlank() }
+                ?: (if (isArabic) "يوجد $aCount تنبيهات تتطلب مراجعتك" else "$aCount alerts require attention")
+        }
+
+        // أسعار الذهب إذا كانت مرفقة داخل الملخص
+        if (data.has("gold_prices") || data.has("prices")) {
+            applyGoldPricesJson(data)
+        }
+    }
+
+    private fun applyGoldPricesJson(root: JSONObject) {
+        val data = root.optJSONObject("data") ?: root
+        val prices = data.optJSONObject("gold_prices") ?: data.optJSONObject("prices") ?: data
+
+        val rate = prices.optDouble("exchange_rate", data.optDouble("exchange_rate", 0.0))
+        if (rate > 0.0) exchangeRateState = rate
+
+        val curr = prices.optString("currency", data.optString("currency", "YER")).ifBlank { "YER" }
+        localCurrencyState = curr.uppercase(Locale.US)
+
+        val p24 = prices.optDouble("karat_24", prices.optDouble("24k", prices.optDouble("price_24k", 0.0)))
+        val p21 = prices.optDouble("karat_21", prices.optDouble("21k", prices.optDouble("price_21k", 0.0)))
+        val p18 = prices.optDouble("karat_18", prices.optDouble("18k", prices.optDouble("price_18k", 0.0)))
+        val p24Usd = prices.optDouble("karat_24_usd", prices.optDouble("24k_usd", 0.0))
+
+        if (p24 > 0.0) price24kLocalState = p24
+        if (p21 > 0.0) price21kLocalState = p21
+        if (p18 > 0.0) price18kLocalState = p18
+        if (p24Usd > 0.0) {
+            price24kUsdState = p24Usd
+        } else if (p24 > 0.0 && exchangeRateState > 0.0) {
+            price24kUsdState = p24 / exchangeRateState
+        }
+
+        pricesLastUpdatedState = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
+    }
+
+    private fun recomputeTodayFallbackFromOperations(ops: List<JSONObject>) {
+        if (todayInvoicesCountState > 0 || ops.isEmpty()) return
+        val todayPrefix = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        var count = 0
+        var sumLocal = 0.0
+        var sumUsd = 0.0
+
+        for (op in ops) {
+            val type = op.optString("type", "")
+            val ts = op.optString("created_at", op.optString("timestamp", ""))
+            if (type == "sale" && ts.startsWith(todayPrefix)) {
+                count++
+                sumLocal += op.optDouble("final_amount", op.optDouble("total_amount", 0.0))
+                sumUsd += op.optDouble("final_amount_usd", op.optDouble("total_amount_usd", 0.0))
+            }
+        }
+        if (count > 0) {
+            todayInvoicesCountState = count
+            if (sumLocal > 0.0) todaySalesLocalState = sumLocal
+            if (sumUsd > 0.0) todaySalesUsdState = sumUsd
+        }
+    }
+
+    private fun extractActivitiesArray(root: JSONObject?): JSONArray? {
+        if (root == null) return null
+        root.optJSONArray("activities")?.let { return it }
+        root.optJSONArray("data")?.let { return it }
+        root.optJSONArray("sales")?.let { return it }
+        val nested = root.optJSONObject("data")
         if (nested != null) {
             nested.optJSONArray("activities")?.let { return it }
-            nested.optJSONArray("items")?.let { return it }
-            nested.optJSONArray("logs")?.let { return it }
+            nested.optJSONArray("data")?.let { return it }
+            nested.optJSONArray("sales")?.let { return it }
         }
         return null
     }
 
-    private fun handleRecentActivityClick(activity: JSONObject) {
+    private fun invokeApiMethod(methodName: String, vararg args: Any): MiraApiClient.ApiResponse? {
+        val client = apiClient ?: return null
+        return try {
+            val target = client.javaClass.methods.firstOrNull {
+                it.name == methodName && it.parameterCount == args.size
+            } ?: return null
+            target.invoke(client, *args) as? MiraApiClient.ApiResponse
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        return try {
+            val cm = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+            val network = cm.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(network) ?: return false
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    private fun openActivityDetails(activityItem: JSONObject) {
         if (!isAdded) return
         try {
-            val sheet = ActivityDetailsBottomSheet.newInstance(activity, isArabicState)
+            val sheet = ActivityDetailsBottomSheet.newInstance(activityItem, isArabic)
             sheet.setOnActionClickListener(object : ActivityDetailsBottomSheet.OnActionClickListener {
                 override fun onPrintInvoice(activityData: JSONObject) {
                     if (!isAdded || context == null) return
                     try {
                         val receiptFragment = MiraReceiptFragment.newInstance(activityData.toString())
                         val fm = parentFragmentManager
-                        if (!fm.isStateSaved) receiptFragment.show(fm, "MiraReceiptFragment")
+                        if (!fm.isStateSaved) {
+                            receiptFragment.show(fm, "MiraReceiptFragment")
+                        }
                     } catch (_: Exception) {
                         Toast.makeText(
                             context,
-                            if (isArabicState) "تعذر فتح الفاتورة" else "Unable to open receipt",
+                            if (isArabic) "تعذر فتح الفاتورة" else "Unable to open receipt",
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -903,341 +608,155 @@ class MiraDashboardFragment : Fragment() {
 
                 override fun onOpenRefund(activityData: JSONObject) {
                     if (!isAdded) return
-                    try {
-                        val salesFragment = MiraPosFragment().apply {
-                            arguments = Bundle().apply {
-                                putString("refund_data_json", activityData.toString())
-                                putBoolean("auto_open_refund", true)
-                            }
+                    val salesFragment = MiraPosFragment().apply {
+                        arguments = Bundle().apply {
+                            putString("refund_data_json", activityData.toString())
+                            putBoolean("auto_open_refund", true)
                         }
-                        (getActivity() as? UHFMainActivity)?.loadFragment(salesFragment, "Sales")
-                    } catch (_: Exception) {
                     }
+                    navigateToFragment(salesFragment, "Sales")
                 }
             })
             sheet.show(parentFragmentManager, "ActivityDetails")
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e(TAG, "openActivityDetails error", e)
         }
     }
 
-    private fun initBranchCache(branchId: Int) {
-        try {
-            val ctx = context ?: return
-            val userId = sessionManager?.userId ?: return
-            if (userId <= 0) return
-            offlineCache = createSecurePrefs(ctx, "$OFFLINE_PREFS_BASE${userId}_b$branchId")
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun createSecurePrefs(ctx: Context, name: String): SharedPreferences {
-        return try {
-            val masterKey = MasterKey.Builder(ctx)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                ctx,
-                name,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (_: Throwable) {
-            ctx.getSharedPreferences(name, Context.MODE_PRIVATE)
-        }
-    }
-
-    private fun loadOfflineData() {
-        val cache = offlineCache ?: return
-        if (!isSessionValid() || !ensureExecutor()) return
-
-        localExecutor!!.execute {
-            try {
-                val totalItems = cache.getInt("total_items", 0)
-                val totalWeight = cache.getFloat("total_weight", 0f).toDouble()
-                val invValue = cache.getFloat("inventory_value", 0f).toDouble()
-                val sToday = cache.getFloat("sales_today", 0f).toDouble()
-                val sMonth = cache.getFloat("sales_month", 0f).toDouble()
-                val sYear = cache.getFloat("sales_year", 0f).toDouble()
-                val karatJson = cache.getString("inventory_by_karat", null)
-
-                val karatItems = mutableListOf<KaratInventory>()
-                if (karatJson != null) {
-                    try {
-                        val arr = JSONArray(karatJson)
-                        for (i in 0 until arr.length()) {
-                            val k = arr.optJSONObject(i) ?: continue
-                            val karat = k.optInt("karat", 0)
-                            if (karat > 0) {
-                                karatItems.add(KaratInventory(karat, k.optInt("count", 0), k.optDouble("weight", 0.0)))
-                            }
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-
-                mainHandler.post {
-                    if (!isAdded) return@post
-                    currentItemCountState = totalItems
-                    currentTotalWeightState = totalWeight
-                    currentInventoryValueState = invValue
-                    inventoryByKaratState = karatItems.sortedByDescending { it.karat }
-                    salesTodayState = sToday
-                    salesMonthState = sMonth
-                    salesYearState = sYear
-                    posCashBalanceState = sToday
-                    if (priceManager != null) displayGoldPricesFromCache()
-                }
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun saveOfflineData(data: JSONObject) {
-        val cache = offlineCache ?: return
-        if (!isSessionValid() || !ensureExecutor()) return
-
-        localExecutor!!.execute {
-            try {
-                val inv = data.optJSONObject("inventory")
-                val sales = data.optJSONObject("sales")
-                val editor = cache.edit()
-                    .putInt("total_items", inv?.optInt("total_items", 0) ?: 0)
-                    .putFloat("total_weight", (inv?.optDouble("total_weight", 0.0) ?: 0.0).toFloat())
-                    .putFloat("inventory_value", (inv?.optDouble("total_value", 0.0) ?: 0.0).toFloat())
-                    .putInt("sold_today", sales?.optInt("count_today", 0) ?: 0)
-                    .putFloat("sales_today", (sales?.optDouble("today", 0.0) ?: 0.0).toFloat())
-                    .putFloat("sales_month", (sales?.optDouble("month", 0.0) ?: 0.0).toFloat())
-                    .putFloat("sales_year", (sales?.optDouble("year", 0.0) ?: 0.0).toFloat())
-                inv?.optJSONArray("by_karat")?.let { editor.putString("inventory_by_karat", it.toString()) }
-                editor.putLong("last_update", System.currentTimeMillis()).apply()
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun refreshAllData() {
-        isRefreshingState = true
-        refreshRoleAndPermissionsState()
-        fetchData()
-        fetchRecentActivity()
-        if (currentBranchId > 0) {
-            fetchScrapSummary(currentBranchId)
-            fetchScrapAging(currentBranchId)
-        }
-        fetchDashboardCharts()
-
-        val now = System.currentTimeMillis()
-        if (canRefreshGoldManuallyState) {
-            if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) fetchLiveGoldPrices(true)
-            else displayGoldPricesFromCache()
-        } else {
-            displayGoldPricesFromCache()
-            fetchApprovedGoldPricesFromServer()
-        }
-    }
-
-    fun onBranchChanged() {
-        try {
-            if (!isAdded) return
-            val newBranchId = branchesManager?.activeBranchId ?: -1
-            if (newBranchId != currentBranchId) {
-                currentBranchId = newBranchId
-                initBranchCache(currentBranchId)
-                refreshRoleAndPermissionsState()
-                syncOrgProfileFromServer(true)
-                loadOfflineData()
-                fetchData()
-                fetchRecentActivity()
-                if (currentBranchId > 0) {
-                    fetchScrapSummary(currentBranchId)
-                    fetchScrapAging(currentBranchId)
-                }
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun setupProfileListener() {
-        try {
-            profileListener = MiraOrgProfileManager.OnProfileChangedListener {
-                mainHandler.post { if (isAdded) updateHeaderIdentity() }
-            }
-            orgProfile?.addListener(profileListener)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun setupBranchListener() {
-        try {
-            branchListener = MiraBranchesManager.OnBranchChangedListener {
-                mainHandler.post { if (isAdded) onBranchChanged() }
-            }
-            branchesManager?.addListener(branchListener)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun syncOrgProfileFromServer(force: Boolean) {
-        val client = apiClient ?: return
-        orgProfile?.syncFromServer(client, force, object : MiraOrgProfileManager.SyncCallback {
-            override fun onSuccess() {
-                mainHandler.post {
-                    if (isAdded) updateHeaderIdentity()
-                    branchesManager?.syncFromServer(object : MiraBranchesManager.SyncCallback {
-                        override fun onSuccess() {}
-                        override fun onError(error: String?) {}
-                    })
-                }
-            }
-
-            override fun onError(error: String?) {}
-        })
-    }
-
-    private fun registerDataRefreshReceiver() {
-        try {
-            if (context == null || isReceiverRegistered) return
-            val filter = IntentFilter().apply {
-                addAction("com.example.uhf.REFRESH_DASHBOARD")
-                addAction("com.example.uhf.REFRESH_INVENTORY")
-                addAction("com.example.uhf.REFRESH_SALES")
-            }
-            ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-            isReceiverRegistered = true
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun unregisterDataRefreshReceiver() {
-        try {
-            if (context != null && isReceiverRegistered) {
-                requireContext().unregisterReceiver(dataRefreshReceiver)
-                isReceiverRegistered = false
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun hideSensitiveValuesOnExit() {
-        isHeroHiddenState = true
-        isSalesHiddenState = true
-        isInventoryHiddenState = true
-        isScrapHiddenState = true
-        isPosDashboardHiddenState = true
-    }
-
-    private fun startAutoRefresh() {
-        mainHandler.removeCallbacks(autoRefreshRunnable)
-        mainHandler.postDelayed(autoRefreshRunnable, REFRESH_INTERVAL_MS)
-    }
-
-    private fun stopAutoRefresh() {
-        mainHandler.removeCallbacks(autoRefreshRunnable)
+    private fun navigateToAllActivities() {
+        navigateToFragment(MiraAllActivitiesFragment(), "AllActivities")
     }
 
     private fun navigateToFragment(fragment: Fragment, tag: String) {
+        if (!isAdded) return
         try {
-            (activity as? UHFMainActivity)?.loadFragment(fragment, tag)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun getSourceDisplayName(source: String?): String {
-        if (source == null) return if (isArabicState) "غير معروف" else "Unknown"
-        return when (source.lowercase(Locale.US)) {
-            "metalprice" -> "MetalPrice"
-            "goldapi" -> "GoldAPI"
-            "metalsdev" -> "Metals.Dev"
-            "fallback" -> if (isArabicState) "احتياطي" else "Fallback"
-            else -> source
-        }
-    }
-
-    private fun formatCurrency(amount: Double): String {
-        if (amount <= 0) return "—"
-        return try {
-            priceManager?.formatPriceDefault(amount)
-                ?: NumberFormat.getCurrencyInstance(Locale.US).format(amount)
-        } catch (_: Exception) {
-            String.format(Locale.US, "$%,.2f", amount)
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        hideSensitiveValuesOnExit()
-        registerDataRefreshReceiver()
-
-        val latestBranchId = branchesManager?.activeBranchId ?: -1
-        if (latestBranchId != currentBranchId) {
-            onBranchChanged()
-        } else if (isViewInitialized) {
-            syncOrgProfileFromServer(false)
-            refreshRoleAndPermissionsState()
-
-            val now = System.currentTimeMillis()
-            if ((now - lastDataFetchTime) > RESUME_REFETCH_THRESHOLD_MS) {
-                fetchData()
-                if (currentBranchId > 0) {
-                    fetchScrapSummary(currentBranchId)
-                    fetchScrapAging(currentBranchId)
+            val host = activity as? UHFMainActivity
+            if (host != null) {
+                host.loadFragment(fragment, tag)
+            } else {
+                val fm = parentFragmentManager
+                if (!fm.isStateSaved) {
+                    fm.beginTransaction()
+                        .replace(R.id.fragment_container, fragment, tag)
+                        .addToBackStack(tag)
+                        .commit()
                 }
             }
-            if (activityCache == null || !activityCache!!.isValid) {
-                mainHandler.postDelayed({ if (isAdded && isResumed) fetchRecentActivity() }, 600)
-            }
-            if ((now - lastGoldFetchTime) > 30 * 60 * 1000L && canRefreshGoldManuallyState) {
-                mainHandler.postDelayed({ if (isAdded && isResumed) fetchLiveGoldPrices(false) }, 1200)
+        } catch (e: Exception) {
+            Log.e(TAG, "navigateToFragment($tag) error: ${e.message}")
+        }
+    }
+
+    private fun openFragmentByClassName(className: String, tag: String, fallback: () -> Unit) {
+        try {
+            val clazz = Class.forName(className)
+            val instance = clazz.getDeclaredConstructor().newInstance() as? Fragment
+            if (instance != null) {
+                navigateToFragment(instance, tag)
             } else {
-                displayGoldPricesFromCache()
-                fetchApprovedGoldPricesFromServer()
+                fallback()
+            }
+        } catch (_: Exception) {
+            fallback()
+        }
+    }
+
+    private fun handleQuickAction(action: QuickActionItem) {
+        when (action.id) {
+            "pos" -> navigateToFragment(MiraPosFragment(), "Sales")
+            "sales_history" -> navigateToFragment(MiraSalesHistoryFragment(), "SalesHistory")
+            "inventory" -> navigateToFragment(MiraInventoryProFragment(), "Scan")
+            "transfers" -> navigateToFragment(MiraTransferFragment(), "Transfers")
+            "scrap" -> openFragmentByClassName("com.example.uhf.fragment.MiraScrapFragment", "Scrap") {
+                val posWithScrap = MiraPosFragment().apply {
+                    arguments = Bundle().apply { putBoolean("open_scrap_mode", true) }
+                }
+                navigateToFragment(posWithScrap, "Sales")
+            }
+            "encode" -> openFragmentByClassName("com.example.uhf.fragment.MiraEncodeFragment", "Encode") {
+                navigateToFragment(MiraInventoryProFragment(), "Scan")
+            }
+            "all_activities" -> navigateToAllActivities()
+            "sync_rates" -> {
+                refreshAllDashboardData(forceNetwork = true)
+                Toast.makeText(
+                    context,
+                    if (isArabic) "جاري تحديث الأسعار والبيانات..." else "Syncing rates & data...",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
-        startAutoRefresh()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        unregisterDataRefreshReceiver()
-        stopAutoRefresh()
-        hideSensitiveValuesOnExit()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        hideSensitiveValuesOnExit()
-    }
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        isArabicState = newConfig.locales[0].language == "ar"
-        refreshRoleAndPermissionsState()
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        unregisterDataRefreshReceiver()
-        stopAutoRefresh()
-        profileListener?.let { orgProfile?.removeListener(it) }
-        branchListener?.let { branchesManager?.removeListener(it) }
-        cancelFuture(dataFuture)
-        cancelFuture(goldPriceFuture)
-        mainHandler.removeCallbacksAndMessages(null)
-        shutdownExecutor()
-        isViewInitialized = false
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  تجميع الشاشة حسب وضع الصلاحيات (UI Orchestrator)
+    //  واجهة لوحة القيادة التنفيذية (Jetpack Compose)
     // ═══════════════════════════════════════════════════════════════════
+
     @Composable
-    private fun MiraDashboardScreen() {
+    private fun DashboardScreenContent() {
         val colors = MiraTheme.colors
-        val computedTotalValue = if (currentInventoryValueState <= 0 && priceManager != null && currentTotalWeightState > 0) {
-            currentTotalWeightState * priceManager!!.getGoldPricePerGram(24)
-        } else {
-            currentInventoryValueState
+        val scrollState = rememberScrollState()
+        val isAr = isArabic
+
+        val quickActions = remember(isAr) {
+            listOf(
+                QuickActionItem(
+                    id = "pos",
+                    titleAr = "نقطة البيع",
+                    titleEn = "POS Sale",
+                    icon = Icons.Rounded.PointOfSale,
+                    accentColor = Color(0xFF10B981)
+                ),
+                QuickActionItem(
+                    id = "sales_history",
+                    titleAr = "سجل المبيعات",
+                    titleEn = "Invoices",
+                    icon = Icons.Rounded.ReceiptLong,
+                    accentColor = Color(0xFFD4AF37)
+                ),
+                QuickActionItem(
+                    id = "inventory",
+                    titleAr = "الجرد الذكي",
+                    titleEn = "Inventory",
+                    icon = Icons.Rounded.Inventory2,
+                    accentColor = Color(0xFF06B6D4)
+                ),
+                QuickActionItem(
+                    id = "transfers",
+                    titleAr = "التحويلات",
+                    titleEn = "Transfers",
+                    icon = Icons.Rounded.SwapHoriz,
+                    accentColor = Color(0xFFA855F7)
+                ),
+                QuickActionItem(
+                    id = "scrap",
+                    titleAr = "شراء كسر",
+                    titleEn = "Scrap Gold",
+                    icon = Icons.Rounded.Scale,
+                    accentColor = Color(0xFFF59E0B)
+                ),
+                QuickActionItem(
+                    id = "encode",
+                    titleAr = "تشفير RFID",
+                    titleEn = "Encode Tag",
+                    icon = Icons.Rounded.Contactless,
+                    accentColor = Color(0xFF3B82F6)
+                ),
+                QuickActionItem(
+                    id = "all_activities",
+                    titleAr = "كل العمليات",
+                    titleEn = "All Logs",
+                    icon = Icons.Rounded.History,
+                    accentColor = Color(0xFFEC4899)
+                ),
+                QuickActionItem(
+                    id = "sync_rates",
+                    titleAr = "تحديث فوري",
+                    titleEn = "Sync Now",
+                    icon = Icons.Rounded.Sync,
+                    accentColor = Color(0xFF14B8A6)
+                )
+            )
         }
 
         Surface(
@@ -1253,234 +772,384 @@ class MiraDashboardFragment : Fragment() {
                         )
                     )
             ) {
-                LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.fillMaxSize()
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    item(key = "header") {
-                        DashboardTopHeader(
-                            isArabic = isArabicState,
-                            orgTitle = orgTitleState,
-                            userName = userGreetingNameState,
-                            isOnline = isOnlineState,
-                            isRefreshing = isRefreshingState,
-                            onRefresh = { refreshAllData() }
-                        )
-                    }
+                    // 1. الترويسة العلوية وحالة الاتصال وزر التحديث
+                    DashboardTopHeader(
+                        isArabic = isAr,
+                        orgTitle = orgTitleState,
+                        userName = userNameState,
+                        isOnline = isOnlineState,
+                        isRefreshing = isRefreshingState,
+                        onRefresh = { refreshAllDashboardData(forceNetwork = true) }
+                    )
 
-                    when (layoutModeState) {
-                        DashboardLayoutMode.POS_ONLY -> {
-                            item(key = "pos_hero") {
-                                PosVaultSummaryCard(
-                                    isArabic = isArabicState,
-                                    isHidden = isPosDashboardHiddenState,
-                                    onToggleHidden = { isPosDashboardHiddenState = !isPosDashboardHiddenState },
-                                    totalWeight = currentTotalWeightState,
-                                    totalValue = computedTotalValue,
-                                    cashBalance = posCashBalanceState,
-                                    formattedCash = formatCurrency(posCashBalanceState)
-                                )
-                            }
-                            if (inventoryByKaratState.isNotEmpty()) {
-                                item(key = "pos_karats") {
-                                    PosKaratChipsRow(
-                                        isHidden = isPosDashboardHiddenState,
-                                        karats = inventoryByKaratState,
-                                        priceManager = priceManager
-                                    )
-                                }
-                            }
-                            if (quickActionsState.isNotEmpty()) {
-                                item(key = "pos_actions") {
-                                    QuickActionsSection(
-                                        isArabic = isArabicState,
-                                        actions = quickActionsState,
-                                        onActionClick = { navigateToFragment(it.fragmentProvider(), it.tag) }
-                                    )
-                                }
-                            }
-                            if (sales7DaysState.isNotEmpty()) {
-                                item(key = "pos_chart") {
-                                    SalesTrendChartCard(
-                                        title = if (isArabicState) "حركة المبيعات والتقدير (7 أيام)" else "Sales & Estimate Trend (7D)",
-                                        points = sales7DaysState,
-                                        showDualCurve = true
-                                    )
-                                }
-                            }
-                            item(key = "pos_activity") {
-                                RecentActivitySection(
-                                    isArabic = isArabicState,
-                                    activities = recentActivitiesState.take(5),
-                                    maskAmounts = isPosDashboardHiddenState,
-                                    onViewAll = { navigateToFragment(MiraAllActivitiesFragment(), "AllActivities") },
-                                    onItemClick = { handleRecentActivityClick(it) }
-                                )
-                            }
-                        }
-
-                        DashboardLayoutMode.GATE_ONLY -> {
-                            item(key = "gate_telemetry") {
-                                GateSecurityTelemetryCard(
-                                    isArabic = isArabicState,
-                                    scansToday = gateScansTodayState,
-                                    allowedToday = gateAllowedTodayState,
-                                    deniedToday = gateDeniedTodayState,
-                                    onOpenGate = { navigateToFragment(MiraSecureGateFragment(), "SecureGate") }
-                                )
-                            }
-                            if (quickActionsState.isNotEmpty()) {
-                                item(key = "gate_actions") {
-                                    QuickActionsSection(
-                                        isArabic = isArabicState,
-                                        actions = quickActionsState,
-                                        onActionClick = { navigateToFragment(it.fragmentProvider(), it.tag) }
-                                    )
-                                }
-                            }
-                            item(key = "gate_activity") {
-                                RecentActivitySection(
-                                    isArabic = isArabicState,
-                                    activities = recentActivitiesState.take(10),
-                                    maskAmounts = false,
-                                    onViewAll = { navigateToFragment(MiraAllActivitiesFragment(), "AllActivities") },
-                                    onItemClick = { handleRecentActivityClick(it) }
-                                )
-                            }
-                        }
-
-                        DashboardLayoutMode.STANDARD -> {
-                            if (alertCountState > 0) {
-                                item(key = "alerts_strip") {
-                                    AlertsBannerCard(
-                                        isArabic = isArabicState,
-                                        count = alertCountState,
-                                        message = alertMessageState,
-                                        onClick = { navigateToFragment(MiraUHFReadTagFragment(), "Scan") }
-                                    )
-                                }
-                            }
-
-                            val carouselTypes = buildList {
-                                if (showHeroCardState) add("HERO")
-                                if (showGoldCardState) add("GOLD")
-                                if (showSalesCardState) add("SALES")
-                            }
-
-                            if (carouselTypes.isNotEmpty()) {
-                                item(key = "carousel_cards") {
-                                    ExecutiveCarouselSection(
-                                        cardTypes = carouselTypes,
-                                        isArabic = isArabicState,
-                                        isHeroHidden = isHeroHiddenState,
-                                        onToggleHeroHidden = { isHeroHiddenState = !isHeroHiddenState },
-                                        totalInventoryValue = computedTotalValue,
-                                        totalWeight = currentTotalWeightState,
-                                        totalItemCount = currentItemCountState,
-                                        goldPrice24 = goldPrice24State,
-                                        goldPrice21 = goldPrice21State,
-                                        goldPrice18 = goldPrice18State,
-                                        ouncePrice = ouncePriceState,
-                                        priceSourceText = priceSourceTextState,
-                                        goldChangePercent = goldChangePercentState,
-                                        hasGoldTrend = hasGoldTrendState,
-                                        canRefreshGoldManually = canRefreshGoldManuallyState,
-                                        isGoldLoading = isGoldLoadingState,
-                                        onRefreshGoldClick = { fetchLiveGoldPrices(true) },
-                                        isSalesHidden = isSalesHiddenState,
-                                        onToggleSalesHidden = { isSalesHiddenState = !isSalesHiddenState },
-                                        salesToday = salesTodayState,
-                                        salesMonth = salesMonthState,
-                                        salesYear = salesYearState
-                                    )
-                                }
-                            }
-
-                            if (quickActionsState.isNotEmpty()) {
-                                item(key = "std_actions") {
-                                    QuickActionsSection(
-                                        isArabic = isArabicState,
-                                        actions = quickActionsState,
-                                        onActionClick = { navigateToFragment(it.fragmentProvider(), it.tag) }
-                                    )
-                                }
-                            }
-
-                            if (showInventoryCardState) {
-                                item(key = "inventory_karat") {
-                                    InventoryByKaratCard(
-                                        isArabic = isArabicState,
-                                        isHidden = isInventoryHiddenState,
-                                        onToggleHidden = { isInventoryHiddenState = !isInventoryHiddenState },
-                                        items = inventoryByKaratState
-                                    )
-                                }
-                            }
-
-                            if (showScrapCardState) {
-                                item(key = "scrap_gold") {
-                                    ScrapGoldSummaryCard(
-                                        isArabic = isArabicState,
-                                        isHidden = isScrapHiddenState,
-                                        onToggleHidden = { isScrapHiddenState = !isScrapHiddenState },
-                                        weight = scrapWeightState,
-                                        formattedValue = formatCurrency(scrapValueState),
-                                        onOpenBuy = { navigateToFragment(MiraScrapGoldBuyFragment(), NavigationManager.TAG_SCRAP_GOLD_BUY) },
-                                        onOpenHistory = { navigateToFragment(MiraScrapHistoryFragment(), NavigationManager.TAG_SCRAP_HISTORY) },
-                                        onOpenBatches = { navigateToFragment(MiraScrapBatchesFragment(), NavigationManager.TAG_SCRAP_BATCHES) }
-                                    )
-                                }
-                            }
-
-                            if (showScrapAgingCardState) {
-                                item(key = "scrap_aging") {
-                                    ScrapAgingAlertCard(
-                                        isArabic = isArabicState,
-                                        totalItems = agingTotalItemsState,
-                                        totalWeight = agingTotalWeightState,
-                                        oldCount = agingOldCountState,
-                                        oldWeight = agingOldWeightState,
-                                        onOpenReport = { navigateToFragment(MiraScrapAgingFragment(), NavigationManager.TAG_SCRAP_AGING) }
-                                    )
-                                }
-                            }
-
-                            if (showChartsCardState && (sales7DaysState.isNotEmpty() || salesByKaratState.isNotEmpty())) {
-                                item(key = "analytics_charts") {
-                                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                        if (sales7DaysState.isNotEmpty()) {
-                                            SalesTrendChartCard(
-                                                title = if (isArabicState) "منحنى المبيعات (آخر 7 أيام)" else "Sales Curve (Last 7 Days)",
-                                                points = sales7DaysState,
-                                                showDualCurve = false
-                                            )
-                                        }
-                                        if (salesByKaratState.isNotEmpty()) {
-                                            KaratDistributionDonutCard(
-                                                isArabic = isArabicState,
-                                                slices = salesByKaratState
-                                            )
-                                        }
+                    // 2. شريط اختيار الفرع (إذا توفر أكثر من فرع)
+                    if (branchesListState.size > 1) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(branchesListState) { branch ->
+                                val selected = branch.id == selectedBranchIdState
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (selected) colors.goldPrimary.copy(alpha = 0.20f)
+                                    else colors.cardSurface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (selected) colors.goldPrimary else colors.cardBorder
+                                    ),
+                                    modifier = Modifier.clickable { switchBranch(branch.id) }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Store,
+                                            contentDescription = null,
+                                            tint = if (selected) colors.goldPrimary else colors.textSecondary,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = branch.name,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                                            color = if (selected) colors.goldPrimary else colors.textSecondary
+                                        )
                                     }
                                 }
                             }
-
-                            if (showRecentActivityState) {
-                                item(key = "recent_activity") {
-                                    RecentActivitySection(
-                                        isArabic = isArabicState,
-                                        activities = recentActivitiesState.take(10),
-                                        maskAmounts = false,
-                                        onViewAll = { navigateToFragment(MiraAllActivitiesFragment(), "AllActivities") },
-                                        onItemClick = { handleRecentActivityClick(it) }
-                                    )
-                                }
-                            }
                         }
+                    }
+
+                    // 3. شريط التنبيهات الذكية (عند وجود تنبيهات)
+                    if (alertsCountState > 0) {
+                        AlertsBannerCard(
+                            isArabic = isAr,
+                            count = alertsCountState,
+                            message = alertsMessageState,
+                            onClick = { navigateToAllActivities() }
+                        )
+                    }
+
+                    // 4. بطاقة مؤشر أسعار الذهب الحية (24K / 21K / 18K)
+                    LiveGoldRatesCard(isArabic = isAr)
+
+                    // 5. بطاقة ملخص مبيعات اليوم والخزينة (مع زر إخفاء/إظهار الأرقام)
+                    ExecutiveSummaryAndVaultCard(isArabic = isAr)
+
+                    // 6. شبكة الوصول السريع (8 اختصارات)
+                    QuickActionsSection(
+                        isArabic = isAr,
+                        actions = quickActions,
+                        onActionClick = { handleQuickAction(it) }
+                    )
+
+                    // 7. قسم آخر العمليات والمبيعات الموحد (نفس تصميم عرض الكل وسجل المبيعات)
+                    RecentActivitySection(
+                        isArabic = isAr,
+                        activities = recentActivitiesState.take(10),
+                        maskAmounts = maskAmountsState,
+                        onViewAll = { navigateToAllActivities() },
+                        onItemClick = { openActivityDetails(it) }
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun LiveGoldRatesCard(isArabic: Boolean) {
+        val colors = MiraTheme.colors
+        val curr = localCurrencyState
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.40f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                colors.goldPrimary.copy(alpha = 0.14f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.TrendingUp,
+                            contentDescription = null,
+                            tint = colors.goldPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = if (isArabic) "أسعار الذهب اليوم (للجرام)" else "Live Gold Rates (/g)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.textPrimary
+                        )
+                    }
+
+                    if (exchangeRateState > 0.0 && curr != "USD") {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFF10B981).copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = "1$ = ${formatCompactNumber(exchangeRateState)} $curr",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF10B981),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    KaratRateChip(
+                        karatLabel = if (isArabic) "عيار 24" else "24K",
+                        priceText = if (price24kLocalState > 0.0) "${formatCompactNumber(price24kLocalState)} $curr" else "—",
+                        subText = if (price24kUsdState > 0.0) String.format(Locale.US, "$%.2f", price24kUsdState) else null,
+                        accent = Color(0xFFD4AF37),
+                        modifier = Modifier.weight(1f)
+                    )
+                    KaratRateChip(
+                        karatLabel = if (isArabic) "عيار 21" else "21K",
+                        priceText = if (price21kLocalState > 0.0) "${formatCompactNumber(price21kLocalState)} $curr" else "—",
+                        subText = null,
+                        accent = Color(0xFF10B981),
+                        modifier = Modifier.weight(1f)
+                    )
+                    KaratRateChip(
+                        karatLabel = if (isArabic) "عيار 18" else "18K",
+                        priceText = if (price18kLocalState > 0.0) "${formatCompactNumber(price18kLocalState)} $curr" else "—",
+                        subText = null,
+                        accent = Color(0xFF06B6D4),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun KaratRateChip(
+        karatLabel: String,
+        priceText: String,
+        subText: String?,
+        accent: Color,
+        modifier: Modifier = Modifier
+    ) {
+        val colors = MiraTheme.colors
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.backgroundTop.copy(alpha = 0.55f))
+                .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(12.dp))
+                .padding(vertical = 8.dp, horizontal = 6.dp)
+        ) {
+            Text(
+                text = karatLabel,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = accent
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = priceText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (subText != null) {
+                Text(
+                    text = subText,
+                    fontSize = 10.sp,
+                    color = colors.textSecondary
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun ExecutiveSummaryAndVaultCard(isArabic: Boolean) {
+        val colors = MiraTheme.colors
+        val curr = localCurrencyState
+        val masked = maskAmountsState
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+            border = BorderStroke(1.dp, colors.cardBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isArabic) "ملخص اليوم والخزينة" else "Today's Performance & Vault",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.textPrimary
+                    )
+
+                    IconButton(
+                        onClick = { maskAmountsState = !maskAmountsState },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (masked) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                            contentDescription = "Toggle Privacy",
+                            tint = colors.goldPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // صف مبيعات اليوم
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val salesMainDisplay = when {
+                        masked -> "•••••"
+                        todaySalesLocalState > 0.0 -> "${formatCompactNumber(todaySalesLocalState)} $curr"
+                        todaySalesUsdState > 0.0 -> String.format(Locale.US, "$%,.2f", todaySalesUsdState)
+                        else -> "0 $curr"
+                    }
+
+                    SalesMetricBox(
+                        label = if (isArabic) "مبيعات اليوم" else "Today Sales",
+                        value = salesMainDisplay,
+                        accent = Color(0xFF10B981),
+                        modifier = Modifier.weight(1.35f)
+                    )
+                    SalesMetricBox(
+                        label = if (isArabic) "الفواتير" else "Invoices",
+                        value = if (masked) "••" else todayInvoicesCountState.toString(),
+                        accent = Color(0xFFD4AF37),
+                        modifier = Modifier.weight(0.8f)
+                    )
+                    SalesMetricBox(
+                        label = if (isArabic) "الوزن المباع" else "Sold Weight",
+                        value = if (masked) "•••" else String.format(Locale.US, "%.1fg", todaySoldWeightState),
+                        accent = Color(0xFF06B6D4),
+                        modifier = Modifier.weight(0.95f)
+                    )
+                }
+
+                // صف رصيد الخزينة والمخزون
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    VaultStatChip(
+                        label = if (isArabic) "قطع المخزون" else "Stock Pieces",
+                        value = if (masked) "•••" else "$totalVaultPiecesState",
+                        icon = Icons.Rounded.Diamond,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VaultStatChip(
+                        label = if (isArabic) "إجمالي الوزن" else "Vault Weight",
+                        value = if (masked) "•••" else String.format(Locale.US, "%.1f g", totalVaultWeightState),
+                        icon = Icons.Rounded.Scale,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (pure24kWeightState > 0.0) {
+                        VaultStatChip(
+                            label = if (isArabic) "صافي 24K" else "Pure 24K",
+                            value = if (masked) "•••" else String.format(Locale.US, "%.1f g", pure24kWeightState),
+                            icon = Icons.Rounded.Verified,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
         }
+    }
+
+    private fun formatCompactNumber(value: Double): String {
+        return try {
+            NumberFormat.getNumberInstance(Locale.US).apply {
+                maximumFractionDigits = 0
+                minimumFractionDigits = 0
+            }.format(value)
+        } catch (_: Exception) {
+            String.format(Locale.US, "%.0f", value)
+        }
+    }
+
+    private fun readStringProp(target: Any?, vararg names: String): String {
+        if (target == null) return ""
+        for (name in names) {
+            try {
+                val getter = "get" + name.replaceFirstChar { it.uppercaseChar() }
+                val m = target.javaClass.methods.firstOrNull {
+                    (it.name == getter || it.name == name) && it.parameterCount == 0
+                }
+                val v = m?.invoke(target)?.toString()?.trim()
+                if (!v.isNullOrEmpty() && v != "null") return v
+            } catch (_: Exception) {
+            }
+        }
+        return ""
+    }
+
+    private fun readIntProp(target: Any?, vararg names: String): Int {
+        if (target == null) return 0
+        for (name in names) {
+            try {
+                val getter = "get" + name.replaceFirstChar { it.uppercaseChar() }
+                val m = target.javaClass.methods.firstOrNull {
+                    (it.name == getter || it.name == name) && it.parameterCount == 0
+                }
+                val v = m?.invoke(target)
+                if (v is Number) return v.toInt()
+            } catch (_: Exception) {
+            }
+        }
+        return 0
     }
 }
