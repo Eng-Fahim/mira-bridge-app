@@ -1,7 +1,7 @@
 package com.example.uhf.security
 
 import android.app.Dialog
-import android.graphics.Color
+import android.graphics.Color as AndroidColor   // ← أضف هذا
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -31,7 +31,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.*          // ← يوفّر Color, Brush, Path, StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -81,16 +81,15 @@ class SessionLockDialogFragment : DialogFragment() {
         })
 
         dialog.window?.apply {
-            setLayout(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            // منع لقطات الشاشة وكشف المحتوى في قائمة التطبيقات المفتوحة
-            addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            statusBarColor = Color.parseColor("#050914")
-            navigationBarColor = Color.parseColor("#050914")
-        }
+    setLayout(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.MATCH_PARENT
+    )
+    addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+    statusBarColor = AndroidColor.parseColor("#050914")      // ← معدّل
+    navigationBarColor = AndroidColor.parseColor("#050914")  // ← معدّل
+}
 
         return dialog
     }
