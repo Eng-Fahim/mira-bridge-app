@@ -377,7 +377,6 @@ class MiraGoldCurrencyFragment : Fragment() {
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
-
         rgExchangeRateType?.setOnCheckedChangeListener { _, checkedId ->
             useMarketRate = (checkedId == R.id.rbMarketRate)
             prefs?.edit()?.putBoolean("use_market_rate", useMarketRate)?.apply()
@@ -385,8 +384,8 @@ class MiraGoldCurrencyFragment : Fragment() {
         }
 
         etGoldPrice24k?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count) {}
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 if (isUpdatingFields) return
                 val price24k = getDouble(etGoldPrice24k)
@@ -398,8 +397,8 @@ class MiraGoldCurrencyFragment : Fragment() {
         })
 
         val rateWatcher = object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count) {}
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) { updateLiveCurrencyRates() }
         }
         etExchangeYER?.addTextChangedListener(rateWatcher)
@@ -411,6 +410,7 @@ class MiraGoldCurrencyFragment : Fragment() {
         etExchangeMarketSAR?.addTextChangedListener(rateWatcher)
         etExchangeMarketAED?.addTextChangedListener(rateWatcher)
     }
+
 
     private fun loadActiveProviders() {
         if (!isAdded) return
