@@ -2488,38 +2488,43 @@ public ApiResponse getDashboardCharts(int branchId) {
         if (branchId > 0) endpoint += "&branch_id=" + branchId;
         return getWithAuth(endpoint);
     }
-    
-        // ==================== المصدر الموحد للعمليات والفواتير ====================
 
-    /**
-     * جلب تفاصيل فاتورة واحدة برقم الفاتورة أو المعرف (لإثراء نافذة التفاصيل بالأصناف وطرق الدفع)
+    public ApiResponse getUserActivityLogs(int userId, int limit) {
+        return getWithAuth("/activity/logs?user_id=" + userId + "&limit=" + limit);
+    }
+
+    public interface ApiCallback {
+        void onSuccess(ApiResponse response);
+        void onFailure(String errorMessage);
+    }
+    
+        /**
+     * النسخة المتوافقة مع الاستدعاءات السابقة (تعمل بصلاحية مدير افتراضياً)
      */
-    public ApiResponse getSaleDetails(String saleIdOrNumber) {
-        if (saleIdOrNumber == null || saleIdOrNumber.trim().isEmpty()) {
-            return new ApiResponse(-1, null, "Missing sale identifier");
-        }
-        try {
-            String clean = saleIdOrNumber.trim().replace("#", "");
-            String encoded = URLEncoder.encode(clean, "UTF-8");
-            ApiResponse res = getWithAuth("/refunds/find-sale?q=" + encoded);
-            if (res != null && res.isSuccess && res.data != null) {
-                return res;
-            }
-            return getWithAuth("/pos/sales/" + encoded);
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        }
+    public ApiResponse getUnifiedOperations(int branchId, int page, int limit, String search, String filterType) {
+        return getUnifiedOperations(branchId, 0, "", true, page, limit, search, filterType);
     }
 
     /**
-     * مصدر الحقيقة الموحد لآخر العمليات (للدشبورد وشاشة عرض الكل)
-     * يدمج الفواتير الكاملة من /pos/sales مع العمليات التشغيلية الصالحة من /activity/unified
+     * مصدر الحقيقة الموحد لآخر العمليات والفواتير مع دعم العزل حسب الدور الوظيفي:
+     * - المدير (isManager = true): يرى جميع عمليات الفرع للجميع.
+     * - الموظف (isManager = false): يرى عملياته وفواتيره الشخصية فقط.
      */
-    public ApiResponse getUnifiedOperations(int branchId, int page, int limit, String search, String filterType) {
+    public ApiResponse getUnifiedOperations(
+            int branchId,
+            int userId,
+            String username,
+            boolean isManager,
+            int page,
+            int limit,
+            String search,
+            String filterType
+    ) {
         try {
             String normalizedFilter = (filterType == null || filterType.trim().isEmpty())
                     ? "all" : filterType.trim().toLowerCase(Locale.ROOT);
             String cleanSearch = (search != null) ? search.trim() : "";
+            String cleanUsername = (username != null) ? username.trim() : "";
 
             List<JSONObject> mergedList = new ArrayList<>();
             java.util.Set<String> seenSaleNumbers = new java.util.HashSet<>();
@@ -2536,10 +2541,12 @@ public ApiResponse getDashboardCharts(int branchId) {
                     || normalizedFilter.equals("inventory")
                     || normalizedFilter.equals("rfid");
 
-            // 1) جلب الفواتير والمرتجعات الغنية بالتفاصيل من /pos/sales
+            // 1) جلب الفواتير والمرتجعات من /pos/sales
             if (includeSales) {
+                // إذا كان موظفاً عادياً، نطلب عدداً أكبر قليلاً من السيرفر لضمان امتلاء الصفحة بعد الفلترة الشخصية
+                int fetchLimit = isManager ? limit : Math.max(limit * 3, 60);
                 ApiResponse salesResp = getSalesHistoryAdvanced(
-                        cleanSearch, "ALL", null, null, page, limit, branchId
+                        cleanSearch, "ALL", null, null, page, fetchLimit, branchId
                 );
 
                 if (salesResp != null && salesResp.isSuccess && salesResp.data != null) {
@@ -2565,6 +2572,11 @@ public ApiResponse getDashboardCharts(int branchId) {
                                 if (sBranch > 0 && sBranch != branchId) continue;
                             }
 
+                            // تطبيق العزل للموظفين غير المدراء
+                            if (!isManager && !matchesCurrentUser(sale, userId, cleanUsername)) {
+                                continue;
+                            }
+
                             JSONObject normalizedSale = normalizeSaleAsUnifiedOperation(sale);
                             String opType = normalizedSale.optString("type", "sale");
 
@@ -2581,15 +2593,21 @@ public ApiResponse getDashboardCharts(int branchId) {
                 }
             }
 
-            // 2) دمج العمليات التشغيلية الأخرى (كسر، تحويلات، جرد، RFID) مع استبعاد سجلات System الفارغة
+            // 2) دمج العمليات التشغيلية الأخرى (كسر، تحويلات، جرد، RFID)
             if (includeOtherActivities && page == 1) {
-                ApiResponse actResp = getUnifiedActivity(branchId, Math.max(limit, 25));
+                int actFetchLimit = isManager ? Math.max(limit, 25) : 60;
+                ApiResponse actResp = getUnifiedActivity(branchId, actFetchLimit);
                 if (actResp != null && actResp.isSuccess && actResp.data != null) {
                     JSONArray actArr = extractArrayFromPayload(actResp.data, "activities");
                     if (actArr != null) {
                         for (int i = 0; i < actArr.length(); i++) {
                             JSONObject act = actArr.optJSONObject(i);
                             if (act == null) continue;
+
+                            // تطبيق العزل للموظفين غير المدراء
+                            if (!isManager && !matchesCurrentUser(act, userId, cleanUsername)) {
+                                continue;
+                            }
 
                             String saleRef = act.optString("sale_number",
                                     act.optString("invoice_number", "")).trim();
@@ -2601,7 +2619,6 @@ public ApiResponse getDashboardCharts(int branchId) {
                                     act.optString("action", "") + " " +
                                     act.optString("event", "")).toLowerCase(Locale.ROOT);
 
-                            // تجاهل سجلات النظام العامة الفارغة التي تسبب ظهور "System / عملية في النظام"
                             boolean isGenericSystem = rawType.trim().isEmpty()
                                     || rawType.contains("system")
                                     || rawType.contains("journal");
@@ -2644,10 +2661,14 @@ public ApiResponse getDashboardCharts(int branchId) {
                 finalArray.put(item);
             }
 
+            int effectiveTotal = isManager
+                    ? Math.max(totalSalesOnServer, finalArray.length())
+                    : finalArray.length();
+
             JSONObject wrapper = new JSONObject();
             wrapper.put("success", true);
             wrapper.put("activities", finalArray);
-            wrapper.put("total", Math.max(totalSalesOnServer, finalArray.length()));
+            wrapper.put("total", effectiveTotal);
             wrapper.put("has_more", hasMoreSales);
 
             return new ApiResponse(200, wrapper, null);
@@ -2657,69 +2678,62 @@ public ApiResponse getDashboardCharts(int branchId) {
         }
     }
 
-    private JSONObject normalizeSaleAsUnifiedOperation(JSONObject sale) {
-        try {
-            JSONObject copy = new JSONObject(sale.toString());
-            String saleNo = copy.optString("sale_number",
-                    copy.optString("invoice_number",
-                            copy.optString("sale_id", copy.optString("id", "—"))));
+    /**
+     * التحقق من ملكية العملية للموظف الحالي (بالـ ID أولاً ثم بالاسم كبديل)
+     */
+    private boolean matchesCurrentUser(JSONObject record, int currentUserId, String currentUsername) {
+        if (record == null) return false;
 
-            String refundStatus = copy.optString("refund_status",
-                    copy.optString("status", "completed")).toLowerCase(Locale.ROOT);
-            boolean isRefund = refundStatus.contains("refund");
+        int[] candidateIds = new int[]{
+                record.optInt("user_id", 0),
+                record.optInt("cashier_id", 0),
+                record.optInt("employee_id", 0),
+                record.optInt("seller_id", 0),
+                record.optInt("created_by", 0),
+                record.optInt("operator_id", 0)
+        };
 
-            copy.put("type", isRefund ? "refund" : "sale");
-            copy.put("action", isRefund ? "SALE_REFUNDED" : "SALE_COMPLETED");
-            copy.put("sale_number", saleNo);
+        JSONObject nestedUser = record.optJSONObject("user");
+        int nestedUserId = (nestedUser != null) ? nestedUser.optInt("id", 0) : 0;
 
-            if (!copy.has("timestamp") || copy.optString("timestamp").isEmpty()) {
-                copy.put("timestamp", copy.optString("created_at", copy.optString("date", "")));
+        boolean hasAnyNumericId = nestedUserId > 0;
+        for (int id : candidateIds) {
+            if (id > 0) {
+                hasAnyNumericId = true;
+                break;
             }
-            if (!copy.has("user") || copy.optString("user").isEmpty()) {
-                String cashier = copy.optString("cashier_name",
-                        copy.optString("employee_name",
-                                copy.optString("username", "")));
-                if (!cashier.isEmpty()) copy.put("user", cashier);
+        }
+
+        if (currentUserId > 0 && hasAnyNumericId) {
+            if (nestedUserId == currentUserId) return true;
+            for (int id : candidateIds) {
+                if (id == currentUserId) return true;
             }
-            return copy;
-        } catch (Exception e) {
-            return sale;
+            return false;
         }
-    }
 
-    private String mapActivityType(String rawType) {
-        if (rawType.contains("refund")) return "refund";
-        if (rawType.contains("sale") || rawType.contains("pos")) return "sale";
-        if (rawType.contains("scrap") || rawType.contains("buy")) return "scrap";
-        if (rawType.contains("transfer") || rawType.contains("move")) return "transfer";
-        if (rawType.contains("inventory") || rawType.contains("audit")) return "inventory";
-        if (rawType.contains("rfid") || rawType.contains("encode") || rawType.contains("gate")) return "rfid";
-        return "system";
-    }
-
-    private JSONArray extractArrayFromPayload(JSONObject root, String primaryKey) {
-        if (root == null) return null;
-        if (root.optJSONArray(primaryKey) != null) return root.optJSONArray(primaryKey);
-        if (root.optJSONArray("data") != null) return root.optJSONArray("data");
-        if (root.optJSONArray("items") != null) return root.optJSONArray("items");
-        JSONObject nested = root.optJSONObject("data");
-        if (nested != null) {
-            if (nested.optJSONArray("data") != null) return nested.optJSONArray("data");
-            if (nested.optJSONArray(primaryKey) != null) return nested.optJSONArray(primaryKey);
-            if (nested.optJSONArray("items") != null) return nested.optJSONArray("items");
+        if (currentUsername != null && !currentUsername.isEmpty()) {
+            String target = currentUsername.trim().toLowerCase(Locale.ROOT);
+            String[] candidateNames = new String[]{
+                    record.optString("cashier_name", ""),
+                    record.optString("employee_name", ""),
+                    record.optString("seller_name", ""),
+                    record.optString("username", ""),
+                    record.optString("user", ""),
+                    record.optString("created_by_name", ""),
+                    (nestedUser != null) ? nestedUser.optString("name", nestedUser.optString("username", "")) : ""
+            };
+            for (String name : candidateNames) {
+                if (name != null && !name.trim().isEmpty()) {
+                    String clean = name.trim().toLowerCase(Locale.ROOT);
+                    if (clean.equals(target)) return true;
+                }
+            }
         }
-        return null;
+
+        return false;
     }
 
-
-    public ApiResponse getUserActivityLogs(int userId, int limit) {
-        return getWithAuth("/activity/logs?user_id=" + userId + "&limit=" + limit);
-    }
-
-    public interface ApiCallback {
-        void onSuccess(ApiResponse response);
-        void onFailure(String errorMessage);
-    }
 
     public void get(final String endpoint, final ApiCallback callback) {
         networkExecutor.execute(() -> {
