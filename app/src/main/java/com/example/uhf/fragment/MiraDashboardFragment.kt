@@ -45,6 +45,7 @@ import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
 import com.example.uhf.manager.MiraBranchesManager
+import com.example.uhf.manager.PermissionManager
 import com.example.uhf.tools.RecentActivityCache
 import com.example.uhf.tools.SecureSessionManager
 import com.example.uhf.ui.dashboard.*
@@ -54,6 +55,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -65,6 +67,7 @@ class MiraDashboardFragment : Fragment() {
     companion object {
         private const val TAG = "MiraDashboardFragment"
         private const val DASHBOARD_CACHE_PREFS = "mira_dashboard_summary_cache_v2"
+        private const val PREFS_RESOLVED_ALERTS = "mira_resolved_alerts_v1"
     }
 
     private data class BranchChipOption(
@@ -84,6 +87,7 @@ class MiraDashboardFragment : Fragment() {
     private var apiClient: MiraApiClient? = null
     private var sessionManager: SecureSessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
+    private var permissionManager: PermissionManager? = null
     private var activityCache: RecentActivityCache? = null
 
     // حالات واجهة المستخدم التفاعلية
@@ -102,6 +106,7 @@ class MiraDashboardFragment : Fragment() {
     // التنبيهات
     private var alertsCountState by mutableIntStateOf(0)
     private var alertsMessageState by mutableStateOf("")
+    private var rawAlertsJsonState by mutableStateOf<String?>(null)
 
     // أسعار الذهب
     private var price24kLocalState by mutableDoubleStateOf(0.0)
@@ -121,6 +126,13 @@ class MiraDashboardFragment : Fragment() {
     private var totalVaultPiecesState by mutableIntStateOf(0)
     private var totalVaultWeightState by mutableDoubleStateOf(0.0)
     private var pure24kWeightState by mutableDoubleStateOf(0.0)
+
+    // حالات الرسوم البيانية (للبائع والمدير)
+    private var selectedChartDaysState by mutableIntStateOf(7)
+    private var chartPointsState by mutableStateOf<List<ChartPeriodPoint>>(emptyList())
+    private var staffTargetAmountState by mutableDoubleStateOf(0.0)
+    private var karatDistributionState by mutableStateOf<List<KaratDistributionItem>>(emptyList())
+    private var operationsBreakdownState by mutableStateOf<List<OperationSummaryMetric>>(emptyList())
 
     // السجل الموحد لآخر العمليات
     private var recentActivitiesState by mutableStateOf<List<JSONObject>>(emptyList())
@@ -155,6 +167,7 @@ class MiraDashboardFragment : Fragment() {
         apiClient = MiraApiClient.getInstance(ctx)
         sessionManager = SecureSessionManager.getInstance(ctx)
         branchesManager = MiraBranchesManager.getInstance(ctx)
+        permissionManager = PermissionManager.getInstance(ctx)
         activityCache = RecentActivityCache(ctx)
 
         initSessionAndBranchState()
@@ -170,6 +183,9 @@ class MiraDashboardFragment : Fragment() {
         isOnlineState = isNetworkAvailable()
         val latestBranch = resolveActiveBranchId()
         val latestUser = readIntProp(sessionManager, "userId", "id")
+
+        // إعادة احتساب التنبيهات المتبقية بعد العودة من شاشة حل التنبيهات
+        recalculateUnresolvedAlertsBadge()
 
         if (latestBranch != currentBranchId || latestUser != currentUserId) {
             initSessionAndBranchState()
@@ -238,11 +254,11 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    /**
-     * تحديد ما إذا كان المستخدم مديراً/مشرفاً (يرى عمليات الفرع بالكامل)
-     * أو موظف مبيعات/كاشير (يرى عملياته الشخصية فقط)
-     */
     private fun resolveIsManagerOrAdmin(sm: SecureSessionManager?, roleRaw: String): Boolean {
+        val pm = permissionManager
+        if (pm != null && (pm.isSystemAdmin || pm.isOrgAdmin || pm.isAdmin || pm.isManager || pm.isFinanceManager || pm.isAccountant)) {
+            return true
+        }
         val managerKeywords = setOf(
             "admin", "super_admin", "superadmin", "owner", "manager",
             "branch_manager", "general_manager", "supervisor", "director",
@@ -356,6 +372,10 @@ class MiraDashboardFragment : Fragment() {
             if (!savedPrices.isNullOrBlank()) {
                 applyGoldPricesJson(JSONObject(savedPrices))
             }
+            val savedCharts = prefs.getString("charts_b${currentBranchId}_d${selectedChartDaysState}", null)
+            if (!savedCharts.isNullOrBlank()) {
+                applyChartsJson(JSONObject(savedCharts))
+            }
 
             val cacheUserKey = if (isManagerState) 0 else currentUserId
             val cachedActs = activityCache?.load(currentBranchId, cacheUserKey)
@@ -366,13 +386,16 @@ class MiraDashboardFragment : Fragment() {
                 }
                 recentActivitiesState = cachedList
                 recomputeTodaySalesFromOperations(cachedList, forceOverride = !isManagerState)
+                if (chartPointsState.isEmpty()) {
+                    buildFallbackChartsFromOperations(cachedList, selectedChartDaysState)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "loadOfflineData error: ${e.message}")
         }
     }
 
-        private fun refreshAllDashboardData(forceNetwork: Boolean) {
+    private fun refreshAllDashboardData(forceNetwork: Boolean) {
         isOnlineState = isNetworkAvailable()
         if (!isOnlineState && !forceNetwork) return
         if (!ensureExecutor() || !isSessionValid()) return
@@ -382,8 +405,10 @@ class MiraDashboardFragment : Fragment() {
         val branchSnapshot = currentBranchId
         val managerSnapshot = isManagerState
         val userSnapshot = currentUserId
+        val daysSnapshot = selectedChartDaysState
 
         fetchRecentActivity()
+        fetchDashboardCharts(daysSnapshot)
 
         localExecutor?.execute {
             try {
@@ -406,7 +431,11 @@ class MiraDashboardFragment : Fragment() {
                     }
                 }
 
+                // جلب أسعار الذهب مع fallback تلقائي إذا فشل المسار الأول
                 val pricesResp = client?.getGoldPricesSmart(branchSnapshot)
+                    ?: invokeApiMethod("getCurrentGoldRates")
+                    ?: invokeApiMethod("getGoldRates")
+
                 if (pricesResp != null && pricesResp.isSuccess && pricesResp.data != null) {
                     val pJson = pricesResp.data!!
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
@@ -433,6 +462,225 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
+    /**
+     * جلب بيانات الرسوم البيانية (للبائع: سجل إنجازه | للمدراء: التحليلات المتعددة)
+     */
+    private fun fetchDashboardCharts(days: Int) {
+        val client = apiClient ?: return
+        if (!isAdded || isDestroyed || !isSessionValid() || !ensureExecutor()) return
+
+        val branchSnapshot = currentBranchId
+        val managerSnapshot = isManagerState
+        val userSnapshot = currentUserId
+
+        localExecutor?.execute {
+            try {
+                val endpoint = if (managerSnapshot) {
+                    "dashboard/app-charts?branch_id=$branchSnapshot&days=$days"
+                } else {
+                    "dashboard/app-charts?branch_id=$branchSnapshot&user_id=$userSnapshot&days=$days"
+                }
+                val resp = invokeApiMethod("get", endpoint)
+                    ?: invokeApiMethod("getDashboardCharts", branchSnapshot, days)
+                    ?: invokeApiMethod("getAccounting", "reports/sales/daily?branch_id=$branchSnapshot&days=$days")
+
+                if (resp != null && resp.isSuccess && resp.data != null) {
+                    val json = resp.data!!
+                    context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
+                        ?.edit()
+                        ?.putString("charts_b${branchSnapshot}_d$days", json.toString())
+                        ?.apply()
+
+                    mainHandler.post {
+                        if (!isDestroyed && isAdded && currentBranchId == branchSnapshot) {
+                            applyChartsJson(json)
+                        }
+                    }
+                } else {
+                    mainHandler.post {
+                        if (!isDestroyed && isAdded && chartPointsState.isEmpty()) {
+                            buildFallbackChartsFromOperations(recentActivitiesState, days)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchDashboardCharts fallback to local ops: ${e.message}")
+                mainHandler.post {
+                    if (!isDestroyed && isAdded && chartPointsState.isEmpty()) {
+                        buildFallbackChartsFromOperations(recentActivitiesState, days)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyChartsJson(root: JSONObject) {
+        val data = root.optJSONObject("data") ?: root
+
+        // 1. استخراج السلسلة الزمنية (للبائع والمدير)
+        val seriesArr = data.optJSONArray("series")
+            ?: data.optJSONArray("daily")
+            ?: data.optJSONArray("chart_data")
+            ?: data.optJSONArray("sales_trend")
+
+        val parsedPoints = mutableListOf<ChartPeriodPoint>()
+        if (seriesArr != null) {
+            for (i in 0 until seriesArr.length()) {
+                val item = seriesArr.optJSONObject(i) ?: continue
+                val label = item.optString("label", item.optString("date", item.optString("day", "#${i + 1}")))
+                val sales = item.optDouble("sales", item.optDouble("total_local", item.optDouble("amount", 0.0)))
+                val scrap = item.optDouble("scrap", item.optDouble("scrap_total", 0.0))
+                val refund = item.optDouble("refunds", item.optDouble("returns", 0.0))
+                val count = item.optInt("count", item.optInt("invoices", 0))
+                val weight = item.optDouble("weight", item.optDouble("sold_weight", 0.0))
+                parsedPoints.add(ChartPeriodPoint(label, sales, scrap, refund, count, weight))
+            }
+        }
+
+        if (parsedPoints.isNotEmpty()) {
+            chartPointsState = parsedPoints
+        } else {
+            buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
+        }
+
+        // هدف البائع إن وُجد
+        val target = data.optDouble("staff_target", data.optDouble("target_amount", 0.0))
+        if (target > 0.0) staffTargetAmountState = target
+
+        // 2. توزيع العيارات (للمدراء)
+        val karatArr = data.optJSONArray("by_karat") ?: data.optJSONArray("karat_distribution")
+        if (karatArr != null && karatArr.length() > 0) {
+            val karats = mutableListOf<KaratDistributionItem>()
+            val palette = listOf(Color(0xFFD4AF37), Color(0xFF10B981), Color(0xFF06B6D4), Color(0xFFA855F7))
+            for (i in 0 until karatArr.length()) {
+                val kObj = karatArr.optJSONObject(i) ?: continue
+                val kName = kObj.optString("karat", kObj.optString("gold_karat", "21K"))
+                val w = kObj.optDouble("weight", kObj.optDouble("total_weight", 0.0))
+                val amt = kObj.optDouble("amount", kObj.optDouble("total_local", 0.0))
+                if (w > 0.0 || amt > 0.0) {
+                    karats.add(KaratDistributionItem(kName, w, amt, palette[i % palette.size]))
+                }
+            }
+            if (karats.isNotEmpty()) karatDistributionState = karats
+        }
+
+        // 3. ملخص حركة العمليات (للمدراء)
+        val opsObj = data.optJSONObject("operations_summary") ?: data.optJSONObject("counts")
+        if (opsObj != null) {
+            operationsBreakdownState = listOf(
+                OperationSummaryMetric("المبيعات (POS)", "POS Sales", opsObj.optInt("sales", todayInvoicesCountState), Color(0xFF10B981)),
+                OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", opsObj.optInt("scrap", 0), Color(0xFFF59E0B)),
+                OperationSummaryMetric("التحويلات المخزنية", "Transfers", opsObj.optInt("transfers", 0), Color(0xFFA855F7)),
+                OperationSummaryMetric("جلسات الجرد", "Inventory Scans", opsObj.optInt("inventory", 0), Color(0xFF06B6D4))
+            )
+        }
+    }
+
+    /**
+     * بناء الرسم البياني تلقائياً من العمليات المحملة إذا لم تتوفر سلسلة زمنية من السيرفر
+     */
+    private fun buildFallbackChartsFromOperations(ops: List<JSONObject>, days: Int) {
+        val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val sdfLabel = SimpleDateFormat("MM/dd", Locale.US)
+        val cal = Calendar.getInstance()
+
+        val buckets = linkedMapOf<String, MutableList<JSONObject>>()
+        val labelsMap = mutableMapOf<String, String>()
+
+        val displayDays = days.coerceAtMost(14)
+        cal.add(Calendar.DAY_OF_YEAR, -(displayDays - 1))
+        for (i in 0 until displayDays) {
+            val d = cal.time
+            val key = sdfKey.format(d)
+            buckets[key] = mutableListOf()
+            labelsMap[key] = sdfLabel.format(d)
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        val karatWeights = mutableMapOf("24K" to 0.0, "21K" to 0.0, "18K" to 0.0)
+        var salesCnt = 0
+        var scrapCnt = 0
+        var transferCnt = 0
+        var invCnt = 0
+
+        for (op in ops) {
+            val type = op.optString("type", "").lowercase(Locale.ROOT)
+            val ts = op.optString("created_at", op.optString("timestamp", ""))
+            val dayKey = if (ts.length >= 10) ts.substring(0, 10) else ""
+            if (buckets.containsKey(dayKey)) {
+                buckets[dayKey]?.add(op)
+            }
+
+            when {
+                type.contains("sale") -> salesCnt++
+                type.contains("scrap") -> scrapCnt++
+                type.contains("transfer") -> transferCnt++
+                type.contains("inv") || type.contains("scan") -> invCnt++
+            }
+
+            val k = op.optString("karat", op.optString("gold_karat", "")).uppercase(Locale.US)
+            val w = op.optDouble("total_weight", op.optDouble("weight", 0.0))
+            if (w > 0.0) {
+                when {
+                    k.contains("24") -> karatWeights["24K"] = (karatWeights["24K"] ?: 0.0) + w
+                    k.contains("21") -> karatWeights["21K"] = (karatWeights["21K"] ?: 0.0) + w
+                    k.contains("18") -> karatWeights["18K"] = (karatWeights["18K"] ?: 0.0) + w
+                }
+            }
+        }
+
+        val points = buckets.map { (key, dayOps) ->
+            var sAmt = 0.0
+            var scAmt = 0.0
+            var rfAmt = 0.0
+            var sCount = 0
+            var sWeight = 0.0
+
+            for (op in dayOps) {
+                val t = op.optString("type", "").lowercase(Locale.ROOT)
+                val amt = op.optDouble("final_amount", op.optDouble("total_amount", 0.0))
+                val w = op.optDouble("total_weight", op.optDouble("weight", 0.0))
+                when {
+                    t == "sale" -> {
+                        sAmt += amt
+                        sCount++
+                        sWeight += w
+                    }
+                    t.contains("scrap") -> scAmt += amt
+                    t.contains("refund") -> rfAmt += amt
+                }
+            }
+            ChartPeriodPoint(
+                label = labelsMap[key] ?: key,
+                salesAmount = sAmt,
+                scrapAmount = scAmt,
+                refundAmount = rfAmt,
+                invoicesCount = sCount,
+                weightGrams = sWeight
+            )
+        }
+
+        chartPointsState = points
+
+        if (isManagerState) {
+            if (karatDistributionState.isEmpty() && karatWeights.values.sum() > 0.0) {
+                karatDistributionState = listOf(
+                    KaratDistributionItem("24K", karatWeights["24K"] ?: 0.0, 0.0, Color(0xFFD4AF37)),
+                    KaratDistributionItem("21K", karatWeights["21K"] ?: 0.0, 0.0, Color(0xFF10B981)),
+                    KaratDistributionItem("18K", karatWeights["18K"] ?: 0.0, 0.0, Color(0xFF06B6D4))
+                ).filter { it.weightGrams > 0.0 }
+            }
+            if (operationsBreakdownState.isEmpty()) {
+                operationsBreakdownState = listOf(
+                    OperationSummaryMetric("المبيعات (POS)", "POS Sales", salesCnt.coerceAtLeast(todayInvoicesCountState), Color(0xFF10B981)),
+                    OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", scrapCnt, Color(0xFFF59E0B)),
+                    OperationSummaryMetric("التحويلات المخزنية", "Transfers", transferCnt, Color(0xFFA855F7)),
+                    OperationSummaryMetric("جلسات الجرد", "Inventory Scans", invCnt, Color(0xFF06B6D4))
+                )
+            }
+        }
+    }
+
     private fun fetchRecentActivity() {
         val client = apiClient ?: return
         if (!isAdded || isDestroyed || !isSessionValid() || !ensureExecutor()) return
@@ -451,7 +699,7 @@ class MiraDashboardFragment : Fragment() {
                     usernameSnapshot,
                     managerSnapshot,
                     1,
-                    10,
+                    25,
                     null,
                     "all"
                 )
@@ -470,6 +718,9 @@ class MiraDashboardFragment : Fragment() {
                                     itemsList,
                                     forceOverride = !managerSnapshot
                                 )
+                                if (chartPointsState.isEmpty()) {
+                                    buildFallbackChartsFromOperations(itemsList, selectedChartDaysState)
+                                }
                             }
                         }
                     }
@@ -483,8 +734,6 @@ class MiraDashboardFragment : Fragment() {
     private fun applyDashboardSummaryJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
 
-        // للمدراء: تُعرض إجماليات الفرع كاملة
-        // للموظفين: نبحث أولاً عن الحقول الشخصية (my_today_sales) وإلا تُحسب من مبيعات الموظف
         if (isManagerState) {
             val salesObj = data.optJSONObject("today_sales") ?: data.optJSONObject("sales") ?: data
             val sLocal = salesObj.optDouble(
@@ -538,53 +787,179 @@ class MiraDashboardFragment : Fragment() {
         if (weight > 0.0) totalVaultWeightState = weight
         if (pure24 > 0.0) pure24kWeightState = pure24
 
-        // التنبيهات (للمدراء)
+        // التنبيهات (للمدراء مع استبعاد ما تم حلّه في شاشة التنبيهات)
         if (isManagerState) {
             val alertsObj = data.optJSONObject("alerts")
+            val itemsArr = alertsObj?.optJSONArray("items") ?: data.optJSONArray("alerts_list")
+            if (itemsArr != null) {
+                rawAlertsJsonState = itemsArr.toString()
+            }
             val aCount = alertsObj?.optInt("count", 0) ?: data.optInt("alerts_count", 0)
-            alertsCountState = aCount
-            if (aCount > 0) {
+            val resolvedPrefs = context?.getSharedPreferences(PREFS_RESOLVED_ALERTS, Context.MODE_PRIVATE)
+            val summaryId = "summary_alert_${currentBranchId}_$aCount"
+
+            if (aCount > 0 && resolvedPrefs?.contains(summaryId) != true) {
+                alertsCountState = aCount
                 alertsMessageState = alertsObj?.optString("latest_message", "")
                     ?.takeIf { it.isNotBlank() }
                     ?: (if (isArabic) "يوجد $aCount تنبيهات تتطلب مراجعتك" else "$aCount alerts require attention")
+            } else {
+                alertsCountState = 0
             }
         } else {
             alertsCountState = 0
         }
 
-        if (data.has("gold_prices") || data.has("prices")) {
+        if (data.has("gold_prices") || data.has("prices") || data.has("rates")) {
             applyGoldPricesJson(data)
         }
     }
 
+    /**
+     * قراءة وتحويل أسعار الذهب بدقة عالية من جميع صيغ استجابات السيرفر
+     */
     private fun applyGoldPricesJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
-        val prices = data.optJSONObject("gold_prices") ?: data.optJSONObject("prices") ?: data
+        val prices = data.optJSONObject("gold_prices")
+            ?: data.optJSONObject("prices")
+            ?: data.optJSONObject("rate")
+            ?: data.optJSONObject("current")
+            ?: data
 
-        val rate = prices.optDouble("exchange_rate", data.optDouble("exchange_rate", 0.0))
+        val rate = findDoubleCaseInsensitive(
+            prices,
+            "exchange_rate", "usd_rate", "rate"
+        ).takeIf { it > 0.0 } ?: findDoubleCaseInsensitive(data, "exchange_rate", "usd_rate")
         if (rate > 0.0) exchangeRateState = rate
 
-        val curr = prices.optString("currency", data.optString("currency", "YER")).ifBlank { "YER" }
-        localCurrencyState = curr.uppercase(Locale.US)
+        val rawCurr = findStringCaseInsensitive(
+            prices,
+            "local_currency", "currency_code", "currency"
+        ).ifBlank {
+            findStringCaseInsensitive(data, "local_currency", "currency_code", "currency")
+        }.ifBlank { "YER" }
+        val curr = rawCurr.uppercase(Locale.US)
+        localCurrencyState = curr
 
-        val p24 = prices.optDouble("karat_24", prices.optDouble("24k", prices.optDouble("price_24k", 0.0)))
-        val p21 = prices.optDouble("karat_21", prices.optDouble("21k", prices.optDouble("price_21k", 0.0)))
-        val p18 = prices.optDouble("karat_18", prices.optDouble("18k", prices.optDouble("price_18k", 0.0)))
-        val p24Usd = prices.optDouble("karat_24_usd", prices.optDouble("24k_usd", 0.0))
+        var p24Local = findDoubleCaseInsensitive(
+            prices,
+            "price_24k_local", "karat_24_local", "sell_24k_local", "local_24k",
+            "karat_24", "24k", "24K", "price_24k", "sell_24k", "gram_24k"
+        )
+        var p21Local = findDoubleCaseInsensitive(
+            prices,
+            "price_21k_local", "karat_21_local", "sell_21k_local", "local_21k",
+            "karat_21", "21k", "21K", "price_21k", "sell_21k", "gram_21k"
+        )
+        var p18Local = findDoubleCaseInsensitive(
+            prices,
+            "price_18k_local", "karat_18_local", "sell_18k_local", "local_18k",
+            "karat_18", "18k", "18K", "price_18k", "sell_18k", "gram_18k"
+        )
+        var p24Usd = findDoubleCaseInsensitive(
+            prices,
+            "price_24k_usd", "karat_24_usd", "24k_usd", "24K_usd", "usd_24k"
+        )
 
-        if (p24 > 0.0) price24kLocalState = p24
-        if (p21 > 0.0) price21kLocalState = p21
-        if (p18 > 0.0) price18kLocalState = p18
+        // دعم استجابة السيرفر عندما تكون rates مصفوفة JSONArray
+        val ratesArr = prices.optJSONArray("rates") ?: data.optJSONArray("rates")
+        if (ratesArr != null) {
+            for (i in 0 until ratesArr.length()) {
+                val rObj = ratesArr.optJSONObject(i) ?: continue
+                val kLabel = rObj.optString("karat", rObj.optString("name", "")).uppercase(Locale.US)
+                val localVal = findDoubleCaseInsensitive(
+                    rObj,
+                    "sell_price_local", "price_local", "local_price", "sell_price", "price", "rate"
+                )
+                val usdVal = findDoubleCaseInsensitive(rObj, "price_usd", "sell_price_usd", "usd_price")
+                when {
+                    kLabel.contains("24") -> {
+                        if (localVal > 0.0) p24Local = localVal
+                        if (usdVal > 0.0) p24Usd = usdVal
+                    }
+                    kLabel.contains("21") -> if (localVal > 0.0) p21Local = localVal
+                    kLabel.contains("18") -> if (localVal > 0.0) p18Local = localVal
+                }
+            }
+        }
+
+        // تصحيح ذكي: إذا أرجع السيرفر سعر الدولار في karat_24 بينما العملة المحلية YER وسعر الصرف > 10
+        if (curr != "USD" && exchangeRateState > 10.0 && p24Local > 0.0 && p24Local < 500.0) {
+            if (p24Usd <= 0.0) p24Usd = p24Local
+            p24Local *= exchangeRateState
+            if (p21Local in 1.0..500.0) p21Local *= exchangeRateState
+            if (p18Local in 1.0..500.0) p18Local *= exchangeRateState
+        }
+
+        // اشتقاق عيار 21 و 18 تلقائياً من عيار 24 إذا كان عيار 24 متوفراً والبقية صفر
+        if (p24Local > 0.0) {
+            if (p21Local <= 0.0) p21Local = p24Local * (21.0 / 24.0)
+            if (p18Local <= 0.0) p18Local = p24Local * (18.0 / 24.0)
+        }
+
+        if (p24Local > 0.0) price24kLocalState = p24Local
+        if (p21Local > 0.0) price21kLocalState = p21Local
+        if (p18Local > 0.0) price18kLocalState = p18Local
+
         if (p24Usd > 0.0) {
             price24kUsdState = p24Usd
-        } else if (p24 > 0.0 && exchangeRateState > 0.0) {
-            price24kUsdState = p24 / exchangeRateState
+        } else if (p24Local > 0.0 && curr == "USD") {
+            price24kUsdState = p24Local
+        } else if (p24Local > 0.0 && exchangeRateState > 0.0) {
+            price24kUsdState = p24Local / exchangeRateState
         }
 
         pricesLastUpdatedState = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
     }
 
-        private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
+    private fun findDoubleCaseInsensitive(obj: JSONObject?, vararg keys: String): Double {
+        if (obj == null) return 0.0
+        for (k in keys) {
+            if (obj.has(k)) {
+                val v = obj.optDouble(k, 0.0)
+                if (!v.isNaN() && v > 0.0) return v
+            }
+            val it = obj.keys()
+            while (it.hasNext()) {
+                val actualKey = it.next()
+                if (actualKey.equals(k, ignoreCase = true)) {
+                    val v = obj.optDouble(actualKey, 0.0)
+                    if (!v.isNaN() && v > 0.0) return v
+                }
+            }
+        }
+        return 0.0
+    }
+
+    private fun findStringCaseInsensitive(obj: JSONObject?, vararg keys: String): String {
+        if (obj == null) return ""
+        for (k in keys) {
+            if (obj.has(k)) {
+                val v = obj.optString(k, "").trim()
+                if (v.isNotEmpty() && v != "null") return v
+            }
+            val it = obj.keys()
+            while (it.hasNext()) {
+                val actualKey = it.next()
+                if (actualKey.equals(k, ignoreCase = true)) {
+                    val v = obj.optString(actualKey, "").trim()
+                    if (v.isNotEmpty() && v != "null") return v
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun recalculateUnresolvedAlertsBadge() {
+        val ctx = context ?: return
+        val prefs = ctx.getSharedPreferences(PREFS_RESOLVED_ALERTS, Context.MODE_PRIVATE)
+        val summaryId = "summary_alert_${currentBranchId}_$alertsCountState"
+        if (alertsCountState > 0 && prefs.contains(summaryId)) {
+            alertsCountState = 0
+        }
+    }
+
+    private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
         if (!forceOverride && todayInvoicesCountState > 0 && todaySoldWeightState > 0.0) return
         val todayPrefix = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         var count = 0
@@ -620,7 +995,6 @@ class MiraDashboardFragment : Fragment() {
             if (sumWeight > 0.0 || forceOverride) todaySoldWeightState = sumWeight
         }
     }
-
 
     private fun extractActivitiesArray(root: JSONObject?): JSONArray? {
         if (root == null) return null
@@ -703,6 +1077,11 @@ class MiraDashboardFragment : Fragment() {
         navigateToFragment(MiraAllActivitiesFragment(), "AllActivities")
     }
 
+    private fun navigateToAlertsCenter() {
+        val alertsFragment = MiraAlertsCenterFragment.newInstance(rawAlertsJsonState, isArabic)
+        navigateToFragment(alertsFragment, "AlertsCenter")
+    }
+
     private fun navigateToFragment(fragment: Fragment, tag: String) {
         if (!isAdded) return
         try {
@@ -723,21 +1102,12 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    private fun createFragmentByClassName(className: String, fallback: () -> Fragment): Fragment {
-        return try {
-            val clazz = Class.forName(className)
-            (clazz.getDeclaredConstructor().newInstance() as? Fragment) ?: fallback()
-        } catch (_: Exception) {
-            fallback()
-        }
-    }
-
     private fun handleQuickAction(action: QuickActionItem) {
         if (action.tag == "sync_rates") {
             refreshAllDashboardData(forceNetwork = true)
             Toast.makeText(
                 context,
-                if (isArabic) "جاري تحديث الأسعار والبيانات..." else "Syncing rates & data...",
+                if (isArabic) "جاري تحديث الأسعار والرسوم البيانية..." else "Syncing rates & charts...",
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -755,66 +1125,98 @@ class MiraDashboardFragment : Fragment() {
         val scrollState = rememberScrollState()
         val isAr = isArabic
 
-        val quickActions = remember(isAr) {
-            listOf(
-                QuickActionItem(
-                    tag = "Sales",
-                    titleAr = "نقطة البيع",
-                    titleEn = "POS Sale",
-                    icon = Icons.Rounded.PointOfSale,
-                    accentColor = Color(0xFF10B981),
-                    fragmentProvider = { MiraPosFragment() }
-                ),
-                QuickActionItem(
-                    tag = "SalesHistory",
-                    titleAr = "سجل المبيعات",
-                    titleEn = "Invoices",
-                    icon = Icons.Rounded.ReceiptLong,
-                    accentColor = Color(0xFFD4AF37),
-                    fragmentProvider = { MiraSalesHistoryFragment() }
-                ),
-                QuickActionItem(
-                    tag = "Scan",
-                    titleAr = "الجرد الذكي",
-                    titleEn = "Inventory",
-                    icon = Icons.Rounded.Inventory2,
-                    accentColor = Color(0xFF06B6D4),
-                    fragmentProvider = { MiraInventoryProFragment() }
-                ),
-                QuickActionItem(
-                    tag = "Transfers",
-                    titleAr = "التحويلات",
-                    titleEn = "Transfers",
-                    icon = Icons.Rounded.SwapHoriz,
-                    accentColor = Color(0xFFA855F7),
-                    fragmentProvider = { MiraTransferFragment() }
-                ),
-                QuickActionItem(
-                    tag = "Scrap",
-                    titleAr = "شراء كسر",
-                    titleEn = "Scrap Gold",
-                    icon = Icons.Rounded.Scale,
-                    accentColor = Color(0xFFF59E0B),
-                    fragmentProvider = {
-                        createFragmentByClassName("com.example.uhf.fragment.MiraScrapFragment") {
-                            MiraPosFragment().apply {
-                                arguments = Bundle().apply { putBoolean("open_scrap_mode", true) }
-                            }
-                        }
-                    }
-                ),
-                QuickActionItem(
-                    tag = "Encode",
-                    titleAr = "تشفير RFID",
-                    titleEn = "Encode Tag",
-                    icon = Icons.Rounded.Contactless,
-                    accentColor = Color(0xFF3B82F6),
-                    fragmentProvider = {
-                        createFragmentByClassName("com.example.uhf.fragment.MiraEncodeFragment") {
-                            MiraInventoryProFragment()
-                        }
-                    }
-                ),
+        // أزرار الإجراءات السريعة المضبوطة لوجهاتها الصحيحة حسب الصلاحيات
+        val quickActions = remember(isAr, isManagerState) {
+            val pm = permissionManager
+            val list = mutableListOf<QuickActionItem>()
+
+            if (pm == null || pm.canUsePos() || isManagerState) {
+                list.add(
+                    QuickActionItem(
+                        tag = "POS",
+                        titleAr = "نقطة البيع",
+                        titleEn = "POS Sale",
+                        icon = Icons.Rounded.PointOfSale,
+                        accentColor = Color(0xFF10B981),
+                        fragmentProvider = { MiraPosFragment() }
+                    )
+                )
+                list.add(
+                    QuickActionItem(
+                        tag = "SalesHistory",
+                        titleAr = "سجل المبيعات",
+                        titleEn = "Invoices",
+                        icon = Icons.Rounded.ReceiptLong,
+                        accentColor = Color(0xFFD4AF37),
+                        fragmentProvider = { MiraSalesHistoryFragment() }
+                    )
+                )
+            }
+
+            // زر الجرد الرئيسي يذهب إلى داشبورد الجرد (MiraInventoryFragment) كما كان سابقاً
+            if (pm == null || pm.canViewInventory() || isManagerState) {
+                list.add(
+                    QuickActionItem(
+                        tag = "MiraInventory",
+                        titleAr = "لوحة الجرد",
+                        titleEn = "Inventory Hub",
+                        icon = Icons.Rounded.Inventory2,
+                        accentColor = Color(0xFF06B6D4),
+                        fragmentProvider = { MiraInventoryFragment() }
+                    )
+                )
+                list.add(
+                    QuickActionItem(
+                        tag = "Scan",
+                        titleAr = "جرد فوري",
+                        titleEn = "Quick Scan",
+                        icon = Icons.Rounded.QrCodeScanner,
+                        accentColor = Color(0xFF38BDF8),
+                        fragmentProvider = { MiraInventoryProFragment() }
+                    )
+                )
+            }
+
+            if (pm == null || pm.canViewTransfers() || isManagerState) {
+                list.add(
+                    QuickActionItem(
+                        tag = "Transfers",
+                        titleAr = "التحويلات",
+                        titleEn = "Transfers",
+                        icon = Icons.Rounded.SwapHoriz,
+                        accentColor = Color(0xFFA855F7),
+                        fragmentProvider = { MiraTransferFragment() }
+                    )
+                )
+            }
+
+            if (pm == null || pm.canUsePos() || pm.canViewInventory() || isManagerState) {
+                list.add(
+                    QuickActionItem(
+                        tag = "ScrapGoldBuy",
+                        titleAr = "شراء كسر",
+                        titleEn = "Scrap Gold",
+                        icon = Icons.Rounded.Scale,
+                        accentColor = Color(0xFFF59E0B),
+                        fragmentProvider = { MiraScrapGoldBuyFragment() }
+                    )
+                )
+            }
+
+            if (pm == null || pm.canViewInventory() || isManagerState) {
+                list.add(
+                    QuickActionItem(
+                        tag = "IdentityStudio",
+                        titleAr = "تشفير RFID",
+                        titleEn = "Encode Tag",
+                        icon = Icons.Rounded.Contactless,
+                        accentColor = Color(0xFF3B82F6),
+                        fragmentProvider = { MiraIdentityStudioFragment() }
+                    )
+                )
+            }
+
+            list.add(
                 QuickActionItem(
                     tag = "AllActivities",
                     titleAr = "كل العمليات",
@@ -822,7 +1224,10 @@ class MiraDashboardFragment : Fragment() {
                     icon = Icons.Rounded.History,
                     accentColor = Color(0xFFEC4899),
                     fragmentProvider = { MiraAllActivitiesFragment() }
-                ),
+                )
+            )
+
+            list.add(
                 QuickActionItem(
                     tag = "sync_rates",
                     titleAr = "تحديث فوري",
@@ -832,6 +1237,7 @@ class MiraDashboardFragment : Fragment() {
                     fragmentProvider = { MiraDashboardFragment() }
                 )
             )
+            list
         }
 
         Surface(
@@ -863,13 +1269,11 @@ class MiraDashboardFragment : Fragment() {
                         onRefresh = { refreshAllDashboardData(forceNetwork = true) }
                     )
 
-                    // شارة توضيح نطاق الصلاحية (للمدير: جميع عمليات الفرع | للموظف: عملياتي فقط)
                     RoleVisibilityScopeBadge(
                         isArabic = isAr,
                         isManager = isManagerState
                     )
 
-                    // مبدّل الفروع للمدراء فقط
                     if (isManagerState && branchesListState.size > 1) {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -910,12 +1314,13 @@ class MiraDashboardFragment : Fragment() {
                         }
                     }
 
+                    // شريط التنبيهات: يفتح شاشة مركز التنبيهات وحلّها MiraAlertsCenterFragment
                     if (alertsCountState > 0) {
                         AlertsBannerCard(
                             isArabic = isAr,
                             count = alertsCountState,
                             message = alertsMessageState,
-                            onClick = { navigateToAllActivities() }
+                            onClick = { navigateToAlertsCenter() }
                         )
                     }
 
@@ -925,6 +1330,36 @@ class MiraDashboardFragment : Fragment() {
                         isArabic = isAr,
                         isManager = isManagerState
                     )
+
+                    // ═══ الرسوم البيانية المخصصة حسب الصلاحية ═══
+                    if (isManagerState) {
+                        ManagerAnalyticsChartsSection(
+                            isArabic = isAr,
+                            currency = localCurrencyState,
+                            points = chartPointsState,
+                            karatItems = karatDistributionState,
+                            operationsBreakdown = operationsBreakdownState,
+                            selectedDays = selectedChartDaysState,
+                            maskAmounts = maskAmountsState,
+                            onPeriodChange = { newDays ->
+                                selectedChartDaysState = newDays
+                                fetchDashboardCharts(newDays)
+                            }
+                        )
+                    } else {
+                        StaffAchievementChartCard(
+                            isArabic = isAr,
+                            currency = localCurrencyState,
+                            points = chartPointsState,
+                            selectedDays = selectedChartDaysState,
+                            targetAmount = staffTargetAmountState,
+                            maskAmounts = maskAmountsState,
+                            onPeriodChange = { newDays ->
+                                selectedChartDaysState = newDays
+                                fetchDashboardCharts(newDays)
+                            }
+                        )
+                    }
 
                     QuickActionsSection(
                         isArabic = isAr,
@@ -1064,14 +1499,16 @@ class MiraDashboardFragment : Fragment() {
                     KaratRateChip(
                         karatLabel = if (isArabic) "عيار 21" else "21K",
                         priceText = if (price21kLocalState > 0.0) "${formatCompactNumber(price21kLocalState)} $curr" else "—",
-                        subText = null,
+                        subText = if (price21kLocalState > 0.0 && exchangeRateState > 0.0 && curr != "USD")
+                            String.format(Locale.US, "$%.2f", price21kLocalState / exchangeRateState) else null,
                         accent = Color(0xFF10B981),
                         modifier = Modifier.weight(1f)
                     )
                     KaratRateChip(
                         karatLabel = if (isArabic) "عيار 18" else "18K",
                         priceText = if (price18kLocalState > 0.0) "${formatCompactNumber(price18kLocalState)} $curr" else "—",
-                        subText = null,
+                        subText = if (price18kLocalState > 0.0 && exchangeRateState > 0.0 && curr != "USD")
+                            String.format(Locale.US, "$%.2f", price18kLocalState / exchangeRateState) else null,
                         accent = Color(0xFF06B6D4),
                         modifier = Modifier.weight(1f)
                     )
@@ -1207,7 +1644,6 @@ class MiraDashboardFragment : Fragment() {
                     )
                 }
 
-                // رصيد الخزينة الكلي يظهر للمدراء
                 if (isManager && (totalVaultPiecesState > 0 || totalVaultWeightState > 0.0)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
