@@ -665,7 +665,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
             zxingReader = new MultiFormatReader();
             Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
             hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
-            hints.put(DecodeHintType.ALSO_INVERTED, Boolean.TRUE);
             hints.put(DecodeHintType.POSSIBLE_FORMATS, Arrays.asList(
                     BarcodeFormat.DATA_MATRIX,
                     BarcodeFormat.QR_CODE,
