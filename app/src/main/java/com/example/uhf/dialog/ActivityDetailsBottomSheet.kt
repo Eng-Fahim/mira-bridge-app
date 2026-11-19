@@ -170,7 +170,8 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                 isHydratingDetails = true
                 val enriched: JSONObject? = withContext(Dispatchers.IO) {
                     try {
-                        val resp = MiraApiClient.getInstance(context).getSaleDetails(saleNoForFetch)
+                        val resp = MiraApiClient.getInstance(context).getSaleDetailsByNumber(saleNoForFetch)
+
                         if (resp != null && resp.isSuccess && resp.data != null) {
                             val saleObj = resp.data.optJSONObject("sale")
                                 ?: resp.data.optJSONObject("data")?.optJSONObject("sale")
