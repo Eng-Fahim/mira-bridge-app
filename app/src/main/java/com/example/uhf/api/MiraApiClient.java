@@ -1,13 +1,19 @@
 package com.example.uhf.api;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.example.uhf.BuildConfig;
 import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.MiraGatesSettings;
+import com.example.uhf.manager.MiraServerConfig;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.model.ItemModel;
 import com.example.uhf.model.MessageModel;
@@ -32,28 +38,28 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.net.ssl.HttpsURLConnection;
-
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
-import com.example.uhf.manager.PermissionManager;
+
+import javax.net.ssl.HttpsURLConnection;
 
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
 
     // ==================== الإعدادات العامة ====================
-    // ✅ مصدر الحقيقة الوحيد هو MiraServerConfig. هذه القيمة للطوارئ فقط.
     public static final String DEFAULT_SERVER_URL = "https://jewelry.ibreg.org/api";
     public static final String DEFAULT_BASE_URL = DEFAULT_SERVER_URL;
 
@@ -69,9 +75,8 @@ public class MiraApiClient {
 
     private static final long TOKEN_CACHE_MS = 30_000;
 
-    // ✅ غير final حتى يُعاد بناؤها عند تغيير السيرفر
     private volatile AccountingApiService accountingService;
-    private okhttp3.OkHttpClient accountingHttpClient;
+    private final okhttp3.OkHttpClient accountingHttpClient;
     private final Gson gson;
 
     private final Context context;
@@ -135,7 +140,6 @@ public class MiraApiClient {
                 .serializeNulls()
                 .create();
 
-        // 1. استخراج Base URL
         String savedBaseUrl = sessionManager.getServerUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
             savedBaseUrl = serverConfig.getBaseUrl();
@@ -146,17 +150,12 @@ public class MiraApiClient {
             serverConfig.setBaseUrl(savedBaseUrl);
         }
         this.baseUrl = normalizeBaseUrl(savedBaseUrl);
-
-        // 2. بناء OkHttp مرة واحدة (يُعاد استخدامه عند إعادة بناء Retrofit)
         this.accountingHttpClient = buildAccountingHttpClient();
-
-        // 3. بناء Retrofit
         this.accountingService = buildAccountingService(this.baseUrl);
 
         refreshCredentials();
     }
 
-    // ✅ مستخرج من الـ constructor ليسهل إعادة البناء
     private okhttp3.OkHttpClient buildAccountingHttpClient() {
         return new okhttp3.OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -166,35 +165,35 @@ public class MiraApiClient {
                     okhttp3.Request original = chain.request();
 
                     String token = "";
-                    String apiKey = "";
-                    String gateId = "";
+                    String key = "";
+                    String gate = "";
                     try {
                         token = getAuthToken();
-                        apiKey = getEffectiveApiKey();
-                        gateId = getEffectiveGateId();
+                        key = getEffectiveApiKey();
+                        gate = getEffectiveGateId();
                     } catch (Exception e) {
                         Log.w(TAG, "Auth read error: " + e.getClass().getSimpleName());
                     }
 
-                    if (com.example.uhf.BuildConfig.DEBUG) {
+                    if (BuildConfig.DEBUG) {
                         Log.d(TAG, "Net req: " + original.method() + " "
                                 + original.url().encodedPath()
-                                + " | key=" + (apiKey.isEmpty() ? "empty" : "set")
+                                + " | key=" + (key.isEmpty() ? "empty" : "set")
                                 + " tok=" + (token.isEmpty() ? "empty" : "set"));
                     }
 
                     okhttp3.Request.Builder builder = original.newBuilder()
                             .header("Accept", "application/json");
 
-                    if (!apiKey.isEmpty()) {
-                        builder.header("X-MIRA-API-Key", apiKey);
+                    if (!key.isEmpty()) {
+                        builder.header("X-MIRA-API-Key", key);
                     }
                     if (!token.isEmpty()) {
                         builder.header("Authorization", "Bearer " + token);
                         builder.header("X-MIRA-Auth-Token", token);
                     }
-                    if (!gateId.isEmpty()) {
-                        builder.header("X-MIRA-Gate-ID", gateId);
+                    if (!gate.isEmpty()) {
+                        builder.header("X-MIRA-Gate-ID", gate);
                     }
                     try {
                         String licenseToken = sessionManager.getActivationToken();
@@ -208,7 +207,6 @@ public class MiraApiClient {
                 .build();
     }
 
-    // ✅ مستخرج ليسهل إعادة البناء عند تغيير baseUrl
     private AccountingApiService buildAccountingService(String base) {
         return new retrofit2.Retrofit.Builder()
                 .baseUrl(normalizeBaseUrl(base) + ACCOUNTING_PREFIX + "/")
@@ -219,7 +217,7 @@ public class MiraApiClient {
     }
 
     public void shutdown() {
-        Log.d(TAG, "shutdown() — closing executors");
+        if (BuildConfig.DEBUG) Log.d(TAG, "shutdown() — closing executors");
         safeShutdown(executorService);
         safeShutdown(networkExecutor);
     }
@@ -237,12 +235,14 @@ public class MiraApiClient {
         }
     }
 
-    // ✅ يُعيد بناء accountingService أيضاً
     private void refreshCredentials() {
         synchronized (credentialsLock) {
             String cleanBaseUrl = normalizeBaseUrl(baseUrl);
             if (cleanBaseUrl.isEmpty()) {
                 cleanBaseUrl = normalizeBaseUrl(serverConfig.getBaseUrl());
+            }
+            if (cleanBaseUrl.isEmpty()) {
+                cleanBaseUrl = normalizeBaseUrl(DEFAULT_BASE_URL);
             }
             this.baseUrl = cleanBaseUrl;
             this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
@@ -268,7 +268,6 @@ public class MiraApiClient {
                 this.cachedTokenTimestamp = 0;
             }
 
-            // ✅ إعادة بناء Retrofit لتعكس baseUrl الجديد
             if (!cleanBaseUrl.isEmpty()) {
                 try {
                     this.accountingService = buildAccountingService(cleanBaseUrl);
@@ -277,16 +276,17 @@ public class MiraApiClient {
                 }
             }
 
-            Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
-                    + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
-                    + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId)
-                    + ", Token=" + (cachedToken == null ? "EMPTY" : "EXISTS"));
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Credentials refreshed: URL=" + apiUrl
+                        + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "EXISTS")
+                        + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId)
+                        + ", Token=" + (cachedToken == null ? "EMPTY" : "EXISTS"));
+            }
         }
     }
 
     private void refreshCredentialsAsync() {
         if (!credentialsRefreshPending.compareAndSet(false, true)) {
-            Log.d(TAG, "refreshCredentialsAsync — already pending, skipped");
             return;
         }
         executorService.execute(() -> {
@@ -303,6 +303,21 @@ public class MiraApiClient {
         String trimmed = url.trim();
         if (trimmed.isEmpty()) return "";
         return trimmed.endsWith("/") ? trimmed : trimmed + "/";
+    }
+
+    private String encodeParam(String value) {
+        if (value == null) return "";
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        } catch (Exception e) {
+            return value;
+        }
+    }
+
+    private String sanitizePathSegment(String segment) {
+        if (segment == null) return "";
+        String cleaned = segment.trim().replaceAll("[^a-zA-Z0-9._-]", "");
+        return encodeParam(cleaned);
     }
 
     public boolean reinitializeWithServer(String newServerUrl) {
@@ -361,9 +376,6 @@ public class MiraApiClient {
                     refreshCredentials();
 
                     success = pingApi();
-                    Log.d(TAG, "reinitializeWithServerAsync result: " + success);
-                } else {
-                    Log.e(TAG, "reinitializeWithServerAsync: empty URL");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "reinitializeWithServerAsync error: " + e.getMessage(), e);
@@ -393,15 +405,17 @@ public class MiraApiClient {
                     return key;
                 }
             } catch (Exception ignored) {}
+            try {
+                key = serverConfig.getApiKey();
+                if (key != null && !key.isEmpty()) {
+                    this.apiKey = key;
+                    return key;
+                }
+            } catch (Exception ignored) {}
         }
-        if (key == null || key.isEmpty()) {
-            Log.e(TAG, "⛔ API Key is empty! User must login first.");
-            return "";
-        }
-        return key;
+        return key != null ? key : "";
     }
 
-    // ✅ إضافة fallback من sessionManager و serverConfig
     private String getEffectiveGateId() {
         String gate = gateId;
         if (gate == null || gate.isEmpty()) {
@@ -419,7 +433,6 @@ public class MiraApiClient {
                     return gate;
                 }
             } catch (Exception ignored) {}
-            Log.w(TAG, "⛔ Gate ID is empty! User must login first.");
             return "";
         }
         return gate;
@@ -428,17 +441,15 @@ public class MiraApiClient {
     private String getAuthToken() {
         long now = System.currentTimeMillis();
         String cached = cachedToken;
-        if (cached != null && (now - cachedTokenTimestamp) < TOKEN_CACHE_MS) {
+        if (cached != null && !cached.isEmpty() && (now - cachedTokenTimestamp) < TOKEN_CACHE_MS) {
             return cached;
         }
 
         String token = sessionManager.getAuthToken();
-
         if (token == null || token.isEmpty()) {
             if (sessionManager.isLoggedIn()) {
                 String fallback = serverConfig.getAuthToken();
                 if (fallback != null && !fallback.isEmpty()) {
-                    Log.d(TAG, "Using fallback token");
                     token = fallback;
                 }
             }
@@ -447,14 +458,12 @@ public class MiraApiClient {
         String result = token != null ? token : "";
         cachedToken = result;
         cachedTokenTimestamp = now;
-
         return result;
     }
 
     public void invalidateTokenCache() {
         cachedToken = null;
         cachedTokenTimestamp = 0;
-        Log.d(TAG, "Token cache invalidated");
     }
 
     public boolean hasValidCredentials() {
@@ -462,8 +471,7 @@ public class MiraApiClient {
     }
 
     public boolean isAuthenticated() {
-        String token = getAuthToken();
-        return !token.isEmpty();
+        return !getAuthToken().isEmpty();
     }
 
     public String getGateId() { return getEffectiveGateId(); }
@@ -472,8 +480,8 @@ public class MiraApiClient {
     public String getAuthDiagnostics() {
         StringBuilder sb = new StringBuilder();
         String token = getAuthToken();
-        String key = apiKey != null ? apiKey : "";
-        String gate = gateId != null ? gateId : "";
+        String key = getEffectiveApiKey();
+        String gate = getEffectiveGateId();
 
         sb.append("Token: ").append(!token.isEmpty()
                 ? "✅ موجود (" + token.length() + " حرف)" : "❌ مفقود").append("\n");
@@ -486,13 +494,38 @@ public class MiraApiClient {
         return sb.toString();
     }
 
-    private void applyStandardHeaders(HttpURLConnection conn, boolean requiresAuth) {
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+    private HttpURLConnection openSecureConnection(String fullUrl) throws Exception {
+        URL url = new URL(fullUrl);
+        if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            String host = url.getHost();
+            boolean isLocal = "localhost".equalsIgnoreCase(host)
+                    || "127.0.0.1".equals(host)
+                    || "10.0.2.2".equals(host);
+            if (!(BuildConfig.DEBUG && isLocal)) {
+                throw new SecurityException("Refused non-HTTPS URL: " + url.getProtocol() + "://" + host);
+            }
+            return (HttpURLConnection) url.openConnection();
+        } else {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            return httpsConn;
+        }
+    }
+
+    private void applyStandardHeaders(HttpURLConnection conn, boolean requiresAuth, boolean isJsonBody) {
+        if (isJsonBody) {
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        }
         conn.setRequestProperty("Accept", "application/json");
 
         String effectiveKey = getEffectiveApiKey();
         if (!effectiveKey.isEmpty()) {
             conn.setRequestProperty("X-MIRA-API-Key", effectiveKey);
+        }
+
+        String effectiveGate = getEffectiveGateId();
+        if (!effectiveGate.isEmpty()) {
+            conn.setRequestProperty("X-MIRA-Gate-ID", effectiveGate);
         }
 
         if (requiresAuth) {
@@ -508,43 +541,23 @@ public class MiraApiClient {
             if (licenseToken != null && !licenseToken.isEmpty()) {
                 conn.setRequestProperty("X-MIRA-License-Token", licenseToken);
             }
-        } catch (Exception e) {
-            Log.w(TAG, "Could not read license token: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
     }
 
     public ApiResponse executeRequest(String method,
-                                       String endpoint,
-                                       JSONObject payload,
-                                       boolean requiresAuth,
-                                       int connectTimeout,
-                                       int readTimeout) {
+                                      String endpoint,
+                                      JSONObject payload,
+                                      boolean requiresAuth,
+                                      int connectTimeout,
+                                      int readTimeout) {
         HttpURLConnection conn = null;
         try {
             String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
             String fullUrl = apiUrl + cleanEndpoint;
-            URL url = new URL(fullUrl);
-
-            if (!"https".equalsIgnoreCase(url.getProtocol())) {
-                String host = url.getHost();
-                boolean isLocal = "localhost".equals(host)
-                               || "127.0.0.1".equals(host)
-                               || "10.0.2.2".equals(host);
-
-                if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-                    Log.e(TAG, "🚨 SECURITY: Refused non-HTTPS URL: "
-                        + url.getProtocol() + "://" + host);
-                    return networkError("يُشترط اتصال HTTPS آمن");
-                }
-                conn = (HttpURLConnection) url.openConnection();
-            } else {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            }
+            conn = openSecureConnection(fullUrl);
 
             conn.setRequestMethod(method);
-            applyStandardHeaders(conn, requiresAuth);
+            applyStandardHeaders(conn, requiresAuth, true);
             conn.setConnectTimeout(connectTimeout);
             conn.setReadTimeout(readTimeout);
 
@@ -558,11 +571,10 @@ public class MiraApiClient {
 
             return buildResponse(conn);
 
-        } catch (java.net.UnknownHostException e) {
-            return networkError(getFriendlyErrorMessage(e));
-        } catch (java.net.ConnectException e) {
-            return networkError(getFriendlyErrorMessage(e));
-        } catch (java.net.SocketTimeoutException e) {
+        } catch (SecurityException se) {
+            Log.e(TAG, "🚨 SECURITY: " + se.getMessage());
+            return networkError("يُشترط اتصال HTTPS آمن");
+        } catch (java.net.UnknownHostException | java.net.ConnectException | java.net.SocketTimeoutException e) {
             return networkError(getFriendlyErrorMessage(e));
         } catch (Exception e) {
             Log.e(TAG, "executeRequest error: " + e.getMessage(), e);
@@ -611,10 +623,9 @@ public class MiraApiClient {
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
 
-        Log.d(TAG, "═══════════════════════════════════════════");
-        Log.d(TAG, "📥 RESPONSE CODE: " + responseCode);
-        Log.d(TAG, "   Content-Encoding: " + conn.getContentEncoding());
-        Log.d(TAG, "   Content-Length: " + conn.getContentLength());
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "📥 RESPONSE CODE: " + responseCode + " | " + conn.getURL().getPath());
+        }
 
         InputStream rawStream = (responseCode >= 200 && responseCode < 300)
                 ? conn.getInputStream()
@@ -630,20 +641,16 @@ public class MiraApiClient {
         try {
             if (encoding != null && !encoding.isEmpty()) {
                 String enc = encoding.toLowerCase(Locale.US).trim();
-
                 if (enc.contains("br")) {
-                    Log.d(TAG, "   ✅ Decompressing Brotli...");
                     is = wrapBrotli(rawStream);
                 } else if (enc.contains("gzip")) {
-                    Log.d(TAG, "   ✅ Decompressing Gzip...");
                     is = new GZIPInputStream(rawStream);
                 } else if (enc.contains("deflate")) {
-                    Log.d(TAG, "   ✅ Decompressing Deflate...");
                     is = new InflaterInputStream(rawStream);
                 }
             }
         } catch (Throwable e) {
-            Log.e(TAG, "   ❌ Decompression error: " + e.getMessage());
+            Log.e(TAG, "Decompression error: " + e.getMessage());
             is = rawStream;
         }
 
@@ -659,10 +666,10 @@ public class MiraApiClient {
 
         String responseBody = response.toString().trim();
 
-        Log.d(TAG, "   ✅ Body length: " + responseBody.length());
-        Log.d(TAG, "   Preview: " + (responseBody.length() > 100
-                ? responseBody.substring(0, 100) + "..." : responseBody));
-        Log.d(TAG, "═══════════════════════════════════════════");
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Body length: " + responseBody.length() + " | Preview: "
+                    + (responseBody.length() > 120 ? responseBody.substring(0, 120) + "..." : responseBody));
+        }
 
         JSONObject json = null;
         String serverMessage = null;
@@ -672,53 +679,48 @@ public class MiraApiClient {
                 json = new JSONObject(responseBody);
                 serverMessage = json.optString("message", null);
             } catch (Exception e) {
-                Log.w(TAG, "   ⚠️ Non-JSON");
+                if (BuildConfig.DEBUG) Log.w(TAG, "Non-JSON response");
             }
         }
 
         boolean isSuccess = responseCode >= 200 && responseCode < 300;
-String errorMessage = isSuccess ? null
-        : (serverMessage != null ? serverMessage : responseBody);
+        String errorMessage = isSuccess ? null
+                : (serverMessage != null && !serverMessage.isEmpty() ? serverMessage : responseBody);
 
-ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
-apiResponse.setBody(responseBody);
+        ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
+        apiResponse.setBody(responseBody);
 
-if (isSuccess && serverMessage != null) {
-    apiResponse.message = serverMessage;
-}
-
-// ✅ v4.0 — Server-Driven Capabilities: احفظ الوثيقة القادمة من السيرفر
-// يغطي: /auth/login, /auth/me, /mobile/capabilities, وأي استجابة تحتوي data/legacy_permissions
-if (isSuccess && json != null) {
-    String path = "";
-    try { path = conn.getURL().getPath(); } catch (Exception ignored) {}
-
-    boolean isCapabilitiesSource =
-            path.endsWith("/auth/login")
-         || path.endsWith("/auth/me")
-         || path.endsWith("/auth/reconnect")
-         || path.endsWith("/mobile/capabilities")
-         || path.contains("/mobile/");
-
-    // أو: أي استجابة تحتوي المفاتيح المميزة (احتياط)
-    boolean hasCapabilitiesPayload =
-            json.has("legacy_permissions")
-         || (json.has("data") && json.optJSONObject("data") != null
-             && json.optJSONObject("data").has("modules"));
-
-    if (isCapabilitiesSource || hasCapabilitiesPayload) {
-        try {
-            com.example.uhf.manager.PermissionManager
-                .getInstance(context)
-                .saveFromServer(json);
-            Log.d(TAG, "✅ Capabilities saved from server: " + path);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to save capabilities: " + e.getMessage());
+        if (isSuccess && serverMessage != null) {
+            apiResponse.message = serverMessage;
         }
-    }
-}
 
-return apiResponse;
+        // حفظ وثيقة الصلاحيات القادمة من السيرفر تلقائياً
+        if (isSuccess && json != null) {
+            String path = "";
+            try { path = conn.getURL().getPath(); } catch (Exception ignored) {}
+
+            boolean isCapabilitiesSource =
+                    path.endsWith("/auth/login")
+                 || path.endsWith("/auth/me")
+                 || path.endsWith("/auth/reconnect")
+                 || path.endsWith("/mobile/capabilities")
+                 || path.contains("/mobile/");
+
+            boolean hasCapabilitiesPayload =
+                    json.has("legacy_permissions")
+                 || (json.has("data") && json.optJSONObject("data") != null
+                     && json.optJSONObject("data").has("modules"));
+
+            if (isCapabilitiesSource || hasCapabilitiesPayload) {
+                try {
+                    PermissionManager.getInstance(context).saveFromServer(json);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to save capabilities: " + e.getMessage());
+                }
+            }
+        }
+
+        return apiResponse;
     }
 
     private InputStream wrapBrotli(InputStream rawStream) {
@@ -728,7 +730,6 @@ return apiResponse;
                     .getConstructor(InputStream.class)
                     .newInstance(rawStream);
         } catch (Throwable t) {
-            Log.w(TAG, "Brotli library not available, using raw stream", t);
             return rawStream;
         }
     }
@@ -745,39 +746,11 @@ return apiResponse;
         HttpURLConnection conn = null;
         try {
             String cleanEndpoint = endpoint.startsWith("/") ? endpoint.substring(1) : endpoint;
-
             String fullUrl = normalizeBaseUrl(baseUrl) + ACCOUNTING_PREFIX + "/" + cleanEndpoint;
-            URL url = new URL(fullUrl);
-
-            if (!"https".equalsIgnoreCase(url.getProtocol())) {
-                Log.e(TAG, "SECURITY: accounting refused non-HTTPS");
-                return networkError("يُشترط اتصال HTTPS آمن");
-            }
-            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-            CertificatePinningManager.applyPinning(httpsConn);
-            conn = httpsConn;
+            conn = openSecureConnection(fullUrl);
 
             conn.setRequestMethod(method);
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("Accept", "application/json");
-
-            String apiKey = getEffectiveApiKey();
-            String token = getAuthToken();
-
-            if (!apiKey.isEmpty()) {
-                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            }
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setRequestProperty("X-MIRA-Auth-Token", token);
-            }
-            try {
-                String licenseToken = sessionManager.getActivationToken();
-                if (licenseToken != null && !licenseToken.isEmpty()) {
-                    conn.setRequestProperty("X-MIRA-License-Token", licenseToken);
-                }
-            } catch (Exception ignored) {}
-
+            applyStandardHeaders(conn, true, true);
             conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
             conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
 
@@ -789,12 +762,11 @@ return apiResponse;
                 }
             }
 
-            if (com.example.uhf.BuildConfig.DEBUG) {
-                Log.d(TAG, "accounting " + method + ": " + url.getPath());
-            }
-
             return buildResponse(conn);
 
+        } catch (SecurityException se) {
+            Log.e(TAG, "SECURITY: accounting refused non-HTTPS");
+            return networkError("يُشترط اتصال HTTPS آمن");
         } catch (Exception e) {
             Log.e(TAG, "accountingRequest error: " + e.getClass().getSimpleName());
             return networkError(getFriendlyErrorMessage(e));
@@ -842,8 +814,7 @@ return apiResponse;
                 serverConfig.setGateId(effectiveGateId);
 
                 try {
-                    MiraGatesSettings.getInstance(context)
-                            .setDeviceGateId(effectiveGateId);
+                    MiraGatesSettings.getInstance(context).setDeviceGateId(effectiveGateId);
                 } catch (Exception ignored) {}
             }
 
@@ -854,7 +825,6 @@ return apiResponse;
                     sessionManager.saveAuthToken(authToken);
                 }
                 serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
-                Log.d(TAG, "✅ Auth token saved (" + authToken.length() + " chars)");
             }
 
             try {
@@ -879,23 +849,17 @@ return apiResponse;
             } catch (Exception e) {
                 Log.e(TAG, "Save user info error: " + e.getMessage());
             }
-            // ✅ جلب capabilities بعد login
-            // ✅ أولاً: حدّث الكاش (token, apiKey, baseUrl, Retrofit)
-refreshCredentials();
 
-// ✅ ثانياً: اجلب capabilities (سيستخدم التوكن الجديد من الكاش)
-try {
-    ApiResponse capsResp = getWithAuth("/mobile/capabilities");
-    if (capsResp != null && capsResp.isSuccess && capsResp.data != null) {
-        PermissionManager.getInstance(context).saveFromServer(capsResp.data);
-        Log.d(TAG, "✅ Capabilities loaded after login");
-    } else {
-        Log.w(TAG, "⚠️ Capabilities fetch failed: "
-            + (capsResp != null ? capsResp.error : "null response"));
-    }
-} catch (Exception e) {
-    Log.e(TAG, "Capabilities fetch error", e);
-}
+            refreshCredentials();
+
+            try {
+                ApiResponse capsResp = getWithAuth("/mobile/capabilities");
+                if (capsResp != null && capsResp.isSuccess && capsResp.data != null) {
+                    PermissionManager.getInstance(context).saveFromServer(capsResp.data);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Capabilities fetch error", e);
+            }
         } else {
             invalidateTokenCache();
         }
@@ -917,15 +881,9 @@ try {
                 String authToken = response.data.optString("token", "");
 
                 if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
-                    if (!newApiKey.isEmpty()) {
-                        sessionManager.saveApiKey(newApiKey);
-                    }
-                    if (newGateId != null && !newGateId.isEmpty()) {
-                        sessionManager.saveGateId(newGateId);
-                    }
-                    if (!authToken.isEmpty()) {
-                        sessionManager.saveAuthToken(authToken);
-                    }
+                    if (!newApiKey.isEmpty()) sessionManager.saveApiKey(newApiKey);
+                    if (newGateId != null && !newGateId.isEmpty()) sessionManager.saveGateId(newGateId);
+                    if (!authToken.isEmpty()) sessionManager.saveAuthToken(authToken);
                     refreshCredentialsAsync();
                 }
             } else {
@@ -956,7 +914,6 @@ try {
         ApiResponse response = postWithAuth("/auth/logout", payload);
 
         invalidateTokenCache();
-
         try {
             if (serverConfig != null) {
                 serverConfig.clearSession();
@@ -1040,7 +997,7 @@ try {
     public void getUnreadMessages(String userId, MessageCallback callback) {
         executorService.execute(() -> {
             try {
-                String endpoint = "/messages/unread?user_id=" + userId;
+                String endpoint = "/messages/unread?user_id=" + encodeParam(userId);
                 ApiResponse response = getWithAuth(endpoint);
 
                 if (response.isSuccess && response.data != null) {
@@ -1066,7 +1023,7 @@ try {
     public void getAllMessages(String userId, MessageCallback callback) {
         executorService.execute(() -> {
             try {
-                String endpoint = "/messages?user_id=" + userId;
+                String endpoint = "/messages?user_id=" + encodeParam(userId);
                 ApiResponse response = getWithAuth(endpoint);
 
                 if (response.isSuccess && response.data != null) {
@@ -1127,7 +1084,7 @@ try {
     public void getUnreadCount(String userId, UnreadCountCallback callback) {
         executorService.execute(() -> {
             try {
-                String endpoint = "/messages/unread-count?user_id=" + userId;
+                String endpoint = "/messages/unread-count?user_id=" + encodeParam(userId);
                 ApiResponse response = getWithAuth(endpoint);
 
                 if (response.isSuccess && response.data != null) {
@@ -1146,7 +1103,7 @@ try {
     public void getNotifications(String userId, NotificationCallback callback) {
         executorService.execute(() -> {
             try {
-                String endpoint = "/notifications?user_id=" + userId;
+                String endpoint = "/notifications?user_id=" + encodeParam(userId);
                 ApiResponse response = getWithAuth(endpoint);
 
                 if (response.isSuccess && response.data != null) {
@@ -1321,13 +1278,11 @@ try {
             try {
                 int userId = sessionManager.getUserId();
                 String username = sessionManager.getUsername();
-                if (userId > 0)  payload.put("user_id", userId);
+                if (userId > 0) payload.put("user_id", userId);
                 if (username != null && !username.isEmpty()) {
                     payload.put("username", username);
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "authorize: could not attach user identity");
-            }
+            } catch (Exception ignored) {}
 
             if (extraParams != null) {
                 Iterator<String> keys = extraParams.keys();
@@ -1351,15 +1306,9 @@ try {
             payload.put("type", type);
             payload.put("amount", amount);
             if (extra != null) {
-                if (extra.has("karat")) {
-                    payload.put("karat", extra.optString("karat"));
-                }
-                if (extra.has("description")) {
-                    payload.put("description", extra.optString("description"));
-                }
-                if (extra.has("account_id")) {
-                    payload.put("account_id", extra.optInt("account_id"));
-                }
+                if (extra.has("karat")) payload.put("karat", extra.optString("karat"));
+                if (extra.has("description")) payload.put("description", extra.optString("description"));
+                if (extra.has("account_id")) payload.put("account_id", extra.optInt("account_id"));
             }
             return postAccounting("setup/add-balance", payload);
         } catch (Exception e) {
@@ -1369,7 +1318,6 @@ try {
     }
 
     // ==================== Ping ====================
-    // ✅ يحاول v1/ping أولاً ثم ping كبديل، وبدون auth
     public boolean pingApi() {
         if (apiUrl != null && !apiUrl.isEmpty() && tryPing(apiUrl + "ping")) {
             return true;
@@ -1384,36 +1332,15 @@ try {
     private boolean tryPing(String urlString) {
         HttpURLConnection conn = null;
         try {
-            URL url = new URL(urlString);
-
-            if (!"https".equalsIgnoreCase(url.getProtocol())) {
-                String host = url.getHost();
-                boolean isLocal = "localhost".equals(host)
-                        || "127.0.0.1".equals(host)
-                        || "10.0.2.2".equals(host);
-                if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-                    Log.e(TAG, "SECURITY: ping refused non-HTTPS: " + host);
-                    return false;
-                }
-                conn = (HttpURLConnection) url.openConnection();
-            } else {
-                HttpsURLConnection httpsConn =
-                        (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            }
-
+            conn = openSecureConnection(urlString);
             conn.setRequestMethod("GET");
-            // ✅ ping عام - لا يحتاج auth
-            applyStandardHeaders(conn, false);
+            applyStandardHeaders(conn, false, false);
             conn.setConnectTimeout(PING_CONNECT_TIMEOUT);
             conn.setReadTimeout(PING_READ_TIMEOUT);
 
             int responseCode = conn.getResponseCode();
-            Log.d(TAG, "ping " + urlString + " → " + responseCode);
             return responseCode >= 200 && responseCode < 400;
         } catch (Exception e) {
-            Log.d(TAG, "ping " + urlString + " failed: " + e.getClass().getSimpleName());
             return false;
         } finally {
             if (conn != null) conn.disconnect();
@@ -1424,52 +1351,277 @@ try {
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
     }
-    
-    // ✅ تحديث مسار الداشبورد ليتطابق مع السيرفر
-public ApiResponse getDashboardFull(int branchId) {
-    String endpoint = "/dashboard/app"; // تم التعديل من /dashboard/full
-    if (branchId > 0) endpoint += "?branch_id=" + branchId;
-    return getWithAuth(endpoint);
-}
 
-// ✅ تحديث مسار الرسوم البيانية ليتطابق مع السيرفر
-public ApiResponse getDashboardCharts(int branchId) {
-    String endpoint = "/dashboard/app-charts"; // تم التعديل من /dashboard/charts
-    if (branchId > 0) endpoint += "?branch_id=" + branchId;
-    return getWithAuth(endpoint);
-}
-
-   /* public ApiResponse getDashboardFull(int branchId) {
-        String endpoint = "/dashboard/full";
+    public ApiResponse getDashboardFull(int branchId) {
+        String endpoint = "/dashboard/app";
         if (branchId > 0) endpoint += "?branch_id=" + branchId;
         return getWithAuth(endpoint);
     }
-    */
-    
 
     public ApiResponse getDashboardFull() {
         return getDashboardFull(0);
+    }
+
+    public ApiResponse getDashboardCharts(int branchId) {
+        String endpoint = "/dashboard/app-charts";
+        if (branchId > 0) endpoint += "?branch_id=" + branchId;
+        return getWithAuth(endpoint);
     }
 
     public ApiResponse getDashboardGoldPrices() {
         return getWithAuth("/dashboard/gold-prices");
     }
 
+    /**
+     * جلب ملخص الداشبورد وبيانات الخزينة/المخزون من المسارات الفعلية للسيرفر
+     */
+    public ApiResponse getDashboardSummarySmart(int branchId) {
+        try {
+            JSONObject combined = new JSONObject();
+
+            // 1) المسار الرئيسي لتطبيق الداشبورد (/dashboard/app)
+            ApiResponse appResp = getDashboardFull(branchId);
+            if (appResp != null && appResp.isSuccess && appResp.data != null) {
+                mergeJsonInto(combined, appResp.data);
+            }
+
+            // 2) المسار التكميلي (/dashboard/summary) إذا نقصت بيانات المبيعات أو الخزينة
+            if (!combined.has("vault") && !combined.has("inventory") && !combined.has("today_sales")) {
+                String sumEp = branchId > 0 ? ("/dashboard/summary?branch_id=" + branchId) : "/dashboard/summary";
+                ApiResponse sumResp = getWithAuth(sumEp);
+                if (sumResp != null && sumResp.isSuccess && sumResp.data != null) {
+                    mergeJsonInto(combined, sumResp.data);
+                }
+            }
+
+            // 3) إحصائيات مخزون الفرع (/branches/{branchId}/inventory/stats)
+            JSONObject existingVault = combined.optJSONObject("vault");
+            int pieces = existingVault != null
+                    ? existingVault.optInt("total_pieces", existingVault.optInt("in_stock_count", 0))
+                    : combined.optInt("total_pieces", combined.optInt("in_stock_count", 0));
+
+            if (pieces <= 0 && branchId > 0) {
+                ApiResponse statsResp = getBranchInventoryStats(branchId);
+                if (statsResp != null && statsResp.isSuccess && statsResp.data != null) {
+                    JSONObject sData = statsResp.data.optJSONObject("data") != null
+                            ? statsResp.data.optJSONObject("data") : statsResp.data;
+                    JSONObject statsObj = sData.optJSONObject("stats") != null
+                            ? sData.optJSONObject("stats") : sData;
+
+                    int stPieces = statsObj.optInt("total_pieces",
+                            statsObj.optInt("in_stock", statsObj.optInt("total_items", statsObj.optInt("count", 0))));
+                    double stWeight = statsObj.optDouble("total_weight",
+                            statsObj.optDouble("gross_weight", statsObj.optDouble("weight", 0.0)));
+                    double stPure = statsObj.optDouble("pure_24k_weight",
+                            statsObj.optDouble("equivalent_24k", statsObj.optDouble("pure_weight", 0.0)));
+
+                    if (stPieces > 0 || stWeight > 0.0) {
+                        JSONObject vault = new JSONObject();
+                        vault.put("total_pieces", stPieces);
+                        vault.put("total_weight", stWeight);
+                        vault.put("pure_24k_weight", stPure);
+                        combined.put("vault", vault);
+                        pieces = stPieces;
+                    }
+                }
+            }
+
+            // 4) احتياط أخير: حساب القطع والأوزان من قائمة أصناف الفرع مباشرة
+            if (pieces <= 0 && branchId > 0) {
+                ApiResponse itemsResp = getBranchItemsList(branchId);
+                if (itemsResp != null && itemsResp.isSuccess && itemsResp.data != null) {
+                    JSONArray itemsArr = extractArrayFromPayload(itemsResp.data, "items");
+                    if (itemsArr != null && itemsArr.length() > 0) {
+                        int count = 0;
+                        double totalWeight = 0.0;
+                        double pure24k = 0.0;
+
+                        for (int i = 0; i < itemsArr.length(); i++) {
+                            JSONObject it = itemsArr.optJSONObject(i);
+                            if (it == null) continue;
+                            String st = it.optString("status", "in_stock").toLowerCase(Locale.ROOT);
+                            if (st.equals("sold") || st.equals("returned") || st.equals("deleted")) continue;
+
+                            count++;
+                            double w = it.optDouble("gross_weight_grams",
+                                    it.optDouble("gross_weight", it.optDouble("weight", 0.0)));
+                            totalWeight += w;
+
+                            String kStr = it.optString("karat",
+                                    it.optString("purity_code", it.optString("gold_karat", "21")))
+                                    .replaceAll("[^0-9.]", "");
+                            double karatVal = 21.0;
+                            try {
+                                if (!kStr.isEmpty()) karatVal = Double.parseDouble(kStr);
+                            } catch (Exception ignored) {}
+                            if (karatVal > 0 && w > 0) {
+                                pure24k += w * (karatVal / 24.0);
+                            }
+                        }
+
+                        if (count > 0) {
+                            JSONObject vault = new JSONObject();
+                            vault.put("total_pieces", count);
+                            vault.put("total_weight", totalWeight);
+                            vault.put("pure_24k_weight", pure24k);
+                            combined.put("vault", vault);
+                        }
+                    }
+                }
+            }
+
+            return new ApiResponse(200, combined, null);
+        } catch (Exception e) {
+            Log.e(TAG, "getDashboardSummarySmart error: " + e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        }
+    }
+
+    /**
+     * جلب أسعار الذهب اليوم (24K / 21K / 18K) وسعر الصرف من المسارات المعتمدة
+     */
+    public ApiResponse getGoldPricesSmart(int branchId) {
+        try {
+            String branchQuery = branchId > 0 ? ("?branch_id=" + branchId) : "";
+            ApiResponse[] attempts = new ApiResponse[]{
+                    getWithAuth("/dashboard/gold-prices" + branchQuery),
+                    getWithAuth("/gold-rates" + branchQuery),
+                    getWithAuth("/gold-currency/live-prices" + branchQuery),
+                    getWithAuth("/gold/price" + branchQuery)
+            };
+
+            for (ApiResponse r : attempts) {
+                if (r != null && r.isSuccess && r.data != null) {
+                    JSONObject parsed = normalizeGoldPricesPayload(r.data);
+                    if (parsed != null && (parsed.optDouble("karat_24", 0.0) > 0.0
+                            || parsed.optDouble("karat_21", 0.0) > 0.0
+                            || parsed.optDouble("karat_24_usd", 0.0) > 0.0)) {
+                        return new ApiResponse(200, parsed, null);
+                    }
+                }
+            }
+            return new ApiResponse(404, null, "Gold prices not available");
+        } catch (Exception e) {
+            Log.e(TAG, "getGoldPricesSmart error: " + e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        }
+    }
+
+    private void mergeJsonInto(JSONObject target, JSONObject source) {
+        if (target == null || source == null) return;
+        try {
+            JSONObject d = source.optJSONObject("data") != null ? source.optJSONObject("data") : source;
+            Iterator<String> keys = d.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                Object val = d.opt(k);
+                if (val != null && val != JSONObject.NULL) {
+                    target.put(k, val);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private JSONObject normalizeGoldPricesPayload(JSONObject root) {
+        try {
+            JSONObject data = root.optJSONObject("data") != null ? root.optJSONObject("data") : root;
+            JSONObject prices = data.optJSONObject("gold_prices") != null
+                    ? data.optJSONObject("gold_prices")
+                    : (data.optJSONObject("prices") != null
+                        ? data.optJSONObject("prices")
+                        : (data.optJSONObject("rates") != null ? data.optJSONObject("rates") : data));
+
+            double rate = firstPositiveDouble(prices, data,
+                    "exchange_rate", "usd_rate", "dollar_rate", "rate", "selling_rate");
+            String currency = prices.optString("currency",
+                    data.optString("currency", data.optString("local_currency", "YER")));
+            if (currency == null || currency.trim().isEmpty()) currency = "YER";
+
+            double p24 = firstPositiveDouble(prices, data,
+                    "karat_24", "price_24k", "24k", "gold_24", "sell_24", "price_24", "k24", "24");
+            double p21 = firstPositiveDouble(prices, data,
+                    "karat_21", "price_21k", "21k", "gold_21", "sell_21", "price_21", "k21", "21");
+            double p18 = firstPositiveDouble(prices, data,
+                    "karat_18", "price_18k", "18k", "gold_18", "sell_18", "price_18", "k18", "18");
+
+            double p24Usd = firstPositiveDouble(prices, data,
+                    "karat_24_usd", "price_24k_usd", "24k_usd", "usd_24k", "gold_24_usd", "gram_24k_usd");
+            double p21Usd = firstPositiveDouble(prices, data,
+                    "karat_21_usd", "price_21k_usd", "21k_usd", "usd_21k", "gram_21k_usd");
+            double p18Usd = firstPositiveDouble(prices, data,
+                    "karat_18_usd", "price_18k_usd", "18k_usd", "usd_18k", "gram_18k_usd");
+
+            JSONArray arr = prices.optJSONArray("rates");
+            if (arr == null) arr = prices.optJSONArray("gold_prices");
+            if (arr == null) arr = data.optJSONArray("gold_rates");
+            if (arr == null) arr = data.optJSONArray("data");
+            if (arr != null) {
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject row = arr.optJSONObject(i);
+                    if (row == null) continue;
+                    int k = row.optInt("karat", row.optInt("purity", 0));
+                    double val = firstPositiveDouble(row, row,
+                            "sell_price", "price", "price_local", "amount", "rate");
+                    double valUsd = firstPositiveDouble(row, row,
+                            "sell_price_usd", "price_usd", "usd_price");
+                    if (k == 24) {
+                        if (val > 0) p24 = val;
+                        if (valUsd > 0) p24Usd = valUsd;
+                    } else if (k == 21) {
+                        if (val > 0) p21 = val;
+                        if (valUsd > 0) p21Usd = valUsd;
+                    } else if (k == 18) {
+                        if (val > 0) p18 = val;
+                        if (valUsd > 0) p18Usd = valUsd;
+                    }
+                }
+            }
+
+            if (p24 <= 0 && p24Usd > 0 && rate > 0) p24 = p24Usd * rate;
+            if (p21 <= 0 && p21Usd > 0 && rate > 0) p21 = p21Usd * rate;
+            if (p18 <= 0 && p18Usd > 0 && rate > 0) p18 = p18Usd * rate;
+
+            if (p24 <= 0 && p21 > 0) p24 = p21 * (24.0 / 21.0);
+            if (p24 <= 0 && p18 > 0) p24 = p18 * (24.0 / 18.0);
+            if (p21 <= 0 && p24 > 0) p21 = p24 * (21.0 / 24.0);
+            if (p18 <= 0 && p24 > 0) p18 = p24 * (18.0 / 24.0);
+
+            if (p24Usd <= 0 && p24 > 0 && rate > 0) p24Usd = p24 / rate;
+
+            JSONObject out = new JSONObject();
+            out.put("karat_24", p24);
+            out.put("karat_21", p21);
+            out.put("karat_18", p18);
+            out.put("karat_24_usd", p24Usd);
+            out.put("exchange_rate", rate);
+            out.put("currency", currency.toUpperCase(Locale.US));
+            return out;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private double firstPositiveDouble(JSONObject primary, JSONObject secondary, String... keys) {
+        for (String k : keys) {
+            if (primary != null) {
+                double v = primary.optDouble(k, 0.0);
+                if (v > 0.0) return v;
+            }
+            if (secondary != null) {
+                double v = secondary.optDouble(k, 0.0);
+                if (v > 0.0) return v;
+            }
+        }
+        return 0.0;
+    }
+
+    // ==================== نقطة البيع والمبيعات ====================
     public ApiResponse checkoutWithLongTimeout(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
-
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-
-            String localUuid = payload.optString("local_uuid", "");
-            if (!localUuid.isEmpty()) {
-                Log.d(TAG, "✅ Checkout with local_uuid: " + localUuid);
-            } else {
-                Log.w(TAG, "⚠️ Checkout WITHOUT local_uuid — offline retry غير محمي!");
-            }
-
         } catch (Exception e) {
             Log.e(TAG, "checkout payload prep error: " + e.getMessage());
         }
@@ -1480,16 +1632,9 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse checkout(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
-
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-
-            String localUuid = payload.optString("local_uuid", "");
-            if (localUuid.isEmpty()) {
-                Log.w(TAG, "⚠️ Checkout without local_uuid");
-            }
-
         } catch (Exception e) {
             Log.e(TAG, "checkout payload prep error: " + e.getMessage());
         }
@@ -1508,13 +1653,10 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse processRefund(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
-
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-
             return postWithAuth("/pos/refund", payload);
-
         } catch (Exception e) {
             Log.e(TAG, "processRefund error: " + e.getMessage());
             ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
@@ -1563,11 +1705,7 @@ public ApiResponse getDashboardCharts(int branchId) {
             if (!payload.has("gate_id")) {
                 payload.put("gate_id", getEffectiveGateId());
             }
-
-            Log.d(TAG, "SEARCH POS ITEM START");
-            ApiResponse response = postWithAuth("/pos/search-item", payload);
-            Log.d(TAG, "SEARCH POS ITEM END -> Code: " + response.code);
-            return response;
+            return postWithAuth("/pos/search-item", payload);
         } catch (Exception e) {
             Log.e(TAG, "searchPosItem error: " + e.getMessage(), e);
             ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
@@ -1586,27 +1724,19 @@ public ApiResponse getDashboardCharts(int branchId) {
     }
 
     public ApiResponse searchSalesHistory(String query, int page, int pageSize) {
-        try {
-            String encodedQuery = URLEncoder.encode(query, "UTF-8");
-            return getWithAuth("/pos/sales?page=" + page
-                    + "&limit=" + pageSize + "&per_page=" + pageSize
-                    + "&search=" + encodedQuery);
-        } catch (Exception e) {
-            return getWithAuth("/pos/sales?page=" + page
-                    + "&limit=" + pageSize + "&per_page=" + pageSize
-                    + "&search=" + query);
-        }
+        return getWithAuth("/pos/sales?page=" + page
+                + "&limit=" + pageSize + "&per_page=" + pageSize
+                + "&search=" + encodeParam(query));
     }
 
     public ApiResponse getSalesHistoryByPaymentMethod(String paymentMethod, int page, int pageSize) {
         return getWithAuth("/pos/sales?page=" + page
                 + "&limit=" + pageSize + "&per_page=" + pageSize
-                + "&payment_method=" + paymentMethod);
+                + "&payment_method=" + encodeParam(paymentMethod));
     }
 
     public ApiResponse getPaymentMethods() {
-    // ✅ المسار الصحيح (بدون /pos/)
-    return getWithAuth("/payment-methods");
+        return getWithAuth("/payment-methods");
     }
 
     public ApiResponse getSalesStats() {
@@ -1614,11 +1744,11 @@ public ApiResponse getDashboardCharts(int branchId) {
     }
 
     public ApiResponse getSalesHistoryByDateRange(String fromDate, String toDate, int page, int pageSize) {
-        String endpoint = "/pos/sales?page=" + page
-                + "&limit=" + pageSize + "&per_page=" + pageSize;
-        if (fromDate != null && !fromDate.isEmpty()) endpoint += "&from=" + fromDate;
-        if (toDate != null && !toDate.isEmpty()) endpoint += "&to=" + toDate;
-        return getWithAuth(endpoint);
+        StringBuilder endpoint = new StringBuilder("/pos/sales?page=")
+                .append(page).append("&limit=").append(pageSize).append("&per_page=").append(pageSize);
+        if (fromDate != null && !fromDate.isEmpty()) endpoint.append("&from=").append(encodeParam(fromDate));
+        if (toDate != null && !toDate.isEmpty()) endpoint.append("&to=").append(encodeParam(toDate));
+        return getWithAuth(endpoint.toString());
     }
 
     public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
@@ -1630,13 +1760,13 @@ public ApiResponse getDashboardCharts(int branchId) {
             endpoint.append("&limit=").append(pageSize);
 
             if (search != null && !search.trim().isEmpty()) {
-                endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
+                endpoint.append("&search=").append(encodeParam(search.trim()));
             }
             if (paymentMethod != null && !paymentMethod.equalsIgnoreCase("ALL")) {
-                endpoint.append("&payment_method=").append(paymentMethod.toLowerCase(Locale.ROOT));
+                endpoint.append("&payment_method=").append(encodeParam(paymentMethod.toLowerCase(Locale.ROOT)));
             }
-            if (fromDate != null && !fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
-            if (toDate != null && !toDate.isEmpty()) endpoint.append("&to=").append(toDate);
+            if (fromDate != null && !fromDate.isEmpty()) endpoint.append("&from=").append(encodeParam(fromDate));
+            if (toDate != null && !toDate.isEmpty()) endpoint.append("&to=").append(encodeParam(toDate));
             if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
 
             return getWithAuth(endpoint.toString());
@@ -1647,35 +1777,60 @@ public ApiResponse getDashboardCharts(int branchId) {
         }
     }
 
+    /**
+     * جلب تفاصيل فاتورة محددة برقمها (متوافق مع ActivityDetailsBottomSheet)
+     */
+    public ApiResponse getSaleDetailsByNumber(String saleNumber) {
+        try {
+            if (saleNumber == null || saleNumber.trim().isEmpty()) {
+                return new ApiResponse(400, null, "Empty sale number");
+            }
+            String cleanNo = saleNumber.trim();
+            ApiResponse resp = getSalesHistoryAdvanced(cleanNo, "ALL", null, null, 1, 10, 0);
+            if (resp != null && resp.isSuccess && resp.data != null) {
+                JSONArray salesArr = extractArrayFromPayload(resp.data, "sales");
+                if (salesArr != null && salesArr.length() > 0) {
+                    JSONObject bestMatch = salesArr.optJSONObject(0);
+                    for (int i = 0; i < salesArr.length(); i++) {
+                        JSONObject item = salesArr.optJSONObject(i);
+                        if (item == null) continue;
+                        String sNo = item.optString("sale_number", item.optString("invoice_number", "")).trim();
+                        if (sNo.equalsIgnoreCase(cleanNo)) {
+                            bestMatch = item;
+                            break;
+                        }
+                    }
+                    if (bestMatch != null) {
+                        JSONObject wrapper = new JSONObject();
+                        wrapper.put("success", true);
+                        wrapper.put("sale", bestMatch);
+                        return new ApiResponse(200, wrapper, null);
+                    }
+                }
+            }
+            return resp != null ? resp : new ApiResponse(404, null, "Sale not found");
+        } catch (Exception e) {
+            Log.e(TAG, "getSaleDetailsByNumber error: " + e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage());
+        }
+    }
+
     public ApiResponse getItemDetail(String code) {
-        return getWithAuth("/item/" + code);
+        return getWithAuth("/item/" + sanitizePathSegment(code));
     }
 
     // ==================== رفع الصور ====================
     public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
+        if (imageFile == null || !imageFile.exists() || !imageFile.isFile()) {
+            return new ApiResponse(400, null, "Image file not found");
+        }
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + "items/" + itemId + "/images";
-            URL url = new URL(fullUrl);
-
-            if (!"https".equalsIgnoreCase(url.getProtocol())) {
-                String host = url.getHost();
-                boolean isLocal = "localhost".equals(host)
-                        || "127.0.0.1".equals(host)
-                        || "10.0.2.2".equals(host);
-                if (!(com.example.uhf.BuildConfig.DEBUG && isLocal)) {
-                    Log.e(TAG, "SECURITY: uploadItemImage refused non-HTTPS: " + host);
-                    return networkError("يُشترط اتصال HTTPS آمن");
-                }
-                conn = (HttpURLConnection) url.openConnection();
-            } else {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            }
+            conn = openSecureConnection(fullUrl);
 
             conn.setRequestMethod("POST");
-            applyStandardHeaders(conn, true);
+            applyStandardHeaders(conn, true, false);
             conn.setConnectTimeout(30_000);
             conn.setReadTimeout(30_000);
             conn.setDoOutput(true);
@@ -1683,11 +1838,13 @@ public ApiResponse getDashboardCharts(int branchId) {
             String boundary = "----MiraBoundary" + System.currentTimeMillis();
             conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
+            String safeFileName = imageFile.getName().replaceAll("[\"\\r\\n]", "_");
+
             try (OutputStream os = conn.getOutputStream()) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("--").append(boundary).append("\r\n");
                 sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
-                        .append(imageFile.getName()).append("\"\r\n");
+                        .append(safeFileName).append("\"\r\n");
                 sb.append("Content-Type: image/jpeg\r\n\r\n");
                 os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
 
@@ -1716,6 +1873,8 @@ public ApiResponse getDashboardCharts(int branchId) {
             }
 
             return buildResponse(conn);
+        } catch (SecurityException se) {
+            return networkError("يُشترط اتصال HTTPS آمن");
         } catch (Exception e) {
             Log.e(TAG, "uploadItemImage error: " + e.getClass().getSimpleName());
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
@@ -1726,12 +1885,12 @@ public ApiResponse getDashboardCharts(int branchId) {
 
     // ==================== المخزون ====================
     public ApiResponse getLastSnapshot(String location) {
-        return getWithAuth("/inventory/last-snapshot?location="
-                + (location != null ? location : "Main Showroom"));
+        String loc = (location != null && !location.isEmpty()) ? location : "Main Showroom";
+        return getWithAuth("/inventory/last-snapshot?location=" + encodeParam(loc));
     }
 
     public ApiResponse getInventoryHistory(String location, int limit) {
-        return getWithAuth("/inventory/history/" + location + "?limit=" + limit);
+        return getWithAuth("/inventory/history/" + sanitizePathSegment(location) + "?limit=" + limit);
     }
 
     public ApiResponse getInventoryReports(int branchId, int page, int perPage) {
@@ -1740,8 +1899,8 @@ public ApiResponse getDashboardCharts(int branchId) {
     }
 
     public ApiResponse getHighValueItems(String location, double threshold) {
-        return getWithAuth("/inventory/high-value?location="
-                + (location != null ? location : "Main Showroom")
+        String loc = (location != null && !location.isEmpty()) ? location : "Main Showroom";
+        return getWithAuth("/inventory/high-value?location=" + encodeParam(loc)
                 + "&threshold=" + threshold);
     }
 
@@ -1812,8 +1971,8 @@ public ApiResponse getDashboardCharts(int branchId) {
     }
 
     public ApiResponse getInventorySettings(String location) {
-        return getWithAuth("/inventory/settings/"
-                + (location != null ? location : "default"));
+        String loc = (location != null && !location.isEmpty()) ? location : "default";
+        return getWithAuth("/inventory/settings/" + sanitizePathSegment(loc));
     }
 
     public ApiResponse submitInventoryAuditReport(JSONObject payload) {
@@ -1830,11 +1989,7 @@ public ApiResponse getDashboardCharts(int branchId) {
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
-    
-        /**
-     * إرسال طلب تغيير حالة قطعة أثناء الجرد إلى السيرفر (تالف، مفقود، موجود، إلخ).
-     * السيرفر هو صاحب القرار الوحيد في التحقق والتحديث وإرجاع الحالة المعتمدة.
-     */
+
     public ApiResponse updateInventoryItemStatus(JSONObject payload) {
         try {
             if (payload == null) payload = new JSONObject();
@@ -1872,9 +2027,6 @@ public ApiResponse getDashboardCharts(int branchId) {
         return updateInventoryItemStatus(payload);
     }
 
-    /**
-     * جلب الكتالوج المرجعي المعتمد للجرد من السيرفر مباشرة دون الاعتماد على الكاش المحلي.
-     */
     public ApiResponse getInventoryExpectedCatalog(int branchId, String location) {
         try {
             int effectiveBranchId = branchId > 0
@@ -1883,7 +2035,7 @@ public ApiResponse getDashboardCharts(int branchId) {
             StringBuilder endpoint = new StringBuilder("/inventory/expected-catalog?branch_id=")
                     .append(effectiveBranchId);
             if (location != null && !location.trim().isEmpty()) {
-                endpoint.append("&location=").append(URLEncoder.encode(location.trim(), "UTF-8"));
+                endpoint.append("&location=").append(encodeParam(location.trim()));
             }
             return getWithAuthLongTimeout(endpoint.toString());
         } catch (Exception e) {
@@ -1893,7 +2045,6 @@ public ApiResponse getDashboardCharts(int branchId) {
             return r;
         }
     }
-
 
     // ==================== Encode / Tags ====================
     public ApiResponse encodeItem(JSONObject itemPayload) {
@@ -1973,7 +2124,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     }
 
     public ApiResponse getSettings() {
-        return getWithAuth("/settings/" + getEffectiveGateId());
+        return getWithAuth("/settings/" + sanitizePathSegment(getEffectiveGateId()));
     }
 
     public ApiResponse saveSettings(JSONObject settings) {
@@ -2021,11 +2172,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         String endpoint = "/branches/" + branchId + "/inventory/items";
         if (category != null && !category.isEmpty()) {
-            try {
-                endpoint += "?category=" + URLEncoder.encode(category, "UTF-8");
-            } catch (Exception e) {
-                endpoint += "?category=" + category;
-            }
+            endpoint += "?category=" + encodeParam(category);
         }
         return getWithAuth(endpoint);
     }
@@ -2035,14 +2182,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     }
 
     public ApiResponse getBranchItemsListWithLongTimeout(int branchId) {
-        Log.d(TAG, "🌐 getBranchItemsListWithLongTimeout | branchId=" + branchId);
-        String endpoint = "/branches/" + branchId + "/inventory/items";
-        ApiResponse response = getWithAuthLongTimeout(endpoint);
-
-        if (response != null) {
-            Log.d(TAG, "📥 Code: " + response.code + ", isSuccess: " + response.isSuccess);
-        }
-        return response;
+        return getWithAuthLongTimeout("/branches/" + branchId + "/inventory/items");
     }
 
     public ApiResponse getBranchInventoryStats(int branchId) {
@@ -2052,11 +2192,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse getMyBranchInventoryItems(String category) {
         String endpoint = "/my-branch/inventory/items";
         if (category != null && !category.isEmpty()) {
-            try {
-                endpoint += "?category=" + URLEncoder.encode(category, "UTF-8");
-            } catch (Exception e) {
-                endpoint += "?category=" + category;
-            }
+            endpoint += "?category=" + encodeParam(category);
         }
         return getWithAuth(endpoint);
     }
@@ -2082,7 +2218,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse getTransfers(int branchId, String status) {
         String url = "/transfers?branch_id=" + branchId;
         if (status != null && !status.isEmpty()) {
-            url += "&status=" + status;
+            url += "&status=" + encodeParam(status);
         }
         return getWithAuth(url);
     }
@@ -2155,13 +2291,13 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse getJournalEntries(String branchId) {
         String url = "/accounting/journal-entries";
         if (branchId != null && !branchId.isEmpty()) {
-            url += "?branch_id=" + branchId;
+            url += "?branch_id=" + encodeParam(branchId);
         }
         return getAccounting(url);
     }
 
     public ApiResponse getJournalEntryDetail(String entryId) {
-        return getAccounting("/accounting/journal-entries/" + entryId);
+        return getAccounting("/accounting/journal-entries/" + sanitizePathSegment(entryId));
     }
 
     public ApiResponse createJournalEntry(JSONObject payload) {
@@ -2179,7 +2315,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse getTrialBalance(String branchId) {
         String url = "/accounting/trial-balance";
         if (branchId != null && !branchId.isEmpty()) {
-            url += "?branch_id=" + branchId;
+            url += "?branch_id=" + encodeParam(branchId);
         }
         return getAccounting(url);
     }
@@ -2187,7 +2323,7 @@ public ApiResponse getDashboardCharts(int branchId) {
     public ApiResponse getAccountingSummary(String branchId) {
         String url = "/accounting/summary";
         if (branchId != null && !branchId.isEmpty()) {
-            url += "?branch_id=" + branchId;
+            url += "?branch_id=" + encodeParam(branchId);
         }
         return getAccounting(url);
     }
@@ -2204,11 +2340,11 @@ public ApiResponse getDashboardCharts(int branchId) {
         String url = "/accounting/vouchers";
         boolean hasParam = false;
         if (branchId != null && !branchId.isEmpty()) {
-            url += "?branch_id=" + branchId;
+            url += "?branch_id=" + encodeParam(branchId);
             hasParam = true;
         }
         if (voucherType != null && !voucherType.isEmpty()) {
-            url += (hasParam ? "&" : "?") + "voucher_type=" + voucherType;
+            url += (hasParam ? "&" : "?") + "voucher_type=" + encodeParam(voucherType);
         }
         return getAccounting(url);
     }
@@ -2261,27 +2397,27 @@ public ApiResponse getDashboardCharts(int branchId) {
         String url = "/accounting/balance-sheet";
         boolean hasParam = false;
         if (branchId != null && !branchId.isEmpty()) {
-            url += "?branch_id=" + branchId;
+            url += "?branch_id=" + encodeParam(branchId);
             hasParam = true;
         }
         if (asOfDate != null && !asOfDate.isEmpty()) {
-            url += (hasParam ? "&" : "?") + "as_of=" + asOfDate;
+            url += (hasParam ? "&" : "?") + "as_of=" + encodeParam(asOfDate);
         }
         return getAccounting(url);
     }
 
     public ApiResponse getIncomeStatement(String branchId, String fromDate, String toDate) {
-        String url = "/accounting/income-statement?from=" + fromDate + "&to=" + toDate;
+        String url = "/accounting/income-statement?from=" + encodeParam(fromDate) + "&to=" + encodeParam(toDate);
         if (branchId != null && !branchId.isEmpty()) {
-            url += "&branch_id=" + branchId;
+            url += "&branch_id=" + encodeParam(branchId);
         }
         return getAccounting(url);
     }
 
     public ApiResponse getGoldMovementReport(String branchId, String fromDate, String toDate) {
-        String url = "/accounting/gold-movement?from=" + fromDate + "&to=" + toDate;
+        String url = "/accounting/gold-movement?from=" + encodeParam(fromDate) + "&to=" + encodeParam(toDate);
         if (branchId != null && !branchId.isEmpty()) {
-            url += "&branch_id=" + branchId;
+            url += "&branch_id=" + encodeParam(branchId);
         }
         return getAccounting(url);
     }
@@ -2298,24 +2434,24 @@ public ApiResponse getDashboardCharts(int branchId) {
                     : "dashboard";
 
             StringBuilder endpoint = new StringBuilder("/reports-app?type=")
-                    .append(URLEncoder.encode(cleanType, "UTF-8"));
+                    .append(encodeParam(cleanType));
 
             if (fromDate != null && !fromDate.isEmpty()) {
-                endpoint.append("&from=").append(URLEncoder.encode(fromDate, "UTF-8"));
+                endpoint.append("&from=").append(encodeParam(fromDate));
             }
             if (toDate != null && !toDate.isEmpty()) {
-                endpoint.append("&to=").append(URLEncoder.encode(toDate, "UTF-8"));
+                endpoint.append("&to=").append(encodeParam(toDate));
             }
             if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
 
             if (search != null && !search.trim().isEmpty()) {
-                endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
+                endpoint.append("&search=").append(encodeParam(search));
             }
             if (filter1 != null && !filter1.trim().isEmpty()) {
-                endpoint.append("&filter1=").append(URLEncoder.encode(filter1, "UTF-8"));
+                endpoint.append("&filter1=").append(encodeParam(filter1));
             }
             if (filter2 != null && !filter2.trim().isEmpty()) {
-                endpoint.append("&filter2=").append(URLEncoder.encode(filter2, "UTF-8"));
+                endpoint.append("&filter2=").append(encodeParam(filter2));
             }
 
             return getWithAuth(endpoint.toString());
@@ -2324,12 +2460,130 @@ public ApiResponse getDashboardCharts(int branchId) {
         }
     }
 
+    public ApiResponse getCashFlowStatement(String date, int branchId) {
+        String url = "/accounting/cash-flow?date=" + encodeParam(date);
+        if (branchId > 0) url += "&branch_id=" + branchId;
+        return getAccounting(url);
+    }
+
+    public ApiResponse reverseJournalEntry(String entryId) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("reason", "عكس من تطبيق الأندرويد");
+        } catch (Exception ignored) {}
+        return postAccounting("/accounting/journal-entries/" + sanitizePathSegment(entryId) + "/reverse", payload);
+    }
+
+    public ApiResponse getAgingReport(String asOfDate, String type) {
+        return getAccounting("/accounting/aging-report?as_of=" + encodeParam(asOfDate)
+                + "&type=" + encodeParam(type));
+    }
+
+    public ApiResponse processGoldConversion(JSONObject payload) {
+        return postAccounting("/accounting/gold-conversion", payload);
+    }
+
+    public ApiResponse getProfitAnalysis(String branchId, String fromDate, String toDate) {
+        String url = "/accounting/profit-analysis?from=" + encodeParam(fromDate) + "&to=" + encodeParam(toDate);
+        if (branchId != null && !branchId.isEmpty()) {
+            url += "&branch_id=" + encodeParam(branchId);
+        }
+        return getAccounting(url);
+    }
+
+    public ApiResponse previewInventoryRevaluation(int branchId) {
+        return getAccounting("/accounting/inventory-revaluation/preview?branch_id=" + branchId);
+    }
+
+    public ApiResponse postInventoryRevaluation(JSONObject payload) {
+        return postAccounting("/accounting/inventory-revaluation/post", payload);
+    }
+
+    public ApiResponse savePurchaseInvoice(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            if (!payload.has("branch_id")) {
+                MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+                payload.put("branch_id", bm.getActiveBranchId());
+            }
+            return postWithAuth("/purchases/create", payload);
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            response.isNetworkError = true;
+            return response;
+        }
+    }
+
+    public ApiResponse getAuditLogs(String status, String action, int limit) {
+        String url = "/audit-logs?limit=" + limit;
+        if (status != null && !status.isEmpty()) url += "&status=" + encodeParam(status);
+        if (action != null && !action.isEmpty()) url += "&action=" + encodeParam(action);
+        return getAccounting(url);
+    }
+
+    // ==================== قفل الفترات المالية ====================
+    public ApiResponse togglePeriodLock(JSONObject payload) {
+        return postAccounting("/accounting/lock-period", payload);
+    }
+
+    public ApiResponse getLockedPeriods() {
+        return getAccounting("/accounting/locked-periods");
+    }
+
+    // ==================== إدارة الشيكات (Cheques) ====================
+    public ApiResponse getCheques(String type, String status) {
+        String url = "/cheques";
+        boolean hasParam = false;
+        if (type != null && !type.isEmpty()) {
+            url += "?type=" + encodeParam(type);
+            hasParam = true;
+        }
+        if (status != null && !status.isEmpty()) {
+            url += (hasParam ? "&" : "?") + "status=" + encodeParam(status);
+        }
+        return getAccounting(url);
+    }
+
+    public ApiResponse createCheque(JSONObject payload) {
+        return postAccounting("/cheques", payload);
+    }
+
+    public ApiResponse depositCheque(int chequeId, JSONObject payload) {
+        return postAccounting("/cheques/" + chequeId + "/deposit", payload);
+    }
+
+    public ApiResponse returnCheque(int chequeId, JSONObject payload) {
+        return postAccounting("/cheques/" + chequeId + "/return", payload);
+    }
+
+    // ==================== التسوية البنكية (Bank Reconciliation) ====================
+    public ApiResponse getReconciliationSummary(int bankAccountId, String date) {
+        return getAccounting("/reconciliation/summary?bank_account_id=" + bankAccountId
+                + "&date=" + encodeParam(date));
+    }
+
+    public ApiResponse saveReconciliation(JSONObject payload) {
+        return postAccounting("/reconciliation/save", payload);
+    }
+
+    // ==================== الأصول الثابتة (Fixed Assets) ====================
+    public ApiResponse getFixedAssets() {
+        return getAccounting("/fixed-assets");
+    }
+
+    public ApiResponse createFixedAsset(JSONObject payload) {
+        return postAccounting("/fixed-assets", payload);
+    }
+
+    public ApiResponse runDepreciation(JSONObject payload) {
+        return postAccounting("/fixed-assets/depreciate", payload);
+    }
+
     // ==================== الذهب والعملات ====================
     public List<ApiProvider> getActiveProviders() {
         List<ApiProvider> providers = new ArrayList<>();
         try {
             if (getAuthToken().isEmpty()) {
-                Log.w(TAG, "No auth token - returning empty providers list");
                 return providers;
             }
 
@@ -2364,9 +2618,7 @@ public ApiResponse getDashboardCharts(int branchId) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("provider_id", providerId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building activate payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         return postWithAuth("/gold/providers/activate", payload);
     }
 
@@ -2381,8 +2633,8 @@ public ApiResponse getDashboardCharts(int branchId) {
 
                 if (providerData != null) {
                     String providerType = providerData.optString("type", "");
-                    String apiKey = providerData.optString("api_key", "");
-                    return fetchGoldPrice(providerType, apiKey);
+                    String key = providerData.optString("api_key", "");
+                    return fetchGoldPrice(providerType, key);
                 }
             }
             return new ApiResponse(-1, null, "Provider not found");
@@ -2463,7 +2715,7 @@ public ApiResponse getDashboardCharts(int branchId) {
         return getWithAuth("/gold-currency/live-prices");
     }
 
-    // ==================== السجلات ====================
+    // ==================== السجلات والعمليات الموحدة ====================
     public ApiResponse logActivity(JSONObject logEntry) {
         return postWithAuth("/activity/log", logEntry);
     }
@@ -2476,7 +2728,6 @@ public ApiResponse getDashboardCharts(int branchId) {
                     this.baseUrl = normalizeBaseUrl(savedBaseUrl);
                 }
                 refreshCredentials();
-                Log.d(TAG, "✅ URL refreshed: " + apiUrl);
             }
         } catch (Exception e) {
             Log.e(TAG, "refreshUrl error: " + e.getMessage(), e);
@@ -2497,19 +2748,11 @@ public ApiResponse getDashboardCharts(int branchId) {
         void onSuccess(ApiResponse response);
         void onFailure(String errorMessage);
     }
-    
-        /**
-     * النسخة المتوافقة مع الاستدعاءات السابقة (تعمل بصلاحية مدير افتراضياً)
-     */
+
     public ApiResponse getUnifiedOperations(int branchId, int page, int limit, String search, String filterType) {
         return getUnifiedOperations(branchId, 0, "", true, page, limit, search, filterType);
     }
 
-    /**
-     * مصدر الحقيقة الموحد لآخر العمليات والفواتير مع دعم العزل حسب الدور الوظيفي:
-     * - المدير (isManager = true): يرى جميع عمليات الفرع للجميع.
-     * - الموظف (isManager = false): يرى عملياته وفواتيره الشخصية فقط.
-     */
     public ApiResponse getUnifiedOperations(
             int branchId,
             int userId,
@@ -2527,7 +2770,7 @@ public ApiResponse getDashboardCharts(int branchId) {
             String cleanUsername = (username != null) ? username.trim() : "";
 
             List<JSONObject> mergedList = new ArrayList<>();
-            java.util.Set<String> seenSaleNumbers = new java.util.HashSet<>();
+            Set<String> seenSaleNumbers = new HashSet<>();
             int totalSalesOnServer = 0;
             boolean hasMoreSales = false;
 
@@ -2541,9 +2784,7 @@ public ApiResponse getDashboardCharts(int branchId) {
                     || normalizedFilter.equals("inventory")
                     || normalizedFilter.equals("rfid");
 
-            // 1) جلب الفواتير والمرتجعات من /pos/sales
             if (includeSales) {
-                // إذا كان موظفاً عادياً، نطلب عدداً أكبر قليلاً من السيرفر لضمان امتلاء الصفحة بعد الفلترة الشخصية
                 int fetchLimit = isManager ? limit : Math.max(limit * 3, 60);
                 ApiResponse salesResp = getSalesHistoryAdvanced(
                         cleanSearch, "ALL", null, null, page, fetchLimit, branchId
@@ -2572,7 +2813,6 @@ public ApiResponse getDashboardCharts(int branchId) {
                                 if (sBranch > 0 && sBranch != branchId) continue;
                             }
 
-                            // تطبيق العزل للموظفين غير المدراء
                             if (!isManager && !matchesCurrentUser(sale, userId, cleanUsername)) {
                                 continue;
                             }
@@ -2593,7 +2833,6 @@ public ApiResponse getDashboardCharts(int branchId) {
                 }
             }
 
-            // 2) دمج العمليات التشغيلية الأخرى (كسر، تحويلات، جرد، RFID)
             if (includeOtherActivities && page == 1) {
                 int actFetchLimit = isManager ? Math.max(limit, 25) : 60;
                 ApiResponse actResp = getUnifiedActivity(branchId, actFetchLimit);
@@ -2604,7 +2843,6 @@ public ApiResponse getDashboardCharts(int branchId) {
                             JSONObject act = actArr.optJSONObject(i);
                             if (act == null) continue;
 
-                            // تطبيق العزل للموظفين غير المدراء
                             if (!isManager && !matchesCurrentUser(act, userId, cleanUsername)) {
                                 continue;
                             }
@@ -2649,8 +2887,7 @@ public ApiResponse getDashboardCharts(int branchId) {
                 }
             }
 
-            // 3) ترتيب زمني تنازلي (الأحدث أولاً)
-            java.util.Collections.sort(mergedList, (a, b) -> {
+            Collections.sort(mergedList, (a, b) -> {
                 String tA = a.optString("created_at", a.optString("timestamp", ""));
                 String tB = b.optString("created_at", b.optString("timestamp", ""));
                 return tB.compareTo(tA);
@@ -2678,9 +2915,83 @@ public ApiResponse getDashboardCharts(int branchId) {
         }
     }
 
-    /**
-     * التحقق من ملكية العملية للموظف الحالي (بالـ ID أولاً ثم بالاسم كبديل)
-     */
+    private JSONArray extractArrayFromPayload(JSONObject root, String primaryKey) {
+        if (root == null) return null;
+        if (primaryKey != null) {
+            JSONArray direct = root.optJSONArray(primaryKey);
+            if (direct != null) return direct;
+        }
+        JSONArray dataArr = root.optJSONArray("data");
+        if (dataArr != null) return dataArr;
+
+        JSONObject nestedData = root.optJSONObject("data");
+        if (nestedData != null) {
+            if (primaryKey != null) {
+                JSONArray nestedPrimary = nestedData.optJSONArray(primaryKey);
+                if (nestedPrimary != null) return nestedPrimary;
+            }
+            JSONArray nestedItems = nestedData.optJSONArray("data");
+            if (nestedItems != null) return nestedItems;
+        }
+        return null;
+    }
+
+    private JSONObject normalizeSaleAsUnifiedOperation(JSONObject sale) {
+        try {
+            JSONObject out = new JSONObject(sale.toString());
+            String status = sale.optString("refund_status", sale.optString("status", "")).toLowerCase(Locale.ROOT);
+            boolean isRefund = status.contains("refund");
+            out.put("type", isRefund ? "refund" : "sale");
+
+            String saleNo = sale.optString("sale_number", sale.optString("invoice_number", "")).trim();
+            if (!saleNo.isEmpty()) {
+                out.put("sale_number", saleNo);
+                if (!out.has("title_ar") || out.optString("title_ar").isEmpty()) {
+                    out.put("title_ar", (isRefund ? "مرتجع فاتورة #" : "فاتورة مبيعات #") + saleNo);
+                }
+                if (!out.has("title_en") || out.optString("title_en").isEmpty()) {
+                    out.put("title_en", (isRefund ? "Refund Invoice #" : "Sales Invoice #") + saleNo);
+                }
+            }
+
+            if (!out.has("timestamp") || out.optString("timestamp").isEmpty()) {
+                out.put("timestamp", sale.optString("created_at", ""));
+            }
+
+            // حساب إجمالي وزن الفاتورة من حقل الوزن أو بجمع أوزان الأصناف
+            double saleWeight = sale.optDouble("total_weight", sale.optDouble("weight", 0.0));
+            if (saleWeight <= 0.0) {
+                JSONArray items = sale.optJSONArray("items");
+                if (items == null) items = sale.optJSONArray("sold_items");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject it = items.optJSONObject(i);
+                        if (it != null) {
+                            saleWeight += it.optDouble("weight",
+                                    it.optDouble("gross_weight_grams", it.optDouble("gross_weight", 0.0)));
+                        }
+                    }
+                }
+            }
+            out.put("total_weight", saleWeight);
+            return out;
+        } catch (Exception e) {
+            return sale;
+        }
+    }
+
+    private String mapActivityType(String rawType) {
+        if (rawType == null) return "system";
+        String lower = rawType.toLowerCase(Locale.ROOT);
+        if (lower.contains("refund") || lower.contains("return")) return "refund";
+        if (lower.contains("sale") || lower.contains("pos") || lower.contains("invoice")) return "sale";
+        if (lower.contains("scrap")) return "scrap";
+        if (lower.contains("transfer") || lower.contains("move")) return "transfer";
+        if (lower.contains("inventory") || lower.contains("audit") || lower.contains("stock")) return "inventory";
+        if (lower.contains("rfid") || lower.contains("encode") || lower.contains("gate") || lower.contains("tag")) return "rfid";
+        return "system";
+    }
+
     private boolean matchesCurrentUser(JSONObject record, int currentUserId, String currentUsername) {
         if (record == null) return false;
 
@@ -2725,15 +3036,13 @@ public ApiResponse getDashboardCharts(int branchId) {
             };
             for (String name : candidateNames) {
                 if (name != null && !name.trim().isEmpty()) {
-                    String clean = name.trim().toLowerCase(Locale.ROOT);
-                    if (clean.equals(target)) return true;
+                    if (name.trim().toLowerCase(Locale.ROOT).equals(target)) return true;
                 }
             }
         }
 
         return false;
     }
-
 
     public void get(final String endpoint, final ApiCallback callback) {
         networkExecutor.execute(() -> {
@@ -2765,82 +3074,233 @@ public ApiResponse getDashboardCharts(int branchId) {
         });
     }
 
-// ==================== حساب قيمة الذهب الكسر ====================
-public ApiResponse calculateScrap(double weightGrams, String karat) {
-    try {
-        JSONObject payload = new JSONObject();
-        payload.put("weight_grams", weightGrams);
-        payload.put("karat", karat);
-        if (!payload.has("gate_id")) {
-            payload.put("gate_id", getEffectiveGateId());
+    // ==================== حساب قيمة الذهب الكسر والاسترجاع ====================
+    public ApiResponse calculateScrap(double weightGrams, String karat) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("weight_grams", weightGrams);
+            payload.put("karat", karat);
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            return postWithAuth("/scrap/calculate", payload);
+        } catch (Exception e) {
+            Log.e(TAG, "calculateScrap error: " + e.getMessage());
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
         }
-        return postWithAuth("/scrap/calculate", payload);
-    } catch (Exception e) {
-        Log.e(TAG, "calculateScrap error: " + e.getMessage());
-        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        r.isNetworkError = true;
-        return r;
     }
-}
 
-// ==================== Refunds V2 (Sale-Centric) ====================
-public ApiResponse findSaleForRefund(String query) {
-    try {
-        String encoded = java.net.URLEncoder.encode(query, "UTF-8");
-        return getWithAuth("/refunds/find-sale?q=" + encoded);
-    } catch (Exception e) {
-        Log.e(TAG, "findSaleForRefund error: " + e.getMessage());
-        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        r.isNetworkError = true;
-        return r;
-    }
-}
-public ApiResponse findSaleForRefundByItem(String code) {
-    try {
-        String encoded = java.net.URLEncoder.encode(code, "UTF-8");
-        return getWithAuth("/refunds/find-by-item?code=" + encoded);
-    } catch (Exception e) {
-        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        r.isNetworkError = true;
-        return r;
-    }
-}
-public ApiResponse processRefundV2(JSONObject payload) {
-    try {
-        if (payload == null) payload = new JSONObject();
-        if (!payload.has("gate_id")) {
-            payload.put("gate_id", getEffectiveGateId());
+    public ApiResponse findSaleForRefund(String query) {
+        try {
+            return getWithAuth("/refunds/find-sale?q=" + encodeParam(query));
+        } catch (Exception e) {
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
         }
-        return postWithAuth("/refunds", payload);
-    } catch (Exception e) {
-        Log.e(TAG, "processRefundV2 error: " + e.getMessage());
-        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        r.isNetworkError = true;
-        return r;
     }
-}
 
-/**
- * يجلب الأسعار الحقيقية من السيرفر قبل فتح الدفع.
- * الحل الجذري لمشكلة "الأسعار القديمة في الكاش".
- */
-public ApiResponse prepareCheckout(java.util.List<Integer> itemIds) {
-    try {
-        JSONObject payload = new JSONObject();
-        JSONArray arr = new JSONArray();
-        for (Integer id : itemIds) {
-            if (id != null && id > 0) arr.put(id);
+    public ApiResponse findSaleForRefundByItem(String code) {
+        try {
+            return getWithAuth("/refunds/find-by-item?code=" + encodeParam(code));
+        } catch (Exception e) {
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
         }
-        payload.put("item_ids", arr);
-
-        return postWithAuth("/pos/prepare-checkout", payload);
-    } catch (Exception e) {
-        Log.e(TAG, "prepareCheckout error: " + e.getMessage());
-        ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        r.isNetworkError = true;
-        return r;
     }
-}
+
+    public ApiResponse processRefundV2(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            return postWithAuth("/refunds", payload);
+        } catch (Exception e) {
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
+        }
+    }
+
+    public ApiResponse prepareCheckout(List<Integer> itemIds) {
+        try {
+            JSONObject payload = new JSONObject();
+            JSONArray arr = new JSONArray();
+            if (itemIds != null) {
+                for (Integer id : itemIds) {
+                    if (id != null && id > 0) arr.put(id);
+                }
+            }
+            payload.put("item_ids", arr);
+            return postWithAuth("/pos/prepare-checkout", payload);
+        } catch (Exception e) {
+            ApiResponse r = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            r.isNetworkError = true;
+            return r;
+        }
+    }
+
+    // ==================== شراء كسر الذهب والتسوية النقدية ====================
+    public ApiResponse saveScrapPurchase(JSONObject payload) {
+        try {
+            if (payload == null) payload = new JSONObject();
+            if (!payload.has("gate_id")) {
+                payload.put("gate_id", getEffectiveGateId());
+            }
+            return postWithAuth("/scrap/purchase", payload);
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+            response.isNetworkError = true;
+            return response;
+        }
+    }
+
+    public ApiResponse getScrapSummary(int branchId) {
+        return getWithAuth("/scrap/summary?branch_id=" + branchId);
+    }
+
+    public ApiResponse getAvailableScrapPurchases(int branchId) {
+        return getWithAuth("/scrap/available-purchases?branch_id=" + branchId);
+    }
+
+    public ApiResponse createScrapBatch(JSONObject payload) {
+        return postWithAuth("/scrap/batches", payload);
+    }
+
+    public ApiResponse getScrapBatches(int branchId) {
+        return getWithAuth("/scrap/batches?branch_id=" + branchId);
+    }
+
+    public ApiResponse sendScrapBatch(int batchId) {
+        return postWithAuth("/scrap/batches/" + batchId + "/send", new JSONObject());
+    }
+
+    public ApiResponse receiveScrapBatch(int batchId, JSONObject payload) {
+        return postWithAuth("/scrap/batches/" + batchId + "/receive", payload);
+    }
+
+    public ApiResponse getScrapProfitReport(int branchId, String fromDate, String toDate) {
+        return getWithAuth("/scrap/profit-report?branch_id=" + branchId
+                + "&from=" + encodeParam(fromDate) + "&to=" + encodeParam(toDate));
+    }
+
+    public ApiResponse getCashReconciliationSummary(int branchId, String date) {
+        return getWithAuth("/cash-reconciliation/daily?branch_id=" + branchId
+                + "&date=" + encodeParam(date));
+    }
+
+    public ApiResponse closeCashier(JSONObject payload) {
+        return postWithAuth("/cash-reconciliation/close", payload);
+    }
+
+    public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
+        return getWithAuth("/scrap/purchase/" + purchaseId + "/receipt");
+    }
+
+    // ==================== السندات والعملاء والموردون ====================
+    public ApiResponse getVouchers(String type, int branchId) {
+        String url = "/vouchers?branch_id=" + branchId;
+        if (type != null && !type.isEmpty()) url += "&type=" + encodeParam(type);
+        return getWithAuth(url);
+    }
+
+    public ApiResponse createVoucherDirect(JSONObject payload) {
+        return postWithAuth("/vouchers", payload);
+    }
+
+    public ApiResponse getVoucherAccounts() {
+        return getWithAuth("/vouchers/accounts");
+    }
+
+    public ApiResponse getVoucherParties() {
+        return getWithAuth("/vouchers/parties");
+    }
+
+    public ApiResponse getVoucherDetail(int voucherId) {
+        return getWithAuth("/vouchers/" + voucherId);
+    }
+
+    public ApiResponse getPartiesList(String type, String search) {
+        StringBuilder url = new StringBuilder("/parties/list?");
+        if (type != null && !type.isEmpty()) url.append("type=").append(encodeParam(type)).append("&");
+        if (search != null && !search.isEmpty()) url.append("search=").append(encodeParam(search));
+        return getWithAuth(url.toString());
+    }
+
+    public ApiResponse createParty(JSONObject payload) {
+        return postWithAuth("/parties/create", payload);
+    }
+
+    public ApiResponse getPartyStatement(int partyId) {
+        return getWithAuth("/parties/" + partyId + "/statement");
+    }
+
+    public ApiResponse getScrapAgingReport(int branchId) {
+        return getWithAuth("/scrap/aging?branch_id=" + branchId);
+    }
+
+    public ApiResponse getScrapAgingSummary(int branchId) {
+        return getWithAuth("/scrap/aging/summary?branch_id=" + branchId);
+    }
+
+    // ==================== معالجة الأخطاء ====================
+    private String getFriendlyErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return isArabic() ? "حدث خطأ غير متوقع، يرجى المحاولة لاحقاً." : "An unexpected error occurred. Please try again.";
+        }
+
+        if (!isNetworkAvailable()) {
+            return isArabic()
+                    ? "لا يوجد اتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مرة أخرى."
+                    : "No internet connection. Please check your network and try again.";
+        }
+
+        if (throwable instanceof java.net.UnknownHostException) {
+            return isArabic()
+                    ? "تعذر الوصول إلى الخادم. يرجى التأكد من اتصالك بالإنترنت."
+                    : "Unable to reach the server. Please check your connection.";
+        } else if (throwable instanceof java.net.SocketTimeoutException) {
+            return isArabic()
+                    ? "انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى."
+                    : "Connection timed out. Please try again.";
+        } else if (throwable instanceof java.net.ConnectException) {
+            return isArabic()
+                    ? "فشل الاتصال بالخادم. يرجى المحاولة لاحقاً."
+                    : "Failed to connect to the server. Please try again later.";
+        }
+
+        return isArabic()
+                ? "حدث خطأ في الاتصال. يرجى المحاولة لاحقاً."
+                : "A network error occurred. Please try again later.";
+    }
+
+    private boolean isArabic() {
+        return Locale.getDefault().getLanguage().equals("ar");
+    }
+
+    private boolean isNetworkAvailable() {
+        try {
+            if (context == null) return false;
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network network = cm.getActiveNetwork();
+                if (network == null) return false;
+                NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+                return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            } else {
+                android.net.NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                return activeNetwork != null && activeNetwork.isConnected();
+            }
+        } catch (Exception ignored) {}
+        return true;
+    }
+
+    // ==================== نماذج الاستجابة والخيوط ====================
     public static class ApiResponse {
         public final int code;
         public final JSONObject data;
@@ -2856,6 +3316,7 @@ public ApiResponse prepareCheckout(java.util.List<Integer> itemIds) {
             this.code = code;
             this.data = data;
             this.error = error;
+            this.statusCode = code;
             this.isSuccess = code >= 200 && code < 300;
             this.rawBody = null;
             this.message = (data != null) ? data.optString("message", "") : "";
@@ -2908,280 +3369,4 @@ public ApiResponse prepareCheckout(java.util.List<Integer> itemIds) {
             return t;
         }
     }
-
-    // ==================== شراء كسر الذهب ====================
-    public ApiResponse saveScrapPurchase(JSONObject payload) {
-        try {
-            if (payload == null) payload = new JSONObject();
-            if (!payload.has("gate_id")) {
-                payload.put("gate_id", getEffectiveGateId());
-            }
-            return postWithAuth("/scrap/purchase", payload);
-        } catch (Exception e) {
-            Log.e(TAG, "saveScrapPurchase error: " + e.getMessage());
-            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-            response.isNetworkError = true;
-            return response;
-        }
-    }
-
-    public ApiResponse getScrapSummary(int branchId) {
-        return getWithAuth("/scrap/summary?branch_id=" + branchId);
-    }
-
-    public ApiResponse getAvailableScrapPurchases(int branchId) {
-        return getWithAuth("/scrap/available-purchases?branch_id=" + branchId);
-    }
-
-    public ApiResponse createScrapBatch(JSONObject payload) {
-        return postWithAuth("/scrap/batches", payload);
-    }
-
-    // ==================== دفعات تصفية الكسر ====================
-    public ApiResponse getScrapBatches(int branchId) {
-        return getWithAuth("/scrap/batches?branch_id=" + branchId);
-    }
-
-    public ApiResponse sendScrapBatch(int batchId) {
-        return postWithAuth("/scrap/batches/" + batchId + "/send", new JSONObject());
-    }
-
-    public ApiResponse receiveScrapBatch(int batchId, JSONObject payload) {
-        return postWithAuth("/scrap/batches/" + batchId + "/receive", payload);
-    }
-
-    public ApiResponse getScrapProfitReport(int branchId, String fromDate, String toDate) {
-        return getWithAuth("/scrap/profit-report?branch_id=" + branchId
-            + "&from=" + fromDate + "&to=" + toDate);
-    }
-
-    public ApiResponse getCashReconciliationSummary(int branchId, String date) {
-        return getWithAuth("/cash-reconciliation/daily?branch_id=" + branchId + "&date=" + date);
-    }
-
-    public ApiResponse closeCashier(JSONObject payload) {
-        return postWithAuth("/cash-reconciliation/close", payload);
-    }
-
-    // ==================== إيصال شراء الكسر ====================
-    public ApiResponse getScrapPurchaseReceipt(int purchaseId) {
-        return getWithAuth("/scrap/purchase/" + purchaseId + "/receipt");
-    }
-
-    // ==================== معالجة الأخطاء Centralized Error Handling ====================
-    private String getFriendlyErrorMessage(Throwable throwable) {
-        if (throwable == null) {
-            return isArabic() ? "حدث خطأ غير متوقع، يرجى المحاولة لاحقاً." : "An unexpected error occurred. Please try again.";
-        }
-
-        if (!isNetworkAvailable()) {
-            return isArabic()
-                ? "لا يوجد اتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مرة أخرى."
-                : "No internet connection. Please check your network and try again.";
-        }
-
-        if (throwable instanceof java.net.UnknownHostException) {
-            return isArabic()
-                ? "تعذر الوصول إلى الخادم. يرجى التأكد من اتصالك بالإنترنت."
-                : "Unable to reach the server. Please check your connection.";
-        } else if (throwable instanceof java.net.SocketTimeoutException) {
-            return isArabic()
-                ? "انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى."
-                : "Connection timed out. Please try again.";
-        } else if (throwable instanceof java.net.ConnectException) {
-            return isArabic()
-                ? "فشل الاتصال بالخادم. يرجى المحاولة لاحقاً."
-                : "Failed to connect to the server. Please try again later.";
-        }
-
-        return isArabic()
-            ? "حدث خطأ في الاتصال. يرجى المحاولة لاحقاً."
-            : "A network error occurred. Please try again later.";
-    }
-
-    private boolean isArabic() {
-        return Locale.getDefault().getLanguage().equals("ar");
-    }
-
-    private boolean isNetworkAvailable() {
-        try {
-            if (context == null) return false;
-            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-            if (cm != null) {
-                android.net.NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-                return activeNetwork != null && activeNetwork.isConnected();
-            }
-        } catch (Exception ignored) {}
-        return true;
-    }
-
-    public ApiResponse getVouchers(String type, int branchId) {
-        String url = "/vouchers?branch_id=" + branchId;
-        if (type != null && !type.isEmpty()) url += "&type=" + type;
-        return getWithAuth(url);
-    }
-
-    public ApiResponse createVoucherDirect(JSONObject payload) {
-        return postWithAuth("/vouchers", payload);
-    }
-
-    public ApiResponse getVoucherAccounts() {
-        return getWithAuth("/vouchers/accounts");
-    }
-
-    public ApiResponse getVoucherParties() {
-        return getWithAuth("/vouchers/parties");
-    }
-
-    public ApiResponse getVoucherDetail(int voucherId) {
-        return getWithAuth("/vouchers/" + voucherId);
-    }
-
-    // ==================== العملاء والموردين ====================
-    public ApiResponse getPartiesList(String type, String search) {
-        String url = "/parties/list?";
-        if (type != null && !type.isEmpty()) url += "type=" + type + "&";
-        if (search != null && !search.isEmpty()) url += "search=" + search;
-        return getWithAuth(url);
-    }
-
-    public ApiResponse createParty(JSONObject payload) {
-        return postWithAuth("/parties/create", payload);
-    }
-
-    public ApiResponse getPartyStatement(int partyId) {
-        return getWithAuth("/parties/" + partyId + "/statement");
-    }
-
-    public ApiResponse getScrapAgingReport(int branchId) {
-        return getWithAuth("/scrap/aging?branch_id=" + branchId);
-    }
-
-    public ApiResponse getScrapAgingSummary(int branchId) {
-        return getWithAuth("/scrap/aging/summary?branch_id=" + branchId);
-    }
-
-    public ApiResponse getCashFlowStatement(String date, int branchId) {
-        String url = "/accounting/cash-flow?date=" + date;
-        if (branchId > 0) url += "&branch_id=" + branchId;
-        return getAccounting(url);
-    }
-
-    public ApiResponse reverseJournalEntry(String entryId) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("reason", "عكس من تطبيق الأندرويد");
-        } catch (Exception ignored) {}
-        return postAccounting("/accounting/journal-entries/" + entryId + "/reverse", payload);
-    }
-
-    public ApiResponse getAgingReport(String asOfDate, String type) {
-        return getAccounting("/accounting/aging-report?as_of=" + asOfDate + "&type=" + type);
-    }
-
-   /* public ApiResponse getDashboardCharts(int branchId) {
-        String endpoint = "/dashboard/charts";
-        if (branchId > 0) endpoint += "?branch_id=" + branchId;
-        return getWithAuth(endpoint);
-    }
-*/
-
-    public ApiResponse processGoldConversion(JSONObject payload) {
-        return postAccounting("/accounting/gold-conversion", payload);
-    }
-
-    public ApiResponse getProfitAnalysis(String branchId, String fromDate, String toDate) {
-        String url = "/accounting/profit-analysis?from=" + fromDate + "&to=" + toDate;
-        if (branchId != null && !branchId.isEmpty()) {
-            url += "&branch_id=" + branchId;
-        }
-        return getAccounting(url);
-    }
-
-    public ApiResponse previewInventoryRevaluation(int branchId) {
-        return getAccounting("/accounting/inventory-revaluation/preview?branch_id=" + branchId);
-    }
-
-    public ApiResponse postInventoryRevaluation(JSONObject payload) {
-        return postAccounting("/accounting/inventory-revaluation/post", payload);
-    }
-
-    public ApiResponse savePurchaseInvoice(JSONObject payload) {
-        try {
-            if (!payload.has("branch_id")) {
-                MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
-                payload.put("branch_id", bm.getActiveBranchId());
-            }
-            return postWithAuth("/purchases/create", payload);
-        } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-            response.isNetworkError = true;
-            return response;
-        }
-    }
-
-    public ApiResponse getAuditLogs(String status, String action, int limit) {
-        String url = "/audit-logs?limit=" + limit;
-        if (status != null && !status.isEmpty()) url += "&status=" + status;
-        if (action != null && !action.isEmpty()) url += "&action=" + action;
-        return getAccounting(url);
-    }
-
-    // ==================== قفل الفترات المالية ====================
-    public ApiResponse togglePeriodLock(JSONObject payload) {
-        return postAccounting("/accounting/lock-period", payload);
-    }
-
-    public ApiResponse getLockedPeriods() {
-        return getAccounting("/accounting/locked-periods");
-    }
-
-    // ==================== إدارة الشيكات (Cheques) ====================
-    public ApiResponse getCheques(String type, String status) {
-        String url = "/cheques";
-        boolean hasParam = false;
-
-        if (type != null && !type.isEmpty()) {
-            url += "?type=" + type;
-            hasParam = true;
-        }
-        if (status != null && !status.isEmpty()) {
-            url += (hasParam ? "&" : "?") + "status=" + status;
-        }
-        return getAccounting(url);
-    }
-
-    public ApiResponse createCheque(JSONObject payload) {
-        return postAccounting("/cheques", payload);
-    }
-
-    public ApiResponse depositCheque(int chequeId, JSONObject payload) {
-        return postAccounting("/cheques/" + chequeId + "/deposit", payload);
-    }
-
-    public ApiResponse returnCheque(int chequeId, JSONObject payload) {
-        return postAccounting("/cheques/" + chequeId + "/return", payload);
-    }
-
-    // ==================== التسوية البنكية (Bank Reconciliation) ====================
-    public ApiResponse getReconciliationSummary(int bankAccountId, String date) {
-        return getAccounting("/reconciliation/summary?bank_account_id=" + bankAccountId + "&date=" + date);
-    }
-
-    public ApiResponse saveReconciliation(JSONObject payload) {
-        return postAccounting("/reconciliation/save", payload);
-    }
-
-    // ==================== الأصول الثابتة (Fixed Assets) ====================
-    public ApiResponse getFixedAssets() {
-        return getAccounting("/fixed-assets");
-    }
-
-    public ApiResponse createFixedAsset(JSONObject payload) {
-        return postAccounting("/fixed-assets", payload);
-    }
-
-    public ApiResponse runDepreciation(JSONObject payload) {
-        return postAccounting("/fixed-assets/depreciate", payload);
-    }
-    }
+}
