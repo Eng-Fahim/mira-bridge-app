@@ -205,7 +205,7 @@ class MiraDashboardFragment : Fragment() {
     private fun isSessionValid(): Boolean {
         val sm = sessionManager ?: return false
         return try {
-            sm.isLoggedIn || sm.userId > 0
+            sm.isLoggedIn() || readIntProp(sm, "userId") > 0
         } catch (_: Exception) {
             true
         }
@@ -215,18 +215,9 @@ class MiraDashboardFragment : Fragment() {
         val sm = sessionManager
         val bm = branchesManager
 
-        val resolvedUser = try {
-            sm?.username?.takeIf { it.isNotBlank() } ?: ""
-        } catch (_: Exception) {
-            ""
-        }
-        userNameState = resolvedUser
+        userNameState = readStringProp(sm, "username", "fullName", "name")
 
-        userRoleState = try {
-            readStringProp(sm, "role", "userRole").lowercase(Locale.ROOT)
-        } catch (_: Exception) {
-            ""
-        }
+        userRoleState = readStringProp(sm, "role", "userRole").lowercase(Locale.ROOT)
 
         val orgName = readStringProp(sm, "orgName", "organizationName", "companyName")
             .ifBlank { if (isArabic) "ميرا للمجوهرات" else "MIRA JEWELRY" }
@@ -245,11 +236,7 @@ class MiraDashboardFragment : Fragment() {
         }
         if (bmActive > 0) return bmActive
 
-        val smBranch = try {
-            sessionManager?.branchId ?: 0
-        } catch (_: Exception) {
-            0
-        }
+        val smBranch = readIntProp(sessionManager, "branchId")
         return if (smBranch > 0) smBranch else 1
     }
 
@@ -316,7 +303,6 @@ class MiraDashboardFragment : Fragment() {
     private fun loadOfflineData() {
         val ctx = context ?: return
         try {
-            // 1) استرجاع ملخص الداشبورد وأسعار الذهب المحفوظة
             val prefs = ctx.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
             val savedSummary = prefs.getString("summary_b$currentBranchId", null)
             if (!savedSummary.isNullOrBlank()) {
@@ -327,7 +313,6 @@ class MiraDashboardFragment : Fragment() {
                 applyGoldPricesJson(JSONObject(savedPrices))
             }
 
-            // 2) استرجاع آخر العمليات الموحدة للفرع من الكاش فوراً
             val cachedActs = activityCache?.load(currentBranchId)
             if (cachedActs != null && cachedActs.length() > 0 && recentActivitiesState.isEmpty()) {
                 val cachedList = mutableListOf<JSONObject>()
@@ -351,12 +336,10 @@ class MiraDashboardFragment : Fragment() {
         isRefreshingState = true
         val branchSnapshot = currentBranchId
 
-        // جلب العمليات الموحدة بالتوازي
         fetchRecentActivity()
 
         localExecutor?.execute {
             try {
-                // جلب ملخص لوحة القيادة والخزينة
                 val summaryResp = invokeApiMethod("getDashboardSummary", branchSnapshot)
                     ?: invokeApiMethod("getDashboardStats", branchSnapshot)
                     ?: invokeApiMethod("getDashboardSummary")
@@ -375,7 +358,6 @@ class MiraDashboardFragment : Fragment() {
                     }
                 }
 
-                // جلب أسعار الذهب الحية
                 val pricesResp = invokeApiMethod("getGoldPrices")
                     ?: invokeApiMethod("getLatestGoldPrices")
                 if (pricesResp != null && pricesResp.isSuccess && pricesResp.data != null) {
@@ -438,7 +420,6 @@ class MiraDashboardFragment : Fragment() {
     private fun applyDashboardSummaryJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
 
-        // المبيعات اليومية
         val salesObj = data.optJSONObject("today_sales") ?: data.optJSONObject("sales") ?: data
         val sLocal = salesObj.optDouble(
             "today_total_local",
@@ -462,7 +443,6 @@ class MiraDashboardFragment : Fragment() {
         if (sCount > 0) todayInvoicesCountState = sCount
         if (sWeight > 0.0) todaySoldWeightState = sWeight
 
-        // الخزينة والمخزون
         val vaultObj = data.optJSONObject("vault") ?: data.optJSONObject("inventory") ?: data
         val pieces = vaultObj.optInt(
             "total_pieces",
@@ -480,7 +460,6 @@ class MiraDashboardFragment : Fragment() {
         if (weight > 0.0) totalVaultWeightState = weight
         if (pure24 > 0.0) pure24kWeightState = pure24
 
-        // التنبيهات
         val alertsObj = data.optJSONObject("alerts")
         val aCount = alertsObj?.optInt("count", 0) ?: data.optInt("alerts_count", 0)
         alertsCountState = aCount
@@ -490,7 +469,6 @@ class MiraDashboardFragment : Fragment() {
                 ?: (if (isArabic) "يوجد $aCount تنبيهات تتطلب مراجعتك" else "$aCount alerts require attention")
         }
 
-        // أسعار الذهب إذا كانت مرفقة داخل الملخص
         if (data.has("gold_prices") || data.has("prices")) {
             applyGoldPricesJson(data)
         }
@@ -647,45 +625,26 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    private fun openFragmentByClassName(className: String, tag: String, fallback: () -> Unit) {
-        try {
+    private fun createFragmentByClassName(className: String, fallback: () -> Fragment): Fragment {
+        return try {
             val clazz = Class.forName(className)
-            val instance = clazz.getDeclaredConstructor().newInstance() as? Fragment
-            if (instance != null) {
-                navigateToFragment(instance, tag)
-            } else {
-                fallback()
-            }
+            (clazz.getDeclaredConstructor().newInstance() as? Fragment) ?: fallback()
         } catch (_: Exception) {
             fallback()
         }
     }
 
     private fun handleQuickAction(action: QuickActionItem) {
-        when (action.id) {
-            "pos" -> navigateToFragment(MiraPosFragment(), "Sales")
-            "sales_history" -> navigateToFragment(MiraSalesHistoryFragment(), "SalesHistory")
-            "inventory" -> navigateToFragment(MiraInventoryProFragment(), "Scan")
-            "transfers" -> navigateToFragment(MiraTransferFragment(), "Transfers")
-            "scrap" -> openFragmentByClassName("com.example.uhf.fragment.MiraScrapFragment", "Scrap") {
-                val posWithScrap = MiraPosFragment().apply {
-                    arguments = Bundle().apply { putBoolean("open_scrap_mode", true) }
-                }
-                navigateToFragment(posWithScrap, "Sales")
-            }
-            "encode" -> openFragmentByClassName("com.example.uhf.fragment.MiraEncodeFragment", "Encode") {
-                navigateToFragment(MiraInventoryProFragment(), "Scan")
-            }
-            "all_activities" -> navigateToAllActivities()
-            "sync_rates" -> {
-                refreshAllDashboardData(forceNetwork = true)
-                Toast.makeText(
-                    context,
-                    if (isArabic) "جاري تحديث الأسعار والبيانات..." else "Syncing rates & data...",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+        if (action.tag == "sync_rates") {
+            refreshAllDashboardData(forceNetwork = true)
+            Toast.makeText(
+                context,
+                if (isArabic) "جاري تحديث الأسعار والبيانات..." else "Syncing rates & data...",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
         }
+        navigateToFragment(action.fragmentProvider(), action.tag)
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -701,60 +660,78 @@ class MiraDashboardFragment : Fragment() {
         val quickActions = remember(isAr) {
             listOf(
                 QuickActionItem(
-                    id = "pos",
+                    tag = "Sales",
                     titleAr = "نقطة البيع",
                     titleEn = "POS Sale",
                     icon = Icons.Rounded.PointOfSale,
-                    accentColor = Color(0xFF10B981)
+                    accentColor = Color(0xFF10B981),
+                    fragmentProvider = { MiraPosFragment() }
                 ),
                 QuickActionItem(
-                    id = "sales_history",
+                    tag = "SalesHistory",
                     titleAr = "سجل المبيعات",
                     titleEn = "Invoices",
                     icon = Icons.Rounded.ReceiptLong,
-                    accentColor = Color(0xFFD4AF37)
+                    accentColor = Color(0xFFD4AF37),
+                    fragmentProvider = { MiraSalesHistoryFragment() }
                 ),
                 QuickActionItem(
-                    id = "inventory",
+                    tag = "Scan",
                     titleAr = "الجرد الذكي",
                     titleEn = "Inventory",
                     icon = Icons.Rounded.Inventory2,
-                    accentColor = Color(0xFF06B6D4)
+                    accentColor = Color(0xFF06B6D4),
+                    fragmentProvider = { MiraInventoryProFragment() }
                 ),
                 QuickActionItem(
-                    id = "transfers",
+                    tag = "Transfers",
                     titleAr = "التحويلات",
                     titleEn = "Transfers",
                     icon = Icons.Rounded.SwapHoriz,
-                    accentColor = Color(0xFFA855F7)
+                    accentColor = Color(0xFFA855F7),
+                    fragmentProvider = { MiraTransferFragment() }
                 ),
                 QuickActionItem(
-                    id = "scrap",
+                    tag = "Scrap",
                     titleAr = "شراء كسر",
                     titleEn = "Scrap Gold",
                     icon = Icons.Rounded.Scale,
-                    accentColor = Color(0xFFF59E0B)
+                    accentColor = Color(0xFFF59E0B),
+                    fragmentProvider = {
+                        createFragmentByClassName("com.example.uhf.fragment.MiraScrapFragment") {
+                            MiraPosFragment().apply {
+                                arguments = Bundle().apply { putBoolean("open_scrap_mode", true) }
+                            }
+                        }
+                    }
                 ),
                 QuickActionItem(
-                    id = "encode",
+                    tag = "Encode",
                     titleAr = "تشفير RFID",
                     titleEn = "Encode Tag",
                     icon = Icons.Rounded.Contactless,
-                    accentColor = Color(0xFF3B82F6)
+                    accentColor = Color(0xFF3B82F6),
+                    fragmentProvider = {
+                        createFragmentByClassName("com.example.uhf.fragment.MiraEncodeFragment") {
+                            MiraInventoryProFragment()
+                        }
+                    }
                 ),
                 QuickActionItem(
-                    id = "all_activities",
+                    tag = "AllActivities",
                     titleAr = "كل العمليات",
                     titleEn = "All Logs",
                     icon = Icons.Rounded.History,
-                    accentColor = Color(0xFFEC4899)
+                    accentColor = Color(0xFFEC4899),
+                    fragmentProvider = { MiraAllActivitiesFragment() }
                 ),
                 QuickActionItem(
-                    id = "sync_rates",
+                    tag = "sync_rates",
                     titleAr = "تحديث فوري",
                     titleEn = "Sync Now",
                     icon = Icons.Rounded.Sync,
-                    accentColor = Color(0xFF14B8A6)
+                    accentColor = Color(0xFF14B8A6),
+                    fragmentProvider = { MiraDashboardFragment() }
                 )
             )
         }
@@ -779,7 +756,6 @@ class MiraDashboardFragment : Fragment() {
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 1. الترويسة العلوية وحالة الاتصال وزر التحديث
                     DashboardTopHeader(
                         isArabic = isAr,
                         orgTitle = orgTitleState,
@@ -789,7 +765,6 @@ class MiraDashboardFragment : Fragment() {
                         onRefresh = { refreshAllDashboardData(forceNetwork = true) }
                     )
 
-                    // 2. شريط اختيار الفرع (إذا توفر أكثر من فرع)
                     if (branchesListState.size > 1) {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -830,7 +805,6 @@ class MiraDashboardFragment : Fragment() {
                         }
                     }
 
-                    // 3. شريط التنبيهات الذكية (عند وجود تنبيهات)
                     if (alertsCountState > 0) {
                         AlertsBannerCard(
                             isArabic = isAr,
@@ -840,20 +814,16 @@ class MiraDashboardFragment : Fragment() {
                         )
                     }
 
-                    // 4. بطاقة مؤشر أسعار الذهب الحية (24K / 21K / 18K)
                     LiveGoldRatesCard(isArabic = isAr)
 
-                    // 5. بطاقة ملخص مبيعات اليوم والخزينة (مع زر إخفاء/إظهار الأرقام)
                     ExecutiveSummaryAndVaultCard(isArabic = isAr)
 
-                    // 6. شبكة الوصول السريع (8 اختصارات)
                     QuickActionsSection(
                         isArabic = isAr,
                         actions = quickActions,
                         onActionClick = { handleQuickAction(it) }
                     )
 
-                    // 7. قسم آخر العمليات والمبيعات الموحد (نفس تصميم عرض الكل وسجل المبيعات)
                     RecentActivitySection(
                         isArabic = isAr,
                         activities = recentActivitiesState.take(10),
@@ -1048,7 +1018,6 @@ class MiraDashboardFragment : Fragment() {
                     }
                 }
 
-                // صف مبيعات اليوم
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1080,7 +1049,6 @@ class MiraDashboardFragment : Fragment() {
                     )
                 }
 
-                // صف رصيد الخزينة والمخزون
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
