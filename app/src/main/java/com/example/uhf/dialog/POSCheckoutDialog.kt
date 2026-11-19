@@ -64,21 +64,33 @@ class POSCheckoutDialog : DialogFragment() {
         private const val ARG_TOTAL_AMOUNT = "total_amount"
         private const val ARG_ITEM_COUNT = "item_count"
         private const val ARG_RATES_JSON = "rates_json"
+        private const val ARG_SCRAP_DETAILS_JSON = "scrap_details_json"
 
         @JvmStatic
-        fun newInstance(totalAmount: Double, itemCount: Int, ratesJson: String?): POSCheckoutDialog {
+        fun newInstance(
+            totalAmount: Double,
+            itemCount: Int,
+            ratesJson: String?,
+            scrapDetailsJson: String?
+        ): POSCheckoutDialog {
             return POSCheckoutDialog().apply {
                 arguments = Bundle().apply {
                     putDouble(ARG_TOTAL_AMOUNT, totalAmount)
                     putInt(ARG_ITEM_COUNT, itemCount)
                     putString(ARG_RATES_JSON, ratesJson ?: "{}")
+                    putString(ARG_SCRAP_DETAILS_JSON, scrapDetailsJson ?: "{}")
                 }
             }
         }
 
         @JvmStatic
+        fun newInstance(totalAmount: Double, itemCount: Int, ratesJson: String?): POSCheckoutDialog {
+            return newInstance(totalAmount, itemCount, ratesJson, "{}")
+        }
+
+        @JvmStatic
         fun newInstance(totalAmount: Double, itemCount: Int): POSCheckoutDialog {
-            return newInstance(totalAmount, itemCount, "{}")
+            return newInstance(totalAmount, itemCount, "{}", "{}")
         }
     }
 
@@ -93,6 +105,7 @@ class POSCheckoutDialog : DialogFragment() {
     class POSCheckoutData {
         @JvmField var customerName: String = ""
         @JvmField var customerPhone: String = ""
+        @JvmField var customerNationalId: String = ""
         @JvmField var customerEmail: String = ""
         @JvmField var customerAddress: String = ""
         @JvmField var customerNotes: String = ""
@@ -118,6 +131,7 @@ class POSCheckoutDialog : DialogFragment() {
 
     private var totalAmount: Double = 0.0
     private var itemCount: Int = 0
+    private var scrapDetailsJson: String = "{}"
     private var listener: OnCheckoutListener? = null
     private var dismissListener: OnDialogDismissListener? = null
     private var isArabic: Boolean = true
@@ -134,6 +148,7 @@ class POSCheckoutDialog : DialogFragment() {
 
     private var customerNameState by mutableStateOf("")
     private var customerPhoneState by mutableStateOf("")
+    private var customerNationalIdState by mutableStateOf("")
 
     private var tradeInTotalState by mutableDoubleStateOf(0.0)
     private var inlineErrorState by mutableStateOf<String?>(null)
@@ -162,6 +177,7 @@ class POSCheckoutDialog : DialogFragment() {
             totalAmount = args.getDouble(ARG_TOTAL_AMOUNT, 0.0)
             itemCount = args.getInt(ARG_ITEM_COUNT, 0)
             currentTotalWithDiscountUsd = totalAmount
+            scrapDetailsJson = args.getString(ARG_SCRAP_DETAILS_JSON, "{}") ?: "{}"
 
             try {
                 val ratesJson = args.getString(ARG_RATES_JSON, "{}") ?: "{}"
@@ -435,7 +451,7 @@ class POSCheckoutDialog : DialogFragment() {
 
     private fun openTradeInDialog() {
         val maxValue = currentTotalWithDiscountUsd * getRateToYER("USD")
-        val tradeDialog = TradeInDialog.newInstance(maxValue, tradeInLines)
+        val tradeDialog = TradeInDialog.newInstance(maxValue, tradeInLines, scrapDetailsJson)
         tradeDialog.setOnTradeInListener { tradeIns, totalValue ->
             this.tradeInLines = tradeIns
             this.tradeInTotalState = totalValue
@@ -444,7 +460,6 @@ class POSCheckoutDialog : DialogFragment() {
         tradeDialog.show(parentFragmentManager, "TradeInDialog")
     }
 
-    // إرسال البيانات إلى السيرفر ليكون هو صاحب القرار النهائي
     private fun submitToServer() {
         dispatchCheckout(buildData())
     }
@@ -453,6 +468,7 @@ class POSCheckoutDialog : DialogFragment() {
         val data = POSCheckoutData().apply {
             customerName = customerNameState.trim()
             customerPhone = customerPhoneState.trim()
+            customerNationalId = customerNationalIdState.trim()
             originalTotal = totalAmount
             finalAmount = totalAmount
             tradeIns = tradeInLines
@@ -529,6 +545,10 @@ class POSCheckoutDialog : DialogFragment() {
         val paidYer = getTotalPaidYER()
         val totalWithGoldYer = paidYer + tradeInTotalState
         val diffYer = totalWithGoldYer - requiredTotalYer
+
+        val showNationalIdField = diffYer > 50_000.0 ||
+            (inlineErrorState?.contains("الهوية") == true) ||
+            customerNationalIdState.isNotEmpty()
 
         var pickerForRowIndex by remember { mutableIntStateOf(-1) }
 
@@ -642,10 +662,16 @@ class POSCheckoutDialog : DialogFragment() {
                         isArabic = isAr,
                         name = customerNameState,
                         phone = customerPhoneState,
+                        nationalId = customerNationalIdState,
+                        showNationalId = showNationalIdField,
                         enabled = !isSubmittingState,
                         onNameChange = { customerNameState = it },
                         onPhoneChange = {
                             customerPhoneState = it
+                            if (inlineErrorState != null) inlineErrorState = null
+                        },
+                        onNationalIdChange = {
+                            customerNationalIdState = it
                             if (inlineErrorState != null) inlineErrorState = null
                         }
                     )
@@ -858,7 +884,7 @@ class POSCheckoutDialog : DialogFragment() {
             else -> Quadruple(
                 Color(0xFF3B82F6),
                 Icons.Rounded.SwapHoriz,
-                if (isArabic) "فارق العملية" else "Difference",
+                if (isArabic) "رصيد دائن للعميل" else "Customer Credit",
                 String.format(Locale.US, "+%,.0f YER", diffYer)
             )
         }
@@ -977,50 +1003,76 @@ class POSCheckoutDialog : DialogFragment() {
         isArabic: Boolean,
         name: String,
         phone: String,
+        nationalId: String,
+        showNationalId: Boolean,
         enabled: Boolean,
         onNameChange: (String) -> Unit,
-        onPhoneChange: (String) -> Unit
+        onPhoneChange: (String) -> Unit,
+        onNationalIdChange: (String) -> Unit
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = onNameChange,
-                enabled = enabled,
-                singleLine = true,
-                label = {
-                    Text(
-                        text = if (isArabic) "اسم العميل (اختياري)" else "Customer Name",
-                        fontSize = 12.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f)
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = onNameChange,
+                    enabled = enabled,
+                    singleLine = true,
+                    label = {
+                        Text(
+                            text = if (isArabic) "اسم العميل (اختياري)" else "Customer Name",
+                            fontSize = 12.sp
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f)
+                )
 
-            OutlinedTextField(
-                value = phone,
-                onValueChange = onPhoneChange,
-                enabled = enabled,
-                singleLine = true,
-                label = {
-                    Text(
-                        text = if (isArabic) "رقم الهاتف" else "Phone",
-                        fontSize = 12.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f)
-            )
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = onPhoneChange,
+                    enabled = enabled,
+                    singleLine = true,
+                    label = {
+                        Text(
+                            text = if (isArabic) "رقم الهاتف" else "Phone",
+                            fontSize = 12.sp
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            AnimatedVisibility(visible = showNationalId) {
+                OutlinedTextField(
+                    value = nationalId,
+                    onValueChange = onNationalIdChange,
+                    enabled = enabled,
+                    singleLine = true,
+                    label = {
+                        Text(
+                            text = if (isArabic) "رقم الهوية الوطنية (مطلوب للرصيد > 50,000)" else "National ID (Required > 50k)",
+                            fontSize = 12.sp
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Badge, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 
