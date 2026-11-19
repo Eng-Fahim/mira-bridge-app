@@ -805,14 +805,13 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
             val tradeTotal = activity.optDouble("trade_in_total", 0.0)
             list.add(
                 PaymentLegDisplay(
-                    label = if (isArabic) "استبدال ذهب كسر (${tradeIns.length()} قطعة)" else "Gold Trade-In (${tradeIns.length()})",
+                    methodLabel = if (isArabic) "استبدال ذهب كسر (${tradeIns.length()} قطعة)" else "Gold Trade-In (${tradeIns.length()})",
                     amountText = if (tradeTotal > 0.0) formatAmount(tradeTotal, "USD") else "🥇",
                     color = Color(0xFFD97706)
                 )
             )
         }
-        return list
-    }
+
 
     private fun buildDetailRows(
         activity: JSONObject,
