@@ -15,22 +15,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AssignmentReturn
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.PointOfSale
-import androidx.compose.material.icons.rounded.ReceiptLong
-import androidx.compose.material.icons.rounded.Recycling
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,8 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uhf.ui.theme.MiraTheme
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.math.abs
+import java.util.TimeZone
 
 @Composable
 internal fun DashboardTopHeader(
@@ -359,27 +355,53 @@ internal fun RecentActivitySection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = if (isArabic) "آخر العمليات والنشاط" else "Recent Activity",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colors.goldPrimary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ReceiptLong,
+                            contentDescription = null,
+                            tint = colors.goldPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = if (isArabic) "آخر العمليات والمبيعات" else "Recent Operations & Sales",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = colors.textPrimary
+                    )
+                }
 
-                Text(
-                    text = if (isArabic) "عرض الكل ←" else "View All →",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.goldPrimary,
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = colors.goldPrimary.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f)),
                     modifier = Modifier.clickable { onViewAll() }
-                )
+                ) {
+                    Text(
+                        text = if (isArabic) "عرض الكل ←" else "View All →",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.goldPrimary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             if (activities.isEmpty()) {
                 Text(
-                    text = if (isArabic) "لا توجد عمليات مسجلة حديثاً" else "No recent activities",
+                    text = if (isArabic) "لا توجد عمليات مسجلة حديثاً" else "No recent operations",
                     fontSize = 12.sp,
                     color = colors.textSecondary,
                     modifier = Modifier.padding(vertical = 10.dp)
@@ -387,9 +409,9 @@ internal fun RecentActivitySection(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     activities.forEach { item ->
-                        ActivityTimelineRow(
-                            isArabic = isArabic,
+                        UnifiedOperationCard(
                             item = item,
+                            isArabic = isArabic,
                             maskAmount = maskAmounts,
                             onClick = { onItemClick(item) }
                         )
@@ -400,315 +422,440 @@ internal fun RecentActivitySection(
     }
 }
 
-private data class ActivityRowPresentation(
-    val title: String,
-    val subtitle: String,
-    val user: String,
-    val timestamp: String,
-    val amount: Double,
-    val currency: String,
-    val accuracy: Double,
-    val status: String,
-    val icon: ImageVector,
-    val accentColor: Color
+// ═══════════════════════════════════════════════════════════════════
+//  بطاقة العملية الموحدة الراقية (مشتركة بين الرئيسية وشاشة عرض الكل)
+// ═══════════════════════════════════════════════════════════════════
+
+private data class UnifiedCardModel(
+    val refCode: String,
+    val categoryLabel: String,
+    val categoryColor: Color,
+    val hasTradeIn: Boolean,
+    val statusLabel: String,
+    val statusColor: Color,
+    val statusIcon: ImageVector,
+    val primaryParty: String,
+    val partyIcon: ImageVector,
+    val formattedDate: String,
+    val countOrWeightText: String,
+    val countIcon: ImageVector,
+    val amountDisplayText: String
 )
 
-private fun buildActivityPresentation(
-    isArabic: Boolean,
-    item: JSONObject
-): ActivityRowPresentation {
-    val actionKey = item.optString("action", "")
-        .ifBlank { item.optString("type", "") }
-        .ifBlank { item.optString("event", "") }
-        .uppercase(Locale.US)
-
-    val nestedObj = extractNestedObject(item, "details")
-        ?: extractNestedObject(item, "meta")
-        ?: extractNestedObject(item, "payload")
-        ?: item
-
-    val (friendlyTitle, icon, accent) = resolveActionVisuals(actionKey, isArabic)
-
-    val candidateTitle = if (isArabic) {
-        item.optString("title_ar", "").ifBlank { item.optString("title", "") }
-    } else {
-        item.optString("title_en", "").ifBlank { item.optString("title", "") }
-    }.trim()
-
-    val finalTitle = if (candidateTitle.isNotBlank() && !isRawKey(candidateTitle)) {
-        candidateTitle
-    } else {
-        friendlyTitle
-    }
-
-    val saleNumber = nestedObj.optString("sale_number")
-        .ifBlank { item.optString("sale_number") }
-        .ifBlank { nestedObj.optString("invoice_number") }
-        .trim()
-
-    val entryId = nestedObj.optString("entry_id")
-        .ifBlank { item.optString("entry_id") }
-        .trim()
-
-    val nestedAmount = firstValidAmount(
-        item.optDouble("amount", Double.NaN),
-        nestedObj.optDouble("amount", Double.NaN),
-        nestedObj.optDouble("total_debit", Double.NaN),
-        nestedObj.optDouble("total_amount", Double.NaN)
-    )
-
-    val pureWeight = firstValidAmount(
-        nestedObj.optDouble("pure_weight", Double.NaN),
-        nestedObj.optDouble("weight", Double.NaN),
-        item.optDouble("weight", Double.NaN)
-    )
-
-    val currency = item.optString("currency")
-        .ifBlank { nestedObj.optString("currency") }
-        .ifBlank { "USD" }
-        .trim()
-
-    val detailParts = mutableListOf<String>()
-    if (saleNumber.isNotBlank()) {
-        detailParts.add(if (isArabic) "فاتورة: $saleNumber" else "Invoice: $saleNumber")
-    }
-    if (entryId.isNotBlank()) {
-        detailParts.add(if (isArabic) "قيد #$entryId" else "Entry #$entryId")
-    }
-    if (!nestedAmount.isNaN()) {
-        detailParts.add(
-            if (isArabic) "القيمة: ${String.format(Locale.US, "%,.2f", nestedAmount)} $currency"
-            else "Amount: ${String.format(Locale.US, "%,.2f", nestedAmount)} $currency"
-        )
-    }
-    if (!pureWeight.isNaN()) {
-        detailParts.add(
-            if (isArabic) "الوزن الصافي: ${String.format(Locale.US, "%.2f", pureWeight)} جم"
-            else "Pure: ${String.format(Locale.US, "%.2f", pureWeight)}g"
-        )
-    }
-
-    val rawDetails = if (isArabic) {
-        item.optString("details_ar", "").ifBlank { item.optString("details", "") }
-    } else {
-        item.optString("details_en", "").ifBlank { item.optString("details", "") }
-    }.trim()
-
-    val subtitle = when {
-        detailParts.isNotEmpty() -> detailParts.joinToString("  •  ")
-        rawDetails.isNotEmpty() && !looksLikeJson(rawDetails) -> rawDetails
-        else -> if (isArabic) "عملية مسجلة في النظام" else "Recorded system operation"
-    }
-
-    val user = item.optString("user", "").ifBlank { item.optString("username", "") }.trim()
-    val timestamp = extractTime(item.optString("timestamp", "").ifBlank { item.optString("created_at", "") })
-    val amount = if (!nestedAmount.isNaN()) nestedAmount else item.optDouble("amount", 0.0)
-    val accuracy = item.optDouble("accuracy", -1.0)
-    val status = item.optString("status", "neutral").lowercase(Locale.ROOT)
-
-    return ActivityRowPresentation(
-        title = finalTitle,
-        subtitle = subtitle,
-        user = user,
-        timestamp = timestamp,
-        amount = amount,
-        currency = currency,
-        accuracy = accuracy,
-        status = status,
-        icon = icon,
-        accentColor = accent
-    )
-}
-
-private fun resolveActionVisuals(actionKey: String, isArabic: Boolean): Triple<String, ImageVector, Color> {
-    return when {
-        actionKey.contains("REFUND") && actionKey.contains("JOURNAL") -> Triple(
-            if (isArabic) "قيد يومية لمرتجع مبيعات" else "Sales Refund Journal Entry",
-            Icons.Rounded.AssignmentReturn,
-            Color(0xFFF59E0B)
-        )
-        actionKey.contains("REFUND") -> Triple(
-            if (isArabic) "مرتجع فاتورة مبيعات" else "Sales Refund",
-            Icons.Rounded.AssignmentReturn,
-            Color(0xFFEF4444)
-        )
-        actionKey.contains("SALE") && actionKey.contains("JOURNAL") -> Triple(
-            if (isArabic) "قيد يومية لفاتورة بيع" else "Sales Journal Entry",
-            Icons.Rounded.ReceiptLong,
-            Color(0xFF38BDF8)
-        )
-        actionKey.contains("SALE") || actionKey.contains("POS") -> Triple(
-            if (isArabic) "إتمام عملية بيع" else "Sale Completed",
-            Icons.Rounded.PointOfSale,
-            Color(0xFF10B981)
-        )
-        actionKey.contains("SCRAP") -> Triple(
-            if (isArabic) "عملية شراء كسر ذهب" else "Scrap Gold Operation",
-            Icons.Rounded.Recycling,
-            Color(0xFFD4AF37)
-        )
-        actionKey.contains("TRANSFER") -> Triple(
-            if (isArabic) "تحويل قطع بين الفروع" else "Branch Transfer",
-            Icons.Rounded.SwapHoriz,
-            Color(0xFFA855F7)
-        )
-        actionKey.contains("GATE") -> Triple(
-            if (isArabic) "تنبيه بوابة أمنية" else "Security Gate Event",
-            Icons.Rounded.Shield,
-            Color(0xFFEF4444)
-        )
-        else -> Triple(
-            if (isArabic) "عملية في النظام" else "System Activity",
-            Icons.Rounded.History,
-            Color(0xFFD4AF37)
-        )
-    }
-}
-
-private fun extractNestedObject(parent: JSONObject, key: String): JSONObject? {
-    parent.optJSONObject(key)?.let { return it }
-    val str = parent.optString(key, "").trim()
-    if (str.startsWith("{")) {
-        return try {
-            JSONObject(str)
-        } catch (_: Exception) {
-            null
-        }
-    }
-    return null
-}
-
-private fun firstValidAmount(vararg values: Double): Double {
-    for (v in values) {
-        if (!v.isNaN() && v != 0.0) return v
-    }
-    return Double.NaN
-}
-
-private fun isRawKey(value: String): Boolean {
-    val trimmed = value.trim()
-    return trimmed.uppercase(Locale.US) == trimmed && trimmed.contains("_")
-}
-
-private fun looksLikeJson(text: String): Boolean {
-    val trimmed = text.trim()
-    return trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.contains("\":")
-}
-
-
-
 @Composable
-private fun ActivityTimelineRow(
-    isArabic: Boolean,
+fun UnifiedOperationCard(
     item: JSONObject,
-    maskAmount: Boolean,
+    isArabic: Boolean,
+    maskAmount: Boolean = false,
     onClick: () -> Unit
 ) {
     val colors = MiraTheme.colors
-    val presentation = buildActivityPresentation(isArabic, item)
+    val model = remember(item, isArabic) { buildUnifiedCardModel(item, isArabic) }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.backgroundTop.copy(alpha = 0.45f))
-            .border(1.dp, presentation.accentColor.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-            .padding(12.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.backgroundTop.copy(alpha = 0.65f)),
+        border = BorderStroke(1.dp, model.statusColor.copy(alpha = 0.30f))
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
+        Column(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(presentation.accentColor.copy(alpha = 0.14f))
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(
-                imageVector = presentation.icon,
-                contentDescription = null,
-                tint = presentation.accentColor,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+            // الصف الأول: رقم الفاتورة/المرجع + شارة الدفع/النوع + شارة الحالة
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = colors.goldPrimary.copy(alpha = 0.16f)
+                    ) {
+                        Text(
+                            text = model.refCode,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.goldPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
 
-        Spacer(modifier = Modifier.width(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = model.categoryColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = model.categoryLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = model.categoryColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = presentation.title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (presentation.subtitle.isNotEmpty()) {
-                Text(
-                    text = presentation.subtitle,
-                    fontSize = 11.sp,
-                    color = colors.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                    if (model.hasTradeIn) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFD97706).copy(alpha = 0.16f)
+                        ) {
+                            Text(
+                                text = "🥇",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = model.statusColor.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, model.statusColor.copy(alpha = 0.42f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = model.statusIcon,
+                            contentDescription = null,
+                            tint = model.statusColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = model.statusLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = model.statusColor
+                        )
+                    }
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (presentation.user.isNotEmpty() && presentation.user != "—") {
+
+            // الصف الثاني: اسم العميل/الموظف + التاريخ والوقت المنسق
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = model.partyIcon,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "👤 ${presentation.user}",
-                        fontSize = 10.sp,
+                        text = model.primaryParty,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.CalendarToday,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = model.formattedDate,
+                        style = MaterialTheme.typography.labelSmall,
                         color = colors.textSecondary
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                 }
-                if (presentation.timestamp.isNotEmpty()) {
+            }
+
+            HorizontalDivider(color = colors.textSecondary.copy(alpha = 0.12f))
+
+            // الصف الثالث: عدد القطع/الوزن + المبلغ بالعملتين + سهم التفاصيل
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = model.countIcon,
+                        contentDescription = null,
+                        tint = Color(0xFF06B6D4),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = presentation.timestamp,
-                        fontSize = 10.sp,
+                        text = model.countOrWeightText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
                         color = colors.textSecondary
                     )
                 }
-            }
-        }
 
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Column(horizontalAlignment = Alignment.End) {
-            if (presentation.amount != 0.0) {
-                val isNegative = presentation.amount < 0 || presentation.status == "refund"
-                val amtColor = if (isNegative) Color(0xFFEF4444) else Color(0xFF10B981)
-                Text(
-                    text = if (maskAmount) "•••••" else String.format(
-                        Locale.US,
-                        "%s%,.2f %s",
-                        if (isNegative) "-" else "",
-                        abs(presentation.amount),
-                        presentation.currency
-                    ),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (maskAmount) colors.textSecondary else amtColor
-                )
-            } else if (presentation.accuracy >= 0) {
-                Text(
-                    text = String.format(Locale.US, "🎯 %.1f%%", presentation.accuracy),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.goldPrimary
-                )
-            }
-
-            if (presentation.status == "danger" || presentation.status == "warning") {
-                Spacer(modifier = Modifier.height(3.dp))
-                val chipColor = if (presentation.status == "danger") Color(0xFFEF4444) else Color(0xFFF59E0B)
-                Text(
-                    text = if (presentation.status == "danger") (if (isArabic) "حرج" else "Critical")
-                    else (if (isArabic) "تحذير" else "Warning"),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = chipColor
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = if (maskAmount) "•••••" else model.amountDisplayText,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (maskAmount) colors.textSecondary else colors.goldPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = if (isArabic) Icons.Rounded.ChevronLeft else Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = colors.goldPrimary.copy(alpha = 0.85f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
+}
+
+private fun buildUnifiedCardModel(item: JSONObject, isArabic: Boolean): UnifiedCardModel {
+    val saleNumber = item.optString("sale_number",
+        item.optString("invoice_number",
+            item.optString("sale_id", "")
+        )
+    ).trim()
+
+    val isSaleOrRefund = saleNumber.isNotEmpty() ||
+        item.optString("type", "").lowercase(Locale.ROOT) in setOf("sale", "refund")
+
+    val rawDate = item.optString("created_at",
+        item.optString("timestamp", item.optString("date", ""))
+    )
+    val formattedDate = formatCleanOperationDate(rawDate, isArabic)
+
+    if (isSaleOrRefund) {
+        val refCode = if (saleNumber.isNotEmpty()) "#$saleNumber" else "#${item.optString("id", "—")}"
+        val customerName = item.optString("customer_name",
+            item.optString("client_name", if (isArabic) "عميل نقدي" else "Cash Customer")
+        ).ifBlank { if (isArabic) "عميل نقدي" else "Cash Customer" }
+
+        val rawCurrency = item.optString("currency", item.optString("currency_code", ""))
+        val isMixCurrency = rawCurrency.equals("MIX", ignoreCase = true)
+        val currency = if (rawCurrency.isBlank() || isMixCurrency) "YER" else rawCurrency.uppercase(Locale.US)
+
+        val rate = item.optDouble("exchange_rate", 0.0)
+        val amountUsdRaw = item.optDouble("final_amount_usd", item.optDouble("total_amount_usd", 0.0))
+        val amountLocalRaw = item.optDouble(
+            "final_amount",
+            item.optDouble("total_amount", item.optDouble("final_amount_local", item.optDouble("amount", 0.0)))
+        )
+
+        val resolvedUsd = when {
+            amountUsdRaw > 0 -> amountUsdRaw
+            currency == "USD" -> amountLocalRaw
+            rate > 0 -> amountLocalRaw / rate
+            else -> 0.0
+        }
+        val resolvedLocal = when {
+            amountLocalRaw > 0 -> amountLocalRaw
+            currency == "USD" -> resolvedUsd
+            rate > 0 -> resolvedUsd * rate
+            else -> 0.0
+        }
+
+        val tradeInsArr = item.optJSONArray("trade_ins")
+            ?: item.optJSONArray("gold_payments")
+            ?: item.optJSONArray("trade_in_items")
+        val hasTradeIn = (tradeInsArr != null && tradeInsArr.length() > 0) ||
+            item.optDouble("trade_in_total", 0.0) > 0.0
+
+        val paymentsArr = item.optJSONArray("payments")
+        val payMethodRaw = item.optString("payment_method", item.optString("pay_type", "CASH"))
+        val isMixed = isMixCurrency ||
+            (paymentsArr != null && paymentsArr.length() > 1) ||
+            (hasTradeIn && paymentsArr != null && paymentsArr.length() > 0) ||
+            payMethodRaw.uppercase(Locale.ROOT) in setOf("MIX", "MIXED", "SPLIT")
+
+        val (payLabel, payColor) = resolveUnifiedPaymentBadge(payMethodRaw, currency, isMixed, hasTradeIn, isArabic)
+
+        val refundStatus = item.optString("refund_status", item.optString("status", "completed")).lowercase(Locale.ROOT)
+        val (statusText, statusColor, statusIcon) = when (refundStatus) {
+            "refunded", "fully_refunded" -> Triple(
+                if (isArabic) "مرتجع كلي" else "Refunded",
+                Color(0xFFEF4444),
+                Icons.Rounded.Autorenew
+            )
+            "partially_refunded" -> Triple(
+                if (isArabic) "مرتجع جزئي" else "Partial Refund",
+                Color(0xFFF59E0B),
+                Icons.Rounded.Autorenew
+            )
+            else -> Triple(
+                if (isArabic) "مكتمل" else "Completed",
+                Color(0xFF10B981),
+                Icons.Rounded.CheckCircle
+            )
+        }
+
+        val itemsArr = item.optJSONArray("items")
+            ?: item.optJSONArray("sold_items")
+            ?: item.optJSONArray("products")
+        val parsedCount = item.optInt(
+            "item_count",
+            item.optInt("total_items", item.optInt("count", itemsArr?.length() ?: 0))
+        )
+        val countText = "$parsedCount " + (if (isArabic) "قطع" else "pcs")
+
+        val amountDisplay = if (currency == "USD" || resolvedLocal <= 0) {
+            String.format(Locale.US, "$%,.2f", resolvedUsd)
+        } else {
+            val localStr = String.format(Locale.US, "%,.0f %s", resolvedLocal, currency)
+            val usdStr = if (resolvedUsd > 0) " ($${String.format(Locale.US, "%,.2f", resolvedUsd)})" else ""
+            "$localStr$usdStr"
+        }
+
+        return UnifiedCardModel(
+            refCode = refCode,
+            categoryLabel = payLabel,
+            categoryColor = payColor,
+            hasTradeIn = hasTradeIn && isMixed,
+            statusLabel = statusText,
+            statusColor = statusColor,
+            statusIcon = statusIcon,
+            primaryParty = customerName,
+            partyIcon = Icons.Rounded.Person,
+            formattedDate = formattedDate,
+            countOrWeightText = countText,
+            countIcon = Icons.Rounded.Inventory2,
+            amountDisplayText = amountDisplay
+        )
+    }
+
+    // العمليات التشغيلية الأخرى (كسر ذهب، تحويلات فروع، جرد، RFID)
+    val opType = item.optString("type", item.optString("action", "system")).lowercase(Locale.ROOT)
+    val idStr = item.optString("id", "").ifBlank { item.optString("reference_id", "OP") }
+    val (catLabel, catColor, catIcon) = when {
+        opType.contains("scrap") -> Triple(if (isArabic) "شراء كسر 🥇" else "Scrap Buy", Color(0xFFD97706), Icons.Rounded.Scale)
+        opType.contains("transfer") -> Triple(if (isArabic) "تحويل فروع" else "Transfer", Color(0xFFA855F7), Icons.Rounded.SwapHoriz)
+        opType.contains("inventory") -> Triple(if (isArabic) "جرد مخزون" else "Inventory", Color(0xFF06B6D4), Icons.Rounded.Inventory2)
+        opType.contains("rfid") -> Triple("RFID", Color(0xFF3B82F6), Icons.Rounded.Contactless)
+        else -> Triple(if (isArabic) "عملية نظام" else "System Op", Color(0xFF6366F1), Icons.Rounded.SettingsSuggest)
+    }
+
+    val titleOrParty = (if (isArabic) item.optString("title_ar", item.optString("title", ""))
+    else item.optString("title_en", item.optString("title", "")))
+        .ifBlank { item.optString("user", item.optString("username", catLabel)) }
+
+    val weight = item.optDouble("weight", item.optDouble("total_weight", 0.0))
+    val count = item.optInt("item_count", item.optInt("count", 0))
+    val leftStat = when {
+        weight > 0 -> String.format(Locale.US, "%.2f g", weight)
+        count > 0 -> "$count " + (if (isArabic) "قطع" else "pcs")
+        else -> catLabel
+    }
+
+    val amt = item.optDouble("amount", 0.0)
+    val curr = item.optString("currency", "USD").ifBlank { "USD" }
+    val rightAmt = if (amt > 0) String.format(Locale.US, "%,.2f %s", amt, curr)
+    else (if (isArabic) "عرض التفاصيل" else "View Details")
+
+    return UnifiedCardModel(
+        refCode = "#$idStr",
+        categoryLabel = catLabel,
+        categoryColor = catColor,
+        hasTradeIn = false,
+        statusLabel = if (isArabic) "مكتمل" else "Completed",
+        statusColor = Color(0xFF10B981),
+        statusIcon = Icons.Rounded.CheckCircle,
+        primaryParty = titleOrParty,
+        partyIcon = Icons.Rounded.Badge,
+        formattedDate = formattedDate,
+        countOrWeightText = leftStat,
+        countIcon = catIcon,
+        amountDisplayText = rightAmt
+    )
+}
+
+private fun resolveUnifiedPaymentBadge(
+    paymentMethod: String,
+    currency: String,
+    isMixed: Boolean,
+    hasTradeIn: Boolean,
+    isArabic: Boolean
+): Pair<String, Color> {
+    val m = paymentMethod.uppercase(Locale.ROOT).trim()
+    return when {
+        isMixed || m in setOf("MIX", "MIXED", "SPLIT") ->
+            (if (isArabic) "متعدد 💰" else "Mixed 💰") to Color(0xFF8B5CF6)
+        hasTradeIn && (m == "CASH" || m == "TRADE_IN") ->
+            (if (isArabic) "دفع بالذهب 🥇" else "Gold Trade-In 🥇") to Color(0xFFD97706)
+        m == "CARD" || m == "POS_MADA" || m == "VISA_MASTER" || m.startsWith("POS_") ->
+            (if (isArabic) "بطاقة / شبكة" else "Card / POS") to Color(0xFF3B82F6)
+        m.startsWith("WALLET_") || m == "E_WALLET" ->
+            (if (isArabic) "محفظة إلكترونية" else "E-Wallet") to Color(0xFF06B6D4)
+        m == "TRANSFER" || m == "BANK_TRANSFER" || m.startsWith("BANK_") ->
+            (if (isArabic) "تحويل بنكي" else "Bank Transfer") to Color(0xFF0EA5E9)
+        m == "CREDIT" ->
+            (if (isArabic) "آجل (ذمم)" else "Credit") to Color(0xFFF59E0B)
+        m == "CUSTOMER_CREDIT" ->
+            (if (isArabic) "رصيد دائن" else "Customer Credit") to Color(0xFF6366F1)
+        else ->
+            (if (isArabic) "نقداً ($currency)" else "Cash ($currency)") to Color(0xFF10B981)
+    }
+}
+
+private fun formatCleanOperationDate(rawDate: String, isArabic: Boolean): String {
+    if (rawDate.isBlank()) return "—"
+    val patterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd HH:mm"
+    )
+    for (pattern in patterns) {
+        try {
+            val parser = SimpleDateFormat(pattern, Locale.US)
+            if (pattern.endsWith("'Z'")) {
+                parser.timeZone = TimeZone.getTimeZone("UTC")
+            }
+            val parsed = parser.parse(rawDate)
+            if (parsed != null) {
+                val out = SimpleDateFormat(
+                    "dd/MM/yyyy • hh:mm a",
+                    if (isArabic) Locale("ar") else Locale.US
+                )
+                return out.format(parsed)
+            }
+        } catch (_: Exception) {
+        }
+    }
+    return rawDate.replace("T", " ").substringBefore(".")
 }
