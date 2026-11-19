@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -70,8 +71,8 @@ class MiraAlertsCenterFragment : Fragment() {
         val id: String,
         val title: String,
         val description: String,
-        val category: String, // security, inventory, transfers, rates, system
-        val severity: String, // critical, warning, info
+        val category: String,
+        val severity: String,
         val referenceCode: String,
         val createdAt: String,
         val isResolved: Boolean = false,
@@ -156,45 +157,116 @@ class MiraAlertsCenterFragment : Fragment() {
     }
 
     private fun fetchLiveAlerts() {
-    val ctx = context ?: return
-    isLoadingState = true
-    val branchId = MiraBranchesManager.getInstance(ctx).activeBranchId.takeIf { it > 0 } ?: 1
-    val resolvedMap = getResolvedMap()
+        val ctx = context ?: return
+        isLoadingState = true
+        val branchId = MiraBranchesManager.getInstance(ctx).activeBranchId.takeIf { it > 0 } ?: 1
+        val resolvedMap = getResolvedMap()
 
-    executor.execute {
-        val collected = mutableListOf<SystemAlertItem>()
-        try {
-            val api = MiraApiClient.getInstance(ctx)
-            val resp = api.getBranchAlerts(branchId, true)
+        executor.execute {
+            val collected = mutableListOf<SystemAlertItem>()
+            try {
+                val api = MiraApiClient.getInstance(ctx)
 
-            if (resp != null && resp.isSuccess && resp.data != null) {
-                val root = resp.data!!
-                val data = root.optJSONObject("data") ?: root
-                val itemsArr = data.optJSONArray("alerts") ?: data.optJSONArray("items")
-
-                if (itemsArr != null) {
-                    for (i in 0 until itemsArr.length()) {
-                        itemsArr.optJSONObject(i)?.let {
-                            collected.add(mapJsonToAlert(it, i, resolvedMap))
+                // استدعاء getBranchAlerts إن وُجدت في MiraApiClient، وإلا الرجوع لملخص الداشبورد
+                val alertsResp = invokeGetBranchAlerts(api, branchId)
+                if (alertsResp != null && alertsResp.isSuccess) {
+                    val root: JSONObject = alertsResp.data
+                    val data = root.optJSONObject("data") ?: root
+                    val itemsArr = data.optJSONArray("alerts") ?: data.optJSONArray("items")
+                    if (itemsArr != null) {
+                        for (i in 0 until itemsArr.length()) {
+                            itemsArr.optJSONObject(i)?.let {
+                                collected.add(mapJsonToAlert(it, i, resolvedMap))
+                            }
                         }
                     }
                 }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "fetchLiveAlerts error: ${e.message}")
-        }
 
-        mainHandler.post {
-            if (isAdded) {
-                isLoadingState = false
-                if (collected.isNotEmpty()) {
-                    alertsState = collected
+                if (collected.isEmpty()) {
+                    val dashResp = api.getDashboardSummarySmart(branchId)
+                    if (dashResp != null && dashResp.isSuccess) {
+                        val root: JSONObject = dashResp.data
+                        val data = root.optJSONObject("data") ?: root
+                        val alertsObj = data.optJSONObject("alerts")
+                        val itemsArr = alertsObj?.optJSONArray("items")
+                            ?: data.optJSONArray("alerts_list")
+                            ?: data.optJSONArray("notifications")
+
+                        if (itemsArr != null) {
+                            for (i in 0 until itemsArr.length()) {
+                                itemsArr.optJSONObject(i)?.let {
+                                    collected.add(mapJsonToAlert(it, i, resolvedMap))
+                                }
+                            }
+                        }
+
+                        val reportedCount = alertsObj?.optInt("count", 0) ?: data.optInt("alerts_count", 0)
+                        if (collected.isEmpty() && reportedCount > 0) {
+                            val msg = alertsObj?.optString("latest_message", "")?.takeIf { it.isNotBlank() }
+                                ?: (if (isArabic) "توجد $reportedCount تنبيهات تشغيلية وأمنية تتطلب المراجعة في الفرع"
+                                else "$reportedCount operational/security alerts require review")
+                            val id = "summary_alert_${branchId}_$reportedCount"
+                            collected.add(
+                                SystemAlertItem(
+                                    id = id,
+                                    title = if (isArabic) "تنبيهات الفرع المعلّقة ($reportedCount)"
+                                    else "Pending Branch Alerts ($reportedCount)",
+                                    description = msg,
+                                    category = "system",
+                                    severity = "warning",
+                                    referenceCode = "BR-$branchId",
+                                    createdAt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()),
+                                    isResolved = resolvedMap.containsKey(id),
+                                    resolutionNote = resolvedMap[id] ?: ""
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "fetchLiveAlerts error: ${e.message}")
+            }
+
+            mainHandler.post {
+                if (isAdded) {
+                    isLoadingState = false
+                    if (collected.isNotEmpty()) {
+                        alertsState = collected
+                    }
                 }
             }
         }
     }
-}
 
+    private fun invokeGetBranchAlerts(api: MiraApiClient, branchId: Int): MiraApiClient.ApiResponse? {
+        return try {
+            val m = api.javaClass.methods.firstOrNull {
+                it.name == "getBranchAlerts" && it.parameterCount == 2
+            } ?: return null
+            m.invoke(api, branchId, true) as? MiraApiClient.ApiResponse
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun invokeResolveAlert(
+        api: MiraApiClient,
+        branchId: Int,
+        alertId: String,
+        note: String,
+        resolveAll: Boolean
+    ) {
+        try {
+            val m = api.javaClass.methods.firstOrNull {
+                it.name == "resolveAlert" && it.parameterCount == 4
+            }
+            if (m != null) {
+                m.invoke(api, branchId, alertId, note, resolveAll)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "resolveAlert remote sync skipped: ${e.message}")
+        }
+    }
 
     private fun mapJsonToAlert(obj: JSONObject, index: Int, resolvedMap: Map<String, String>): SystemAlertItem {
         val id = obj.optString("id", "").ifBlank {
@@ -211,7 +283,7 @@ class MiraAlertsCenterFragment : Fragment() {
             else -> "system"
         }
         val severity = obj.optString("severity", obj.optString("level", "warning")).lowercase(Locale.ROOT)
-        val ref = obj.optString("reference", obj.optString("epc", obj.optString("serial_number", "")))
+        val ref = obj.optString("reference", obj.optString("reference_code", obj.optString("serial_number", "")))
         val createdAt = obj.optString("created_at", obj.optString("timestamp", ""))
 
         val serverResolved = obj.optBoolean("is_resolved", false) || obj.optString("status") == "resolved"
@@ -230,68 +302,90 @@ class MiraAlertsCenterFragment : Fragment() {
     }
 
     private fun resolveAlert(alert: SystemAlertItem, note: String) {
-    val finalNote = note.ifBlank {
-        if (isArabic) "تمت المراجعة والمعالجة بواسطة الإدارة" else "Reviewed and resolved by management"
-    }
-    saveResolvedAlertLocally(alert.id, finalNote)
-
-    alertsState = alertsState.map {
-        if (it.id == alert.id) it.copy(isResolved = true, resolutionNote = finalNote) else it
-    }
-
-    val ctx = context ?: return
-    val branchId = MiraBranchesManager.getInstance(ctx).activeBranchId.takeIf { it > 0 } ?: 1
-
-    executor.execute {
-        try {
-            val api = MiraApiClient.getInstance(ctx)
-            api.resolveAlert(branchId, alert.id, finalNote, false)
-        } catch (e: Exception) {
-            Log.e(TAG, "resolveAlert sync error: ${e.message}")
+        val finalNote = note.ifBlank {
+            if (isArabic) "تمت المراجعة والمعالجة بواسطة الإدارة" else "Reviewed and resolved by management"
         }
-    }
+        saveResolvedAlertLocally(alert.id, finalNote)
 
-    Toast.makeText(
-        ctx,
-        if (isArabic) "✅ تم حل التنبيه وحفظه في السيرفر" else "✅ Alert resolved & synced",
-        Toast.LENGTH_SHORT
-    ).show()
-}
-
-private fun resolveAllPending() {
-    val defaultNote = if (isArabic) "تم اعتماد وحل جميع التنبيهات دفعة واحدة" else "Batch resolved all alerts"
-    alertsState = alertsState.map {
-        if (!it.isResolved) {
-            saveResolvedAlertLocally(it.id, defaultNote)
-            it.copy(isResolved = true, resolutionNote = defaultNote)
-        } else it
-    }
-
-    val ctx = context ?: return
-    val branchId = MiraBranchesManager.getInstance(ctx).activeBranchId.takeIf { it > 0 } ?: 1
-
-    executor.execute {
-        try {
-            val api = MiraApiClient.getInstance(ctx)
-            api.resolveAlert(branchId, "", defaultNote, true)
-        } catch (e: Exception) {
-            Log.e(TAG, "resolveAllPending sync error: ${e.message}")
+        alertsState = alertsState.map {
+            if (it.id == alert.id) it.copy(isResolved = true, resolutionNote = finalNote) else it
         }
+
+        val ctx = context ?: return
+        val branchId = MiraBranchesManager.getInstance(ctx).activeBranchId.takeIf { it > 0 } ?: 1
+
+        executor.execute {
+            val api = MiraApiClient.getInstance(ctx)
+            invokeResolveAlert(api, branchId, alert.id, finalNote, false)
+        }
+
+        Toast.makeText(
+            ctx,
+            if (isArabic) "✅ تم حل التنبيه وتوثيقه" else "✅ Alert resolved & logged",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
-    Toast.makeText(
-        ctx,
-        if (isArabic) "✅ تم حل جميع التنبيهات المعلّقة في السيرفر" else "✅ All pending alerts resolved",
-        Toast.LENGTH_SHORT
-    ).show()
-}
+    private fun resolveAllPending() {
+        val defaultNote = if (isArabic) "تم اعتماد وحل جميع التنبيهات دفعة واحدة" else "Batch resolved all alerts"
+        alertsState = alertsState.map {
+            if (!it.isResolved) {
+                saveResolvedAlertLocally(it.id, defaultNote)
+                it.copy(isResolved = true, resolutionNote = defaultNote)
+            } else it
+        }
+
+        val ctx = context ?: return
+        val branchId = MiraBranchesManager.getInstance(ctx).activeBranchId.takeIf { it > 0 } ?: 1
+
+        executor.execute {
+            val api = MiraApiClient.getInstance(ctx)
+            invokeResolveAlert(api, branchId, "", defaultNote, true)
+        }
+
+        Toast.makeText(
+            ctx,
+            if (isArabic) "✅ تم حل جميع التنبيهات المعلّقة" else "✅ All pending alerts resolved",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun resolveFragmentByCandidates(vararg classNames: String, fallback: () -> Fragment): Fragment {
+        for (name in classNames) {
+            try {
+                val clazz = Class.forName(name)
+                val instance = clazz.getDeclaredConstructor().newInstance()
+                if (instance is Fragment) return instance
+            } catch (_: Exception) {
+            }
+        }
+        return fallback()
+    }
 
     private fun navigateToAlertSource(alert: SystemAlertItem) {
         val host = activity as? UHFMainActivity ?: return
         when (alert.category) {
-            "security" -> host.loadFragment(MiraSecureGateFragment(), "Gates")
-            "inventory" -> host.loadFragment(MiraInventoryFragment(), "MiraInventory")
-            "transfers" -> host.loadFragment(MiraTransferFragment(), "Transfers")
+            "security" -> {
+                val frag = resolveFragmentByCandidates(
+                    "com.example.uhf.fragment.MiraSecureGateFragment",
+                    "com.example.uhf.fragment.MiraGatesFragment",
+                    "com.example.uhf.fragment.MiraGateControlFragment"
+                ) { MiraAllActivitiesFragment() }
+                host.loadFragment(frag, "Gates")
+            }
+            "inventory" -> {
+                val frag = resolveFragmentByCandidates(
+                    "com.example.uhf.fragment.MiraInventoryDashboardFragment",
+                    "com.example.uhf.fragment.MiraInventoryProFragment"
+                ) { MiraAllActivitiesFragment() }
+                host.loadFragment(frag, "MiraInventory")
+            }
+            "transfers" -> {
+                val frag = resolveFragmentByCandidates(
+                    "com.example.uhf.fragment.MiraTransferFragment"
+                ) { MiraAllActivitiesFragment() }
+                host.loadFragment(frag, "Transfers")
+            }
             "rates" -> host.loadFragment(MiraGoldCurrencyFragment(), "GoldRates")
             else -> host.loadFragment(MiraAllActivitiesFragment(), "AllActivities")
         }
@@ -320,7 +414,6 @@ private fun resolveAllPending() {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // شريط الرأس
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -338,7 +431,8 @@ private fun resolveAllPending() {
                                 .background(colors.cardSurface)
                         ) {
                             Icon(
-                                imageVector = if (isArabic) Icons.Rounded.ArrowForward else Icons.Rounded.ArrowBack,
+                                imageVector = if (isArabic) Icons.AutoMirrored.Rounded.ArrowForward
+                                else Icons.AutoMirrored.Rounded.ArrowBack,
                                 contentDescription = "Back",
                                 tint = colors.goldPrimary
                             )
@@ -371,7 +465,6 @@ private fun resolveAllPending() {
                     }
                 }
 
-                // التبويب: قيد المراجعة / تم الحل
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -393,7 +486,6 @@ private fun resolveAllPending() {
                     )
                 }
 
-                // تصنيفات التنبيهات
                 val categories = listOf(
                     "all" to (if (isArabic) "الكل" else "All"),
                     "security" to (if (isArabic) "الأمن والبوابات" else "Security"),
@@ -461,7 +553,6 @@ private fun resolveAllPending() {
             }
         }
 
-        // نافذة توثيق حل التنبيه
         alertBeingResolvedState?.let { targetAlert ->
             ResolveAlertDialog(
                 alert = targetAlert,
