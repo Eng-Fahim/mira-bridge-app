@@ -15,12 +15,15 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.view.WindowCallbackWrapper
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -39,11 +42,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -53,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.uhf.MiraRfid.MiraIRFIDReader
 import com.example.uhf.MiraRfid.RFIDManager
@@ -80,6 +88,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * ───────────────────────────────────────────────────────────────────────────
  *  إدارة التحويلات والمناقلات المخزنية بين الفروع:
  *   • دعم كامل لزناد القارئ اليدوي (139 / 280 / 293) والمسح الجماعي المستمر
+ *     سواء من الشاشة أو أثناء فتح نوافذ Dialog
  *   • التحقق اللحظي من صلاحية كل قطعة عبر السيرفر قبل إضافتها للشحنة
  *   • منع التكرار مع إمكانية حذف أي قطعة ممسوحة بالخطأ قبل الاعتماد
  *   • دورة حياة كاملة للشحنة: إنشاء ➔ إضافة قطع ➔ إرسال إلزامي بالمسح ➔ استلام إلزامي بالمسح
@@ -93,9 +102,9 @@ class MiraTransferFragment : MiraBaseFragment() {
         private const val OFFLINE_PREFS = "transfers_cache"
         const val ACTION_REFRESH_TRANSFERS = "com.example.uhf.REFRESH_TRANSFERS"
 
-        private const val KEYCODE_TRIGGER_1 = 139
-        private const val KEYCODE_TRIGGER_2 = 280
-        private const val KEYCODE_TRIGGER_3 = 293
+        internal const val KEYCODE_TRIGGER_1 = 139
+        internal const val KEYCODE_TRIGGER_2 = 280
+        internal const val KEYCODE_TRIGGER_3 = 293
     }
 
     data class TransferData(
@@ -112,12 +121,12 @@ class MiraTransferFragment : MiraBaseFragment() {
         val createdAt: String
     )
 
-    private data class BranchOption(
+    internal data class BranchOption(
         val id: Int,
         val name: String
     )
 
-    private data class ScannedTransferItem(
+    internal data class ScannedTransferItem(
         val epc: String,
         val title: String,
         val serialNumber: String,
@@ -127,7 +136,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         val rejectReason: String = ""
     )
 
-    private data class TransferManifestItem(
+    internal data class TransferManifestItem(
         val title: String,
         val serialNumber: String,
         val rfidEpc: String,
@@ -135,13 +144,13 @@ class MiraTransferFragment : MiraBaseFragment() {
         val karat: String
     )
 
-    private data class TransferDialogPayload(
+    internal data class TransferDialogPayload(
         val title: String,
         val message: String,
         val isError: Boolean
     )
 
-    private data class FilterOption(
+    internal data class FilterOption(
         val key: String,
         val labelAr: String,
         val labelEn: String,
@@ -150,10 +159,10 @@ class MiraTransferFragment : MiraBaseFragment() {
     )
 
     // ─── Services & Managers ───────────────────────────────────────────
-    private var sessionManager: SessionManager? = null
-    private var apiClient: MiraApiClient? = null
-    private var branchesManager: MiraBranchesManager? = null
-    private var permissionManager: PermissionManager? = null
+    internal var sessionManager: SessionManager? = null
+    internal var apiClient: MiraApiClient? = null
+    internal var branchesManager: MiraBranchesManager? = null
+    internal var permissionManager: PermissionManager? = null
     private var offlineCache: SharedPreferences? = null
     private var appContext: Context? = null
 
@@ -162,53 +171,53 @@ class MiraTransferFragment : MiraBaseFragment() {
     private var toneGenerator: ToneGenerator? = null
 
     // ─── Hardware RFID Scan State ──────────────────────────────────────
-    @Volatile private var isTriggerDown = false
-    @Volatile private var isRfidSweepActive = false
+    @Volatile internal var isTriggerDown = false
+    @Volatile internal var isRfidSweepActive = false
     private val isStoppingReader = AtomicBoolean(false)
     private var transferRfidListener: MiraIRFIDReader.OnTagReadListener? = null
     private var scanProgressDialog: ScanProgressDialog? = null
 
-    private var isArabic = true
-    private var selectedTransfer: TransferData? = null
+    internal var isArabicState by mutableStateOf(true)
+    internal var selectedTransfer by mutableStateOf<TransferData?>(null)
 
     // ─── Compose Reactive States ───────────────────────────────────────
-    private val allTransfersState = mutableStateListOf<TransferData>()
-    private val displayedTransfersState = mutableStateListOf<TransferData>()
+    internal val allTransfersState = mutableStateListOf<TransferData>()
+    internal val displayedTransfersState = mutableStateListOf<TransferData>()
 
-    private var currentFilterState by mutableStateOf("")
-    private var searchQueryState by mutableStateOf("")
-    private var activeBranchNameState by mutableStateOf("")
-    private var canCreateTransferState by mutableStateOf(false)
-    private var canViewTransfersState by mutableStateOf(true)
-    private var isLoadingTransfersState by mutableStateOf(false)
+    internal var currentFilterState by mutableStateOf("")
+    internal var searchQueryState by mutableStateOf("")
+    internal var activeBranchNameState by mutableStateOf("")
+    internal var canCreateTransferState by mutableStateOf(false)
+    internal var canViewTransfersState by mutableStateOf(true)
+    internal var isLoadingTransfersState by mutableStateOf(false)
 
     // New Transfer Dialog State
-    private var showNewTransferSheetState by mutableStateOf(false)
-    private val availableBranchesState = mutableStateListOf<BranchOption>()
-    private var isLoadingBranchesState by mutableStateOf(false)
+    internal var showNewTransferSheetState by mutableStateOf(false)
+    internal val availableBranchesState = mutableStateListOf<BranchOption>()
+    internal var isLoadingBranchesState by mutableStateOf(false)
 
     // Scan & Verify Items Sheet State
-    private var activeScanTransferState by mutableStateOf<TransferData?>(null)
-    private val scannedItemsState = mutableStateListOf<ScannedTransferItem>()
-    private val activeScanEpcSet = HashSet<String>()
-    private val verifyingEpcSet = HashSet<String>()
-    private var manualEpcInputState by mutableStateOf("")
-    private var isRfidScanningUiState by mutableStateOf(false)
-    private var isSavingTransferItemsState by mutableStateOf(false)
+    internal var activeScanTransferState by mutableStateOf<TransferData?>(null)
+    internal val scannedItemsState = mutableStateListOf<ScannedTransferItem>()
+    internal val activeScanEpcSet = HashSet<String>()
+    internal val verifyingEpcSet = HashSet<String>()
+    internal var manualEpcInputState by mutableStateOf("")
+    internal var isRfidScanningUiState by mutableStateOf(false)
+    internal var isSavingTransferItemsState by mutableStateOf(false)
 
     // Manifest / Items View State
-    private var manifestTransferState by mutableStateOf<TransferData?>(null)
-    private val manifestItemsState = mutableStateListOf<TransferManifestItem>()
-    private var isLoadingManifestState by mutableStateOf(false)
+    internal var manifestTransferState by mutableStateOf<TransferData?>(null)
+    internal val manifestItemsState = mutableStateListOf<TransferManifestItem>()
+    internal var isLoadingManifestState by mutableStateOf(false)
 
     // Action Sheet & Confirmation Dialogs
-    private var actionSheetTransferState by mutableStateOf<TransferData?>(null)
-    private var detailsTransferState by mutableStateOf<TransferData?>(null)
-    private var cancelConfirmTransferState by mutableStateOf<TransferData?>(null)
-    private var showTransferPickerState by mutableStateOf(false)
+    internal var actionSheetTransferState by mutableStateOf<TransferData?>(null)
+    internal var detailsTransferState by mutableStateOf<TransferData?>(null)
+    internal var cancelConfirmTransferState by mutableStateOf<TransferData?>(null)
+    internal var showTransferPickerState by mutableStateOf(false)
 
-    private var loadingOverlayMessageState by mutableStateOf<String?>(null)
-    private var feedbackDialogState by mutableStateOf<TransferDialogPayload?>(null)
+    internal var loadingOverlayMessageState by mutableStateOf<String?>(null)
+    internal var feedbackDialogState by mutableStateOf<TransferDialogPayload?>(null)
 
     private val refreshReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -244,9 +253,10 @@ class MiraTransferFragment : MiraBaseFragment() {
         appContext = ctx.applicationContext
         executor = Executors.newFixedThreadPool(2)
 
-        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+        val detectedAr = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
             Locale.getDefault().language == "ar"
-        view.layoutDirection = if (isArabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        isArabicState = detectedAr
+        view.layoutDirection = if (detectedAr) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
 
         apiClient = MiraApiClient.getInstance(ctx)
         branchesManager = MiraBranchesManager.getInstance(ctx)
@@ -314,19 +324,20 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Physical RFID Trigger Integration (Handheld Reader)
+    //  Physical RFID Trigger Integration (Handheld Reader + Dialog Hook)
     // ═══════════════════════════════════════════════════════════════════
 
-    override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
-        val isTrigger = keyCode == KEYCODE_TRIGGER_1 ||
+    internal fun isTriggerKeyCode(keyCode: Int): Boolean {
+        return keyCode == KEYCODE_TRIGGER_1 ||
             keyCode == KEYCODE_TRIGGER_2 ||
             keyCode == KEYCODE_TRIGGER_3
-        if (!isTrigger) return false
+    }
 
-        // إذا كانت نافذة إضافة القطع مفتوحة، استخدم الزناد للمسح الجماعي المباشر
+    internal fun handleHardwareTriggerEvent(keyCode: Int, action: Int, repeatCount: Int): Boolean {
+        if (!isTriggerKeyCode(keyCode)) return false
         val targetTransfer = activeScanTransferState ?: return false
 
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+        if (action == KeyEvent.ACTION_DOWN && repeatCount == 0) {
             if (isTriggerDown) return true
             if (isSavingTransferItemsState) return true
 
@@ -335,21 +346,42 @@ class MiraTransferFragment : MiraBaseFragment() {
             return true
         }
 
-        if (event.action == KeyEvent.ACTION_UP) {
+        if (action == KeyEvent.ACTION_UP) {
             if (!isTriggerDown) return true
             isTriggerDown = false
             stopRfidSweep()
             return true
         }
 
-        return false
+        return action == KeyEvent.ACTION_DOWN
     }
 
-    private fun startRfidSweep(transfer: TransferData) {
+    override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
+        return handleHardwareTriggerEvent(keyCode, event.action, event.repeatCount)
+    }
+
+    internal fun toggleManualRfidSweep(transfer: TransferData) {
+        if (isRfidSweepActive) {
+            isTriggerDown = false
+            stopRfidSweep()
+        } else {
+            startRfidSweep(transfer)
+        }
+    }
+
+    internal fun startRfidSweep(transfer: TransferData) {
         val ctx = appContext ?: return
         if (isRfidSweepActive) return
 
-        val mgr = RFIDManager.getInstance(ctx) ?: return
+        val mgr = RFIDManager.getInstance(ctx)
+        if (mgr == null) {
+            showToast(
+                if (isArabicState) "❌ وحدة قارئ RFID غير متوفرة على هذا الجهاز"
+                else "❌ RFID module not available on this device"
+            )
+            return
+        }
+
         isRfidSweepActive = true
         isRfidScanningUiState = true
 
@@ -379,7 +411,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                 mainHandler.post {
                     stopRfidSweep()
                     showToast(
-                        if (isArabic) "❌ تعذر تشغيل قارئ RFID: ${reason ?: ""}"
+                        if (isArabicState) "❌ تعذر تشغيل قارئ RFID: ${reason ?: ""}"
                         else "❌ RFID reader error: ${reason ?: ""}"
                     )
                 }
@@ -387,7 +419,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         })
     }
 
-    private fun stopRfidSweep() {
+    internal fun stopRfidSweep() {
         val wasActive = isRfidSweepActive
         isRfidSweepActive = false
         isRfidScanningUiState = false
@@ -454,17 +486,17 @@ class MiraTransferFragment : MiraBaseFragment() {
         canViewTransfersState = isTopLevel || (pm?.canView("transfers") == true)
     }
 
-    private fun canCreateTransfer(): Boolean {
+    internal fun canCreateTransfer(): Boolean {
         val pm = permissionManager ?: return canCreateTransferState
         return canCreateTransferState || pm.canEdit("transfers") || pm.isManager || pm.isInventoryManager
     }
 
-    private fun canApproveTransfer(): Boolean {
+    internal fun canApproveTransfer(): Boolean {
         val pm = permissionManager ?: return false
         return pm.isManager || pm.isBranchManager || pm.canEdit("transfers")
     }
 
-    private fun canReceiveTransfer(t: TransferData?): Boolean {
+    internal fun canReceiveTransfer(t: TransferData?): Boolean {
         if (t == null) return false
         val userBranchId = branchesManager?.activeBranchId ?: 0
         if (t.fromBranchId == userBranchId) return false
@@ -481,7 +513,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     //  Data Loading, Filtering & Offline Cache
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun loadTransfers() {
+    internal fun loadTransfers() {
         val exec = executor ?: return
         if (exec.isShutdown) return
         val client = apiClient ?: return
@@ -507,8 +539,8 @@ class MiraTransferFragment : MiraBaseFragment() {
                 if (!isAdded || context == null) return@post
 
                 allTransfersState.clear()
-                if (response != null && response.isSuccess && response.data != null) {
-                    val transfers = response.data!!.optJSONArray("transfers")
+                if (response != null && response.isSuccess) {
+                    val transfers = extractJsonArray(response, "transfers")
                     if (transfers != null) {
                         for (i in 0 until transfers.length()) {
                             val d = parseTransferData(transfers.optJSONObject(i))
@@ -529,16 +561,58 @@ class MiraTransferFragment : MiraBaseFragment() {
         }
     }
 
+    private fun extractJsonArray(response: MiraApiClient.ApiResponse?, primaryKey: String): JSONArray? {
+        if (response == null) return null
+        val dataObj = response.data
+        if (dataObj != null) {
+            dataObj.optJSONArray(primaryKey)?.let { return it }
+            dataObj.optJSONArray("data")?.let { return it }
+            dataObj.optJSONArray("items")?.let { return it }
+        }
+        val raw = response.rawJson?.trim() ?: ""
+        if (raw.startsWith("[")) {
+            return try {
+                JSONArray(raw)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        if (raw.startsWith("{")) {
+            return try {
+                val root = JSONObject(raw)
+                root.optJSONArray(primaryKey)
+                    ?: root.optJSONArray("data")
+                    ?: root.optJSONArray("items")
+            } catch (_: Exception) {
+                null
+            }
+        }
+        return null
+    }
+
     private fun parseTransferData(t: JSONObject?): TransferData? {
         if (t == null) return null
         val id = t.optInt("id")
+        val fromObj = t.optJSONObject("from_branch")
+        val toObj = t.optJSONObject("to_branch")
+
+        val fromBranchName = t.optString("from_branch_name_ar")
+            .ifEmpty { t.optString("from_branch_name") }
+            .ifEmpty { fromObj?.optString("name_ar") ?: "" }
+            .ifEmpty { fromObj?.optString("name") ?: "" }
+
+        val toBranchName = t.optString("to_branch_name_ar")
+            .ifEmpty { t.optString("to_branch_name") }
+            .ifEmpty { toObj?.optString("name_ar") ?: "" }
+            .ifEmpty { toObj?.optString("name") ?: "" }
+
         return TransferData(
             id = id,
             transferNumber = t.optString("transfer_number", "TR-$id"),
-            fromBranch = t.optString("from_branch_name_ar", t.optString("from_branch_name", "")),
-            toBranch = t.optString("to_branch_name_ar", t.optString("to_branch_name", "")),
-            fromBranchId = t.optInt("from_branch_id"),
-            toBranchId = t.optInt("to_branch_id"),
+            fromBranch = fromBranchName,
+            toBranch = toBranchName,
+            fromBranchId = t.optInt("from_branch_id", fromObj?.optInt("id") ?: 0),
+            toBranchId = t.optInt("to_branch_id", toObj?.optInt("id") ?: 0),
             status = t.optString("status", "draft"),
             itemCount = t.optInt("item_count", 0),
             totalWeight = t.optDouble("total_weight", 0.0),
@@ -574,7 +648,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         }
     }
 
-    private fun getStatusCount(key: String): Int {
+    internal fun getStatusCount(key: String): Int {
         if (key.isEmpty()) return allTransfersState.size
         return allTransfersState.count { t ->
             if (key == "in_transit") {
@@ -585,7 +659,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         }
     }
 
-    private fun applyFilterAndRefreshList() {
+    internal fun applyFilterAndRefreshList() {
         val q = searchQueryState.trim().lowercase(Locale.ROOT)
         val filtered = allTransfersState.filter { t ->
             val matchesStatus = when {
@@ -609,7 +683,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     //  Transfer Actions & Mandatory Scan Phases
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun handleTransferAction(t: TransferData, action: String) {
+    internal fun handleTransferAction(t: TransferData, action: String) {
         selectedTransfer = t
         when (action) {
             "approve" -> {
@@ -623,9 +697,10 @@ class MiraTransferFragment : MiraBaseFragment() {
                 if (canReceiveTransfer(t)) {
                     openScanMethodForReceive(t)
                 } else {
+                    val isAr = isArabicState
                     feedbackDialogState = TransferDialogPayload(
-                        title = if (isArabic) "⛔ غير مصرح" else "⛔ Not Authorized",
-                        message = if (isArabic) "فقط الفرع المستقبل يمكنه تأكيد استلام هذه الشحنة."
+                        title = if (isAr) "⛔ غير مصرح" else "⛔ Not Authorized",
+                        message = if (isAr) "فقط الفرع المستقبل يمكنه تأكيد استلام هذه الشحنة."
                         else "Only the receiving branch can confirm receipt.",
                         isError = true
                     )
@@ -636,25 +711,26 @@ class MiraTransferFragment : MiraBaseFragment() {
         }
     }
 
-    private fun openScanMethodForDispatch(transfer: TransferData) {
+    internal fun openScanMethodForDispatch(transfer: TransferData) {
         if (!isAdded || context == null) return
-        ScanMethodDialog(requireContext(), isArabic) { method ->
+        ScanMethodDialog(requireContext(), isArabicState) { method ->
             startScanSession(transfer, "dispatch", method)
         }.show()
     }
 
-    private fun openScanMethodForReceive(transfer: TransferData) {
+    internal fun openScanMethodForReceive(transfer: TransferData) {
         if (!isAdded || context == null) return
-        ScanMethodDialog(requireContext(), isArabic) { method ->
+        ScanMethodDialog(requireContext(), isArabicState) { method ->
             startScanSession(transfer, "receive", method)
         }.show()
     }
 
     private fun startScanSession(transfer: TransferData, phase: String, method: ScanMethod) {
         if (!isAdded || context == null) return
+        val isAr = isArabicState
         val dialog = ScanProgressDialog(
             requireActivity(),
-            isArabic,
+            isAr,
             transfer.id,
             transfer.transferNumber,
             phase,
@@ -668,14 +744,14 @@ class MiraTransferFragment : MiraBaseFragment() {
                     } catch (_: Exception) {
                     }
 
-                    val msg = if (isArabic) {
+                    val msg = if (isAr) {
                         "✅ تم ${if (phase == "dispatch") "إرسال" else "استلام"} الشحنة بنجاح ($scannedCount قطعة)"
                     } else {
                         "✅ ${if (phase == "dispatch") "Dispatched" else "Received"} successfully ($scannedCount items)"
                     }
 
                     feedbackDialogState = TransferDialogPayload(
-                        title = if (isArabic) {
+                        title = if (isAr) {
                             if (phase == "dispatch") "✅ تم الإرسال" else "✅ تم الاستلام"
                         } else {
                             if (phase == "dispatch") "✅ Dispatched" else "✅ Received"
@@ -688,14 +764,14 @@ class MiraTransferFragment : MiraBaseFragment() {
                 }
 
                 override fun onCancelled() {
-                    showToast(if (isArabic) "تم إلغاء المسح" else "Scan cancelled")
+                    showToast(if (isAr) "تم إلغاء المسح" else "Scan cancelled")
                 }
 
                 override fun onError(message: String?) {
                     if (!isAdded || context == null) return
                     feedbackDialogState = TransferDialogPayload(
-                        title = if (isArabic) "❌ فشل المسح" else "❌ Scan Failed",
-                        message = message ?: (if (isArabic) "حدث خطأ أثناء المسح" else "Error during scan"),
+                        title = if (isAr) "❌ فشل المسح" else "❌ Scan Failed",
+                        message = message ?: (if (isAr) "حدث خطأ أثناء المسح" else "Error during scan"),
                         isError = true
                     )
                 }
@@ -705,7 +781,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         dialog.show()
     }
 
-    private fun cancelTransferConfirmed(t: TransferData) {
+    internal fun cancelTransferConfirmed(t: TransferData) {
         if (!canCreateTransfer() && permissionManager?.isManager != true) {
             showAccessDenied()
             return
@@ -713,7 +789,8 @@ class MiraTransferFragment : MiraBaseFragment() {
 
         val exec = executor ?: return
         val client = apiClient ?: return
-        loadingOverlayMessageState = if (isArabic) "جاري إلغاء الشحنة..." else "Cancelling transfer..."
+        val isAr = isArabicState
+        loadingOverlayMessageState = if (isAr) "جاري إلغاء الشحنة..." else "Cancelling transfer..."
 
         exec.execute {
             try {
@@ -725,8 +802,8 @@ class MiraTransferFragment : MiraBaseFragment() {
 
                     if (response != null && response.isSuccess) {
                         feedbackDialogState = TransferDialogPayload(
-                            title = if (isArabic) "✅ تم الإلغاء" else "✅ Transfer Cancelled",
-                            message = if (isArabic) "تم إلغاء الشحنة ${t.transferNumber} وإعادة القطع للمخزون المتاح."
+                            title = if (isAr) "✅ تم الإلغاء" else "✅ Transfer Cancelled",
+                            message = if (isAr) "تم إلغاء الشحنة ${t.transferNumber} وإعادة القطع للمخزون المتاح."
                             else "Transfer ${t.transferNumber} cancelled and items released.",
                             isError = false
                         )
@@ -734,7 +811,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                         notifyDashboardUpdate()
                     } else {
                         feedbackDialogState = TransferDialogPayload(
-                            title = if (isArabic) "❌ فشل الإلغاء" else "❌ Cancel Failed",
+                            title = if (isAr) "❌ فشل الإلغاء" else "❌ Cancel Failed",
                             message = getErrorMessage(response),
                             isError = true
                         )
@@ -744,7 +821,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                 mainHandler.post {
                     loadingOverlayMessageState = null
                     feedbackDialogState = TransferDialogPayload(
-                        title = if (isArabic) "❌ خطأ" else "❌ Error",
+                        title = if (isAr) "❌ خطأ" else "❌ Error",
                         message = e.message ?: "Unknown error",
                         isError = true
                     )
@@ -754,10 +831,10 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  New Transfer Creation Flow
+    //  New Transfer Creation Flow (Supports all Branch JSON shapes)
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun openNewTransferSheet() {
+    internal fun openNewTransferSheet() {
         if (!canCreateTransfer()) {
             showAccessDenied()
             return
@@ -770,11 +847,13 @@ class MiraTransferFragment : MiraBaseFragment() {
         val fromBranchId = branchesManager?.activeBranchId ?: 0
         val exec = executor ?: return
         val client = apiClient ?: return
+        val isAr = isArabicState
 
         exec.execute {
             val response = try {
                 client.getBranches()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e(TAG, "getBranches failed", e)
                 null
             }
 
@@ -783,32 +862,108 @@ class MiraTransferFragment : MiraBaseFragment() {
                 if (!isAdded) return@post
 
                 availableBranchesState.clear()
-                if (response != null && response.isSuccess && response.data != null) {
-                    val branches = response.data!!.optJSONArray("branches")
-                    if (branches != null) {
-                        for (i in 0 until branches.length()) {
-                            val b = branches.optJSONObject(i) ?: continue
-                            val bId = b.optInt("id")
-                            if (bId != 0 && bId != fromBranchId) {
-                                val bName = if (isArabic) {
-                                    b.optString("branch_name_ar", b.optString("branch_name", "فرع #$bId"))
-                                } else {
-                                    b.optString("branch_name", b.optString("branch_name_ar", "Branch #$bId"))
-                                }
-                                availableBranchesState.add(BranchOption(bId, bName))
-                            }
-                        }
-                    }
+                val parsed = parseBranchesFromApiResponse(response, fromBranchId, isAr)
+                if (parsed.isNotEmpty()) {
+                    availableBranchesState.addAll(parsed)
+                } else {
+                    // Fallback من MiraBranchesManager المحلي في حال كانت الاستجابة بصيغة غير قياسية
+                    val fallback = loadBranchesFromLocalManager(fromBranchId, isAr)
+                    availableBranchesState.addAll(fallback)
                 }
             }
         }
+    }
+
+    private fun parseBranchesFromApiResponse(
+        response: MiraApiClient.ApiResponse?,
+        excludeBranchId: Int,
+        isAr: Boolean
+    ): List<BranchOption> {
+        val result = ArrayList<BranchOption>()
+        val branches = extractJsonArray(response, "branches") ?: return result
+
+        for (i in 0 until branches.length()) {
+            val b = branches.optJSONObject(i) ?: continue
+            val bId = b.optInt("id", b.optInt("branch_id", 0))
+            if (bId == 0 || bId == excludeBranchId) continue
+
+            val status = b.optString("status", "active")
+            if (status.isNotEmpty() && !status.equals("active", ignoreCase = true)) continue
+
+            val nameAr = b.optString("name_ar").ifEmpty { b.optString("branch_name_ar") }
+            val nameEn = b.optString("name").ifEmpty { b.optString("branch_name") }
+            val code = b.optString("code", "")
+
+            val baseName = if (isAr) {
+                nameAr.ifEmpty { nameEn }.ifEmpty { "فرع #$bId" }
+            } else {
+                nameEn.ifEmpty { nameAr }.ifEmpty { "Branch #$bId" }
+            }
+
+            val displayName = if (code.isNotEmpty() && !baseName.contains(code)) {
+                "$baseName ($code)"
+            } else {
+                baseName
+            }
+
+            result.add(BranchOption(bId, displayName))
+        }
+        return result
+    }
+
+    private fun loadBranchesFromLocalManager(excludeBranchId: Int, isAr: Boolean): List<BranchOption> {
+        val result = ArrayList<BranchOption>()
+        val mgr = branchesManager ?: return result
+        try {
+            val rawList = mgr.branches ?: return result
+            for (item in rawList) {
+                if (item == null) continue
+                val cls = item.javaClass
+                val id = try {
+                    cls.getField("id").getInt(item)
+                } catch (_: Exception) {
+                    try {
+                        (cls.getMethod("getId").invoke(item) as? Number)?.toInt() ?: 0
+                    } catch (_: Exception) {
+                        0
+                    }
+                }
+                if (id == 0 || id == excludeBranchId) continue
+
+                val nameAr = try {
+                    (cls.getField("nameAr").get(item) as? String) ?: ""
+                } catch (_: Exception) {
+                    try {
+                        (cls.getMethod("getNameAr").invoke(item) as? String) ?: ""
+                    } catch (_: Exception) {
+                        ""
+                    }
+                }
+                val nameEn = try {
+                    (cls.getField("name").get(item) as? String) ?: ""
+                } catch (_: Exception) {
+                    try {
+                        (cls.getMethod("getName").invoke(item) as? String) ?: ""
+                    } catch (_: Exception) {
+                        ""
+                    }
+                }
+                val display = if (isAr) nameAr.ifEmpty { nameEn } else nameEn.ifEmpty { nameAr }
+                if (display.isNotEmpty()) {
+                    result.add(BranchOption(id, display))
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Fallback branch read failed: ${e.message}")
+        }
+        return result
     }
 
     // ═══════════════════════════════════════════════════════════════════
     //  Scan & Verify Items into Transfer (Handheld + Manual)
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun openScanItemsSheetForTransfer(t: TransferData) {
+    internal fun openScanItemsSheetForTransfer(t: TransferData) {
         activeScanEpcSet.clear()
         verifyingEpcSet.clear()
         scannedItemsState.clear()
@@ -817,7 +972,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         activeScanTransferState = t
     }
 
-    private fun closeScanItemsSheet() {
+    internal fun closeScanItemsSheet() {
         isTriggerDown = false
         stopRfidSweep()
         activeScanEpcSet.clear()
@@ -827,11 +982,12 @@ class MiraTransferFragment : MiraBaseFragment() {
         activeScanTransferState = null
     }
 
-    private fun verifyAndAddEpcToTransfer(rawEpc: String) {
+    internal fun verifyAndAddEpcToTransfer(rawEpc: String) {
         val epc = rawEpc.trim().uppercase(Locale.US)
         if (epc.isEmpty()) return
+        val isAr = isArabicState
         if (activeScanEpcSet.contains(epc) || verifyingEpcSet.contains(epc)) {
-            showToast(if (isArabic) "⚠️ هذه القطعة ممسوحة مسبقاً" else "⚠️ Item already scanned")
+            showToast(if (isAr) "⚠️ هذه القطعة ممسوحة مسبقاً" else "⚠️ Item already scanned")
             return
         }
 
@@ -856,12 +1012,18 @@ class MiraTransferFragment : MiraBaseFragment() {
                         val itemObj = response.data!!.optJSONObject("item")
 
                         if (allowed || itemObj != null) {
-                            val title = itemObj?.optString("title", "")
-                                ?.ifEmpty { itemObj.optString("item_title", epc) }
+                            val title = itemObj?.optString("item_title", "")
+                                ?.ifEmpty { itemObj.optString("title", epc) }
                                 ?: epc
                             val serial = itemObj?.optString("serial_number", "") ?: ""
-                            val weight = itemObj?.optDouble("gross_weight", itemObj.optDouble("gross_weight_grams", 0.0)) ?: 0.0
-                            val karat = itemObj?.optString("purity_code", itemObj.optString("gold_karat", "")) ?: ""
+                            val weight = itemObj?.optDouble(
+                                "gross_weight_grams",
+                                itemObj.optDouble("gross_weight", 0.0)
+                            ) ?: 0.0
+                            val karat = itemObj?.optString(
+                                "gold_karat",
+                                itemObj.optString("purity_code", "")
+                            ) ?: ""
 
                             activeScanEpcSet.add(epc)
                             scannedItemsState.add(
@@ -879,13 +1041,13 @@ class MiraTransferFragment : MiraBaseFragment() {
                         } else {
                             val reason = response.data!!.optString(
                                 "reason",
-                                if (isArabic) "غير مسموح بنقل هذه القطعة" else "Not authorized for transfer"
+                                if (isAr) "غير مسموح بنقل هذه القطعة" else "Not authorized for transfer"
                             )
                             playErrorBeepSound()
                             showToast("❌ $epc: $reason")
                         }
                     } else {
-                        // وضع التوافق في حال عدم توفر استجابة السيرفر التفصيلية
+                        // وضع التوافق في حال عدم توفر استجابة السيرفر التفصيلية — يُدقق نهائياً عند الحفظ
                         activeScanEpcSet.add(epc)
                         scannedItemsState.add(
                             0,
@@ -925,15 +1087,16 @@ class MiraTransferFragment : MiraBaseFragment() {
         }
     }
 
-    private fun removeScannedItem(epc: String) {
+    internal fun removeScannedItem(epc: String) {
         activeScanEpcSet.remove(epc)
         scannedItemsState.removeAll { it.epc == epc }
     }
 
-    private fun saveScannedItemsToTransfer(t: TransferData) {
+    internal fun saveScannedItemsToTransfer(t: TransferData) {
+        val isAr = isArabicState
         if (activeScanEpcSet.isEmpty()) {
             showToast(
-                if (isArabic) "⚠️ لا توجد قطع ممسوحة للحفظ"
+                if (isAr) "⚠️ لا توجد قطع ممسوحة للحفظ"
                 else "⚠️ No scanned items to save"
             )
             return
@@ -960,6 +1123,17 @@ class MiraTransferFragment : MiraBaseFragment() {
                     }
 
                     val createResponse = client.createTransfer(createPayload)
+                    if (createResponse != null && createResponse.isSuccess) {
+                        val createdObj = createResponse.data?.optJSONObject("transfer") ?: createResponse.data
+                        val createdId = createdObj?.optInt("id", 0) ?: 0
+                        val savedCount = createdObj?.optInt("item_count", 0) ?: 0
+
+                        // إذا أنشأ السيرفر رأس الشحنة فقط دون إلحاق المصفوفة، نلحق القطع فوراً
+                        if (createdId > 0 && savedCount == 0) {
+                            client.addItemsToTransfer(createdId, itemsArray)
+                        }
+                    }
+
                     mainHandler.post {
                         isSavingTransferItemsState = false
                         if (!isAdded || context == null) return@post
@@ -967,8 +1141,8 @@ class MiraTransferFragment : MiraBaseFragment() {
                         if (createResponse != null && createResponse.isSuccess) {
                             closeScanItemsSheet()
                             feedbackDialogState = TransferDialogPayload(
-                                title = if (isArabic) "✅ تم إنشاء الشحنة" else "✅ Transfer Created",
-                                message = if (isArabic) "تم إنشاء أمر التحويل وإضافة ${itemsArray.length()} قطعة بنجاح."
+                                title = if (isAr) "✅ تم إنشاء الشحنة" else "✅ Transfer Created",
+                                message = if (isAr) "تم إنشاء أمر التحويل وإضافة ${itemsArray.length()} قطعة بنجاح."
                                 else "Transfer order created with ${itemsArray.length()} items.",
                                 isError = false
                             )
@@ -976,7 +1150,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                             notifyDashboardUpdate()
                         } else {
                             feedbackDialogState = TransferDialogPayload(
-                                title = if (isArabic) "❌ فشل الإنشاء" else "❌ Create Failed",
+                                title = if (isAr) "❌ فشل الإنشاء" else "❌ Create Failed",
                                 message = getErrorMessage(createResponse),
                                 isError = true
                             )
@@ -991,8 +1165,8 @@ class MiraTransferFragment : MiraBaseFragment() {
                         if (addResponse != null && addResponse.isSuccess) {
                             closeScanItemsSheet()
                             feedbackDialogState = TransferDialogPayload(
-                                title = if (isArabic) "✅ تمت الإضافة بنجاح" else "✅ Items Added",
-                                message = if (isArabic) "تم إضافة ${itemsArray.length()} قطعة إلى الشحنة ${t.transferNumber}."
+                                title = if (isAr) "✅ تمت الإضافة بنجاح" else "✅ Items Added",
+                                message = if (isAr) "تم إضافة ${itemsArray.length()} قطعة إلى الشحنة ${t.transferNumber}."
                                 else "Added ${itemsArray.length()} items to ${t.transferNumber}.",
                                 isError = false
                             )
@@ -1000,7 +1174,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                             notifyDashboardUpdate()
                         } else {
                             feedbackDialogState = TransferDialogPayload(
-                                title = if (isArabic) "❌ فشل الحفظ" else "❌ Save Failed",
+                                title = if (isAr) "❌ فشل الحفظ" else "❌ Save Failed",
                                 message = getErrorMessage(addResponse),
                                 isError = true
                             )
@@ -1011,7 +1185,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                 mainHandler.post {
                     isSavingTransferItemsState = false
                     feedbackDialogState = TransferDialogPayload(
-                        title = if (isArabic) "❌ خطأ" else "❌ Error",
+                        title = if (isAr) "❌ خطأ" else "❌ Error",
                         message = e.message ?: "Unknown error",
                         isError = true
                     )
@@ -1024,13 +1198,14 @@ class MiraTransferFragment : MiraBaseFragment() {
     //  Manifest / Items Viewer
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun openTransferManifest(t: TransferData) {
+    internal fun openTransferManifest(t: TransferData) {
         manifestTransferState = t
         manifestItemsState.clear()
         isLoadingManifestState = true
 
         val exec = executor ?: return
         val client = apiClient ?: return
+        val isAr = isArabicState
 
         exec.execute {
             val response = try {
@@ -1044,24 +1219,30 @@ class MiraTransferFragment : MiraBaseFragment() {
                 if (!isAdded || manifestTransferState == null) return@post
 
                 manifestItemsState.clear()
-                if (response != null && response.isSuccess && response.data != null) {
-                    val items = response.data!!.optJSONArray("items")
+                if (response != null && response.isSuccess) {
+                    val items = extractJsonArray(response, "items")
                     if (items != null) {
                         for (i in 0 until items.length()) {
                             val obj = items.optJSONObject(i) ?: continue
                             manifestItemsState.add(
                                 TransferManifestItem(
-                                    title = obj.optString("item_title", obj.optString("title", if (isArabic) "قطعة مجوهرات" else "Jewelry Item")),
+                                    title = obj.optString(
+                                        "item_title",
+                                        obj.optString("title", if (isAr) "قطعة مجوهرات" else "Jewelry Item")
+                                    ),
                                     serialNumber = obj.optString("serial_number", ""),
                                     rfidEpc = obj.optString("rfid_epc", obj.optString("epc", "")),
-                                    weight = obj.optDouble("gross_weight_grams", obj.optDouble("gross_weight", 0.0)),
+                                    weight = obj.optDouble(
+                                        "gross_weight_grams",
+                                        obj.optDouble("gross_weight", 0.0)
+                                    ),
                                     karat = obj.optString("gold_karat", obj.optString("purity_code", ""))
                                 )
                             )
                         }
                     }
                 } else {
-                    showToast(if (isArabic) "❌ تعذر تحميل قطع الشحنة" else "❌ Could not load transfer items")
+                    showToast(if (isAr) "❌ تعذر تحميل قطع الشحنة" else "❌ Could not load transfer items")
                 }
             }
         }
@@ -1071,20 +1252,22 @@ class MiraTransferFragment : MiraBaseFragment() {
     //  Helpers & Audio
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun showAccessDenied() {
+    internal fun showAccessDenied() {
+        val isAr = isArabicState
         feedbackDialogState = TransferDialogPayload(
-            title = if (isArabic) "⛔ لا تملك صلاحية" else "⛔ Access Denied",
-            message = if (isArabic) "عذراً، ليس لديك صلاحية لتنفيذ هذا الإجراء.\nيرجى التواصل مع مدير النظام."
+            title = if (isAr) "⛔ لا تملك صلاحية" else "⛔ Access Denied",
+            message = if (isAr) "عذراً، ليس لديك صلاحية لتنفيذ هذا الإجراء.\nيرجى التواصل مع مدير النظام."
             else "Sorry, you don't have permission to perform this action.",
             isError = true
         )
     }
 
     private fun getErrorMessage(response: MiraApiClient.ApiResponse?): String {
-        if (response == null) return if (isArabic) "تعذر الاتصال بالسيرفر." else "Could not connect to server."
+        val isAr = isArabicState
+        if (response == null) return if (isAr) "تعذر الاتصال بالسيرفر." else "Could not connect to server."
         if (!response.error.isNullOrEmpty()) return response.error!!
         if (!response.message.isNullOrEmpty()) return response.message!!
-        return if (isArabic) "حدث خطأ غير متوقع." else "An unexpected error occurred."
+        return if (isAr) "حدث خطأ غير متوقع." else "An unexpected error occurred."
     }
 
     private fun notifyDashboardUpdate() {
@@ -1107,25 +1290,26 @@ class MiraTransferFragment : MiraBaseFragment() {
         }
     }
 
-    private fun showToast(msg: String) {
+    internal fun showToast(msg: String) {
         if (isAdded && context != null) {
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun getStatusLabel(status: String): String {
+    internal fun getStatusLabel(status: String): String {
+        val isAr = isArabicState
         return when (status) {
-            "draft" -> if (isArabic) "مسودة" else "Draft"
-            "pending" -> if (isArabic) "معلق للاعتماد" else "Pending"
-            "approved" -> if (isArabic) "معتمد ومجهز" else "Approved"
-            "in_transit" -> if (isArabic) "قيد النقل" else "In Transit"
-            "received" -> if (isArabic) "مستلم" else "Received"
-            "rejected", "cancelled" -> if (isArabic) "ملغى" else "Cancelled"
+            "draft" -> if (isAr) "مسودة" else "Draft"
+            "pending" -> if (isAr) "معلق للاعتماد" else "Pending"
+            "approved" -> if (isAr) "معتمد ومجهز" else "Approved"
+            "in_transit" -> if (isAr) "قيد النقل" else "In Transit"
+            "received" -> if (isAr) "مستلم" else "Received"
+            "rejected", "cancelled" -> if (isAr) "ملغى" else "Cancelled"
             else -> status
         }
     }
 
-    private fun getStatusColor(status: String): Color {
+    internal fun getStatusColor(status: String): Color {
         return when (status) {
             "draft" -> Color(0xFF94A3B8)
             "pending" -> Color(0xFFF59E0B)
@@ -1141,9 +1325,9 @@ class MiraTransferFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     @Composable
-    private fun TransferManagementScreen() {
+    internal fun TransferManagementScreen() {
         val colors = MiraTheme.colors
-        val isAr = isArabic
+        val isAr = isArabicState
         val keyboardController = LocalSoftwareKeyboardController.current
 
         val filterOptions = remember {
@@ -1249,7 +1433,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                         }
                     }
 
-                    // 2. بطاقة الإجراءات السريعة (تحويل جديد + مسح وتدقيق)
+                    // 2. بطاقة الإجراءات السريعة (تحويل جديد + مسح وتدقيق بالـ RFID)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1284,18 +1468,38 @@ class MiraTransferFragment : MiraBaseFragment() {
                                     showAccessDenied()
                                     return@OutlinedButton
                                 }
-                                val current = selectedTransfer
-                                if (current != null && (current.status == "draft" || current.status == "pending")) {
-                                    openScanItemsSheetForTransfer(current)
-                                } else if (allTransfersState.isNotEmpty()) {
-                                    showTransferPickerState = true
-                                } else {
-                                    feedbackDialogState = TransferDialogPayload(
-                                        title = if (isArabic) "📭 لا توجد شحنات" else "📭 No Transfers",
-                                        message = if (isArabic) "لا توجد شحنات نشطة للمسح حالياً. أنشئ تحويلاً جديداً أولاً."
-                                        else "No active transfers to scan. Create a new transfer first.",
-                                        isError = false
-                                    )
+                                val actionable = allTransfersState.filter {
+                                    it.status == "draft" ||
+                                        it.status == "pending" ||
+                                        it.status == "approved" ||
+                                        it.status == "in_transit"
+                                }
+                                when {
+                                    actionable.size == 1 -> {
+                                        val single = actionable.first()
+                                        selectedTransfer = single
+                                        when {
+                                            single.status == "approved" || single.status == "in_transit" -> {
+                                                if (canReceiveTransfer(single)) openScanMethodForReceive(single)
+                                                else openTransferManifest(single)
+                                            }
+                                            single.status == "pending" && single.itemCount > 0 && canApproveTransfer() -> {
+                                                openScanMethodForDispatch(single)
+                                            }
+                                            else -> openScanItemsSheetForTransfer(single)
+                                        }
+                                    }
+                                    actionable.isNotEmpty() -> {
+                                        showTransferPickerState = true
+                                    }
+                                    else -> {
+                                        feedbackDialogState = TransferDialogPayload(
+                                            title = if (isAr) "📭 لا توجد شحنات نشطة" else "📭 No Active Transfers",
+                                            message = if (isAr) "لا توجد شحنات قيد التجهيز أو النقل للمسح حالياً. أنشئ تحويلاً جديداً أولاً."
+                                            else "No draft, pending, or in-transit transfers to scan. Create a new transfer first.",
+                                            isError = false
+                                        )
+                                    }
                                 }
                             },
                             modifier = Modifier
@@ -1533,7 +1737,7 @@ class MiraTransferFragment : MiraBaseFragment() {
             )
         }
 
-        // 2. نافذة مسح وإضافة القطع للشحنة (RFID + Manual)
+        // 2. نافذة مسح وإضافة القطع للشحنة (RFID Handheld Trigger + On-Screen Scan + Manual)
         activeScanTransferState?.let { transfer ->
             ScanTransferItemsDialog(
                 transfer = transfer,
@@ -1554,6 +1758,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                     scannedItemsState.clear()
                 },
                 isRfidScanning = isRfidScanningUiState,
+                onToggleRfidScan = { toggleManualRfidSweep(transfer) },
                 isSaving = isSavingTransferItemsState,
                 onSave = { saveScannedItemsToTransfer(transfer) },
                 onClose = { closeScanItemsSheet() }
@@ -1694,7 +1899,7 @@ class MiraTransferFragment : MiraBaseFragment() {
             )
         }
 
-        // 7. اختيار شحنة للمسح السريع
+        // 7. اختيار شحنة للمسح والتدقيق بالـ RFID
         if (showTransferPickerState) {
             val activeList = allTransfersState.filter {
                 it.status == "draft" || it.status == "pending" || it.status == "approved" || it.status == "in_transit"
@@ -1704,7 +1909,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                 containerColor = colors.cardSurface,
                 title = {
                     Text(
-                        text = if (isAr) "اختر الشحنة للمسح" else "Select Transfer to Scan",
+                        text = if (isAr) "اختر الشحنة للمسح بالـ RFID" else "Select Transfer to Scan",
                         color = colors.goldPrimary,
                         fontWeight = FontWeight.ExtraBold
                     )
@@ -1721,17 +1926,29 @@ class MiraTransferFragment : MiraBaseFragment() {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             activeList.forEach { item ->
+                                val phaseHint = when {
+                                    item.status == "approved" || item.status == "in_transit" ->
+                                        if (isAr) "📥 مسح إلزامي للاستلام" else "📥 Mandatory Receive Scan"
+                                    item.status == "pending" && item.itemCount > 0 ->
+                                        if (isAr) "🚚 مسح إلزامي للإرسال" else "🚚 Mandatory Dispatch Scan"
+                                    else ->
+                                        if (isAr) "📡 مسح وإضافة قطع" else "📡 Scan & Add Items"
+                                }
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
                                             showTransferPickerState = false
                                             selectedTransfer = item
-                                            if (item.status == "approved" || item.status == "in_transit") {
-                                                if (canReceiveTransfer(item)) openScanMethodForReceive(item)
-                                                else openTransferManifest(item)
-                                            } else {
-                                                openScanItemsSheetForTransfer(item)
+                                            when {
+                                                item.status == "approved" || item.status == "in_transit" -> {
+                                                    if (canReceiveTransfer(item)) openScanMethodForReceive(item)
+                                                    else openTransferManifest(item)
+                                                }
+                                                item.status == "pending" && item.itemCount > 0 && canApproveTransfer() -> {
+                                                    openScanMethodForDispatch(item)
+                                                }
+                                                else -> openScanItemsSheetForTransfer(item)
                                             }
                                         },
                                     shape = RoundedCornerShape(12.dp),
@@ -1739,15 +1956,32 @@ class MiraTransferFragment : MiraBaseFragment() {
                                     border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = item.transferNumber,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = colors.goldPrimary
-                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = item.transferNumber,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = colors.goldPrimary
+                                            )
+                                            Text(
+                                                text = getStatusLabel(item.status),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = getStatusColor(item.status),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                         Text(
                                             text = "${item.fromBranch} ➔ ${item.toBranch}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = colors.textPrimary
+                                        )
+                                        Text(
+                                            text = phaseHint,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF06B6D4),
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
@@ -1828,7 +2062,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     @Composable
-    private fun TransferCard(
+    internal fun TransferCard(
         transfer: TransferData,
         isArabic: Boolean,
         onCardClick: () -> Unit,
@@ -2015,7 +2249,6 @@ class MiraTransferFragment : MiraBaseFragment() {
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // زر الإجراء المرحلي (إضافة / اعتماد وإرسال / استلام)
                         when {
                             transfer.status == "draft" && canCreateTransfer() -> {
                                 FilledTonalButton(
@@ -2070,7 +2303,6 @@ class MiraTransferFragment : MiraBaseFragment() {
                             }
                         }
 
-                        // زر عرض القطع
                         OutlinedButton(
                             onClick = onViewItems,
                             shape = RoundedCornerShape(10.dp),
@@ -2091,7 +2323,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     @Composable
-    private fun NewTransferDialog(
+    internal fun NewTransferDialog(
         isArabic: Boolean,
         fromBranchName: String,
         branches: List<BranchOption>,
@@ -2100,7 +2332,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         onProceedToScan: (BranchOption, String) -> Unit
     ) {
         val colors = MiraTheme.colors
-        var selectedBranch by remember(branches) { mutableStateOf(branches.firstOrNull()) }
+        var selectedBranch by remember(branches.size) { mutableStateOf(branches.firstOrNull()) }
         var notesText by remember { mutableStateOf("") }
 
         Dialog(onDismissRequest = onDismiss) {
@@ -2180,7 +2412,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 170.dp)
+                                .heightIn(max = 180.dp)
                                 .verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
@@ -2206,7 +2438,8 @@ class MiraTransferFragment : MiraBaseFragment() {
                                             text = "🏢 ${branch.name}",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                            color = if (isSelected) Color(0xFF10B981) else colors.textPrimary
+                                            color = if (isSelected) Color(0xFF10B981) else colors.textPrimary,
+                                            modifier = Modifier.weight(1f)
                                         )
                                         if (isSelected) {
                                             Icon(
@@ -2271,7 +2504,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     @Composable
-    private fun ScanTransferItemsDialog(
+    internal fun ScanTransferItemsDialog(
         transfer: TransferData,
         isArabic: Boolean,
         scannedItems: List<ScannedTransferItem>,
@@ -2281,11 +2514,13 @@ class MiraTransferFragment : MiraBaseFragment() {
         onRemoveItem: (String) -> Unit,
         onClearAll: () -> Unit,
         isRfidScanning: Boolean,
+        onToggleRfidScan: () -> Unit,
         isSaving: Boolean,
         onSave: () -> Unit,
         onClose: () -> Unit
     ) {
         val colors = MiraTheme.colors
+        val focusRequester = remember { FocusRequester() }
         val totalScannedWeight = remember(scannedItems.size) {
             scannedItems.sumOf { it.weight }
         }
@@ -2298,10 +2533,45 @@ class MiraTransferFragment : MiraBaseFragment() {
                 usePlatformDefaultWidth = false
             )
         ) {
+            // ربط أزرار زناد القارئ اليدوي (139 / 280 / 293) بنافذة الـ Dialog مباشرة حتى لو كان التركيز داخل حقل أو قائمة
+            val dialogView = LocalView.current
+            DisposableEffect(dialogView) {
+                val window = (dialogView.parent as? DialogWindowProvider)?.window
+                val originalCallback = window?.callback
+                if (window != null && originalCallback != null) {
+                    window.callback = object : WindowCallbackWrapper(originalCallback) {
+                        override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                            if (handleHardwareTriggerEvent(event.keyCode, event.action, event.repeatCount)) {
+                                return true
+                            }
+                            return super.dispatchKeyEvent(event)
+                        }
+                    }
+                }
+                onDispose {
+                    if (window != null && originalCallback != null) {
+                        window.callback = originalCallback
+                    }
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                try {
+                    focusRequester.requestFocus()
+                } catch (_: Exception) {
+                }
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { keyEvent ->
+                        val native = keyEvent.nativeKeyEvent
+                        handleHardwareTriggerEvent(native.keyCode, native.action, native.repeatCount)
+                    },
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 border = BorderStroke(1.5.dp, colors.goldPrimary.copy(alpha = 0.5f))
@@ -2320,7 +2590,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isArabic) "مسح قطع الشحنة" else "Scan Transfer Items",
+                                text = if (isArabic) "مسح قطع الشحنة بالـ RFID" else "Scan Transfer Items (RFID)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = colors.textPrimary
@@ -2339,58 +2609,92 @@ class MiraTransferFragment : MiraBaseFragment() {
                         }
                     }
 
-                    // مؤشر حالة القارئ اليدوي + العدادات
+                    // مؤشر حالة القارئ اليدوي + زر بدء/إيقاف المسح المباشر + العدادات
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         color = if (isRfidScanning) Color(0xFF06B6D4).copy(alpha = 0.16f) else colors.backgroundMid,
                         border = BorderStroke(
-                            1.dp,
+                            1.2.dp,
                             if (isRfidScanning) Color(0xFF06B6D4) else colors.goldPrimary.copy(alpha = 0.35f)
                         )
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Sensors,
-                                    contentDescription = null,
-                                    tint = if (isRfidScanning) Color(0xFF06B6D4) else colors.goldPrimary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isRfidScanning) {
-                                        if (isArabic) "جاري قراءة الشرائح..." else "Reading RFID tags..."
-                                    } else {
-                                        if (isArabic) "اضغط زناد القارئ لإضافة القطع" else "Hold trigger to scan tags"
-                                    },
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isRfidScanning) Color(0xFF06B6D4) else colors.textPrimary
-                                )
-                            }
-
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = "${scannedItems.size} ${if (isArabic) "قطعة" else "pcs"}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = colors.goldPrimary
-                                )
-                                if (totalScannedWeight > 0) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Sensors,
+                                        contentDescription = null,
+                                        tint = if (isRfidScanning) Color(0xFF06B6D4) else colors.goldPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = String.format(Locale.US, "%.2f g", totalScannedWeight),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF10B981),
-                                        fontWeight = FontWeight.Bold
+                                        text = if (isRfidScanning) {
+                                            if (isArabic) "جاري مسح شرائح RFID..." else "Scanning RFID tags..."
+                                        } else {
+                                            if (isArabic) "اضغط زناد القارئ أو زر المسح أدناه" else "Hold gun trigger or tap Scan below"
+                                        },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isRfidScanning) Color(0xFF06B6D4) else colors.textPrimary
                                     )
                                 }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "${scannedItems.size} ${if (isArabic) "قطعة" else "pcs"}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = colors.goldPrimary
+                                    )
+                                    if (totalScannedWeight > 0) {
+                                        Text(
+                                            text = String.format(Locale.US, "%.2f g", totalScannedWeight),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF10B981),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            Button(
+                                onClick = onToggleRfidScan,
+                                enabled = !isSaving,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isRfidScanning) Color(0xFFEF4444) else Color(0xFF06B6D4),
+                                    contentColor = if (isRfidScanning) Color.White else Color(0xFF0A0F1D)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = if (isRfidScanning) Icons.Rounded.StopCircle else Icons.Rounded.WifiTethering,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isRfidScanning) {
+                                        if (isArabic) "إيقاف المسح بالـ RFID" else "Stop RFID Scan"
+                                    } else {
+                                        if (isArabic) "بدء المسح المستمر بالـ RFID" else "Start Continuous RFID Scan"
+                                    },
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 13.sp
+                                )
                             }
                         }
                     }
@@ -2431,15 +2735,15 @@ class MiraTransferFragment : MiraBaseFragment() {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 140.dp, max = 260.dp)
+                            .heightIn(min = 140.dp, max = 250.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(colors.backgroundMid)
                             .padding(8.dp)
                     ) {
                         if (scannedItems.isEmpty()) {
                             Text(
-                                text = if (isArabic) "لم يتم مسح أي قطعة بعد.\nقرّب القطع واضغط الزناد للمسح الفوري."
-                                else "No items scanned yet.\nApproach items and press trigger.",
+                                text = if (isArabic) "لم يتم مسح أي قطعة بعد.\nقرّب القطع واضغط زناد القارئ اليدوي للمسح الفوري."
+                                else "No items scanned yet.\nApproach items and press handheld trigger.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.textSecondary,
                                 textAlign = TextAlign.Center,
@@ -2502,7 +2806,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                         }
                     }
 
-                    // أزرار المسح والحفظ
+                    // أزرار التفريغ والحفظ
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -2554,7 +2858,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     @Composable
-    private fun TransferActionsDialog(
+    internal fun TransferActionsDialog(
         transfer: TransferData,
         isArabic: Boolean,
         canAddItems: Boolean,
@@ -2600,7 +2904,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                     if (canAddItems) {
                         ActionOptionRow(
                             icon = Icons.Rounded.AddCircleOutline,
-                            label = if (isArabic) "إضافة قطع للشحنة بالمسح" else "Scan & Add Items",
+                            label = if (isArabic) "إضافة قطع للشحنة بالمسح (RFID)" else "Scan & Add Items (RFID)",
                             accentColor = Color(0xFF06B6D4),
                             onClick = onAddItems
                         )
@@ -2651,7 +2955,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     @Composable
-    private fun ActionOptionRow(
+    internal fun ActionOptionRow(
         icon: ImageVector,
         label: String,
         accentColor: Color,
@@ -2683,7 +2987,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     @Composable
-    private fun TransferManifestDialog(
+    internal fun TransferManifestDialog(
         transfer: TransferData,
         isArabic: Boolean,
         items: List<TransferManifestItem>,
@@ -2834,7 +3138,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     @Composable
-    private fun DetailRow(label: String, value: String) {
+    internal fun DetailRow(label: String, value: String) {
         val colors = MiraTheme.colors
         Row(
             modifier = Modifier.fillMaxWidth(),
