@@ -2488,6 +2488,229 @@ public ApiResponse getDashboardCharts(int branchId) {
         if (branchId > 0) endpoint += "&branch_id=" + branchId;
         return getWithAuth(endpoint);
     }
+    
+        // ==================== المصدر الموحد للعمليات والفواتير ====================
+
+    /**
+     * جلب تفاصيل فاتورة واحدة برقم الفاتورة أو المعرف (لإثراء نافذة التفاصيل بالأصناف وطرق الدفع)
+     */
+    public ApiResponse getSaleDetails(String saleIdOrNumber) {
+        if (saleIdOrNumber == null || saleIdOrNumber.trim().isEmpty()) {
+            return new ApiResponse(-1, null, "Missing sale identifier");
+        }
+        try {
+            String clean = saleIdOrNumber.trim().replace("#", "");
+            String encoded = URLEncoder.encode(clean, "UTF-8");
+            ApiResponse res = getWithAuth("/refunds/find-sale?q=" + encoded);
+            if (res != null && res.isSuccess && res.data != null) {
+                return res;
+            }
+            return getWithAuth("/pos/sales/" + encoded);
+        } catch (Exception e) {
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        }
+    }
+
+    /**
+     * مصدر الحقيقة الموحد لآخر العمليات (للدشبورد وشاشة عرض الكل)
+     * يدمج الفواتير الكاملة من /pos/sales مع العمليات التشغيلية الصالحة من /activity/unified
+     */
+    public ApiResponse getUnifiedOperations(int branchId, int page, int limit, String search, String filterType) {
+        try {
+            String normalizedFilter = (filterType == null || filterType.trim().isEmpty())
+                    ? "all" : filterType.trim().toLowerCase(Locale.ROOT);
+            String cleanSearch = (search != null) ? search.trim() : "";
+
+            List<JSONObject> mergedList = new ArrayList<>();
+            java.util.Set<String> seenSaleNumbers = new java.util.HashSet<>();
+            int totalSalesOnServer = 0;
+            boolean hasMoreSales = false;
+
+            boolean includeSales = normalizedFilter.equals("all")
+                    || normalizedFilter.equals("sale")
+                    || normalizedFilter.equals("refund");
+
+            boolean includeOtherActivities = normalizedFilter.equals("all")
+                    || normalizedFilter.equals("scrap")
+                    || normalizedFilter.equals("transfer")
+                    || normalizedFilter.equals("inventory")
+                    || normalizedFilter.equals("rfid");
+
+            // 1) جلب الفواتير والمرتجعات الغنية بالتفاصيل من /pos/sales
+            if (includeSales) {
+                ApiResponse salesResp = getSalesHistoryAdvanced(
+                        cleanSearch, "ALL", null, null, page, limit, branchId
+                );
+
+                if (salesResp != null && salesResp.isSuccess && salesResp.data != null) {
+                    JSONArray salesArr = extractArrayFromPayload(salesResp.data, "sales");
+                    JSONObject dataObj = salesResp.data.optJSONObject("data");
+                    if (dataObj != null) {
+                        totalSalesOnServer = dataObj.optInt("total", 0);
+                        int lastP = dataObj.optInt("last_page", 1);
+                        int currP = dataObj.optInt("current_page", page);
+                        hasMoreSales = currP < lastP;
+                    }
+                    if (totalSalesOnServer == 0) {
+                        totalSalesOnServer = salesResp.data.optInt("total", 0);
+                    }
+
+                    if (salesArr != null) {
+                        for (int i = 0; i < salesArr.length(); i++) {
+                            JSONObject sale = salesArr.optJSONObject(i);
+                            if (sale == null) continue;
+
+                            if (branchId > 0) {
+                                int sBranch = sale.optInt("branch_id", 0);
+                                if (sBranch > 0 && sBranch != branchId) continue;
+                            }
+
+                            JSONObject normalizedSale = normalizeSaleAsUnifiedOperation(sale);
+                            String opType = normalizedSale.optString("type", "sale");
+
+                            if (normalizedFilter.equals("refund") && !opType.equals("refund")) continue;
+                            if (normalizedFilter.equals("sale") && !opType.equals("sale")) continue;
+
+                            String saleNo = normalizedSale.optString("sale_number", "");
+                            if (!saleNo.isEmpty()) {
+                                seenSaleNumbers.add(saleNo.toUpperCase(Locale.US));
+                            }
+                            mergedList.add(normalizedSale);
+                        }
+                    }
+                }
+            }
+
+            // 2) دمج العمليات التشغيلية الأخرى (كسر، تحويلات، جرد، RFID) مع استبعاد سجلات System الفارغة
+            if (includeOtherActivities && page == 1) {
+                ApiResponse actResp = getUnifiedActivity(branchId, Math.max(limit, 25));
+                if (actResp != null && actResp.isSuccess && actResp.data != null) {
+                    JSONArray actArr = extractArrayFromPayload(actResp.data, "activities");
+                    if (actArr != null) {
+                        for (int i = 0; i < actArr.length(); i++) {
+                            JSONObject act = actArr.optJSONObject(i);
+                            if (act == null) continue;
+
+                            String saleRef = act.optString("sale_number",
+                                    act.optString("invoice_number", "")).trim();
+                            if (!saleRef.isEmpty() && seenSaleNumbers.contains(saleRef.toUpperCase(Locale.US))) {
+                                continue;
+                            }
+
+                            String rawType = (act.optString("type", "") + " " +
+                                    act.optString("action", "") + " " +
+                                    act.optString("event", "")).toLowerCase(Locale.ROOT);
+
+                            // تجاهل سجلات النظام العامة الفارغة التي تسبب ظهور "System / عملية في النظام"
+                            boolean isGenericSystem = rawType.trim().isEmpty()
+                                    || rawType.contains("system")
+                                    || rawType.contains("journal");
+                            boolean hasMeaningfulAmount = act.optDouble("amount", 0.0) > 0.0
+                                    || act.optDouble("weight", 0.0) > 0.0;
+
+                            if (isGenericSystem && !hasMeaningfulAmount && saleRef.isEmpty()) {
+                                continue;
+                            }
+
+                            String mappedType = mapActivityType(rawType);
+                            if (!normalizedFilter.equals("all") && !mappedType.equals(normalizedFilter)) {
+                                continue;
+                            }
+
+                            if (!cleanSearch.isEmpty() && !act.toString().toLowerCase(Locale.ROOT)
+                                    .contains(cleanSearch.toLowerCase(Locale.ROOT))) {
+                                continue;
+                            }
+
+                            act.put("type", mappedType);
+                            if (!act.has("timestamp") || act.optString("timestamp").isEmpty()) {
+                                act.put("timestamp", act.optString("created_at", ""));
+                            }
+                            mergedList.add(act);
+                        }
+                    }
+                }
+            }
+
+            // 3) ترتيب زمني تنازلي (الأحدث أولاً)
+            java.util.Collections.sort(mergedList, (a, b) -> {
+                String tA = a.optString("created_at", a.optString("timestamp", ""));
+                String tB = b.optString("created_at", b.optString("timestamp", ""));
+                return tB.compareTo(tA);
+            });
+
+            JSONArray finalArray = new JSONArray();
+            for (JSONObject item : mergedList) {
+                finalArray.put(item);
+            }
+
+            JSONObject wrapper = new JSONObject();
+            wrapper.put("success", true);
+            wrapper.put("activities", finalArray);
+            wrapper.put("total", Math.max(totalSalesOnServer, finalArray.length()));
+            wrapper.put("has_more", hasMoreSales);
+
+            return new ApiResponse(200, wrapper, null);
+        } catch (Exception e) {
+            Log.e(TAG, "getUnifiedOperations error: " + e.getMessage(), e);
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        }
+    }
+
+    private JSONObject normalizeSaleAsUnifiedOperation(JSONObject sale) {
+        try {
+            JSONObject copy = new JSONObject(sale.toString());
+            String saleNo = copy.optString("sale_number",
+                    copy.optString("invoice_number",
+                            copy.optString("sale_id", copy.optString("id", "—"))));
+
+            String refundStatus = copy.optString("refund_status",
+                    copy.optString("status", "completed")).toLowerCase(Locale.ROOT);
+            boolean isRefund = refundStatus.contains("refund");
+
+            copy.put("type", isRefund ? "refund" : "sale");
+            copy.put("action", isRefund ? "SALE_REFUNDED" : "SALE_COMPLETED");
+            copy.put("sale_number", saleNo);
+
+            if (!copy.has("timestamp") || copy.optString("timestamp").isEmpty()) {
+                copy.put("timestamp", copy.optString("created_at", copy.optString("date", "")));
+            }
+            if (!copy.has("user") || copy.optString("user").isEmpty()) {
+                String cashier = copy.optString("cashier_name",
+                        copy.optString("employee_name",
+                                copy.optString("username", "")));
+                if (!cashier.isEmpty()) copy.put("user", cashier);
+            }
+            return copy;
+        } catch (Exception e) {
+            return sale;
+        }
+    }
+
+    private String mapActivityType(String rawType) {
+        if (rawType.contains("refund")) return "refund";
+        if (rawType.contains("sale") || rawType.contains("pos")) return "sale";
+        if (rawType.contains("scrap") || rawType.contains("buy")) return "scrap";
+        if (rawType.contains("transfer") || rawType.contains("move")) return "transfer";
+        if (rawType.contains("inventory") || rawType.contains("audit")) return "inventory";
+        if (rawType.contains("rfid") || rawType.contains("encode") || rawType.contains("gate")) return "rfid";
+        return "system";
+    }
+
+    private JSONArray extractArrayFromPayload(JSONObject root, String primaryKey) {
+        if (root == null) return null;
+        if (root.optJSONArray(primaryKey) != null) return root.optJSONArray(primaryKey);
+        if (root.optJSONArray("data") != null) return root.optJSONArray("data");
+        if (root.optJSONArray("items") != null) return root.optJSONArray("items");
+        JSONObject nested = root.optJSONObject("data");
+        if (nested != null) {
+            if (nested.optJSONArray("data") != null) return nested.optJSONArray("data");
+            if (nested.optJSONArray(primaryKey) != null) return nested.optJSONArray(primaryKey);
+            if (nested.optJSONArray("items") != null) return nested.optJSONArray("items");
+        }
+        return null;
+    }
+
 
     public ApiResponse getUserActivityLogs(int userId, int limit) {
         return getWithAuth("/activity/logs?user_id=" + userId + "&limit=" + limit);
