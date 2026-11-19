@@ -1700,139 +1700,316 @@ if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
     }
 
     private void showAutoLockDialog() {
-        if (isFinishing() || isDestroyed()) return;
-        if (!isActivityAlive()) return;
+    if (isFinishing() || isDestroyed()) return;
+    if (!isActivityAlive()) return;
 
-        if (justUnlockedWithBiometric) {
-            Log.d(TAG, "⏭️ Skipping showAutoLockDialog (just unlocked)");
-            justUnlockedWithBiometric = false;
+    if (justUnlockedWithBiometric) {
+        Log.d(TAG, "⏭️ Skipping showAutoLockDialog (just unlocked)");
+        justUnlockedWithBiometric = false;
+        return;
+    }
+
+    if (sessionManager != null && sessionManager.isBiometricAuthInProgress()) {
+        Log.d(TAG, "⏭️ Skipping showAutoLockDialog (biometric auth already in progress)");
+        return;
+    }
+
+    try {
+        BottomSheetDialog lockDialog = new BottomSheetDialog(
+                this, R.style.TransparentBottomSheetDialog);
+
+        int bgDark = android.graphics.Color.parseColor("#0A1224");
+        int cardDark = android.graphics.Color.parseColor("#121E38");
+        int gold = android.graphics.Color.parseColor("#D4AF37");
+        int cyan = android.graphics.Color.parseColor("#38BDF8");
+        int emerald = android.graphics.Color.parseColor("#10B981");
+        int red = android.graphics.Color.parseColor("#EF4444");
+        int slate = android.graphics.Color.parseColor("#94A3B8");
+
+        float d = getResources().getDisplayMetrics().density;
+        int p20 = Math.round(20 * d);
+        int p14 = Math.round(14 * d);
+        int p12 = Math.round(12 * d);
+
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        root.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        root.setPadding(p20, Math.round(24 * d), p20, Math.round(26 * d));
+
+        android.graphics.drawable.GradientDrawable rootBg = new android.graphics.drawable.GradientDrawable();
+        rootBg.setColor(bgDark);
+        float topR = Math.round(28 * d);
+        rootBg.setCornerRadii(new float[]{topR, topR, topR, topR, 0f, 0f, 0f, 0f});
+        rootBg.setStroke(Math.round(1.5f * d), android.graphics.Color.parseColor("#88D4AF37"));
+        root.setBackground(rootBg);
+
+        // أيقونة القفل الذهبية
+        android.widget.TextView tvLockIcon = new android.widget.TextView(this);
+        tvLockIcon.setText("🔒");
+        tvLockIcon.setTextSize(34f);
+        tvLockIcon.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams iconLp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(68 * d), Math.round(68 * d));
+        iconLp.bottomMargin = p12;
+        android.graphics.drawable.GradientDrawable iconBg = new android.graphics.drawable.GradientDrawable();
+        iconBg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        iconBg.setColor(android.graphics.Color.parseColor("#26D4AF37"));
+        tvLockIcon.setBackground(iconBg);
+        root.addView(tvLockIcon, iconLp);
+
+        // العنوان
+        android.widget.TextView tvLockTitle = new android.widget.TextView(this);
+        tvLockTitle.setText(isArabic ? "تم قفل الجلسة مؤقتاً" : "Session Temporarily Locked");
+        tvLockTitle.setTextColor(android.graphics.Color.WHITE);
+        tvLockTitle.setTextSize(19f);
+        tvLockTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvLockTitle.setGravity(android.view.Gravity.CENTER);
+        root.addView(tvLockTitle);
+
+        // الرسالة
+        android.widget.TextView tvLockMessage = new android.widget.TextView(this);
+        tvLockMessage.setText(isArabic
+                ? "لحماية بياناتك وحسابات المجوهرات، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط. يرجى التحقق من هويتك للمتابعة."
+                : "For your security, your session was locked after inactivity. Verify your identity to continue.");
+        tvLockMessage.setTextColor(slate);
+        tvLockMessage.setTextSize(13f);
+        tvLockMessage.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams msgLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        msgLp.topMargin = Math.round(8 * d);
+        msgLp.bottomMargin = p14;
+        root.addView(tvLockMessage, msgLp);
+
+        // بطاقة معلومات الجلسة وآخر نشاط
+        android.widget.LinearLayout infoCard = new android.widget.LinearLayout(this);
+        infoCard.setOrientation(android.widget.LinearLayout.VERTICAL);
+        infoCard.setPadding(p14, p12, p14, p12);
+        android.graphics.drawable.GradientDrawable infoBg = new android.graphics.drawable.GradientDrawable();
+        infoBg.setColor(cardDark);
+        infoBg.setCornerRadius(Math.round(14 * d));
+        infoBg.setStroke(Math.round(1 * d), android.graphics.Color.parseColor("#243658"));
+        infoCard.setBackground(infoBg);
+
+        if (sessionManager != null) {
+            String userLabel = sessionManager.getDisplayName();
+            if (userLabel == null || userLabel.trim().isEmpty()) {
+                userLabel = sessionManager.getUsername();
+            }
+            if (userLabel != null && !userLabel.trim().isEmpty()) {
+                android.widget.TextView tvUser = new android.widget.TextView(this);
+                tvUser.setText("👤 " + userLabel);
+                tvUser.setTextColor(android.graphics.Color.WHITE);
+                tvUser.setTextSize(13f);
+                tvUser.setTypeface(null, android.graphics.Typeface.BOLD);
+                infoCard.addView(tvUser);
+            }
+
+            String branchLabel = sessionManager.getBranchName();
+            if (branchLabel != null && !branchLabel.trim().isEmpty()) {
+                android.widget.TextView tvBranch = new android.widget.TextView(this);
+                tvBranch.setText("🏢 " + branchLabel);
+                tvBranch.setTextColor(emerald);
+                tvBranch.setTextSize(12.5f);
+                android.widget.LinearLayout.LayoutParams brLp = new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+                brLp.topMargin = Math.round(4 * d);
+                infoCard.addView(tvBranch, brLp);
+            }
+
+            long lastActive = sessionManager.getLastAppActiveTime();
+            if (lastActive > 0L) {
+                long mins = Math.max(0L, (System.currentTimeMillis() - lastActive) / 60_000L);
+                String activityStr = isArabic
+                        ? (mins < 1L ? "🕒 آخر نشاط: الآن" : "🕒 آخر نشاط: قبل " + mins + " دقيقة")
+                        : (mins < 1L ? "🕒 Last activity: Just now" : "🕒 Last activity: " + mins + " min ago");
+                android.widget.TextView tvAct = new android.widget.TextView(this);
+                tvAct.setText(activityStr);
+                tvAct.setTextColor(cyan);
+                tvAct.setTextSize(12f);
+                android.widget.LinearLayout.LayoutParams actLp = new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+                actLp.topMargin = Math.round(4 * d);
+                infoCard.addView(tvAct, actLp);
+            }
+        }
+
+        android.widget.LinearLayout.LayoutParams infoLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        infoLp.bottomMargin = Math.round(18 * d);
+        root.addView(infoCard, infoLp);
+
+        // زر فتح بالبصمة (ذهبي فاخر ومحمي ضد التكرار)
+        com.google.android.material.button.MaterialButton btnBiometricUnlock =
+                new com.google.android.material.button.MaterialButton(this);
+        btnBiometricUnlock.setText(isArabic ? "☝️ فتح بالبصمة" : "☝️ Unlock with Fingerprint");
+        btnBiometricUnlock.setTextColor(android.graphics.Color.parseColor("#060B17"));
+        btnBiometricUnlock.setBackgroundTintList(android.content.res.ColorStateList.valueOf(gold));
+        btnBiometricUnlock.setCornerRadius(Math.round(14 * d));
+        btnBiometricUnlock.setAllCaps(false);
+        btnBiometricUnlock.setTypeface(null, android.graphics.Typeface.BOLD);
+        android.widget.LinearLayout.LayoutParams bioLp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                Math.round(50 * d));
+        bioLp.bottomMargin = Math.round(8 * d);
+        root.addView(btnBiometricUnlock, bioLp);
+
+        // زر تسجيل الخروج
+        com.google.android.material.button.MaterialButton btnLogout =
+                new com.google.android.material.button.MaterialButton(
+                        this, null, com.google.android.material.R.attr.borderlessButtonStyle);
+        btnLogout.setText(isArabic ? "تسجيل الخروج" : "Logout");
+        btnLogout.setTextColor(red);
+        btnLogout.setAllCaps(false);
+        btnLogout.setTypeface(null, android.graphics.Typeface.BOLD);
+        root.addView(btnLogout);
+
+        lockDialog.setContentView(root);
+        lockDialog.setCancelable(false);
+        lockDialog.setCanceledOnTouchOutside(false);
+
+        btnBiometricUnlock.setOnClickListener(v -> {
+            if (sessionManager != null && sessionManager.isBiometricAuthInProgress()) {
+                return;
+            }
+            if (sessionManager != null) {
+                sessionManager.tryBeginBiometricAuth();
+            }
+            lockDialog.dismiss();
+            triggerBiometricUnlock();
+        });
+
+        btnLogout.setOnClickListener(v -> {
+            if (sessionManager != null) {
+                sessionManager.endBiometricAuth();
+            }
+            lockDialog.dismiss();
+            performFullLogout();
+        });
+
+        lockDialog.show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
+    }
+}
+
+    private void triggerBiometricUnlock() {
+    if (isFinishing() || isDestroyed() || !isActivityAlive()) return;
+
+    if (sessionManager != null && sessionManager.isBiometricAuthInProgress()) {
+        Log.d(TAG, "⏭️ Biometric prompt already active — skipping duplicate trigger");
+        return;
+    }
+
+    final long reqId = (sessionManager != null) ? sessionManager.tryBeginBiometricAuth() : 1L;
+    if (reqId <= 0L) {
+        return;
+    }
+
+    try {
+        androidx.biometric.BiometricManager bm = androidx.biometric.BiometricManager.from(this);
+        int canAuth = bm.canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG);
+
+        if (canAuth != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+            Log.w(TAG, "Biometric not available (" + canAuth + "), falling back to logout");
+            if (sessionManager != null) {
+                sessionManager.endBiometricAuth(reqId);
+            }
+            performFullLogout();
             return;
         }
 
-        try {
-            BottomSheetDialog lockDialog = new BottomSheetDialog(
-                    this, R.style.TransparentBottomSheetDialog);
+        java.util.concurrent.Executor executor = ContextCompat.getMainExecutor(this);
 
-            View view = getLayoutInflater().inflate(
-                    R.layout.dialog_session_locked, null);
-            lockDialog.setContentView(view);
+        androidx.biometric.BiometricPrompt prompt = new androidx.biometric.BiometricPrompt(
+                this,
+                executor,
+                new androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(
+                            @NonNull androidx.biometric.BiometricPrompt.AuthenticationResult result) {
+                        Log.d(TAG, "✅ Biometric unlock success");
+                        justUnlockedWithBiometric = true;
 
-            lockDialog.setCancelable(false);
-            lockDialog.setCanceledOnTouchOutside(false);
-
-            MaterialButton btnBiometricUnlock = view.findViewById(R.id.btnBiometricUnlock);
-            MaterialButton btnLogout = view.findViewById(R.id.btnLogout);
-            TextView tvLockTitle = view.findViewById(R.id.tvLockTitle);
-            TextView tvLockMessage = view.findViewById(R.id.tvLockMessage);
-
-            if (isArabic) {
-                tvLockTitle.setText("🔒 تم قفل الجلسة مؤقتاً");
-                tvLockMessage.setText(
-                        "لحماية بياناتك، تم قفل الجلسة تلقائياً بعد فترة من عدم النشاط.\n\n" +
-                                "يرجى التحقق من هويتك للمتابعة بأمان.");
-                btnBiometricUnlock.setText("فتح بالبصمة");
-                btnLogout.setText("تسجيل الخروج");
-            } else {
-                tvLockTitle.setText("🔒 Session Locked");
-                tvLockMessage.setText(
-                        "For your security, your session has been locked due to inactivity.\n\n" +
-                                "Please verify your identity to continue.");
-                btnBiometricUnlock.setText("Unlock with Fingerprint");
-                btnLogout.setText("Logout");
-            }
-
-            btnBiometricUnlock.setOnClickListener(v -> {
-                lockDialog.dismiss();
-                triggerBiometricUnlock();
-            });
-
-            btnLogout.setOnClickListener(v -> {
-                lockDialog.dismiss();
-                performFullLogout();
-            });
-
-            lockDialog.show();
-
-        } catch (Exception e) {
-            Log.e(TAG, "showAutoLockDialog error: " + e.getMessage(), e);
-        }
-    }
-
-    private void triggerBiometricUnlock() {
-        try {
-            BiometricManager bm = BiometricManager.from(this);
-            int canAuth = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
-
-            if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
-                Log.w(TAG, "Biometric not available, using password");
-                performFullLogout();
-                return;
-            }
-
-            Executor executor = ContextCompat.getMainExecutor(this);
-
-            BiometricPrompt prompt = new BiometricPrompt(this, executor,
-                    new BiometricPrompt.AuthenticationCallback() {
-                        @Override
-                        public void onAuthenticationSucceeded(
-                                @NonNull BiometricPrompt.AuthenticationResult result) {
-                            Log.d(TAG, "✅ Biometric unlock success");
-                            justUnlockedWithBiometric = true;
-                            sessionManager.unlockSession();
-                            Toast.makeText(UHFMainActivity.this,
-                                    isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-
-                        @Override
-                        public void onAuthenticationError(int code, @NonNull CharSequence msg) {
-                            Log.e(TAG, "Biometric error: " + code + " - " + msg);
-
-                            if (code == BiometricPrompt.ERROR_USER_CANCELED
-                                    || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                                    || code == BiometricPrompt.ERROR_CANCELED) {
-
-                                if (justUnlockedWithBiometric) {
-                                    Log.d(TAG, "⏭️ Skip reopening dialog (biometric already succeeded)");
-                                    return;
-                                }
-
-                                mainHandler.postDelayed(() -> {
-                                    if (isActivityAlive()) {
-                                        showAutoLockDialog();
-                                    }
-                                }, 300);
+                        if (sessionManager != null) {
+                            if (!sessionManager.hasValidToken() && sessionManager.hasOfflineSession()) {
+                                sessionManager.restoreBiometricSession();
                             }
+                            sessionManager.unlockSession();
+                            sessionManager.endBiometricAuth(reqId);
                         }
 
-                        @Override
-                        public void onAuthenticationFailed() {
-                            Log.w(TAG, "Biometric failed");
-                            Toast.makeText(UHFMainActivity.this,
-                                    isArabic ? "❌ لم يتم التعرف على البصمة" : "❌ Fingerprint not recognized",
-                                    Toast.LENGTH_SHORT).show();
+                        Toast.makeText(
+                                UHFMainActivity.this,
+                                isArabic ? "✅ تم فتح الجلسة" : "✅ Session unlocked",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int code, @NonNull CharSequence msg) {
+                        Log.e(TAG, "Biometric error: " + code + " - " + msg);
+                        if (sessionManager != null) {
+                            sessionManager.endBiometricAuth(reqId);
                         }
-                    });
 
-            BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-                    .setTitle(isArabic ? "التحقق من الهوية" : "Identity Verification")
-                    .setSubtitle(isArabic
-                            ? "استخدم بصمة الإصبع للمتابعة بأمان"
-                            : "Use fingerprint to continue securely")
-                    .setDescription(isArabic
-                            ? "بياناتك محمية بتشفير AES-256"
-                            : "Your data is protected with AES-256 encryption")
-                    .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
-                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                    .build();
+                        if (justUnlockedWithBiometric) {
+                            Log.d(TAG, "⏭️ Skip reopening dialog (biometric already succeeded)");
+                            return;
+                        }
 
-            prompt.authenticate(info);
+                        if (code == androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED
+                                || code == androidx.biometric.BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                                || code == androidx.biometric.BiometricPrompt.ERROR_CANCELED) {
 
-        } catch (Exception e) {
-            Log.e(TAG, "triggerBiometricUnlock error: " + e.getMessage(), e);
-            performFullLogout();
+                            mainHandler.postDelayed(() -> {
+                                if (isActivityAlive() && !justUnlockedWithBiometric
+                                        && (sessionManager == null || !sessionManager.isBiometricAuthInProgress())) {
+                                    showAutoLockDialog();
+                                }
+                            }, 350L);
+                        }
+                    }
+
+                    @Override
+                    public void onAuthenticationFailed() {
+                        Log.w(TAG, "Biometric failed attempt");
+                        Toast.makeText(
+                                UHFMainActivity.this,
+                                isArabic ? "❌ لم يتم التعرف على البصمة" : "❌ Fingerprint not recognized",
+                                Toast.LENGTH_SHORT
+                        ).show();
+                    }
+                });
+
+        androidx.biometric.BiometricPrompt.PromptInfo info =
+                new androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(isArabic ? "التحقق من الهوية" : "Identity Verification")
+                        .setSubtitle(isArabic
+                                ? "استخدم بصمة الإصبع للمتابعة بأمان"
+                                : "Use fingerprint to continue securely")
+                        .setDescription(isArabic
+                                ? "بياناتك محمية بتشفير AES-256"
+                                : "Your data is protected with AES-256 encryption")
+                        .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
+                        .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                        .build();
+
+        prompt.authenticate(info);
+
+    } catch (Exception e) {
+        Log.e(TAG, "triggerBiometricUnlock error: " + e.getMessage(), e);
+        if (sessionManager != null) {
+            sessionManager.endBiometricAuth(reqId);
         }
+        performFullLogout();
     }
+}
+
 
     private void performFullLogout() {
         try {
