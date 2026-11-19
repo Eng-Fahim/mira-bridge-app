@@ -402,7 +402,6 @@ class MiraSalesHistoryFragment : Fragment() {
         val filterSnapshot = currentFilterState
         val branchSnapshot = selectedBranchIdState
 
-        // تمرير كود الفلتر المتوافق مع السيرفر (أو جلب الكل عند الفلترة محلياً على الدفع بالذهب/المتعدد)
         val serverPaymentFilter = when (filterSnapshot) {
             "ALL", "TRADE_IN", "MIXED" -> "ALL"
             else -> filterSnapshot
@@ -750,6 +749,20 @@ class MiraSalesHistoryFragment : Fragment() {
     //  Open Receipt Navigation (Enriched JSON for MiraReceiptFragment)
     // ═══════════════════════════════════════════════════════════════════
 
+    private fun hasCompleteReceiptDetails(rawJson: String): Boolean {
+        return try {
+            val obj = JSONObject(rawJson)
+            val target = obj.optJSONObject("sale") ?: obj.optJSONObject("data") ?: obj
+            val items = target.optJSONArray("items")
+                ?: target.optJSONArray("sold_items")
+                ?: target.optJSONArray("products")
+                ?: target.optJSONArray("invoice_items")
+            items != null && items.length() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun buildEnrichedReceiptJson(sale: MiraSaleItem): String {
         return try {
             val obj = JSONObject(sale.rawJson)
@@ -771,15 +784,74 @@ class MiraSalesHistoryFragment : Fragment() {
         }
     }
 
+    private fun launchReceiptDialog(jsonPayload: String) {
+        if (!isAdded) return
+        val act = activity
+        if (act is UHFMainActivity) {
+            act.openReceiptFragment(jsonPayload)
+        } else {
+            MiraReceiptFragment.newInstance(jsonPayload)
+                .show(parentFragmentManager, "mira_receipt")
+        }
+    }
+
     private fun openReceipt(sale: MiraSaleItem) {
         try {
-            val enrichedJson = buildEnrichedReceiptJson(sale)
-            val act = activity
-            if (act is UHFMainActivity) {
-                act.openReceiptFragment(enrichedJson)
-            } else if (isAdded) {
-                MiraReceiptFragment.newInstance(enrichedJson)
-                    .show(parentFragmentManager, "mira_receipt")
+            val fallbackJson = buildEnrichedReceiptJson(sale)
+            if (hasCompleteReceiptDetails(fallbackJson)) {
+                launchReceiptDialog(fallbackJson)
+                return
+            }
+
+            // محاولة جلب تفاصيل الفاتورة الكاملة إذا كانت عناصر القائمة مختصرة
+            val client = apiClient
+            val numericId = sale.saleId.removePrefix("#").trim()
+            if (client != null && numericId.isNotEmpty() && !networkExecutor.isShutdown) {
+                val ctx = context
+                if (ctx != null) {
+                    Toast.makeText(
+                        ctx,
+                        if (isArabic) "⏳ جاري تحميل تفاصيل الفاتورة..." else "⏳ Loading invoice details...",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                networkExecutor.execute {
+                    var finalJson = fallbackJson
+                    try {
+                        val method = client.javaClass.methods.firstOrNull { m ->
+                            (m.name == "getSaleDetails" || m.name == "getSaleById" || m.name == "getInvoiceDetails") &&
+                                m.parameterTypes.size == 1
+                        }
+                        if (method != null) {
+                            val arg: Any = if (method.parameterTypes[0] == Int::class.java ||
+                                method.parameterTypes[0] == Integer::class.java
+                            ) {
+                                numericId.toIntOrNull() ?: numericId
+                            } else {
+                                numericId
+                            }
+                            val res = method.invoke(client, arg)
+                            if (res != null) {
+                                val resJsonStr = res.toString()
+                                val extracted = JSONObject(resJsonStr).optJSONObject("data")
+                                    ?: JSONObject(resJsonStr).optJSONObject("sale")
+                                if (extracted != null && extracted.length() > 0) {
+                                    finalJson = extracted.toString()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Optional sale details fetch fallback: ${e.message}")
+                    }
+
+                    mainHandler.post {
+                        if (isAdded) {
+                            launchReceiptDialog(finalJson)
+                        }
+                    }
+                }
+            } else {
+                launchReceiptDialog(fallbackJson)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening receipt", e)
@@ -819,7 +891,6 @@ class MiraSalesHistoryFragment : Fragment() {
             )
         }
 
-        // Instant local filter + Debounced server search (400ms)
         LaunchedEffect(searchQueryState) {
             if (isFirstSearchEffect) {
                 isFirstSearchEffect = false
@@ -832,7 +903,6 @@ class MiraSalesHistoryFragment : Fragment() {
             }
         }
 
-        // Infinite scroll trigger when reaching near bottom
         val shouldLoadMore by remember {
             derivedStateOf {
                 val layoutInfo = listState.layoutInfo
@@ -866,7 +936,6 @@ class MiraSalesHistoryFragment : Fragment() {
                         .fillMaxSize()
                         .statusBarsPadding()
                 ) {
-                    // 1. الشريط العلوي (Header + Branch Selector + Refresh)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1012,7 +1081,6 @@ class MiraSalesHistoryFragment : Fragment() {
                         }
                     }
 
-                    // 2. بطاقة ملخص الإيرادات والفواتير
                     if (canViewSalesState) {
                         SalesSummaryHeroCard(
                             isArabic = isAr,
@@ -1022,7 +1090,6 @@ class MiraSalesHistoryFragment : Fragment() {
                         )
                     }
 
-                    // 3. شريط البحث + فلاتر طرق الدفع
                     if (canViewSalesState) {
                         Column(
                             modifier = Modifier
@@ -1122,7 +1189,6 @@ class MiraSalesHistoryFragment : Fragment() {
                         }
                     }
 
-                    // 4. قائمة الفواتير أو حالة التحميل / الفراغ
                     Box(modifier = Modifier.weight(1f)) {
                         when {
                             !canViewSalesState -> {
