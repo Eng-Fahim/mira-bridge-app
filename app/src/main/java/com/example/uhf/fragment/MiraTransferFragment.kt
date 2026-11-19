@@ -562,33 +562,13 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     private fun extractJsonArray(response: MiraApiClient.ApiResponse?, primaryKey: String): JSONArray? {
-        if (response == null) return null
-        val dataObj = response.data
-        if (dataObj != null) {
-            dataObj.optJSONArray(primaryKey)?.let { return it }
-            dataObj.optJSONArray("data")?.let { return it }
-            dataObj.optJSONArray("items")?.let { return it }
-        }
-        val raw = response.rawJson?.trim() ?: ""
-        if (raw.startsWith("[")) {
-            return try {
-                JSONArray(raw)
-            } catch (_: Exception) {
-                null
-            }
-        }
-        if (raw.startsWith("{")) {
-            return try {
-                val root = JSONObject(raw)
-                root.optJSONArray(primaryKey)
-                    ?: root.optJSONArray("data")
-                    ?: root.optJSONArray("items")
-            } catch (_: Exception) {
-                null
-            }
-        }
-        return null
-    }
+    if (response == null) return null
+    val dataObj = response.data ?: return null
+    return dataObj.optJSONArray(primaryKey)
+        ?: dataObj.optJSONArray("data")
+        ?: dataObj.optJSONArray("items")
+}
+
 
     private fun parseTransferData(t: JSONObject?): TransferData? {
         if (t == null) return null
@@ -912,52 +892,27 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     private fun loadBranchesFromLocalManager(excludeBranchId: Int, isAr: Boolean): List<BranchOption> {
-        val result = ArrayList<BranchOption>()
-        val mgr = branchesManager ?: return result
-        try {
-            val rawList = mgr.branches ?: return result
-            for (item in rawList) {
-                if (item == null) continue
-                val cls = item.javaClass
-                val id = try {
-                    cls.getField("id").getInt(item)
-                } catch (_: Exception) {
-                    try {
-                        (cls.getMethod("getId").invoke(item) as? Number)?.toInt() ?: 0
-                    } catch (_: Exception) {
-                        0
-                    }
-                }
-                if (id == 0 || id == excludeBranchId) continue
-
-                val nameAr = try {
-                    (cls.getField("nameAr").get(item) as? String) ?: ""
-                } catch (_: Exception) {
-                    try {
-                        (cls.getMethod("getNameAr").invoke(item) as? String) ?: ""
-                    } catch (_: Exception) {
-                        ""
-                    }
-                }
-                val nameEn = try {
-                    (cls.getField("name").get(item) as? String) ?: ""
-                } catch (_: Exception) {
-                    try {
-                        (cls.getMethod("getName").invoke(item) as? String) ?: ""
-                    } catch (_: Exception) {
-                        ""
-                    }
-                }
-                val display = if (isAr) nameAr.ifEmpty { nameEn } else nameEn.ifEmpty { nameAr }
-                if (display.isNotEmpty()) {
-                    result.add(BranchOption(id, display))
-                }
+    val result = ArrayList<BranchOption>()
+    val client = apiClient ?: return result
+    try {
+        val resp = client.getBranches()
+        val arr = extractJsonArray(resp, "branches") ?: return result
+        for (i in 0 until arr.length()) {
+            val b = arr.optJSONObject(i) ?: continue
+            val id = b.optInt("id", b.optInt("branch_id", 0))
+            if (id == 0 || id == excludeBranchId) continue
+            val nameAr = b.optString("name_ar").ifEmpty { b.optString("branch_name_ar") }
+            val nameEn = b.optString("name").ifEmpty { b.optString("branch_name") }
+            val display = if (isAr) nameAr.ifEmpty { nameEn } else nameEn.ifEmpty { nameAr }
+            if (display.isNotEmpty()) {
+                result.add(BranchOption(id, display))
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Fallback branch read failed: ${e.message}")
         }
-        return result
+    } catch (_: Exception) {
     }
+    return result
+}
+
 
     // ═══════════════════════════════════════════════════════════════════
     //  Scan & Verify Items into Transfer (Handheld + Manual)
