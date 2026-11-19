@@ -3299,6 +3299,34 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return true;
     }
+    
+    /**
+ * جلب تنبيهات الفرع (المعلّقة والمحلولة)
+ */
+public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
+    String endpoint = "alerts?branch_id=" + branchId + "&include_resolved=" + (includeResolved ? 1 : 0);
+    // استبدل executeGet بالاسم الفعلي لدالة GET الداخلية في MiraApiClient لديك
+    return executeGet(endpoint);
+}
+
+/**
+ * حل تنبيه محدد أو حل جميع تنبيهات الفرع وتوثيق إجراء المعالجة
+ */
+public ApiResponse resolveAlert(int branchId, String alertId, String resolutionNote, boolean resolveAll) {
+    try {
+        JSONObject payload = new JSONObject();
+        payload.put("branch_id", branchId);
+        payload.put("alert_id", alertId != null ? alertId : "");
+        payload.put("resolution_note", resolutionNote != null ? resolutionNote : "");
+        payload.put("resolve_all", resolveAll);
+
+        // استبدل executePost بالاسم الفعلي لدالة POST الداخلية في MiraApiClient لديك
+        return executePost("alerts/resolve", payload);
+    } catch (Exception e) {
+        return new ApiResponse(false, null, e.getMessage());
+    }
+}
+
 
     // ==================== نماذج الاستجابة والخيوط ====================
     public static class ApiResponse {
