@@ -59,6 +59,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -191,11 +192,9 @@ class MiraDashboardFragment : Fragment() {
             loadOfflineData()
             refreshAllDashboardData(forceNetwork = true)
         } else {
-            val cache = activityCache
-            val cacheUserKey = if (isManagerState) 0 else currentUserId
-            if (cache != null && !cache.isValid(currentBranchId, cacheUserKey)) {
-                fetchRecentActivity()
-            }
+            // تحديث فوري لآخر العمليات والملخص والرسوم عند العودة من شاشة البيع أو الكسر
+            fetchRecentActivity()
+            fetchDashboardCharts(selectedChartDaysState)
         }
     }
 
@@ -379,7 +378,7 @@ class MiraDashboardFragment : Fragment() {
                     cachedActs.optJSONObject(i)?.let { cachedList.add(it) }
                 }
                 recentActivitiesState = cachedList
-                recomputeTodaySalesFromOperations(cachedList, forceOverride = !isManagerState)
+                recomputeTodaySalesFromOperations(cachedList, forceOverride = !isManagerState || todaySalesLocalState <= 0.0)
                 if (chartPointsState.isEmpty()) {
                     buildFallbackChartsFromOperations(cachedList, selectedChartDaysState)
                 }
@@ -487,7 +486,7 @@ class MiraDashboardFragment : Fragment() {
                     }
                 } else {
                     mainHandler.post {
-                        if (!isDestroyed && isAdded && chartPointsState.isEmpty()) {
+                        if (!isDestroyed && isAdded) {
                             buildFallbackChartsFromOperations(recentActivitiesState, days)
                         }
                     }
@@ -495,7 +494,7 @@ class MiraDashboardFragment : Fragment() {
             } catch (e: Exception) {
                 Log.w(TAG, "fetchDashboardCharts fallback to local ops: ${e.message}")
                 mainHandler.post {
-                    if (!isDestroyed && isAdded && chartPointsState.isEmpty()) {
+                    if (!isDestroyed && isAdded) {
                         buildFallbackChartsFromOperations(recentActivitiesState, days)
                     }
                 }
@@ -525,7 +524,7 @@ class MiraDashboardFragment : Fragment() {
             }
         }
 
-        if (parsedPoints.isNotEmpty()) {
+        if (parsedPoints.isNotEmpty() && parsedPoints.sumOf { it.salesAmount } > 0.0) {
             chartPointsState = parsedPoints
         } else {
             buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
@@ -561,6 +560,91 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
+    private fun parseOperationDate(op: JSONObject): Date? {
+        val raw = op.optString("created_at", "")
+            .ifBlank { op.optString("timestamp", "") }
+            .ifBlank { op.optString("date", "") }
+            .ifBlank { op.optString("sold_at", "") }
+            .trim()
+        if (raw.isEmpty() || raw == "null") return null
+
+        val patterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd",
+            "dd/MM/yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm",
+            "dd/MM/yyyy",
+            "dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy"
+        )
+        for (p in patterns) {
+            try {
+                val sdf = SimpleDateFormat(p, Locale.US).apply {
+                    isLenient = false
+                    if (p.endsWith("'Z'")) {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }
+                }
+                val parsed = sdf.parse(raw)
+                if (parsed != null) return parsed
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun isSaleOperation(op: JSONObject): Boolean {
+        val type = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
+        val invoiceNo = op.optString("invoice_number", op.optString("reference", "")).uppercase(Locale.US)
+        if (type.contains("refund") || type.contains("return") || type.contains("scrap") || type.contains("transfer")) {
+            return false
+        }
+        return type == "sale" || type == "pos_sale" || type == "invoice" ||
+            type.contains("sale") || invoiceNo.startsWith("INV")
+    }
+
+    private fun extractOperationAmountLocal(op: JSONObject): Double {
+        val candidates = listOf(
+            "final_amount", "total_local", "total_amount", "grand_total",
+            "net_amount", "paid_amount", "amount_local", "amount"
+        )
+        for (k in candidates) {
+            val v = op.optDouble(k, 0.0)
+            if (!v.isNaN() && v > 0.0) return v
+        }
+        return 0.0
+    }
+
+    private fun extractOperationAmountUsd(op: JSONObject): Double {
+        val candidates = listOf("final_amount_usd", "total_amount_usd", "total_usd", "amount_usd")
+        for (k in candidates) {
+            val v = op.optDouble(k, 0.0)
+            if (!v.isNaN() && v > 0.0) return v
+        }
+        return 0.0
+    }
+
+    private fun extractOperationWeight(op: JSONObject): Double {
+        val candidates = listOf("total_weight", "sold_weight", "weight_grams", "net_weight", "gross_weight", "weight")
+        for (k in candidates) {
+            val v = op.optDouble(k, 0.0)
+            if (!v.isNaN() && v > 0.0) return v
+        }
+        val items = op.optJSONArray("items") ?: op.optJSONArray("sold_items") ?: op.optJSONArray("lines")
+        var sum = 0.0
+        if (items != null) {
+            for (i in 0 until items.length()) {
+                val it = items.optJSONObject(i) ?: continue
+                sum += it.optDouble("weight", it.optDouble("gross_weight_grams", it.optDouble("net_weight", 0.0)))
+            }
+        }
+        return sum
+    }
+
     private fun buildFallbackChartsFromOperations(ops: List<JSONObject>, days: Int) {
         val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val sdfLabel = SimpleDateFormat("MM/dd", Locale.US)
@@ -579,6 +663,7 @@ class MiraDashboardFragment : Fragment() {
             cal.add(Calendar.DAY_OF_YEAR, 1)
         }
 
+        val todayKey = sdfKey.format(Date())
         val karatWeights = mutableMapOf("24K" to 0.0, "21K" to 0.0, "18K" to 0.0)
         var salesCnt = 0
         var scrapCnt = 0
@@ -586,22 +671,23 @@ class MiraDashboardFragment : Fragment() {
         var invCnt = 0
 
         for (op in ops) {
-            val type = op.optString("type", "").lowercase(Locale.ROOT)
-            val ts = op.optString("created_at", op.optString("timestamp", ""))
-            val dayKey = if (ts.length >= 10) ts.substring(0, 10) else ""
+            val type = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
+            val parsedDate = parseOperationDate(op)
+            val dayKey = if (parsedDate != null) sdfKey.format(parsedDate) else todayKey
+
             if (buckets.containsKey(dayKey)) {
                 buckets[dayKey]?.add(op)
             }
 
             when {
-                type.contains("sale") -> salesCnt++
+                isSaleOperation(op) -> salesCnt++
                 type.contains("scrap") -> scrapCnt++
                 type.contains("transfer") -> transferCnt++
                 type.contains("inv") || type.contains("scan") -> invCnt++
             }
 
             val k = op.optString("karat", op.optString("gold_karat", "")).uppercase(Locale.US)
-            val w = op.optDouble("total_weight", op.optDouble("weight", 0.0))
+            val w = extractOperationWeight(op)
             if (w > 0.0) {
                 when {
                     k.contains("24") -> karatWeights["24K"] = (karatWeights["24K"] ?: 0.0) + w
@@ -619,17 +705,17 @@ class MiraDashboardFragment : Fragment() {
             var sWeight = 0.0
 
             for (op in dayOps) {
-                val t = op.optString("type", "").lowercase(Locale.ROOT)
-                val amt = op.optDouble("final_amount", op.optDouble("total_amount", 0.0))
-                val w = op.optDouble("total_weight", op.optDouble("weight", 0.0))
+                val t = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
+                val amt = extractOperationAmountLocal(op)
+                val w = extractOperationWeight(op)
                 when {
-                    t == "sale" -> {
+                    isSaleOperation(op) -> {
                         sAmt += amt
                         sCount++
                         sWeight += w
                     }
                     t.contains("scrap") -> scAmt += amt
-                    t.contains("refund") -> rfAmt += amt
+                    t.contains("refund") || t.contains("return") -> rfAmt += amt
                 }
             }
             ChartPeriodPoint(
@@ -681,7 +767,7 @@ class MiraDashboardFragment : Fragment() {
                     usernameSnapshot,
                     managerSnapshot,
                     1,
-                    25,
+                    30,
                     null,
                     "all"
                 )
@@ -699,11 +785,9 @@ class MiraDashboardFragment : Fragment() {
                                 recentActivitiesState = itemsList
                                 recomputeTodaySalesFromOperations(
                                     itemsList,
-                                    forceOverride = !managerSnapshot
+                                    forceOverride = !managerSnapshot || todaySalesLocalState <= 0.0
                                 )
-                                if (chartPointsState.isEmpty()) {
-                                    buildFallbackChartsFromOperations(itemsList, selectedChartDaysState)
-                                }
+                                buildFallbackChartsFromOperations(itemsList, selectedChartDaysState)
                             }
                         }
                     }
@@ -742,8 +826,9 @@ class MiraDashboardFragment : Fragment() {
             if (sWeight > 0.0) todaySoldWeightState = sWeight
         } else {
             val mySalesObj = data.optJSONObject("my_today_sales") ?: data.optJSONObject("user_sales")
-            if (mySalesObj != null) {
-                todaySalesLocalState = mySalesObj.optDouble("total_local", 0.0)
+            val mLocal = mySalesObj?.optDouble("total_local", 0.0) ?: 0.0
+            if (mySalesObj != null && mLocal > 0.0) {
+                todaySalesLocalState = mLocal
                 todaySalesUsdState = mySalesObj.optDouble("total_usd", 0.0)
                 todayInvoicesCountState = mySalesObj.optInt("count", 0)
                 todaySoldWeightState = mySalesObj.optDouble("weight", 0.0)
@@ -935,34 +1020,27 @@ class MiraDashboardFragment : Fragment() {
     }
 
     private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
-        if (!forceOverride && todayInvoicesCountState > 0 && todaySoldWeightState > 0.0) return
-        val todayPrefix = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        if (!forceOverride && todayInvoicesCountState > 0 && todaySalesLocalState > 0.0) return
+        val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val todayKey = sdfKey.format(Date())
+
         var count = 0
         var sumLocal = 0.0
         var sumUsd = 0.0
         var sumWeight = 0.0
 
         for (op in ops) {
-            val type = op.optString("type", "")
-            val ts = op.optString("created_at", op.optString("timestamp", ""))
-            if (type == "sale" && ts.startsWith(todayPrefix)) {
+            if (!isSaleOperation(op)) continue
+            val parsedDate = parseOperationDate(op)
+            val opDayKey = if (parsedDate != null) sdfKey.format(parsedDate) else ""
+            if (opDayKey == todayKey) {
                 count++
-                sumLocal += op.optDouble("final_amount", op.optDouble("total_amount", 0.0))
-                sumUsd += op.optDouble("final_amount_usd", op.optDouble("total_amount_usd", 0.0))
-
-                var opWeight = op.optDouble("total_weight", op.optDouble("weight", 0.0))
-                if (opWeight <= 0.0) {
-                    val items = op.optJSONArray("items") ?: op.optJSONArray("sold_items")
-                    if (items != null) {
-                        for (i in 0 until items.length()) {
-                            val it = items.optJSONObject(i) ?: continue
-                            opWeight += it.optDouble("weight", it.optDouble("gross_weight_grams", 0.0))
-                        }
-                    }
-                }
-                sumWeight += opWeight
+                sumLocal += extractOperationAmountLocal(op)
+                sumUsd += extractOperationAmountUsd(op)
+                sumWeight += extractOperationWeight(op)
             }
         }
+
         if (forceOverride || count > 0) {
             if (count > 0 || forceOverride) todayInvoicesCountState = count
             if (sumLocal > 0.0 || forceOverride) todaySalesLocalState = sumLocal
@@ -1111,6 +1189,16 @@ class MiraDashboardFragment : Fragment() {
         val colors = MiraTheme.colors
         val scrollState = rememberScrollState()
         val isAr = isArabic
+
+        LaunchedEffect(recentActivitiesState, isManagerState, selectedChartDaysState) {
+            if (recentActivitiesState.isNotEmpty()) {
+                recomputeTodaySalesFromOperations(
+                    recentActivitiesState,
+                    forceOverride = !isManagerState || todaySalesLocalState <= 0.0
+                )
+                buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
+            }
+        }
 
         val quickActions = remember(isAr) {
             listOf(
@@ -1288,7 +1376,6 @@ class MiraDashboardFragment : Fragment() {
                         isManager = isManagerState
                     )
 
-                    // الرسوم البيانية المخصصة حسب الصلاحية
                     if (isManagerState) {
                         ManagerAnalyticsChartsSection(
                             isArabic = isAr,
