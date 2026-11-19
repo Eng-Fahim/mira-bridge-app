@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,7 +47,6 @@ import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
 import com.example.uhf.manager.MiraBranchesManager
-import com.example.uhf.manager.PermissionManager
 import com.example.uhf.tools.RecentActivityCache
 import com.example.uhf.tools.SecureSessionManager
 import com.example.uhf.ui.dashboard.*
@@ -87,7 +88,6 @@ class MiraDashboardFragment : Fragment() {
     private var apiClient: MiraApiClient? = null
     private var sessionManager: SecureSessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
-    private var permissionManager: PermissionManager? = null
     private var activityCache: RecentActivityCache? = null
 
     // حالات واجهة المستخدم التفاعلية
@@ -167,7 +167,6 @@ class MiraDashboardFragment : Fragment() {
         apiClient = MiraApiClient.getInstance(ctx)
         sessionManager = SecureSessionManager.getInstance(ctx)
         branchesManager = MiraBranchesManager.getInstance(ctx)
-        permissionManager = PermissionManager.getInstance(ctx)
         activityCache = RecentActivityCache(ctx)
 
         initSessionAndBranchState()
@@ -184,7 +183,6 @@ class MiraDashboardFragment : Fragment() {
         val latestBranch = resolveActiveBranchId()
         val latestUser = readIntProp(sessionManager, "userId", "id")
 
-        // إعادة احتساب التنبيهات المتبقية بعد العودة من شاشة حل التنبيهات
         recalculateUnresolvedAlertsBadge()
 
         if (latestBranch != currentBranchId || latestUser != currentUserId) {
@@ -255,10 +253,6 @@ class MiraDashboardFragment : Fragment() {
     }
 
     private fun resolveIsManagerOrAdmin(sm: SecureSessionManager?, roleRaw: String): Boolean {
-        val pm = permissionManager
-        if (pm != null && (pm.isSystemAdmin || pm.isOrgAdmin || pm.isAdmin || pm.isManager || pm.isFinanceManager || pm.isAccountant)) {
-            return true
-        }
         val managerKeywords = setOf(
             "admin", "super_admin", "superadmin", "owner", "manager",
             "branch_manager", "general_manager", "supervisor", "director",
@@ -414,16 +408,16 @@ class MiraDashboardFragment : Fragment() {
             try {
                 val client = apiClient
                 val summaryResp = client?.getDashboardSummarySmart(branchSnapshot)
-                if (summaryResp != null && summaryResp.isSuccess && summaryResp.data != null) {
-                    val dataJson = summaryResp.data!!
+                val summaryData: JSONObject? = summaryResp?.data
+                if (summaryResp != null && summaryResp.isSuccess && summaryData != null) {
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
                         ?.edit()
-                        ?.putString(summaryCacheKey(branchSnapshot), dataJson.toString())
+                        ?.putString(summaryCacheKey(branchSnapshot), summaryData.toString())
                         ?.apply()
 
                     mainHandler.post {
                         if (!isDestroyed && isAdded && currentBranchId == branchSnapshot) {
-                            applyDashboardSummaryJson(dataJson)
+                            applyDashboardSummaryJson(summaryData)
                             if (!managerSnapshot && currentUserId == userSnapshot) {
                                 recomputeTodaySalesFromOperations(recentActivitiesState, forceOverride = true)
                             }
@@ -431,21 +425,20 @@ class MiraDashboardFragment : Fragment() {
                     }
                 }
 
-                // جلب أسعار الذهب مع fallback تلقائي إذا فشل المسار الأول
                 val pricesResp = client?.getGoldPricesSmart(branchSnapshot)
                     ?: invokeApiMethod("getCurrentGoldRates")
                     ?: invokeApiMethod("getGoldRates")
+                val pricesData: JSONObject? = pricesResp?.data
 
-                if (pricesResp != null && pricesResp.isSuccess && pricesResp.data != null) {
-                    val pJson = pricesResp.data!!
+                if (pricesResp != null && pricesResp.isSuccess && pricesData != null) {
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
                         ?.edit()
-                        ?.putString("gold_prices_json", pJson.toString())
+                        ?.putString("gold_prices_json", pricesData.toString())
                         ?.apply()
 
                     mainHandler.post {
                         if (!isDestroyed && isAdded) {
-                            applyGoldPricesJson(pJson)
+                            applyGoldPricesJson(pricesData)
                         }
                     }
                 }
@@ -462,12 +455,8 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    /**
-     * جلب بيانات الرسوم البيانية (للبائع: سجل إنجازه | للمدراء: التحليلات المتعددة)
-     */
     private fun fetchDashboardCharts(days: Int) {
-        val client = apiClient ?: return
-        if (!isAdded || isDestroyed || !isSessionValid() || !ensureExecutor()) return
+        if (apiClient == null || !isAdded || isDestroyed || !isSessionValid() || !ensureExecutor()) return
 
         val branchSnapshot = currentBranchId
         val managerSnapshot = isManagerState
@@ -484,16 +473,16 @@ class MiraDashboardFragment : Fragment() {
                     ?: invokeApiMethod("getDashboardCharts", branchSnapshot, days)
                     ?: invokeApiMethod("getAccounting", "reports/sales/daily?branch_id=$branchSnapshot&days=$days")
 
-                if (resp != null && resp.isSuccess && resp.data != null) {
-                    val json = resp.data!!
+                val chartJson: JSONObject? = resp?.data
+                if (resp != null && resp.isSuccess && chartJson != null) {
                     context?.getSharedPreferences(DASHBOARD_CACHE_PREFS, Context.MODE_PRIVATE)
                         ?.edit()
-                        ?.putString("charts_b${branchSnapshot}_d$days", json.toString())
+                        ?.putString("charts_b${branchSnapshot}_d$days", chartJson.toString())
                         ?.apply()
 
                     mainHandler.post {
                         if (!isDestroyed && isAdded && currentBranchId == branchSnapshot) {
-                            applyChartsJson(json)
+                            applyChartsJson(chartJson)
                         }
                     }
                 } else {
@@ -517,7 +506,6 @@ class MiraDashboardFragment : Fragment() {
     private fun applyChartsJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
 
-        // 1. استخراج السلسلة الزمنية (للبائع والمدير)
         val seriesArr = data.optJSONArray("series")
             ?: data.optJSONArray("daily")
             ?: data.optJSONArray("chart_data")
@@ -543,11 +531,9 @@ class MiraDashboardFragment : Fragment() {
             buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
         }
 
-        // هدف البائع إن وُجد
         val target = data.optDouble("staff_target", data.optDouble("target_amount", 0.0))
         if (target > 0.0) staffTargetAmountState = target
 
-        // 2. توزيع العيارات (للمدراء)
         val karatArr = data.optJSONArray("by_karat") ?: data.optJSONArray("karat_distribution")
         if (karatArr != null && karatArr.length() > 0) {
             val karats = mutableListOf<KaratDistributionItem>()
@@ -564,7 +550,6 @@ class MiraDashboardFragment : Fragment() {
             if (karats.isNotEmpty()) karatDistributionState = karats
         }
 
-        // 3. ملخص حركة العمليات (للمدراء)
         val opsObj = data.optJSONObject("operations_summary") ?: data.optJSONObject("counts")
         if (opsObj != null) {
             operationsBreakdownState = listOf(
@@ -576,9 +561,6 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    /**
-     * بناء الرسم البياني تلقائياً من العمليات المحملة إذا لم تتوفر سلسلة زمنية من السيرفر
-     */
     private fun buildFallbackChartsFromOperations(ops: List<JSONObject>, days: Int) {
         val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val sdfLabel = SimpleDateFormat("MM/dd", Locale.US)
@@ -703,8 +685,9 @@ class MiraDashboardFragment : Fragment() {
                     null,
                     "all"
                 )
-                if (response != null && response.isSuccess && response.data != null) {
-                    val activities = extractActivitiesArray(response.data)
+                val respData: JSONObject? = response?.data
+                if (response != null && response.isSuccess && respData != null) {
+                    val activities = extractActivitiesArray(respData)
                     if (activities != null) {
                         activityCache?.save(branchId, cacheUserKey, activities)
                         val itemsList = mutableListOf<JSONObject>()
@@ -769,7 +752,6 @@ class MiraDashboardFragment : Fragment() {
             }
         }
 
-        // الخزينة والمخزون
         val vaultObj = data.optJSONObject("vault") ?: data.optJSONObject("inventory") ?: data
         val pieces = vaultObj.optInt(
             "total_pieces",
@@ -787,7 +769,6 @@ class MiraDashboardFragment : Fragment() {
         if (weight > 0.0) totalVaultWeightState = weight
         if (pure24 > 0.0) pure24kWeightState = pure24
 
-        // التنبيهات (للمدراء مع استبعاد ما تم حلّه في شاشة التنبيهات)
         if (isManagerState) {
             val alertsObj = data.optJSONObject("alerts")
             val itemsArr = alertsObj?.optJSONArray("items") ?: data.optJSONArray("alerts_list")
@@ -815,9 +796,6 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    /**
-     * قراءة وتحويل أسعار الذهب بدقة عالية من جميع صيغ استجابات السيرفر
-     */
     private fun applyGoldPricesJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
         val prices = data.optJSONObject("gold_prices")
@@ -861,7 +839,6 @@ class MiraDashboardFragment : Fragment() {
             "price_24k_usd", "karat_24_usd", "24k_usd", "24K_usd", "usd_24k"
         )
 
-        // دعم استجابة السيرفر عندما تكون rates مصفوفة JSONArray
         val ratesArr = prices.optJSONArray("rates") ?: data.optJSONArray("rates")
         if (ratesArr != null) {
             for (i in 0 until ratesArr.length()) {
@@ -883,7 +860,6 @@ class MiraDashboardFragment : Fragment() {
             }
         }
 
-        // تصحيح ذكي: إذا أرجع السيرفر سعر الدولار في karat_24 بينما العملة المحلية YER وسعر الصرف > 10
         if (curr != "USD" && exchangeRateState > 10.0 && p24Local > 0.0 && p24Local < 500.0) {
             if (p24Usd <= 0.0) p24Usd = p24Local
             p24Local *= exchangeRateState
@@ -891,7 +867,6 @@ class MiraDashboardFragment : Fragment() {
             if (p18Local in 1.0..500.0) p18Local *= exchangeRateState
         }
 
-        // اشتقاق عيار 21 و 18 تلقائياً من عيار 24 إذا كان عيار 24 متوفراً والبقية صفر
         if (p24Local > 0.0) {
             if (p21Local <= 0.0) p21Local = p24Local * (21.0 / 24.0)
             if (p18Local <= 0.0) p18Local = p24Local * (18.0 / 24.0)
@@ -1102,6 +1077,18 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
+    private fun createFragmentByClassName(vararg classNames: String, fallback: () -> Fragment): Fragment {
+        for (name in classNames) {
+            try {
+                val clazz = Class.forName(name)
+                val instance = clazz.getDeclaredConstructor().newInstance()
+                if (instance is Fragment) return instance
+            } catch (_: Exception) {
+            }
+        }
+        return fallback()
+    }
+
     private fun handleQuickAction(action: QuickActionItem) {
         if (action.tag == "sync_rates") {
             refreshAllDashboardData(forceNetwork = true)
@@ -1125,98 +1112,73 @@ class MiraDashboardFragment : Fragment() {
         val scrollState = rememberScrollState()
         val isAr = isArabic
 
-        // أزرار الإجراءات السريعة المضبوطة لوجهاتها الصحيحة حسب الصلاحيات
-        val quickActions = remember(isAr, isManagerState) {
-            val pm = permissionManager
-            val list = mutableListOf<QuickActionItem>()
-
-            if (pm == null || pm.canUsePos() || isManagerState) {
-                list.add(
-                    QuickActionItem(
-                        tag = "POS",
-                        titleAr = "نقطة البيع",
-                        titleEn = "POS Sale",
-                        icon = Icons.Rounded.PointOfSale,
-                        accentColor = Color(0xFF10B981),
-                        fragmentProvider = { MiraPosFragment() }
-                    )
-                )
-                list.add(
-                    QuickActionItem(
-                        tag = "SalesHistory",
-                        titleAr = "سجل المبيعات",
-                        titleEn = "Invoices",
-                        icon = Icons.Rounded.ReceiptLong,
-                        accentColor = Color(0xFFD4AF37),
-                        fragmentProvider = { MiraSalesHistoryFragment() }
-                    )
-                )
-            }
-
-            // زر الجرد الرئيسي يذهب إلى داشبورد الجرد (MiraInventoryFragment) كما كان سابقاً
-            if (pm == null || pm.canViewInventory() || isManagerState) {
-                list.add(
-                    QuickActionItem(
-                        tag = "MiraInventory",
-                        titleAr = "لوحة الجرد",
-                        titleEn = "Inventory Hub",
-                        icon = Icons.Rounded.Inventory2,
-                        accentColor = Color(0xFF06B6D4),
-                        fragmentProvider = { MiraInventoryFragment() }
-                    )
-                )
-                list.add(
-                    QuickActionItem(
-                        tag = "Scan",
-                        titleAr = "جرد فوري",
-                        titleEn = "Quick Scan",
-                        icon = Icons.Rounded.QrCodeScanner,
-                        accentColor = Color(0xFF38BDF8),
-                        fragmentProvider = { MiraInventoryProFragment() }
-                    )
-                )
-            }
-
-            if (pm == null || pm.canViewTransfers() || isManagerState) {
-                list.add(
-                    QuickActionItem(
-                        tag = "Transfers",
-                        titleAr = "التحويلات",
-                        titleEn = "Transfers",
-                        icon = Icons.Rounded.SwapHoriz,
-                        accentColor = Color(0xFFA855F7),
-                        fragmentProvider = { MiraTransferFragment() }
-                    )
-                )
-            }
-
-            if (pm == null || pm.canUsePos() || pm.canViewInventory() || isManagerState) {
-                list.add(
-                    QuickActionItem(
-                        tag = "ScrapGoldBuy",
-                        titleAr = "شراء كسر",
-                        titleEn = "Scrap Gold",
-                        icon = Icons.Rounded.Scale,
-                        accentColor = Color(0xFFF59E0B),
-                        fragmentProvider = { MiraScrapGoldBuyFragment() }
-                    )
-                )
-            }
-
-            if (pm == null || pm.canViewInventory() || isManagerState) {
-                list.add(
-                    QuickActionItem(
-                        tag = "IdentityStudio",
-                        titleAr = "تشفير RFID",
-                        titleEn = "Encode Tag",
-                        icon = Icons.Rounded.Contactless,
-                        accentColor = Color(0xFF3B82F6),
-                        fragmentProvider = { MiraIdentityStudioFragment() }
-                    )
-                )
-            }
-
-            list.add(
+        val quickActions = remember(isAr) {
+            listOf(
+                QuickActionItem(
+                    tag = "Sales",
+                    titleAr = "نقطة البيع",
+                    titleEn = "POS Sale",
+                    icon = Icons.Rounded.PointOfSale,
+                    accentColor = Color(0xFF10B981),
+                    fragmentProvider = { MiraPosFragment() }
+                ),
+                QuickActionItem(
+                    tag = "SalesHistory",
+                    titleAr = "سجل المبيعات",
+                    titleEn = "Invoices",
+                    icon = Icons.AutoMirrored.Rounded.ReceiptLong,
+                    accentColor = Color(0xFFD4AF37),
+                    fragmentProvider = { MiraSalesHistoryFragment() }
+                ),
+                QuickActionItem(
+                    tag = "InventoryDashboard",
+                    titleAr = "لوحة الجرد",
+                    titleEn = "Inventory Hub",
+                    icon = Icons.Rounded.Inventory2,
+                    accentColor = Color(0xFF06B6D4),
+                    fragmentProvider = { MiraInventoryDashboardFragment() }
+                ),
+                QuickActionItem(
+                    tag = "Scan",
+                    titleAr = "جرد فوري",
+                    titleEn = "Quick Scan",
+                    icon = Icons.Rounded.QrCodeScanner,
+                    accentColor = Color(0xFF38BDF8),
+                    fragmentProvider = { MiraInventoryProFragment() }
+                ),
+                QuickActionItem(
+                    tag = "Transfers",
+                    titleAr = "التحويلات",
+                    titleEn = "Transfers",
+                    icon = Icons.Rounded.SwapHoriz,
+                    accentColor = Color(0xFFA855F7),
+                    fragmentProvider = { MiraTransferFragment() }
+                ),
+                QuickActionItem(
+                    tag = "Scrap",
+                    titleAr = "شراء كسر",
+                    titleEn = "Scrap Gold",
+                    icon = Icons.Rounded.Scale,
+                    accentColor = Color(0xFFF59E0B),
+                    fragmentProvider = {
+                        createFragmentByClassName(
+                            "com.example.uhf.fragment.MiraScrapGoldBuyFragment",
+                            "com.example.uhf.fragment.MiraScrapFragment"
+                        ) {
+                            MiraPosFragment().apply {
+                                arguments = Bundle().apply { putBoolean("open_scrap_mode", true) }
+                            }
+                        }
+                    }
+                ),
+                QuickActionItem(
+                    tag = "Encode",
+                    titleAr = "تشفير RFID",
+                    titleEn = "Encode Tag",
+                    icon = Icons.Rounded.Contactless,
+                    accentColor = Color(0xFF3B82F6),
+                    fragmentProvider = { MiraIdentityStudioFragment() }
+                ),
                 QuickActionItem(
                     tag = "AllActivities",
                     titleAr = "كل العمليات",
@@ -1224,10 +1186,7 @@ class MiraDashboardFragment : Fragment() {
                     icon = Icons.Rounded.History,
                     accentColor = Color(0xFFEC4899),
                     fragmentProvider = { MiraAllActivitiesFragment() }
-                )
-            )
-
-            list.add(
+                ),
                 QuickActionItem(
                     tag = "sync_rates",
                     titleAr = "تحديث فوري",
@@ -1237,7 +1196,6 @@ class MiraDashboardFragment : Fragment() {
                     fragmentProvider = { MiraDashboardFragment() }
                 )
             )
-            list
         }
 
         Surface(
@@ -1314,7 +1272,6 @@ class MiraDashboardFragment : Fragment() {
                         }
                     }
 
-                    // شريط التنبيهات: يفتح شاشة مركز التنبيهات وحلّها MiraAlertsCenterFragment
                     if (alertsCountState > 0) {
                         AlertsBannerCard(
                             isArabic = isAr,
@@ -1331,7 +1288,7 @@ class MiraDashboardFragment : Fragment() {
                         isManager = isManagerState
                     )
 
-                    // ═══ الرسوم البيانية المخصصة حسب الصلاحية ═══
+                    // الرسوم البيانية المخصصة حسب الصلاحية
                     if (isManagerState) {
                         ManagerAnalyticsChartsSection(
                             isArabic = isAr,
@@ -1455,7 +1412,7 @@ class MiraDashboardFragment : Fragment() {
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.TrendingUp,
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                             contentDescription = null,
                             tint = colors.goldPrimary,
                             modifier = Modifier.size(18.dp)
