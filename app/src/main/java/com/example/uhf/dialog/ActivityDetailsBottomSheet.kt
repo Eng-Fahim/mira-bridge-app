@@ -156,20 +156,19 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
         var activityState by remember(baseActivity) { mutableStateOf(baseActivity) }
         var isHydratingDetails by remember { mutableStateOf(false) }
 
-        val saleNoForFetch = remember(baseActivity) {
+        val saleNoForFetch: String = remember(baseActivity) {
             baseActivity.optString(
                 "sale_number",
                 baseActivity.optString("invoice_number", baseActivity.optString("sale_id", ""))
             ).trim()
         }
 
-        // جلب الأصناف وتفاصيل الفاتورة الكاملة من السيرفر إذا لم تكن مرفقة في ملخص القائمة
         LaunchedEffect(saleNoForFetch) {
             val existingItems = activityState.optJSONArray("items")
                 ?: activityState.optJSONArray("sold_items")
             if (saleNoForFetch.isNotEmpty() && (existingItems == null || existingItems.length() == 0)) {
                 isHydratingDetails = true
-                val enriched = withContext(Dispatchers.IO) {
+                val enriched: JSONObject? = withContext(Dispatchers.IO) {
                     try {
                         val resp = MiraApiClient.getInstance(context).getSaleDetails(saleNoForFetch)
                         if (resp != null && resp.isSuccess && resp.data != null) {
@@ -193,12 +192,12 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
         }
 
         val activity = activityState
-        val actionKey = remember(activity) {
+        val actionKey: String = remember(activity) {
             activity.optString("action", "")
                 .ifBlank { activity.optString("type", "") }
                 .uppercase(Locale.US)
         }
-        val normalizedType = remember(actionKey, activity) {
+        val normalizedType: String = remember(actionKey, activity, saleNoForFetch) {
             resolveNormalizedType(actionKey, activity.optString("type", ""), saleNoForFetch)
         }
 
@@ -207,40 +206,41 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
         val isFullyRefunded = statusRaw == "refunded" || statusRaw == "fully_refunded"
         val isPartiallyRefunded = statusRaw == "partially_refunded"
 
-        val (statusText, statusColor) = when {
-            isFullyRefunded -> (if (isArabic) "مرتجع كلي" else "Fully Refunded") to Color(0xFFEF4444)
-            isPartiallyRefunded -> (if (isArabic) "مرتجع جزئي" else "Partially Refunded") to Color(0xFFF59E0B)
-            normalizedType in setOf("sale", "refund") -> (if (isArabic) "فاتورة مكتملة" else "Completed") to Color(0xFF10B981)
-            else -> (if (isArabic) "مكتمل" else "Completed") to Color(0xFF10B981)
+        val statusPair: Pair<String, Color> = when {
+            isFullyRefunded -> Pair(if (isArabic) "مرتجع كلي" else "Fully Refunded", Color(0xFFEF4444))
+            isPartiallyRefunded -> Pair(if (isArabic) "مرتجع جزئي" else "Partially Refunded", Color(0xFFF59E0B))
+            normalizedType == "sale" || normalizedType == "refund" ->
+                Pair(if (isArabic) "فاتورة مكتملة" else "Completed", Color(0xFF10B981))
+            else -> Pair(if (isArabic) "مكتمل" else "Completed", Color(0xFF10B981))
         }
+        val statusText = statusPair.first
+        val statusColor = statusPair.second
 
-        val title = remember(activity, saleNoForFetch, isArabic) {
-            when {
-                saleNoForFetch.isNotEmpty() ->
-                    if (isArabic) "فاتورة مبيعات #$saleNoForFetch" else "Sales Invoice #$saleNoForFetch"
-                else -> {
-                    val raw = if (isArabic) activity.optString("title_ar", activity.optString("title", ""))
-                    else activity.optString("title_en", activity.optString("title", ""))
-                    raw.ifBlank { if (isArabic) "تفاصيل العملية" else "Operation Details" }
-                }
+        val title: String = remember(activity, saleNoForFetch, isArabic) {
+            if (saleNoForFetch.isNotEmpty()) {
+                if (isArabic) "فاتورة مبيعات #$saleNoForFetch" else "Sales Invoice #$saleNoForFetch"
+            } else {
+                val raw = if (isArabic) activity.optString("title_ar", activity.optString("title", ""))
+                else activity.optString("title_en", activity.optString("title", ""))
+                raw.ifBlank { if (isArabic) "تفاصيل العملية" else "Operation Details" }
             }
         }
 
-        val formattedTime = remember(activity) {
+        val formattedTime: String = remember(activity, isArabic) {
             val ts = activity.optString("created_at", activity.optString("timestamp", ""))
             formatFullTime(ts, isArabic)
         }
 
-        val detailRows = remember(activity, isArabic, normalizedType) {
+        val detailRows: List<DetailEntry> = remember(activity, isArabic, normalizedType) {
             buildDetailRows(activity, normalizedType, isArabic)
         }
-        val paymentLegs = remember(activity, isArabic) {
+        val paymentLegs: List<PaymentLegDisplay> = remember(activity, isArabic) {
             extractPaymentLegs(activity, isArabic)
         }
-        val soldItems = remember(activity, isArabic) {
+        val soldItems: List<SoldItemDisplay> = remember(activity, isArabic) {
             extractSoldItems(activity, isArabic)
         }
-        val actions = remember(activity, normalizedType, isFullyRefunded, isArabic) {
+        val actions: List<ActionSpec> = remember(activity, normalizedType, isFullyRefunded, isArabic) {
             buildActionSpecs(activity, normalizedType, isFullyRefunded, isArabic)
         }
 
@@ -261,7 +261,6 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                     )
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // مقبض السحب
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
@@ -273,7 +272,6 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // رأس النافذة
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -352,14 +350,12 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                         .verticalScroll(scrollState),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 1. بطاقة الملخص المالي الراقي
                     FinancialSummaryHeroBox(
                         activity = activity,
                         isArabic = isArabic,
                         paymentLegs = paymentLegs
                     )
 
-                    // 2. تنبيه المرتجع إن وجد
                     if (isFullyRefunded || isPartiallyRefunded) {
                         val reason = activity.optString("refund_reason", "").trim()
                         val refundedAt = activity.optString("refunded_at", "").trim()
@@ -407,12 +403,10 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                         }
                     }
 
-                    // 3. بطاقات البيانات الأساسية (العميل، الموظف، العدد، الوزن...)
                     detailRows.forEach { row ->
                         DetailInfoCard(row = row)
                     }
 
-                    // 4. قائمة القطع المباعة / المرتبطة
                     if (isHydratingDetails) {
                         Row(
                             modifier = Modifier
@@ -447,7 +441,6 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                         }
                     }
 
-                    // 5. الإجراءات السريعة (طباعة الفاتورة، استرجاع، سجل المبيعات، نسخ)
                     if (actions.isNotEmpty()) {
                         Text(
                             text = if (isArabic) "الإجراءات" else "Actions",
@@ -796,7 +789,13 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                     else -> method
                 }
                 if (amt > 0.0) {
-                    list.add(PaymentLegDisplay(label, formatAmount(amt, curr), Color(0xFF10B981)))
+                    list.add(
+                        PaymentLegDisplay(
+                            methodLabel = label,
+                            amountText = formatAmount(amt, curr),
+                            color = Color(0xFF10B981)
+                        )
+                    )
                 }
             }
         }
@@ -811,7 +810,8 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
                 )
             )
         }
-
+        return list
+    }
 
     private fun buildDetailRows(
         activity: JSONObject,
@@ -842,7 +842,8 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
             )
         }
 
-        val user = activity.optString("cashier_name",
+        val user = activity.optString(
+            "cashier_name",
             activity.optString("user", activity.optString("username", ""))
         ).trim()
         if (user.isNotEmpty() && user != "—") {
@@ -890,7 +891,7 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
             )
         }
 
-        if (normalizedType !in setOf("sale", "refund")) {
+        if (normalizedType != "sale" && normalizedType != "refund") {
             val details = (if (isArabic) activity.optString("details_ar", activity.optString("details", ""))
             else activity.optString("details_en", activity.optString("details", ""))).trim()
             if (details.isNotEmpty() && !details.startsWith("{")) {
@@ -960,7 +961,7 @@ class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
     ): List<ActionSpec> {
         val list = mutableListOf<ActionSpec>()
 
-        if (normalizedType in setOf("sale", "refund")) {
+        if (normalizedType == "sale" || normalizedType == "refund") {
             list.add(
                 ActionSpec(
                     label = if (isArabic) "عرض وطباعة الفاتورة" else "View & Print Invoice",
