@@ -7,7 +7,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.pdf.PdfDocument
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -228,6 +227,17 @@ class MiraReceiptFragment : DialogFragment() {
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&#39;")
+    }
+
+    private fun extractItemsArray(t: JSONObject, root: JSONObject): JSONArray? {
+        val keys = arrayOf("items", "sold_items", "products", "invoice_items", "lines", "order_items")
+        for (k in keys) {
+            t.optJSONArray(k)?.let { if (it.length() > 0) return it }
+            t.optJSONObject("data")?.optJSONArray(k)?.let { if (it.length() > 0) return it }
+            t.optJSONObject("sale")?.optJSONArray(k)?.let { if (it.length() > 0) return it }
+            root.optJSONArray(k)?.let { if (it.length() > 0) return it }
+        }
+        return t.optJSONArray("items") ?: t.optJSONArray("sold_items") ?: t.optJSONArray("products")
     }
 
     // ═══════════════════════════════════════════════════════
@@ -559,12 +569,42 @@ class MiraReceiptFragment : DialogFragment() {
         return t.optJSONArray("trade_ins") ?: paymentObj?.optJSONArray("trade_ins")
     }
 
-    private fun buildPaymentsHtml(t: JSONObject, paymentObj: JSONObject?, baseCurrency: String): String {
+    private fun resolvePaymentBaseAmount(
+        p: JSONObject,
+        amount: Double,
+        currency: String,
+        baseCurrency: String,
+        rate: Double
+    ): Double {
+        val explicitBase = safeDouble(
+            p, "base_amount",
+            safeDouble(p, "amount_in_yer", safeDouble(p, "amount_local", -1.0))
+        )
+        if (explicitBase > 0.0) {
+            return explicitBase
+        }
+        if (baseCurrency.equals(currency, ignoreCase = true)) {
+            return amount
+        }
+        if (currency.equals("USD", ignoreCase = true) && !baseCurrency.equals("USD", ignoreCase = true) && rate > 1.0) {
+            return amount * rate
+        }
+        if (rate > 1.0 && amount < 5000.0 && baseCurrency.equals("YER", ignoreCase = true)) {
+            return amount * rate
+        }
+        return amount
+    }
+
+    private fun buildPaymentsHtml(
+        t: JSONObject,
+        paymentObj: JSONObject?,
+        baseCurrency: String,
+        defaultExchangeRate: Double
+    ): String {
         return try {
             val payments = extractPaymentsArray(t, paymentObj)
             if (payments == null || payments.length() == 0) return ""
 
-            // إخفاء الجدول التفصيلي فقط إذا كانت دفعة نقدية وحيدة بنفس عملة الفاتورة بدون ذهب مستلم أو مرجع
             if (payments.length() == 1) {
                 val single = payments.optJSONObject(0)
                 if (single != null) {
@@ -600,14 +640,8 @@ class MiraReceiptFragment : DialogFragment() {
                 val p = payments.optJSONObject(i) ?: continue
                 val currency = safeString(p, "currency", baseCurrency)
                 val amount = safeDouble(p, "amount", 0.0)
-                val rate = safeDouble(p, "exchange_rate", safeDouble(p, "server_rate", 1.0))
-                val baseAmount = safeDouble(
-                    p, "base_amount",
-                    safeDouble(
-                        p, "amount_in_yer",
-                        safeDouble(p, "amount_local", if (baseCurrency.equals(currency, true)) amount else amount * rate)
-                    )
-                )
+                val rate = safeDouble(p, "exchange_rate", safeDouble(p, "server_rate", defaultExchangeRate))
+                val baseAmount = resolvePaymentBaseAmount(p, amount, currency, baseCurrency, rate)
 
                 totalInBase += baseAmount
 
@@ -617,23 +651,23 @@ class MiraReceiptFragment : DialogFragment() {
                 val ref = findFirstNonEmpty(p, "reference_number", "reference", "transaction_id", "voucher_no")
 
                 val icon = getCurrencyIcon(currency)
-                val rateInfo = if (!baseCurrency.equals(currency, ignoreCase = true) && rate > 0) {
-                    "<br><span style='font-size:9px; color:#718096;'>(1 $currency = ${String.format(Locale.US, "%,.2f", rate)} $baseCurrency)</span>"
+                val rateInfo = if (!baseCurrency.equals(currency, ignoreCase = true) && rate > 1.0) {
+                    "<br><span class='sub-note'>(1 $currency = ${String.format(Locale.US, "%,.2f", rate)} $baseCurrency)</span>"
                 } else {
                     ""
                 }
                 val refInfo = if (ref != "—") {
-                    "<br><span style='font-size:8px; font-family:monospace; color:#2b6cb0;'>#${escapeHtml(ref)}</span>"
+                    "<br><span class='ref-tag'>#${escapeHtml(ref)}</span>"
                 } else {
                     ""
                 }
 
                 sb.append("<tr>")
-                    .append("<td style='font-weight:bold;'>").append(icon).append(" ").append(escapeHtml(currency)).append("</td>")
-                    .append("<td style='font-weight:bold; color:#0d1b2a;'>")
+                    .append("<td class='nowrap' style='font-weight:bold;'>").append(icon).append(" ").append(escapeHtml(currency)).append("</td>")
+                    .append("<td class='nowrap' style='font-weight:bold; color:#0d1b2a;'>")
                     .append(String.format(Locale.US, "%,.2f", amount)).append(rateInfo).append("</td>")
                     .append("<td>").append(escapeHtml(methodText)).append(refInfo).append("</td>")
-                    .append("<td style='font-weight:bold; color:#c59b27;'>")
+                    .append("<td class='nowrap' style='font-weight:bold; color:#c59b27;'>")
                     .append(String.format(Locale.US, "%,.2f", baseAmount)).append("</td>")
                     .append("</tr>")
             }
@@ -643,7 +677,7 @@ class MiraReceiptFragment : DialogFragment() {
                     .append("<td colspan='3' style='text-align:right; font-weight:bold;'>")
                     .append(if (isArabic) "إجمالي المدفوعات:" else "Total Paid:")
                     .append("</td>")
-                    .append("<td style='font-weight:bold; color:#0d1b2a;'>")
+                    .append("<td class='nowrap' style='font-weight:bold; color:#0d1b2a;'>")
                     .append(String.format(Locale.US, "%,.2f", totalInBase)).append(" $baseCurrency</td>")
                     .append("</tr>")
             }
@@ -714,7 +748,7 @@ class MiraReceiptFragment : DialogFragment() {
                 val valueCell = if (value > 0) "${String.format(Locale.US, "%,.0f", value)} $baseCurrency" else "—"
                 val rateCell = if (ratePerGram > 0) String.format(Locale.US, "%,.0f", ratePerGram) else "—"
                 val wtNote = if (stoneWt > 0.001) {
-                    "<br><span style='font-size:8px; color:#78350f;'>(${if (isArabic) "قائم" else "Gross"}: ${String.format(Locale.US, "%.3f", grossWt)}g)</span>"
+                    "<br><span class='sub-note'>(${if (isArabic) "قائم" else "Gross"}: ${String.format(Locale.US, "%.3f", grossWt)}g)</span>"
                 } else {
                     ""
                 }
@@ -722,10 +756,10 @@ class MiraReceiptFragment : DialogFragment() {
                 sb.append("<tr>")
                     .append("<td>").append(i + 1).append("</td>")
                     .append("<td>").append(escapeHtml(desc)).append("</td>")
-                    .append("<td><span class='karat-badge'>").append(escapeHtml(karat)).append("</span></td>")
-                    .append("<td><b>").append(String.format(Locale.US, "%.3f", netWt)).append("</b> g").append(wtNote).append("</td>")
-                    .append("<td>").append(rateCell).append("</td>")
-                    .append("<td style='font-weight:bold; color:#b45309;'>").append(valueCell).append("</td>")
+                    .append("<td class='nowrap'><span class='karat-badge'>").append(escapeHtml(karat)).append("</span></td>")
+                    .append("<td class='nowrap'><b>").append(String.format(Locale.US, "%.3f", netWt)).append("</b> g").append(wtNote).append("</td>")
+                    .append("<td class='nowrap'>").append(rateCell).append("</td>")
+                    .append("<td class='nowrap' style='font-weight:bold; color:#b45309;'>").append(valueCell).append("</td>")
                     .append("</tr>")
             }
 
@@ -736,9 +770,9 @@ class MiraReceiptFragment : DialogFragment() {
                 .append("<td colspan='3' style='text-align:right; font-weight:bold;'>")
                 .append(if (isArabic) "إجمالي الذهب المُستلم:" else "Total Trade-In:")
                 .append("</td>")
-                .append("<td style='font-weight:bold;'>").append(String.format(Locale.US, "%.3f", totalWeight)).append(" g</td>")
+                .append("<td class='nowrap' style='font-weight:bold;'>").append(String.format(Locale.US, "%.3f", totalWeight)).append(" g</td>")
                 .append("<td>—</td>")
-                .append("<td style='font-weight:bold; color:#b45309;'>").append(totalCell).append("</td>")
+                .append("<td class='nowrap' style='font-weight:bold; color:#b45309;'>").append(totalCell).append("</td>")
                 .append("</tr></tbody></table></div>")
 
             sb.toString()
@@ -789,11 +823,11 @@ class MiraReceiptFragment : DialogFragment() {
                 val curr = safeString(r, "currency", baseCurrency)
 
                 sb.append("<tr>")
-                    .append("<td style='font-weight:bold;'>").append(escapeHtml(refNum)).append("</td>")
+                    .append("<td class='nowrap' style='font-weight:bold;'>").append(escapeHtml(refNum)).append("</td>")
                     .append("<td>").append(escapeHtml(refDate)).append("</td>")
                     .append("<td>").append(escapeHtml(reason)).append("</td>")
                     .append("<td>").append(escapeHtml(method)).append("</td>")
-                    .append("<td style='font-weight:bold; color:#c53030;'>")
+                    .append("<td class='nowrap' style='font-weight:bold; color:#c53030;'>")
                     .append(String.format(Locale.US, "%,.2f", amount)).append(" ").append(escapeHtml(curr))
                     .append("</td>")
                     .append("</tr>")
@@ -832,13 +866,7 @@ class MiraReceiptFragment : DialogFragment() {
                         p, "exchange_rate",
                         safeDouble(p, "server_rate", if (pCurr.equals("USD", true)) safeRate else 1.0)
                     )
-                    cashPaidYer += safeDouble(
-                        p, "amount_in_yer",
-                        safeDouble(
-                            p, "base_amount",
-                            safeDouble(p, "amount_local", if (pCurr.equals("YER", true)) pAmt else pAmt * pRate)
-                        )
-                    )
+                    cashPaidYer += resolvePaymentBaseAmount(p, pAmt, pCurr, "YER", pRate)
                 }
             }
 
@@ -885,27 +913,27 @@ class MiraReceiptFragment : DialogFragment() {
                 .append("<table class='payment-summary-table'>")
                 .append("<tr><td class='label'>")
                 .append(if (isArabic) "صافي قيمة الفاتورة:" else "Net Invoice Total:")
-                .append("</td><td class='value'>")
+                .append("</td><td class='value nowrap'>")
                 .append(String.format(Locale.US, "%,.2f", finalInvoiceAmount)).append(" $displayCurrency</td></tr>")
 
             if (cashDisplay > 0) {
                 sb.append("<tr><td class='label'>💵 ")
                     .append(if (isArabic) "المسدد نقداً / إلكترونياً:" else "Cash / Electronic Paid:")
-                    .append("</td><td class='value'>")
+                    .append("</td><td class='value nowrap'>")
                     .append(String.format(Locale.US, "%,.2f", cashDisplay)).append(" $displayCurrency</td></tr>")
             }
 
             if (tradeInDisplay > 0) {
                 sb.append("<tr><td class='label'>🥇 ")
                     .append(if (isArabic) "قيمة الذهب المُستلم:" else "Gold Trade-In Value:")
-                    .append("</td><td class='value'>")
+                    .append("</td><td class='value nowrap'>")
                     .append(String.format(Locale.US, "%,.2f", tradeInDisplay)).append(" $displayCurrency</td></tr>")
             }
 
             if (creditDisplay > 0) {
                 sb.append("<tr><td class='label'>💳 ")
                     .append(if (isArabic) "خصم من رصيد العميل الدائن:" else "Applied Customer Credit:")
-                    .append("</td><td class='value'>")
+                    .append("</td><td class='value nowrap'>")
                     .append(String.format(Locale.US, "%,.2f", creditDisplay)).append(" $displayCurrency</td></tr>")
             }
 
@@ -918,13 +946,13 @@ class MiraReceiptFragment : DialogFragment() {
                 diffDisplay > 0 -> {
                     sb.append("<tr class='payment-summary-credit'><td class='label'>")
                         .append(if (isArabic) "💰 فائض / رصيد دائن للعميل:" else "💰 Customer Credit Balance:")
-                        .append("</td><td class='value'>+")
+                        .append("</td><td class='value nowrap'>+")
                         .append(String.format(Locale.US, "%,.2f", diffDisplay)).append(" $displayCurrency</td></tr>")
                 }
                 else -> {
                     sb.append("<tr class='payment-summary-short'><td class='label'>")
                         .append(if (isArabic) "⚠️ المتبقي (ذمم على العميل):" else "⚠️ Remaining Balance Due:")
-                        .append("</td><td class='value'>")
+                        .append("</td><td class='value nowrap'>")
                         .append(String.format(Locale.US, "%,.2f", abs(diffDisplay))).append(" $displayCurrency</td></tr>")
                 }
             }
@@ -956,70 +984,79 @@ class MiraReceiptFragment : DialogFragment() {
             .append("<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>")
             .append("<style>")
             .append("* { box-sizing: border-box; }")
-            .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 12px; margin: 0 auto; max-width: 100%; background: #fff; color: #1a1a1a; font-size: 11px; line-height: 1.45; }")
-            .append(".header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0d1b2a; padding-bottom: 10px; margin-bottom: 10px; }")
+            .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 10px; margin: 0 auto; max-width: 100%; background: #fff; color: #1a1a1a; font-size: 10.5px; line-height: 1.4; }")
+            .append(".nowrap { white-space: nowrap; }")
+            .append(".sub-note { font-size: 8px; color: #64748b; }")
+            .append(".ref-tag { font-size: 8px; font-family: monospace; color: #2b6cb0; }")
+            .append(".header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0d1b2a; padding-bottom: 8px; margin-bottom: 8px; }")
             .append(".brand-box { text-align: ").append(alignStart).append("; }")
-            .append(".org-name { font-size: 21px; font-weight: 800; color: #0d1b2a; }")
-            .append(".org-subtitle { font-size: 10px; color: #c59b27; font-weight: bold; }")
-            .append(".org-meta { font-size: 10px; color: #555; margin-top: 2px; }")
-            .append(".invoice-title-bar { display: flex; justify-content: space-between; align-items: center; background: #0d1b2a; color: #fff; padding: 8px 12px; border-radius: 6px; margin: 10px 0; }")
-            .append(".invoice-title { font-size: 14px; font-weight: bold; color: #f4d58d; }")
-            .append(".invoice-type { font-size: 11px; background: rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 4px; border: 1px solid #c59b27; }")
-            .append(".refund-alert { background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 8px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 11px; }")
-            .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; background: #fafafa; }")
+            .append(".org-name { font-size: 19px; font-weight: 800; color: #0d1b2a; }")
+            .append(".org-subtitle { font-size: 9.5px; color: #c59b27; font-weight: bold; }")
+            .append(".org-meta { font-size: 9px; color: #555; margin-top: 2px; }")
+            .append(".invoice-title-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #0d1b2a; color: #fff; padding: 7px 10px; border-radius: 6px; margin: 8px 0; }")
+            .append(".invoice-title { font-size: 13px; font-weight: bold; color: #f4d58d; }")
+            .append(".invoice-type { font-size: 10px; white-space: nowrap; background: rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 4px; border: 1px solid #c59b27; }")
+            .append(".refund-alert { background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 7px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 8px; font-size: 10.5px; }")
+            .append(".info-grid { width: 100%; font-size: 9.5px; margin-bottom: 8px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; background: #fafafa; }")
             .append(".info-grid table { width: 100%; border-collapse: collapse; }")
             .append(".info-grid td { padding: 3px 4px; vertical-align: top; }")
-            .append(".label { color: #666; white-space: nowrap; } .value { font-weight: bold; color: #0d1b2a; }")
-            .append("table.items { width: 100%; border-collapse: collapse; margin: 10px 0 4px 0; font-size: 10px; }")
-            .append("table.items th { background: #0d1b2a; color: #f4d58d; padding: 6px 4px; text-align: center; border: 1px solid #0d1b2a; }")
-            .append("table.items td { padding: 6px 4px; border: 1px solid #e2e8f0; text-align: center; color: #2d3748; }")
+            .append(".label { color: #666; } .value { font-weight: bold; color: #0d1b2a; }")
+            .append("table.items { width: 100%; border-collapse: collapse; margin: 8px 0 4px 0; font-size: 9.5px; }")
+            .append("table.items th { background: #0d1b2a; color: #f4d58d; padding: 5px 3px; text-align: center; border: 1px solid #0d1b2a; }")
+            .append("table.items td { padding: 5px 3px; border: 1px solid #e2e8f0; text-align: center; color: #2d3748; }")
             .append("table.items tr:nth-child(even) { background-color: #f8fafc; }")
             .append(".returned-row { background-color: #fff5f5 !important; color: #e53e3e; text-decoration: line-through; }")
-            .append(".serial-box { font-family: monospace; font-size: 9px; background: #edf2f7; padding: 2px 4px; border-radius: 3px; color: #2b6cb0; word-break: break-all; display: inline-block; }")
+            .append(".serial-box { font-family: monospace; font-size: 8.5px; background: #edf2f7; padding: 2px 4px; border-radius: 3px; color: #2b6cb0; word-break: break-all; display: inline-block; }")
             .append(".karat-badge { display: inline-block; padding: 1px 5px; border-radius: 8px; font-weight: bold; background: #fefcbf; color: #744210; border: 1px solid #f6e05e; }")
-            .append(".karat-strip { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 10px; color: #1e293b; text-align: center; }")
-            .append(".payment-breakdown { margin: 12px 0; border: 2px solid #c59b27; border-radius: 8px; overflow: hidden; background: #fffdf5; }")
-            .append(".payment-title { background: #0d1b2a; color: #f4d58d; padding: 7px 12px; font-weight: bold; font-size: 11px; text-align: center; }")
-            .append("table.payments-table { width: 100%; border-collapse: collapse; font-size: 10px; }")
-            .append("table.payments-table th { background: #faf8f0; color: #0d1b2a; padding: 6px 4px; text-align: center; border-bottom: 2px solid #e0d5b0; font-weight: bold; }")
-            .append("table.payments-table td { padding: 7px 4px; border-bottom: 1px solid #f0ead0; color: #2d3748; text-align: center; }")
+            .append(".karat-strip { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; margin-bottom: 8px; font-size: 9.5px; color: #1e293b; text-align: center; }")
+            .append(".payment-breakdown { margin: 10px 0; border: 2px solid #c59b27; border-radius: 8px; overflow: hidden; background: #fffdf5; }")
+            .append(".payment-title { background: #0d1b2a; color: #f4d58d; padding: 6px 10px; font-weight: bold; font-size: 10.5px; text-align: center; }")
+            .append("table.payments-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }")
+            .append("table.payments-table th { background: #faf8f0; color: #0d1b2a; padding: 5px 3px; text-align: center; border-bottom: 2px solid #e0d5b0; font-weight: bold; }")
+            .append("table.payments-table td { padding: 6px 3px; border-bottom: 1px solid #f0ead0; color: #2d3748; text-align: center; }")
             .append(".payment-total-row td { background: #faf8f0; font-weight: bold; }")
-            .append(".summary-container { display: flex; justify-content: space-between; margin-top: 10px; gap: 10px; }")
-            .append(".notes-box { width: 50%; font-size: 9px; border: 1px dashed #cbd5e0; padding: 8px; border-radius: 6px; background: #f7fafc; }")
-            .append(".totals-box { width: 48%; }")
-            .append(".totals-table { width: 100%; font-size: 11px; border-collapse: collapse; }")
-            .append(".totals-table td { padding: 4px 0; }")
-            .append(".grand-total { font-size: 13px; font-weight: bold; color: #0d1b2a; border-top: 2px solid #0d1b2a; border-bottom: 2px solid #0d1b2a; padding: 6px 0; }")
-            .append(".tafqeet-box { font-size: 10px; color: #1a202c; text-align: center; margin-top: 8px; padding: 6px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0; }")
-            .append(".warranty-box { font-size: 10px; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px; border-radius: 6px; border: 1px dashed #38a169; background: #f0fff4; color: #22543d; }")
-            .append(".footer-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; }")
+            .append(".summary-container { display: flex; justify-content: space-between; margin-top: 8px; gap: 8px; }")
+            .append(".notes-box { width: 52%; font-size: 8.8px; border: 1px dashed #cbd5e0; padding: 7px; border-radius: 6px; background: #f7fafc; }")
+            .append(".totals-box { width: 46%; }")
+            .append(".totals-table { width: 100%; font-size: 10px; border-collapse: collapse; }")
+            .append(".totals-table td { padding: 3px 0; }")
+            .append(".grand-total { font-size: 12px; font-weight: bold; color: #0d1b2a; border-top: 2px solid #0d1b2a; border-bottom: 2px solid #0d1b2a; padding: 5px 0; }")
+            .append(".tafqeet-box { font-size: 9.5px; color: #1a202c; text-align: center; margin-top: 8px; padding: 6px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0; }")
+            .append(".warranty-box { font-size: 9.5px; font-weight: bold; text-align: center; margin: 8px 0; padding: 6px; border-radius: 6px; border: 1px dashed #38a169; background: #f0fff4; color: #22543d; }")
+            .append(".footer-section { margin-top: 12px; display: flex; justify-content: space-between; align-items: flex-end; }")
             .append(".qr-box { text-align: center; }")
-            .append(".qr-box img { width: 82px; height: 82px; border: 1px solid #e2e8f0; padding: 2px; border-radius: 4px; background: #fff; }")
-            .append(".signatures { display: flex; gap: 20px; }")
-            .append(".sig-box { text-align: center; width: 105px; font-size: 9px; font-weight: bold; color: #4a5568; }")
-            .append(".sig-line { border-top: 1px solid #a0aec0; margin-top: 30px; padding-top: 3px; }")
-            .append(".copyright { text-align: center; margin-top: 15px; font-size: 8px; color: #a0aec0; border-top: 1px solid #edf2f7; padding-top: 6px; }")
-            .append(".trade-in-section { margin: 12px 0; border: 2px solid #d97706; border-radius: 8px; overflow: hidden; background: #fffbeb; }")
-            .append(".trade-in-title { background: linear-gradient(135deg,#92400e,#b45309); color: #fff; padding: 7px 12px; font-weight: bold; font-size: 11px; text-align: center; }")
-            .append("table.trade-ins-table { width: 100%; border-collapse: collapse; font-size: 10px; }")
-            .append("table.trade-ins-table th { background: #fef3c7; color: #78350f; padding: 6px 4px; text-align: center; border-bottom: 2px solid #fde68a; }")
-            .append("table.trade-ins-table td { padding: 7px 4px; border-bottom: 1px solid #fde68a; color: #2d3748; text-align: center; }")
+            .append(".qr-box img { width: 78px; height: 78px; border: 1px solid #e2e8f0; padding: 2px; border-radius: 4px; background: #fff; }")
+            .append(".signatures { display: flex; gap: 16px; }")
+            .append(".sig-box { text-align: center; width: 96px; font-size: 8.5px; font-weight: bold; color: #4a5568; }")
+            .append(".sig-line { border-top: 1px solid #a0aec0; margin-top: 26px; padding-top: 3px; }")
+            .append(".copyright { text-align: center; margin-top: 12px; font-size: 8px; color: #a0aec0; border-top: 1px solid #edf2f7; padding-top: 5px; }")
+            .append(".trade-in-section { margin: 10px 0; border: 2px solid #d97706; border-radius: 8px; overflow: hidden; background: #fffbeb; }")
+            .append(".trade-in-title { background: linear-gradient(135deg,#92400e,#b45309); color: #fff; padding: 6px 10px; font-weight: bold; font-size: 10.5px; text-align: center; }")
+            .append("table.trade-ins-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }")
+            .append("table.trade-ins-table th { background: #fef3c7; color: #78350f; padding: 5px 3px; text-align: center; border-bottom: 2px solid #fde68a; }")
+            .append("table.trade-ins-table td { padding: 6px 3px; border-bottom: 1px solid #fde68a; color: #2d3748; text-align: center; }")
             .append(".trade-in-total-row td { background: #fef3c7; border-top: 2px solid #f59e0b; }")
-            .append(".refund-section { margin: 12px 0; border: 2px solid #e53e3e; border-radius: 8px; overflow: hidden; background: #fff5f5; }")
-            .append(".refund-section-title { background: #c53030; color: #fff; padding: 7px 12px; font-weight: bold; font-size: 11px; text-align: center; }")
-            .append("table.refund-table { width: 100%; border-collapse: collapse; font-size: 10px; }")
-            .append("table.refund-table th { background: #fed7d7; color: #742a2a; padding: 5px 4px; text-align: center; }")
-            .append("table.refund-table td { padding: 6px 4px; border-bottom: 1px solid #feb2b2; text-align: center; }")
-            .append(".payment-summary { margin: 12px 0; border: 2px solid #0d1b2a; border-radius: 8px; overflow: hidden; background: #f8fafc; }")
-            .append(".payment-summary-title { background: #0d1b2a; color: #f4d58d; padding: 7px 12px; font-weight: bold; font-size: 11px; text-align: center; }")
-            .append("table.payment-summary-table { width: 100%; border-collapse: collapse; font-size: 11px; }")
-            .append("table.payment-summary-table td { padding: 7px 12px; border-bottom: 1px solid #e2e8f0; }")
+            .append(".refund-section { margin: 10px 0; border: 2px solid #e53e3e; border-radius: 8px; overflow: hidden; background: #fff5f5; }")
+            .append(".refund-section-title { background: #c53030; color: #fff; padding: 6px 10px; font-weight: bold; font-size: 10.5px; text-align: center; }")
+            .append("table.refund-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }")
+            .append("table.refund-table th { background: #fed7d7; color: #742a2a; padding: 5px 3px; text-align: center; }")
+            .append("table.refund-table td { padding: 5px 3px; border-bottom: 1px solid #feb2b2; text-align: center; }")
+            .append(".payment-summary { margin: 10px 0; border: 2px solid #0d1b2a; border-radius: 8px; overflow: hidden; background: #f8fafc; }")
+            .append(".payment-summary-title { background: #0d1b2a; color: #f4d58d; padding: 6px 10px; font-weight: bold; font-size: 10.5px; text-align: center; }")
+            .append("table.payment-summary-table { width: 100%; border-collapse: collapse; font-size: 10px; }")
+            .append("table.payment-summary-table td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }")
             .append("table.payment-summary-table td.label { color: #4a5568; text-align: ").append(alignStart).append("; }")
             .append("table.payment-summary-table td.value { font-weight: bold; text-align: ").append(alignEnd).append("; color: #0d1b2a; }")
             .append(".payment-summary-equal { background: #dcfce7; color: #166534; font-weight: bold; }")
             .append(".payment-summary-credit { background: #dbeafe; color: #1e40af; font-weight: bold; }")
             .append(".payment-summary-short { background: #fee2e2; color: #991b1b; font-weight: bold; }")
             .append("</style></head><body>")
+
+        var totalWeightSum = 0.0
+        var displayAmount = "0.00"
+        var displayCurrencyLabel = "USD"
+        var saleNumber = "—"
+        var dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
 
         try {
             val root = JSONObject(receiptJsonStr)
@@ -1053,11 +1090,11 @@ class MiraReceiptFragment : DialogFragment() {
             }
             if (branchName.isEmpty()) branchName = if (isArabic) "الفرع الرئيسي" else "Main Branch"
 
-            val saleNumber = findFirstNonEmpty(t, "sale_number", "invoice_number", "receipt_number", "id")
+            saleNumber = findFirstNonEmpty(t, "sale_number", "invoice_number", "receipt_number", "id")
             val origSaleNumber = findFirstNonEmpty(t, "original_sale_number", "parent_sale_number")
-            var dateStr = findFirstNonEmpty(t, "timestamp", "created_at", "sale_date")
-            if (dateStr == "—") {
-                dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
+            val rawDate = findFirstNonEmpty(t, "timestamp", "created_at", "sale_date")
+            if (rawDate != "—") {
+                dateStr = rawDate
             }
 
             var customer = safeString(t, "customer_name", customerObj?.let { safeString(it, "name", "") }.orEmpty())
@@ -1182,17 +1219,17 @@ class MiraReceiptFragment : DialogFragment() {
                 .append("<td class='label'>").append(if (isArabic) "اسم العميل:" else "Customer:").append("</td>")
                 .append("<td class='value'>").append(escapeHtml(customer))
             if (customerId.isNotEmpty() && customerId != "0" && customerId != "null") {
-                h.append(" <span style='font-size:9px; color:#2b6cb0;'>(#").append(escapeHtml(customerId)).append(")</span>")
+                h.append(" <span class='ref-tag'>(#").append(escapeHtml(customerId)).append(")</span>")
             }
             h.append("</td>")
-                .append("<td class='label'>").append(if (isArabic) "التاريخ والوقت:" else "Date & Time:").append("</td>")
+                .append("<td class='label'>").append(if (isArabic) "التاريخ:" else "Date:").append("</td>")
                 .append("<td class='value'>").append(escapeHtml(dateStr)).append("</td>")
                 .append("</tr>")
 
                 .append("<tr>")
                 .append("<td class='label'>").append(if (isArabic) "هاتف العميل:" else "Phone:").append("</td>")
                 .append("<td class='value'>").append(if (customerPhone.isEmpty()) "—" else escapeHtml(customerPhone)).append("</td>")
-                .append("<td class='label'>").append(if (isArabic) "البائع / المحرر:" else "Cashier / Seller:").append("</td>")
+                .append("<td class='label'>").append(if (isArabic) "البائع:" else "Seller:").append("</td>")
                 .append("<td class='value'>").append(escapeHtml(sellerName)).append("</td>")
                 .append("</tr>")
 
@@ -1204,8 +1241,8 @@ class MiraReceiptFragment : DialogFragment() {
                 .append("</tr>")
 
                 .append("<tr>")
-                .append("<td class='label'>").append(if (isArabic) "سعر الصرف:" else "Exchange Rate:").append("</td>")
-                .append("<td class='value'>1 USD = ").append(String.format(Locale.US, "%,.2f", exchangeRate)).append(" ").append(escapeHtml(currency)).append("</td>")
+                .append("<td class='label'>").append(if (isArabic) "سعر الصرف:" else "FX Rate:").append("</td>")
+                .append("<td class='value nowrap'>1 USD = ").append(String.format(Locale.US, "%,.2f", exchangeRate)).append(" ").append(escapeHtml(currency)).append("</td>")
             when {
                 goldSpot21k > 0 || goldSpot24k > 0 -> {
                     val spotLabel = if (goldSpot21k > 0) {
@@ -1214,7 +1251,7 @@ class MiraReceiptFragment : DialogFragment() {
                         "24K: ${String.format(Locale.US, "%,.2f", goldSpot24k)}"
                     }
                     h.append("<td class='label'>").append(if (isArabic) "تسعيرة الذهب:" else "Gold Rate:").append("</td>")
-                        .append("<td class='value'>").append(spotLabel).append("</td>")
+                        .append("<td class='value nowrap'>").append(spotLabel).append("</td>")
                 }
                 origSaleNumber != "—" -> {
                     h.append("<td class='label'>").append(if (isArabic) "الفاتورة الأصلية:" else "Original Inv:").append("</td>")
@@ -1252,11 +1289,7 @@ class MiraReceiptFragment : DialogFragment() {
             h.append("</table></div>")
 
             // ═══ 4. Items Table & Karat Weight Summary ═══
-            val items = t.optJSONArray("items")
-                ?: t.optJSONArray("sold_items")
-                ?: t.optJSONArray("products")
-
-            var totalWeightSum = 0.0
+            val items = extractItemsArray(t, root)
             var activePiecesCount = 0
             val weightByKarat = LinkedHashMap<String, Double>()
 
@@ -1317,8 +1350,8 @@ class MiraReceiptFragment : DialogFragment() {
 
                     val rowClass = if (isItemRefunded) "class='returned-row'" else ""
                     val weightNote = when {
-                        stoneWeight > 0.001 -> "<br><span style='font-size:8px; color:#718096;'>(${if (isArabic) "فصوص" else "Stone"}: ${String.format(Locale.US, "%.3f", stoneWeight)}g)</span>"
-                        grossWeight > netWeight + 0.001 -> "<br><span style='font-size:8px; color:#718096;'>(${if (isArabic) "قائم" else "Gross"}: ${String.format(Locale.US, "%.3f", grossWeight)}g)</span>"
+                        stoneWeight > 0.001 -> "<br><span class='sub-note'>(${if (isArabic) "فصوص" else "Stone"}: ${String.format(Locale.US, "%.3f", stoneWeight)}g)</span>"
+                        grossWeight > netWeight + 0.001 -> "<br><span class='sub-note'>(${if (isArabic) "قائم" else "Gross"}: ${String.format(Locale.US, "%.3f", grossWeight)}g)</span>"
                         else -> ""
                     }
 
@@ -1327,7 +1360,7 @@ class MiraReceiptFragment : DialogFragment() {
                         .append("<td style='text-align:").append(alignStart).append("; font-weight:bold;'>")
                         .append(escapeHtml(title))
                     if (category != "—") {
-                        h.append("<br><span style='font-size:8px; font-weight:normal; color:#64748b;'>")
+                        h.append("<br><span class='sub-note'>")
                             .append(escapeHtml(category)).append("</span>")
                     }
                     if (isItemRefunded) {
@@ -1336,10 +1369,10 @@ class MiraReceiptFragment : DialogFragment() {
                     }
                     h.append("</td>")
                         .append("<td><span class='serial-box'>").append(escapeHtml(serial)).append("</span></td>")
-                        .append("<td><span class='karat-badge'>").append(escapeHtml(karat)).append("</span></td>")
-                        .append("<td><b>").append(String.format(Locale.US, "%.3f", netWeight)).append("</b> g").append(weightNote).append("</td>")
-                        .append("<td>").append(if (laborFee > 0) formatMoney(laborFee, "$") else "—").append("</td>")
-                        .append("<td style='font-weight:bold; color:#0d1b2a;'>").append(formatMoney(itemPriceUSD, "$")).append("</td>")
+                        .append("<td class='nowrap'><span class='karat-badge'>").append(escapeHtml(karat)).append("</span></td>")
+                        .append("<td class='nowrap'><b>").append(String.format(Locale.US, "%.3f", netWeight)).append("</b> g").append(weightNote).append("</td>")
+                        .append("<td class='nowrap'>").append(if (laborFee > 0) formatMoney(laborFee, "$") else "—").append("</td>")
+                        .append("<td class='nowrap' style='font-weight:bold; color:#0d1b2a;'>").append(formatMoney(itemPriceUSD, "$")).append("</td>")
                         .append("</tr>")
                 }
                 h.append("</tbody></table>")
@@ -1357,8 +1390,15 @@ class MiraReceiptFragment : DialogFragment() {
                 }
             }
 
+            if (totalWeightSum <= 0.0) {
+                totalWeightSum = safeDouble(
+                    t, "total_weight",
+                    safeDouble(t, "net_weight", safeDouble(t, "total_net_weight", safeDouble(t, "weight", 0.0)))
+                )
+            }
+
             // ═══ 5. Multi-Currency Payments Breakdown ═══
-            val paymentsHtml = buildPaymentsHtml(t, paymentObj, currency)
+            val paymentsHtml = buildPaymentsHtml(t, paymentObj, currency, exchangeRate)
             if (paymentsHtml.isNotEmpty()) h.append(paymentsHtml)
 
             // ═══ 6. Gold Trade-Ins Table ═══
@@ -1431,14 +1471,14 @@ class MiraReceiptFragment : DialogFragment() {
             h.append("<div class='totals-box'><table class='totals-table'>")
                 .append("<tr><td class='label'>")
                 .append(if (isArabic) "الإجمالي قبل الخصم:" else "Subtotal:")
-                .append("</td><td class='value' style='text-align:").append(alignEnd).append(";'>")
+                .append("</td><td class='value nowrap' style='text-align:").append(alignEnd).append(";'>")
                 .append(formatMoney(subtotalUSD, "USD"))
                 .append("</td></tr>")
 
             if (discountUSD > 0) {
                 h.append("<tr><td class='label'>")
                     .append(if (isArabic) "الخصم الممنوح:" else "Discount:")
-                    .append("</td><td class='value' style='text-align:").append(alignEnd).append("; color:#e53e3e;'>- ")
+                    .append("</td><td class='value nowrap' style='text-align:").append(alignEnd).append("; color:#e53e3e;'>- ")
                     .append(formatMoney(discountUSD, "USD"))
                     .append("</td></tr>")
             }
@@ -1446,7 +1486,7 @@ class MiraReceiptFragment : DialogFragment() {
             if (taxUSD > 0) {
                 h.append("<tr><td class='label'>")
                     .append(if (isArabic) "الضريبة:" else "Tax / VAT:")
-                    .append("</td><td class='value' style='text-align:").append(alignEnd).append(";'>")
+                    .append("</td><td class='value nowrap' style='text-align:").append(alignEnd).append(";'>")
                     .append(formatMoney(taxUSD, "USD"))
                     .append("</td></tr>")
             }
@@ -1454,13 +1494,11 @@ class MiraReceiptFragment : DialogFragment() {
             if (finalLocal > 0 && abs(finalLocal - finalUSD) > 0.01) {
                 h.append("<tr><td class='label'>")
                     .append(if (isArabic) "الصافي بالدولار:" else "Net (USD):")
-                    .append("</td><td class='value' style='text-align:").append(alignEnd).append(";'>")
+                    .append("</td><td class='value nowrap' style='text-align:").append(alignEnd).append(";'>")
                     .append(formatMoney(finalUSD, "USD"))
                     .append("</td></tr>")
             }
 
-            val displayAmount: String
-            val displayCurrencyLabel: String
             val effectiveTotalForSummary: Double
             if (finalLocal > 0 && abs(finalLocal - finalUSD) > 0.01) {
                 displayAmount = String.format(Locale.US, "%,.2f", finalLocal)
@@ -1474,9 +1512,9 @@ class MiraReceiptFragment : DialogFragment() {
 
             h.append("<tr class='grand-total'><td class='label' style='color:#0d1b2a;'>")
                 .append(if (isArabic) "💰 الصافي المستحق:" else "💰 Net Total:")
-                .append("</td><td class='value' style='text-align:").append(alignEnd).append("; color:#0d1b2a;'>")
+                .append("</td><td class='value nowrap' style='text-align:").append(alignEnd).append("; color:#0d1b2a;'>")
                 .append(displayAmount)
-                .append(" <span style='font-size:11px; color:#c59b27;'>")
+                .append(" <span style='font-size:10.5px; color:#c59b27;'>")
                 .append(escapeHtml(displayCurrencyLabel))
                 .append("</span></td></tr>")
                 .append("</table></div></div>")
@@ -1502,11 +1540,11 @@ class MiraReceiptFragment : DialogFragment() {
                     t.optJSONObject("sale")?.let { creditId = it.optLong("credit_id_created", 0L) }
                 }
 
-                h.append("<div style='margin:12px 0; padding:12px; background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border:2px solid #3b82f6; border-radius:10px;'>")
-                    .append("<div style='text-align:center; font-weight:bold; color:#1e40af; font-size:12px; margin-bottom:6px;'>💰 ")
+                h.append("<div style='margin:10px 0; padding:10px; background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%); border:2px solid #3b82f6; border-radius:10px;'>")
+                    .append("<div style='text-align:center; font-weight:bold; color:#1e40af; font-size:11.5px; margin-bottom:4px;'>💰 ")
                     .append(if (isArabic) "رصيد دائن للعميل" else "Customer Store Credit")
                     .append("</div>")
-                    .append("<div style='text-align:center; font-size:20px; font-weight:900; color:#1e3a8a; padding:6px; background:#fff; border-radius:6px;'>+")
+                    .append("<div style='text-align:center; font-size:18px; font-weight:900; color:#1e3a8a; padding:5px; background:#fff; border-radius:6px;'>+")
                     .append(String.format(Locale.US, "%,.2f", creditCreated)).append(" ").append(escapeHtml(currency))
                     .append("</div>")
 
@@ -1516,7 +1554,7 @@ class MiraReceiptFragment : DialogFragment() {
                         .append("</div>")
                 }
 
-                h.append("<div style='text-align:center; font-size:10px; color:#1e40af; margin-top:4px;'>")
+                h.append("<div style='text-align:center; font-size:9.5px; color:#1e40af; margin-top:4px;'>")
                     .append(if (isArabic) "✅ صالح 12 شهراً — يُستخدم في مشترياتك القادمة" else "✅ Valid for 12 months on future purchases")
                     .append("</div></div>")
             }
@@ -1549,12 +1587,12 @@ class MiraReceiptFragment : DialogFragment() {
                 "Org:$orgName|Invoice:$saleNumber|Date:$dateStr|Total:$displayAmount $displayCurrencyLabel|Weight:${String.format(Locale.US, "%.3f", totalWeightSum)}g"
             }
             val qrImgSrc = generateOfflineQrDataUri(qrPayload)
-                ?: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${Uri.encode(qrPayload)}"
+                ?: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${android.net.Uri.encode(qrPayload)}"
 
             h.append("<div class='footer-section'>")
                 .append("<div class='qr-box'>")
                 .append("<img src='").append(qrImgSrc).append("' alt='QR Verify'/><br>")
-                .append("<span style='font-size:8px; color:#718096;'>")
+                .append("<span class='sub-note'>")
                 .append(if (isArabic) "رمز التحقق الرقمي" else "Digital Verification")
                 .append("</span></div>")
                 .append("<div class='signatures'>")
