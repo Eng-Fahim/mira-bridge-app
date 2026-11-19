@@ -12,7 +12,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -67,6 +66,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -80,6 +80,7 @@ class MiraSalesHistoryFragment : Fragment() {
     }
 
     data class MiraSaleItem(
+        val dbId: Long,
         val saleId: String,
         val customerName: String,
         val paymentMethod: String,
@@ -114,6 +115,7 @@ class MiraSalesHistoryFragment : Fragment() {
     private var dataRefreshReceiver: BroadcastReceiver? = null
 
     private val saleList = ArrayList<MiraSaleItem>()
+    private val fullReceiptCache = ConcurrentHashMap<Long, String>()
     private var currentPage = 1
 
     private val isLoadingAtomic = AtomicBoolean(false)
@@ -149,6 +151,7 @@ class MiraSalesHistoryFragment : Fragment() {
     private var isRefreshingState by mutableStateOf(false)
     private var isLoadingMoreState by mutableStateOf(false)
     private var isEndOfListState by mutableStateOf(false)
+    private var isOpeningReceiptState by mutableStateOf(false)
     private var emptyMessageState by mutableStateOf("")
 
     private var totalRevenueTextState by mutableStateOf("—")
@@ -349,6 +352,7 @@ class MiraSalesHistoryFragment : Fragment() {
         isEndOfListState = false
 
         if (showProgress) {
+            fullReceiptCache.clear()
             if (saleList.isEmpty()) {
                 isInitialLoadingState = true
                 emptyMessageState = if (isArabic) "جاري تحميل المبيعات..." else "Loading sales..."
@@ -486,8 +490,8 @@ class MiraSalesHistoryFragment : Fragment() {
                             isLastPage = isLast
                         } else {
                             if (items.isNotEmpty()) {
-                                val existingIds = saleList.mapTo(HashSet()) { it.saleId }
-                                val uniqueNew = items.filter { it.saleId !in existingIds }
+                                val existingIds = saleList.mapTo(HashSet()) { "${it.dbId}_${it.saleId}" }
+                                val uniqueNew = items.filter { "${it.dbId}_${it.saleId}" !in existingIds }
                                 saleList.addAll(uniqueNew)
                             }
                             currentPage = page
@@ -539,6 +543,7 @@ class MiraSalesHistoryFragment : Fragment() {
         for (i in 0 until sales.length()) {
             val sale = sales.optJSONObject(i) ?: continue
 
+            val dbId = sale.optLong("id", sale.optLong("sale_id", 0L))
             val saleId = sale.optString(
                 "sale_number",
                 sale.optString(
@@ -546,10 +551,15 @@ class MiraSalesHistoryFragment : Fragment() {
                     sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")))
                 )
             )
+            val customerObj = sale.optJSONObject("customer")
             val customerName = sale.optString(
                 "customer_name",
-                sale.optString("client_name", if (isArabic) "عميل نقدي" else "Cash Customer")
-            )
+                sale.optString(
+                    "client_name",
+                    customerObj?.optString("name", "")?.takeIf { it.isNotBlank() }
+                        ?: if (isArabic) "عميل نقدي" else "Cash Customer"
+                )
+            ).ifBlank { if (isArabic) "عميل نقدي" else "Cash Customer" }
 
             val rawCurrency = sale.optString("currency", sale.optString("currency_code", ""))
             val isMixCurrency = rawCurrency.equals("MIX", ignoreCase = true)
@@ -587,7 +597,7 @@ class MiraSalesHistoryFragment : Fragment() {
             val hasTradeIn = (tradeInsArr != null && tradeInsArr.length() > 0) || tradeInTotal > 0.0
 
             val paymentsArr = sale.optJSONArray("payments")
-            val payMethodRaw = sale.optString("payment_method", sale.optString("pay_type", "CASH"))
+            val payMethodRaw = sale.optString("payment_method", sale.optString("pay_type", "CASH")).ifBlank { "CASH" }
             val isMixed = isMixCurrency ||
                 (paymentsArr != null && paymentsArr.length() > 1) ||
                 (hasTradeIn && paymentsArr != null && paymentsArr.length() > 0) ||
@@ -603,22 +613,39 @@ class MiraSalesHistoryFragment : Fragment() {
                 sale.optInt("total_items", sale.optInt("count", itemsArr?.length() ?: 0))
             )
 
+            val date = sale.optString(
+                "created_at",
+                sale.optString("sale_date", sale.optString("timestamp", sale.optString("date", "")))
+            )
+            val branchId = sale.optInt("branch_id", sale.optJSONObject("branch")?.optInt("id", 0) ?: 0)
+
+            val rawStatus = sale.optString("status", "completed").lowercase(Locale.ROOT)
+            val rawRefundStatus = sale.optString("refund_status", "").lowercase(Locale.ROOT)
+            val refundStatus = when {
+                rawRefundStatus.isNotEmpty() && rawRefundStatus != "none" && rawRefundStatus != "null" -> rawRefundStatus
+                rawStatus == "refunded" || rawStatus == "fully_refunded" || rawStatus == "partially_refunded" -> rawStatus
+                else -> "completed"
+            }
+            val refundReason = sale.optString("refund_reason", "")
+            val refundedAt = sale.optString("refunded_at", "")
+
             items.add(
                 MiraSaleItem(
+                    dbId = dbId,
                     saleId = saleId,
                     customerName = customerName,
                     paymentMethod = payMethodRaw,
-                    date = sale.optString("created_at", sale.optString("timestamp", sale.optString("date", ""))),
+                    date = date,
                     rawJson = sale.toString(),
                     amountLocal = resolvedLocal,
                     amountUSD = resolvedUsd,
                     currency = currency,
                     exchangeRate = rate,
                     itemCount = parsedCount,
-                    branchId = sale.optInt("branch_id", 0),
-                    refundStatus = sale.optString("refund_status", sale.optString("status", "completed")),
-                    refundReason = sale.optString("refund_reason", ""),
-                    refundedAt = sale.optString("refunded_at", ""),
+                    branchId = branchId,
+                    refundStatus = refundStatus,
+                    refundReason = refundReason,
+                    refundedAt = refundedAt,
                     hasTradeIn = hasTradeIn,
                     isMixedPayment = isMixed
                 )
@@ -719,23 +746,68 @@ class MiraSalesHistoryFragment : Fragment() {
         }
     }
 
+    private fun showReceiptDialog(receiptJson: String) {
+        if (!isAdded) return
+        val act = activity
+        if (act is UHFMainActivity) {
+            act.openReceiptFragment(receiptJson)
+        } else {
+            MiraReceiptFragment.newInstance(receiptJson)
+                .show(parentFragmentManager, "mira_receipt")
+        }
+    }
+
     private fun openReceipt(sale: MiraSaleItem) {
-        try {
-            val act = activity
-            if (act is UHFMainActivity) {
-                act.openReceiptFragment(sale.rawJson)
-            } else if (isAdded) {
-                MiraReceiptFragment.newInstance(sale.rawJson)
-                    .show(parentFragmentManager, "mira_receipt")
+        if (isOpeningReceiptState) return
+
+        val isRefundedState = sale.refundStatus == "refunded" ||
+            sale.refundStatus == "fully_refunded" ||
+            sale.refundStatus == "partially_refunded"
+
+        // 1. التحقق من الكاش الفوري في الذاكرة أو التخزين المحلي
+        val cachedFull = if (sale.dbId > 0) {
+            fullReceiptCache[sale.dbId]
+                ?: offlineCache?.getString("sale_detail_${sale.dbId}", null)?.takeIf { cached ->
+                    !isRefundedState || cached.contains(sale.refundStatus)
+                }
+        } else null
+
+        if (!cachedFull.isNullOrEmpty()) {
+            fullReceiptCache[sale.dbId] = cachedFull
+            showReceiptDialog(cachedFull)
+            return
+        }
+
+        // 2. إذا لم يتوفر معرّف رقمي، اعرض المتاح مباشرة
+        if (sale.dbId <= 0L) {
+            showReceiptDialog(sale.rawJson)
+            return
+        }
+
+        // 3. جلب التفاصيل الكاملة من /pos/sales/{id}
+        isOpeningReceiptState = true
+        networkExecutor.execute {
+            var resolvedJson: String? = null
+            try {
+                if (apiClient == null && context != null) {
+                    apiClient = MiraApiClient.getInstance(requireContext())
+                }
+                val resp = apiClient?.getSaleDetail(sale.dbId)
+                if (resp != null && resp.isSuccess && resp.data != null) {
+                    resolvedJson = resp.data.toString()
+                    fullReceiptCache[sale.dbId] = resolvedJson
+                    offlineCache?.edit()
+                        ?.putString("sale_detail_${sale.dbId}", resolvedJson)
+                        ?.apply()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching full sale detail #${sale.dbId}: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error opening receipt", e)
-            context?.let {
-                Toast.makeText(
-                    it,
-                    if (isArabic) "خطأ في فتح الإيصال" else "Error opening receipt",
-                    Toast.LENGTH_SHORT
-                ).show()
+
+            mainHandler.post {
+                isOpeningReceiptState = false
+                if (!isAdded) return@post
+                showReceiptDialog(resolvedJson ?: sale.rawJson)
             }
         }
     }
@@ -1106,7 +1178,7 @@ class MiraSalesHistoryFragment : Fragment() {
                                 ) {
                                     itemsIndexed(
                                         items = filteredSalesState,
-                                        key = { index, item -> "${item.saleId}_$index" }
+                                        key = { index, item -> "${item.dbId}_${item.saleId}_$index" }
                                     ) { _, sale ->
                                         SaleInvoiceCard(
                                             sale = sale,
@@ -1153,6 +1225,39 @@ class MiraSalesHistoryFragment : Fragment() {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                if (isOpeningReceiptState) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                            border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = colors.goldPrimary
+                                )
+                                Text(
+                                    text = if (isAr) "جاري تحميل تفاصيل الفاتورة..." else "Loading invoice details...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
+                                )
                             }
                         }
                     }
