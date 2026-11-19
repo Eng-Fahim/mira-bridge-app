@@ -56,7 +56,7 @@ import java.util.Locale
 
 class ActivityDetailsBottomSheet : BottomSheetDialogFragment() {
 
-    fun interface OnActionClickListener {
+    interface OnActionClickListener {
         fun onPrintInvoice(activityData: JSONObject)
         fun onOpenRefund(activityData: JSONObject)
     }
