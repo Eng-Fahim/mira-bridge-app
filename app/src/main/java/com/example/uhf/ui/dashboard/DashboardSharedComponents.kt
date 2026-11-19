@@ -15,7 +15,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AssignmentReturn
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.PointOfSale
+import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Recycling
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -393,6 +400,207 @@ internal fun RecentActivitySection(
     }
 }
 
+private data class ActivityRowPresentation(
+    val title: String,
+    val subtitle: String,
+    val user: String,
+    val timestamp: String,
+    val amount: Double,
+    val currency: String,
+    val accuracy: Double,
+    val status: String,
+    val icon: ImageVector,
+    val accentColor: Color
+)
+
+private fun buildActivityPresentation(
+    isArabic: Boolean,
+    item: JSONObject
+): ActivityRowPresentation {
+    val actionKey = item.optString("action", "")
+        .ifBlank { item.optString("type", "") }
+        .ifBlank { item.optString("event", "") }
+        .uppercase(Locale.US)
+
+    val nestedObj = extractNestedObject(item, "details")
+        ?: extractNestedObject(item, "meta")
+        ?: extractNestedObject(item, "payload")
+        ?: item
+
+    val (friendlyTitle, icon, accent) = resolveActionVisuals(actionKey, isArabic)
+
+    val candidateTitle = if (isArabic) {
+        item.optString("title_ar", "").ifBlank { item.optString("title", "") }
+    } else {
+        item.optString("title_en", "").ifBlank { item.optString("title", "") }
+    }.trim()
+
+    val finalTitle = if (candidateTitle.isNotBlank() && !isRawKey(candidateTitle)) {
+        candidateTitle
+    } else {
+        friendlyTitle
+    }
+
+    val saleNumber = nestedObj.optString("sale_number")
+        .ifBlank { item.optString("sale_number") }
+        .ifBlank { nestedObj.optString("invoice_number") }
+        .trim()
+
+    val entryId = nestedObj.optString("entry_id")
+        .ifBlank { item.optString("entry_id") }
+        .trim()
+
+    val nestedAmount = firstValidAmount(
+        item.optDouble("amount", Double.NaN),
+        nestedObj.optDouble("amount", Double.NaN),
+        nestedObj.optDouble("total_debit", Double.NaN),
+        nestedObj.optDouble("total_amount", Double.NaN)
+    )
+
+    val pureWeight = firstValidAmount(
+        nestedObj.optDouble("pure_weight", Double.NaN),
+        nestedObj.optDouble("weight", Double.NaN),
+        item.optDouble("weight", Double.NaN)
+    )
+
+    val currency = item.optString("currency")
+        .ifBlank { nestedObj.optString("currency") }
+        .ifBlank { "USD" }
+        .trim()
+
+    val detailParts = mutableListOf<String>()
+    if (saleNumber.isNotBlank()) {
+        detailParts.add(if (isArabic) "فاتورة: $saleNumber" else "Invoice: $saleNumber")
+    }
+    if (entryId.isNotBlank()) {
+        detailParts.add(if (isArabic) "قيد #$entryId" else "Entry #$entryId")
+    }
+    if (!nestedAmount.isNaN()) {
+        detailParts.add(
+            if (isArabic) "القيمة: ${String.format(Locale.US, "%,.2f", nestedAmount)} $currency"
+            else "Amount: ${String.format(Locale.US, "%,.2f", nestedAmount)} $currency"
+        )
+    }
+    if (!pureWeight.isNaN()) {
+        detailParts.add(
+            if (isArabic) "الوزن الصافي: ${String.format(Locale.US, "%.2f", pureWeight)} جم"
+            else "Pure: ${String.format(Locale.US, "%.2f", pureWeight)}g"
+        )
+    }
+
+    val rawDetails = if (isArabic) {
+        item.optString("details_ar", "").ifBlank { item.optString("details", "") }
+    } else {
+        item.optString("details_en", "").ifBlank { item.optString("details", "") }
+    }.trim()
+
+    val subtitle = when {
+        detailParts.isNotEmpty() -> detailParts.joinToString("  •  ")
+        rawDetails.isNotEmpty() && !looksLikeJson(rawDetails) -> rawDetails
+        else -> if (isArabic) "عملية مسجلة في النظام" else "Recorded system operation"
+    }
+
+    val user = item.optString("user", "").ifBlank { item.optString("username", "") }.trim()
+    val timestamp = extractTime(item.optString("timestamp", "").ifBlank { item.optString("created_at", "") })
+    val amount = if (!nestedAmount.isNaN()) nestedAmount else item.optDouble("amount", 0.0)
+    val accuracy = item.optDouble("accuracy", -1.0)
+    val status = item.optString("status", "neutral").lowercase(Locale.ROOT)
+
+    return ActivityRowPresentation(
+        title = finalTitle,
+        subtitle = subtitle,
+        user = user,
+        timestamp = timestamp,
+        amount = amount,
+        currency = currency,
+        accuracy = accuracy,
+        status = status,
+        icon = icon,
+        accentColor = accent
+    )
+}
+
+private fun resolveActionVisuals(actionKey: String, isArabic: Boolean): Triple<String, ImageVector, Color> {
+    return when {
+        actionKey.contains("REFUND") && actionKey.contains("JOURNAL") -> Triple(
+            if (isArabic) "قيد يومية لمرتجع مبيعات" else "Sales Refund Journal Entry",
+            Icons.Rounded.AssignmentReturn,
+            Color(0xFFF59E0B)
+        )
+        actionKey.contains("REFUND") -> Triple(
+            if (isArabic) "مرتجع فاتورة مبيعات" else "Sales Refund",
+            Icons.Rounded.AssignmentReturn,
+            Color(0xFFEF4444)
+        )
+        actionKey.contains("SALE") && actionKey.contains("JOURNAL") -> Triple(
+            if (isArabic) "قيد يومية لفاتورة بيع" else "Sales Journal Entry",
+            Icons.Rounded.ReceiptLong,
+            Color(0xFF38BDF8)
+        )
+        actionKey.contains("SALE") || actionKey.contains("POS") -> Triple(
+            if (isArabic) "إتمام عملية بيع" else "Sale Completed",
+            Icons.Rounded.PointOfSale,
+            Color(0xFF10B981)
+        )
+        actionKey.contains("SCRAP") -> Triple(
+            if (isArabic) "عملية شراء كسر ذهب" else "Scrap Gold Operation",
+            Icons.Rounded.Recycling,
+            Color(0xFFD4AF37)
+        )
+        actionKey.contains("TRANSFER") -> Triple(
+            if (isArabic) "تحويل قطع بين الفروع" else "Branch Transfer",
+            Icons.Rounded.SwapHoriz,
+            Color(0xFFA855F7)
+        )
+        actionKey.contains("GATE") -> Triple(
+            if (isArabic) "تنبيه بوابة أمنية" else "Security Gate Event",
+            Icons.Rounded.Shield,
+            Color(0xFFEF4444)
+        )
+        else -> Triple(
+            if (isArabic) "عملية في النظام" else "System Activity",
+            Icons.Rounded.History,
+            Color(0xFFD4AF37)
+        )
+    }
+}
+
+private fun extractNestedObject(parent: JSONObject, key: String): JSONObject? {
+    parent.optJSONObject(key)?.let { return it }
+    val str = parent.optString(key, "").trim()
+    if (str.startsWith("{")) {
+        return try {
+            JSONObject(str)
+        } catch (_: Exception) {
+            null
+        }
+    }
+    return null
+}
+
+private fun firstValidAmount(vararg values: Double): Double {
+    for (v in values) {
+        if (!v.isNaN() && v != 0.0) return v
+    }
+    return Double.NaN
+}
+
+private fun isRawKey(value: String): Boolean {
+    val trimmed = value.trim()
+    return trimmed.uppercase(Locale.US) == trimmed && trimmed.contains("_")
+}
+
+private fun looksLikeJson(text: String): Boolean {
+    val trimmed = text.trim()
+    return trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.contains("\":")
+}
+
+private fun extractTime(raw: String): String {
+    if (raw.isBlank()) return ""
+    val match = Regex("""\b(\d{2}:\d{2})(?::\d{2})?\b""").find(raw)
+    return match?.groupValues?.getOrNull(1) ?: raw
+}
+
 @Composable
 private fun ActivityTimelineRow(
     isArabic: Boolean,
@@ -401,19 +609,7 @@ private fun ActivityTimelineRow(
     onClick: () -> Unit
 ) {
     val colors = MiraTheme.colors
-    val iconEmoji = item.optString("icon", "⚙️")
-    val title = if (isArabic) {
-        item.optString("title_ar", item.optString("title", item.optString("action", "عملية")))
-    } else {
-        item.optString("title_en", item.optString("title", item.optString("action", "Activity")))
-    }
-    val details = if (isArabic) item.optString("details_ar", "") else item.optString("details_en", "")
-    val user = item.optString("user", "")
-    val timestamp = extractTime(item.optString("timestamp", ""))
-    val amount = item.optDouble("amount", 0.0)
-    val currency = item.optString("currency", "USD")
-    val accuracy = item.optDouble("accuracy", -1.0)
-    val status = item.optString("status", "neutral")
+    val presentation = buildActivityPresentation(isArabic, item)
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -421,7 +617,7 @@ private fun ActivityTimelineRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(colors.backgroundTop.copy(alpha = 0.45f))
-            .border(1.dp, colors.cardBorder, RoundedCornerShape(14.dp))
+            .border(1.dp, presentation.accentColor.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .padding(12.dp)
     ) {
@@ -430,43 +626,48 @@ private fun ActivityTimelineRow(
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(colors.goldPrimary.copy(alpha = 0.14f))
+                .background(presentation.accentColor.copy(alpha = 0.14f))
         ) {
-            Text(text = iconEmoji, fontSize = 18.sp)
+            Icon(
+                imageVector = presentation.icon,
+                contentDescription = null,
+                tint = presentation.accentColor,
+                modifier = Modifier.size(20.dp)
+            )
         }
 
         Spacer(modifier = Modifier.width(10.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = title,
+                text = presentation.title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (details.isNotEmpty()) {
+            if (presentation.subtitle.isNotEmpty()) {
                 Text(
-                    text = details,
+                    text = presentation.subtitle,
                     fontSize = 11.sp,
                     color = colors.textSecondary,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (user.isNotEmpty() && user != "—") {
+                if (presentation.user.isNotEmpty() && presentation.user != "—") {
                     Text(
-                        text = "👤 $user",
+                        text = "👤 ${presentation.user}",
                         fontSize = 10.sp,
                         color = colors.textSecondary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                if (timestamp.isNotEmpty()) {
+                if (presentation.timestamp.isNotEmpty()) {
                     Text(
-                        text = timestamp,
+                        text = presentation.timestamp,
                         fontSize = 10.sp,
                         color = colors.textSecondary
                     )
@@ -477,35 +678,35 @@ private fun ActivityTimelineRow(
         Spacer(modifier = Modifier.width(8.dp))
 
         Column(horizontalAlignment = Alignment.End) {
-            if (amount != 0.0) {
-                val isNegative = amount < 0 || status == "refund"
+            if (presentation.amount != 0.0) {
+                val isNegative = presentation.amount < 0 || presentation.status == "refund"
                 val amtColor = if (isNegative) Color(0xFFEF4444) else Color(0xFF10B981)
                 Text(
                     text = if (maskAmount) "•••••" else String.format(
                         Locale.US,
                         "%s%,.2f %s",
                         if (isNegative) "-" else "",
-                        abs(amount),
-                        currency
+                        abs(presentation.amount),
+                        presentation.currency
                     ),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (maskAmount) colors.textSecondary else amtColor
                 )
-            } else if (accuracy >= 0) {
+            } else if (presentation.accuracy >= 0) {
                 Text(
-                    text = String.format(Locale.US, "🎯 %.1f%%", accuracy),
+                    text = String.format(Locale.US, "🎯 %.1f%%", presentation.accuracy),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.goldPrimary
                 )
             }
 
-            if (status == "danger" || status == "warning") {
+            if (presentation.status == "danger" || presentation.status == "warning") {
                 Spacer(modifier = Modifier.height(3.dp))
-                val chipColor = if (status == "danger") Color(0xFFEF4444) else Color(0xFFF59E0B)
+                val chipColor = if (presentation.status == "danger") Color(0xFFEF4444) else Color(0xFFF59E0B)
                 Text(
-                    text = if (status == "danger") (if (isArabic) "حرج" else "Critical")
+                    text = if (presentation.status == "danger") (if (isArabic) "حرج" else "Critical")
                     else (if (isArabic) "تحذير" else "Warning"),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
