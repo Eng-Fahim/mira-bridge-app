@@ -205,7 +205,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     private val stoppingReader = AtomicBoolean(false)
 
     @Volatile private var isFormLocked = false
-    internal var isArabic: Boolean = true
+    
+    private var isArabic: Boolean = true
+
 
 
     @Volatile private var isEpcBound = false
@@ -1423,15 +1425,17 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     //  Save & Encode — finalizeItemIdentity
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun finalizeItemIdentity() {
+        private fun finalizeItemIdentity() {
+        val isAr = isArabic // ✅ التقاط محلي لتجنب IllegalAccessError داخل lambdas
+
         if (isFormLocked) {
-            showToast(if (isArabic) "⛔ العملية قيد التنفيذ..." else "⛔ Operation in progress...")
+            showToast(if (isAr) "⛔ العملية قيد التنفيذ..." else "⛔ Operation in progress...")
             return
         }
 
         val pm = permissionManager ?: return
         if (!(pm.canEdit("identity") || pm.isManager)) {
-            showToast(if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied")
+            showToast(if (isAr) "⛔ غير مصرح" else "⛔ Access Denied")
             return
         }
 
@@ -1452,7 +1456,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             val title = titleTextState.trim()
             val weightStr = grossWeightTextState.trim()
 
-            if (!validateInputData(identifier, title, weightStr)) {
+            if (!validateInputData(identifier, title, weightStr, isAr)) {
                 unlockFormFast()
                 return
             }
@@ -1473,7 +1477,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             val stoneWeightGrams = PricingCalculator.caratsToGrams(stoneWeightCarats)
             if (stoneWeightGrams >= grossWeight) {
                 showValidationError(
-                    if (isArabic) "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي!"
+                    if (isAr) "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي!"
                     else "❌ Stone weight cannot exceed gross weight!"
                 )
                 unlockFormFast()
@@ -1493,16 +1497,16 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             val exchangeRate = prcMgr.getExchangeRate(localCurrency)
 
             loadingDialogState = (
-                if (isArabic) "🔄 جاري التكويد وإنشاء الأكواد المجهرية..."
+                if (isAr) "🔄 جاري التكويد وإنشاء الأكواد المجهرية..."
                 else "🔄 Encoding & Generating Micro-Codes..."
             ) to (
-                if (isArabic) "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات"
+                if (isAr) "يرجى الانتظار - يتم الآن تسجيل القطعة في قاعدة البيانات"
                 else "Please wait - saving item in database"
             )
 
             val selectedKarat = "${selectedKaratNum}K"
             val selectedCategory = getSelectedCategoryLabel()
-            val location = if (isArabic) "المعرض الرئيسي" else "Main Showroom"
+            val location = if (isAr) "المعرض الرئيسي" else "Main Showroom"
             val branchId = branchesManager?.activeBranchId ?: 1
             val finalPhotoPaths = ArrayList(photoManager?.photoPaths ?: emptyList())
             val currentUserId = getCurrentUserId()
@@ -1511,8 +1515,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 loadingDialogState = null
                 unlockFormFast()
                 showErrorDialog(
-                    if (isArabic) "❌ جلسة منتهية" else "❌ Session Expired",
-                    if (isArabic) "يرجى تسجيل الدخول مجدداً" else "Please log in again"
+                    if (isAr) "❌ جلسة منتهية" else "❌ Session Expired",
+                    if (isAr) "يرجى تسجيل الدخول مجدداً" else "Please log in again"
                 )
                 return
             }
@@ -1553,8 +1557,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         loadingDialogState = null
                         unlockFormFast()
                         showErrorDialog(
-                            if (isArabic) "❌ فشل التكويد" else "❌ Encoding Failed",
-                            if (isArabic) "لم نتمكن من قراءة TID الشريحة.\n\n💡 أعد المسح."
+                            if (isAr) "❌ فشل التكويد" else "❌ Encoding Failed",
+                            if (isAr) "لم نتمكن من قراءة TID الشريحة.\n\n💡 أعد المسح."
                             else "Cannot read tag TID.\n\n💡 Rescan the tag."
                         )
                     }
@@ -1564,14 +1568,14 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 val tid = tidFromTagWorking.trim().uppercase(Locale.US)
                 val originalEpc = epcFromTagWorking.trim().uppercase(Locale.US)
 
-                val verifyError = verifyTagWithServerBeforeEncodingSync(tid, originalEpc, lastScanSource)
+                val verifyError = verifyTagWithServerBeforeEncodingSync(tid, originalEpc, lastScanSource, isAr)
                 if (verifyError != null) {
                     safeRun {
                         loadingDialogState = null
                         unlockFormFast()
                         playErrorSound()
                         showErrorDialog(
-                            if (isArabic) "⛔ الشريحة مرفوضة" else "⛔ Tag Rejected",
+                            if (isAr) "⛔ الشريحة مرفوضة" else "⛔ Tag Rejected",
                             verifyError
                         )
                     }
@@ -1603,7 +1607,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                 if (response.isSuccess && response.data != null) {
                                     serverItemId = response.data!!.optInt("item_id", 0)
                                 } else if (!response.isSuccess) {
-                                    errorMessage = extractErrorMessage(response)
+                                    errorMessage = extractErrorMessage(response, isAr)
                                     isNetworkError = response.isNetworkError
                                 }
                             }
@@ -1622,15 +1626,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                     safeRun { updatePendingSyncBadge() }
                                 }
                                 showToast(
-                                    if (isArabic) "💾 تم الحفظ محلياً (أوفلاين)"
+                                    if (isAr) "💾 تم الحفظ محلياً (أوفلاين)"
                                     else "💾 Saved locally (Offline)"
                                 )
                                 scheduleAutoSync()
                                 unlockFormFast()
                             } else {
                                 showErrorDialog(
-                                    if (isArabic) "خطأ في التكويد" else "Encoding Error",
-                                    errorMessage ?: if (isArabic) "❌ فشل التكويد" else "❌ Encoding failed"
+                                    if (isAr) "خطأ في التكويد" else "Encoding Error",
+                                    errorMessage ?: if (isAr) "❌ فشل التكويد" else "❌ Encoding failed"
                                 )
                                 unlockFormFast()
                             }
@@ -1688,8 +1692,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                 loadingDialogState = null
                                 unlockFormFast()
                                 showErrorDialog(
-                                    if (isArabic) "❌ فشل التحقق من الكتابة" else "❌ Write Verification Failed",
-                                    if (isArabic) "لم يتم كتابة EPC بنجاح على الشريحة." else "Failed to write EPC on tag."
+                                    if (isAr) "❌ فشل التحقق من الكتابة" else "❌ Write Verification Failed",
+                                    if (isAr) "لم يتم كتابة EPC بنجاح على الشريحة." else "Failed to write EPC on tag."
                                 )
                             }
                             return@execute
@@ -1779,12 +1783,12 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
                         if (!wasWritten) {
                             showToast(
-                                if (isArabic) "✅ تم استخدام EPC الموجود بنجاح"
+                                if (isAr) "✅ تم استخدام EPC الموجود بنجاح"
                                 else "✅ Existing EPC used successfully"
                             )
                         } else if (writeOk && verifyOk && lockOk) {
                             showToast(
-                                if (isArabic) "🔒 تم التكويد والقفل بنجاح"
+                                if (isAr) "🔒 تم التكويد والقفل بنجاح"
                                 else "🔒 Encoded & locked successfully"
                             )
                         }
@@ -1814,20 +1818,23 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         loadingDialogState = null
                         unlockFormFast()
                         showErrorDialog(
-                            if (isArabic) "خطأ للنظام" else "System Error",
+                            if (isAr) "خطأ للنظام" else "System Error",
                             e.message ?: "Unknown"
                         )
                     }
                 }
             }
         } catch (e: NumberFormatException) {
-            showValidationError(if (isArabic) "❌ خطأ في الأرقام المدخلة" else "❌ Invalid number format")
+            loadingDialogState = null
+            showValidationError(if (isAr) "❌ خطأ في الأرقام المدخلة" else "❌ Invalid number format")
             unlockFormFast()
         } catch (e: Exception) {
+            loadingDialogState = null
             unlockFormFast()
             showToast("❌ ${e.message}")
         }
     }
+
 
     private fun verifyTagWithServerBeforeEncodingSync(tid: String, epc: String, source: String?): String? {
         val client = apiClient ?: return if (isArabic) "❌ لا اتصال بالسيرفر" else "❌ No server connection"
