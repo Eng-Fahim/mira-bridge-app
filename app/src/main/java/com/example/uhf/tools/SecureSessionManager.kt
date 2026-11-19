@@ -6,9 +6,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
-import androidx.annotation.Nullable
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.nio.charset.StandardCharsets
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.util.Locale
@@ -18,9 +18,9 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * SecureSessionManager - إدارة الجلسات الآمنة للتطبيق
+ * SecureSessionManager - إدارة الجلسات الآمنة والترخيص والمصادقة البيومترية للتطبيق
  *
- * 💎 Kotlin Edition (v3.0) — هندسة نظيفة، أمان عالٍ، وتوافقية تامة.
+ * 💎 Kotlin Edition (v4.0) — هندسة نظيفة، أمان عالٍ، حماية من تكرار البصمة، وتوافقية تامة.
  */
 class SecureSessionManager private constructor(context: Context) {
 
@@ -30,20 +30,24 @@ class SecureSessionManager private constructor(context: Context) {
 
     // تخزين مؤقت (Cached Fields) لتحسين الأداء
     private var cachedAuthToken: String? = null
-    private var tokenCacheTime: Long = 0
+    private var tokenCacheTime: Long = 0L
     private var cachedApiKey: String? = null
-    private var apiKeyCacheTime: Long = 0
+    private var apiKeyCacheTime: Long = 0L
     private var cachedLoggedIn: Boolean? = null
-    private var loggedInCacheTime: Long = 0
+    private var loggedInCacheTime: Long = 0L
     private var cachedUsername: String? = null
-    private var usernameCacheTime: Long = 0
+    private var usernameCacheTime: Long = 0L
     private var cachedServerUrl: String? = null
-    private var serverUrlCacheTime: Long = 0
+    private var serverUrlCacheTime: Long = 0L
     private var cachedLastActiveTime: Long? = null
     private var cachedSessionLocked: Boolean? = null
-    
-    // ✅ تم إزالة الخصائص المتعارضة (userId, branchId, username) 
-    // لأن الدوال getUserId(), getBranchId(), getUsername() موجودة بالفعل وتؤدي الغرض بالكامل بدون تعارض في توقيع جافا.
+
+    // حماية ذرية ضد استدعاء نافذة البصمة مرتين في نفس الوقت
+    @Volatile
+    private var biometricPromptInProgress: Boolean = false
+
+    @Volatile
+    private var activeBiometricRequestId: Long = 0L
 
     enum class Role {
         SYSTEM_ADMIN,
@@ -58,19 +62,17 @@ class SecureSessionManager private constructor(context: Context) {
         SECURITY,
         ADMIN
     }
-    
 
     init {
         val appContext = context.applicationContext
         userPrefs = appContext.getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE)
-        
-        
+
         try {
-            keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
+            keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply {
                 load(null)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing KeyStore", e)
+            Log.e(TAG, "Error initializing AndroidKeyStore", e)
         }
 
         securePrefs = createEncryptedSharedPreferences(appContext)
@@ -78,6 +80,7 @@ class SecureSessionManager private constructor(context: Context) {
 
     companion object {
         private const val TAG = "SecureSessionManager"
+        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
         @Volatile
         private var instance: SecureSessionManager? = null
@@ -145,6 +148,7 @@ class SecureSessionManager private constructor(context: Context) {
         // التشفير البيومتري
         private const val BIOMETRIC_KEY_ALIAS = "mira_biometric_key"
         private const val BIOMETRIC_TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val GCM_IV_LENGTH = 12
         private const val GCM_TAG_LENGTH = 128
 
         @JvmStatic
@@ -157,6 +161,7 @@ class SecureSessionManager private constructor(context: Context) {
         @JvmStatic
         fun resetInstance() {
             synchronized(INSTANCE_LOCK) {
+                instance?.endBiometricAuth()
                 instance = null
                 Log.d(TAG, "🔄 SecureSessionManager Singleton reset")
             }
@@ -184,31 +189,69 @@ class SecureSessionManager private constructor(context: Context) {
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
                 EncryptedSharedPreferences.create(
-                    context, SECURE_PREFS_NAME, masterKey,
+                    context,
+                    SECURE_PREFS_NAME,
+                    masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (ex: Exception) {
                 Log.e(TAG, "Critical: Failed to recreate EncryptedSharedPreferences securely!", ex)
-                throw RuntimeException("Security Error: Cannot initialize encrypted storage.", ex)
+                throw IllegalStateException("Security Error: Cannot initialize encrypted storage.", ex)
             }
         }
     }
 
     fun invalidateCache() {
         cachedAuthToken = null
-        tokenCacheTime = 0
+        tokenCacheTime = 0L
         cachedApiKey = null
-        apiKeyCacheTime = 0
+        apiKeyCacheTime = 0L
         cachedLoggedIn = null
-        loggedInCacheTime = 0
+        loggedInCacheTime = 0L
         cachedUsername = null
-        usernameCacheTime = 0
+        usernameCacheTime = 0L
         cachedServerUrl = null
-        serverUrlCacheTime = 0
+        serverUrlCacheTime = 0L
         cachedLastActiveTime = null
         cachedSessionLocked = null
         Log.d(TAG, "🗑️ Session cache invalidated")
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // حماية المصادقة البيومترية من التكرار المزدوج
+    // ═══════════════════════════════════════════════════════════════════
+
+    fun isBiometricAuthInProgress(): Boolean = biometricPromptInProgress
+
+    /**
+     * يبدأ طلب مصادقة بيومترية جديدة ويعيد معرف الطلب (> 0)،
+     * أو يعيد 0L إذا كان هناك طلب نشط بالفعل لمنع فتح البصمة مرتين.
+     */
+    fun tryBeginBiometricAuth(): Long {
+        synchronized(INSTANCE_LOCK) {
+            if (biometricPromptInProgress) {
+                Log.w(TAG, "⏭️ Biometric prompt already in progress — duplicate trigger blocked")
+                return 0L
+            }
+            biometricPromptInProgress = true
+            activeBiometricRequestId += 1L
+            return activeBiometricRequestId
+        }
+    }
+
+    fun isCurrentBiometricRequest(requestId: Long): Boolean {
+        synchronized(INSTANCE_LOCK) {
+            return biometricPromptInProgress && requestId > 0L && requestId == activeBiometricRequestId
+        }
+    }
+
+    fun endBiometricAuth(requestId: Long = activeBiometricRequestId) {
+        synchronized(INSTANCE_LOCK) {
+            if (requestId == activeBiometricRequestId || requestId <= 0L) {
+                biometricPromptInProgress = false
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -224,10 +267,11 @@ class SecureSessionManager private constructor(context: Context) {
         expiresInSeconds: Long = DEFAULT_TOKEN_DAYS * 24 * 60 * 60
     ) {
         try {
+            val now = System.currentTimeMillis()
             val expiryTime = if (expiresInSeconds > 0) {
-                System.currentTimeMillis() + (expiresInSeconds * 1000L)
+                now + (expiresInSeconds * 1000L)
             } else {
-                System.currentTimeMillis() + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L)
+                now + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L)
             }
 
             val tokenOk = securePrefs.edit()
@@ -247,12 +291,15 @@ class SecureSessionManager private constructor(context: Context) {
 
             userPrefs.edit()
                 .putBoolean(KEY_IS_LOGGED_IN, true)
+                .putBoolean(KEY_SESSION_LOCKED, false)
+                .putLong(KEY_LAST_ACTIVE_TIME, now)
                 .putString(KEY_USERNAME, username ?: "")
                 .putString(KEY_USER_ROLE, role ?: Role.INVENTORY_MGR.name)
                 .putString(KEY_LAST_USERNAME, username ?: "")
                 .putString(KEY_SERVER_URL, finalServerUrl)
                 .apply()
 
+            endBiometricAuth()
             invalidateCache()
             Log.d(TAG, "✅ Login session created for: $username")
         } catch (e: Exception) {
@@ -318,7 +365,7 @@ class SecureSessionManager private constructor(context: Context) {
             tokenCacheTime = now
         } else {
             cachedAuthToken = null
-            tokenCacheTime = 0
+            tokenCacheTime = 0L
         }
 
         return token
@@ -353,8 +400,7 @@ class SecureSessionManager private constructor(context: Context) {
     }
 
     fun logoutUser() {
-        setSessionLocked(false)
-        setLastAppActiveTime(0)
+        endBiometricAuth()
 
         val keepBiometric = isBiometricEnabled()
         val apiKey = getApiKey()
@@ -384,6 +430,9 @@ class SecureSessionManager private constructor(context: Context) {
 
         val userEditor = userPrefs.edit()
         val secureEditor = securePrefs.edit()
+
+        userEditor.putBoolean(KEY_SESSION_LOCKED, false)
+        userEditor.putLong(KEY_LAST_ACTIVE_TIME, 0L)
 
         if (keepBiometric) {
             userEditor.putBoolean(KEY_BIOMETRIC_ENABLED, true)
@@ -440,7 +489,8 @@ class SecureSessionManager private constructor(context: Context) {
                 return false
             }
 
-            val expiryTime = System.currentTimeMillis() + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L)
+            val now = System.currentTimeMillis()
+            val expiryTime = now + (DEFAULT_TOKEN_DAYS * 24 * 60 * 60 * 1000L)
 
             val tokenOk = securePrefs.edit()
                 .putString(KEY_AUTH_TOKEN, token)
@@ -451,18 +501,26 @@ class SecureSessionManager private constructor(context: Context) {
                 Log.e(TAG, "🚨 restoreBiometricSession: token commit FAILED")
             }
 
-            userPrefs.edit()
+            val userEditor = userPrefs.edit()
                 .putBoolean(KEY_IS_LOGGED_IN, true)
+                .putBoolean(KEY_SESSION_LOCKED, false)
+                .putLong(KEY_LAST_ACTIVE_TIME, now)
                 .putString(KEY_USERNAME, username)
                 .putString(KEY_USER_ROLE, role)
                 .putString(KEY_DISPLAY_NAME, displayName)
                 .putInt(KEY_USER_ID, userId)
-                .putInt(KEY_BRANCH_ID, branchId)
-                .putString(KEY_BRANCH_NAME, branchName)
-                .apply()
 
+            if (branchId > 0) {
+                userEditor.putInt(KEY_BRANCH_ID, branchId)
+            }
+            if (branchName.isNotEmpty()) {
+                userEditor.putString(KEY_BRANCH_NAME, branchName)
+            }
+            userEditor.commit()
+
+            endBiometricAuth()
             invalidateCache()
-            Log.d(TAG, "✅ Biometric session restored for: $username")
+            Log.d(TAG, "✅ Biometric session restored & unlocked for: $username")
             true
         } catch (e: Exception) {
             Log.e(TAG, "restoreBiometricSession error: ${e.message}", e)
@@ -522,7 +580,7 @@ class SecureSessionManager private constructor(context: Context) {
     fun getPhone(): String = userPrefs.getString(KEY_USER_PHONE, "") ?: ""
     fun setPhone(phone: String?) { if (phone != null) userPrefs.edit().putString(KEY_USER_PHONE, phone).apply() }
 
-    fun getRoleString(): String = userPrefs.getString(KEY_USER_ROLE, "INVENTORY_MGR") ?: "INVENTORY_MGR"
+    fun getRoleString(): String = userPrefs.getString(KEY_USER_ROLE, Role.INVENTORY_MGR.name) ?: Role.INVENTORY_MGR.name
     fun getRole(): String = getRoleString()
 
     fun setRole(role: String?) {
@@ -532,7 +590,7 @@ class SecureSessionManager private constructor(context: Context) {
     fun getUserRole(): Role {
         return try {
             Role.valueOf(getRoleString().uppercase(Locale.ROOT))
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             Role.INVENTORY_MGR
         }
     }
@@ -543,9 +601,9 @@ class SecureSessionManager private constructor(context: Context) {
     fun isAnyAdmin(): Boolean {
         val role = getRoleString()
         return Role.SYSTEM_ADMIN.name.equals(role, true) ||
-                Role.ORG_ADMIN.name.equals(role, true) ||
-                Role.FINANCE_MANAGER.name.equals(role, true) ||
-                Role.ADMIN.name.equals(role, true)
+            Role.ORG_ADMIN.name.equals(role, true) ||
+            Role.FINANCE_MANAGER.name.equals(role, true) ||
+            Role.ADMIN.name.equals(role, true)
     }
 
     fun isAdmin(): Boolean = isAnyAdmin()
@@ -553,16 +611,16 @@ class SecureSessionManager private constructor(context: Context) {
     fun canPerformAccountingSetup(): Boolean {
         val role = getRoleString()
         return Role.SYSTEM_ADMIN.name.equals(role, true) ||
-                Role.ORG_ADMIN.name.equals(role, true) ||
-                Role.FINANCE_MANAGER.name.equals(role, true) ||
-                Role.ACCOUNTANT.name.equals(role, true)
+            Role.ORG_ADMIN.name.equals(role, true) ||
+            Role.FINANCE_MANAGER.name.equals(role, true) ||
+            Role.ACCOUNTANT.name.equals(role, true)
     }
 
     fun isManager(): Boolean {
         val role = getRoleString()
         return isAnyAdmin() ||
-                Role.BRANCH_MANAGER.name.equals(role, true) ||
-                Role.INVENTORY_MGR.name.equals(role, true)
+            Role.BRANCH_MANAGER.name.equals(role, true) ||
+            Role.INVENTORY_MGR.name.equals(role, true)
     }
 
     fun isAccountant(): Boolean = Role.ACCOUNTANT.name.equals(getRoleString(), true)
@@ -651,7 +709,7 @@ class SecureSessionManager private constructor(context: Context) {
             .remove(KEY_API_KEY_CREATED_AT)
             .apply()
         cachedApiKey = null
-        apiKeyCacheTime = 0
+        apiKeyCacheTime = 0L
     }
 
     fun saveApiKeyInfo(apiKey: String?, keyId: String?, keyPrefix: String?, createdAt: String?) {
@@ -717,6 +775,7 @@ class SecureSessionManager private constructor(context: Context) {
     fun getLastBiometricBranchName(): String = userPrefs.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "") ?: ""
 
     fun clearBiometricData() {
+        endBiometricAuth()
         securePrefs.edit().remove(KEY_LAST_BIOMETRIC_TOKEN).apply()
         userPrefs.edit()
             .remove(KEY_LAST_BIOMETRIC_USER)
@@ -730,7 +789,7 @@ class SecureSessionManager private constructor(context: Context) {
 
     @Throws(GeneralSecurityException::class)
     fun createBiometricKey(): SecretKey {
-        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         val keyGenParameterSpec = KeyGenParameterSpec.Builder(
             BIOMETRIC_KEY_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
@@ -744,24 +803,22 @@ class SecureSessionManager private constructor(context: Context) {
         return keyGenerator.generateKey()
     }
 
-    @Nullable
     fun getBiometricKey(): SecretKey? {
         return try {
             keyStore?.getKey(BIOMETRIC_KEY_ALIAS, null) as? SecretKey
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
 
     fun isBiometricKeyAvailable(): Boolean = getBiometricKey() != null
 
-    @Nullable
     fun encryptWithBiometricKey(data: String): String? {
         return try {
-            var key = getBiometricKey() ?: createBiometricKey()
+            val key = getBiometricKey() ?: createBiometricKey()
             val cipher = Cipher.getInstance(BIOMETRIC_TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, key)
-            val encryptedData = cipher.doFinal(data.toByteArray())
+            val encryptedData = cipher.doFinal(data.toByteArray(StandardCharsets.UTF_8))
             val iv = cipher.iv
             val combined = ByteArray(iv.size + encryptedData.size)
             System.arraycopy(iv, 0, combined, 0, iv.size)
@@ -773,20 +830,19 @@ class SecureSessionManager private constructor(context: Context) {
         }
     }
 
-    @Nullable
     fun decryptWithBiometricKey(encryptedBase64: String): String? {
         return try {
             val key = getBiometricKey() ?: return null
             val combined = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            if (combined.size <= GCM_IV_LENGTH) return null
+
+            val iv = combined.copyOfRange(0, GCM_IV_LENGTH)
+            val encryptedData = combined.copyOfRange(GCM_IV_LENGTH, combined.size)
+
             val cipher = Cipher.getInstance(BIOMETRIC_TRANSFORMATION)
-            val ivLength = 12 // GCM standard IV length
-            val iv = ByteArray(ivLength)
-            val encryptedData = ByteArray(combined.size - ivLength)
-            System.arraycopy(combined, 0, iv, 0, ivLength)
-            System.arraycopy(combined, ivLength, encryptedData, 0, encryptedData.size)
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
             val decryptedData = cipher.doFinal(encryptedData)
-            String(decryptedData)
+            String(decryptedData, StandardCharsets.UTF_8)
         } catch (e: Exception) {
             Log.e(TAG, "Error decrypting with biometric key", e)
             null
@@ -814,7 +870,7 @@ class SecureSessionManager private constructor(context: Context) {
 
     fun getLastAppActiveTime(): Long {
         if (cachedLastActiveTime != null) return cachedLastActiveTime!!
-        val valTime = userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0)
+        val valTime = userPrefs.getLong(KEY_LAST_ACTIVE_TIME, 0L)
         cachedLastActiveTime = valTime
         return valTime
     }
@@ -831,15 +887,18 @@ class SecureSessionManager private constructor(context: Context) {
         return valLocked
     }
 
-    fun touchActivity() { setLastAppActiveTime(System.currentTimeMillis()) }
+    fun touchActivity() {
+        setLastAppActiveTime(System.currentTimeMillis())
+    }
 
     fun isInactivityTimeout(timeoutMs: Long): Boolean {
         val last = getLastAppActiveTime()
-        if (last <= 0) return false
+        if (last <= 0L) return false
         return (System.currentTimeMillis() - last) > timeoutMs
     }
 
     fun unlockSession() {
+        endBiometricAuth()
         setSessionLocked(false)
         touchActivity()
     }
@@ -916,7 +975,7 @@ class SecureSessionManager private constructor(context: Context) {
 
     fun getDaysSinceLastHeartbeat(): Int {
         val last = getLastHeartbeat()
-        if (last <= 0) return 0
+        if (last <= 0L) return 0
         val diffMs = System.currentTimeMillis() - last
         return (diffMs / (24 * 60 * 60 * 1000L)).toInt()
     }
@@ -955,12 +1014,14 @@ class SecureSessionManager private constructor(context: Context) {
     // ═══════════════════════════════════════════════════════════════════
 
     fun clearAll() {
+        endBiometricAuth()
         securePrefs.edit().clear().commit()
         userPrefs.edit().clear().commit()
         invalidateCache()
-        deleteBiometricKey()
-        setSessionLocked(false)
-        setLastAppActiveTime(0)
+        try {
+            keyStore?.deleteEntry(BIOMETRIC_KEY_ALIAS)
+        } catch (_: Exception) {
+        }
     }
 
     fun getSessionSummary(): String {
@@ -973,10 +1034,11 @@ class SecureSessionManager private constructor(context: Context) {
             .remove(KEY_TOKEN_EXPIRY)
             .apply()
         cachedAuthToken = null
-        tokenCacheTime = 0
+        tokenCacheTime = 0L
     }
 
     fun clearSessionCompletely() {
+        endBiometricAuth()
         securePrefs.edit()
             .remove(KEY_AUTH_TOKEN)
             .remove(KEY_TOKEN_EXPIRY)
@@ -986,6 +1048,7 @@ class SecureSessionManager private constructor(context: Context) {
             .remove(KEY_IS_LOGGED_IN)
             .remove(KEY_USERNAME)
             .remove(KEY_USER_ROLE)
+            .remove(KEY_SESSION_LOCKED)
             .apply()
         invalidateCache()
     }
