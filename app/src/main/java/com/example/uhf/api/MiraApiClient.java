@@ -1776,9 +1776,18 @@ public class MiraApiClient {
             return response;
         }
     }
+    /**
+     * جلب التفاصيل الكاملة للفاتورة الواحدة من /pos/sales/{id}
+     */
+    public ApiResponse getSaleDetail(long saleId) {
+        if (saleId <= 0) {
+            return new ApiResponse(400, null, "Invalid sale ID");
+        }
+        return getWithAuth("/pos/sales/" + saleId);
+    }
 
     /**
-     * جلب تفاصيل فاتورة محددة برقمها (متوافق مع ActivityDetailsBottomSheet)
+     * جلب تفاصيل فاتورة محددة برقمها (يجلب التفاصيل الكاملة من /pos/sales/{id})
      */
     public ApiResponse getSaleDetailsByNumber(String saleNumber) {
         try {
@@ -1801,6 +1810,13 @@ public class MiraApiClient {
                         }
                     }
                     if (bestMatch != null) {
+                        long dbId = bestMatch.optLong("id", bestMatch.optLong("sale_id", 0L));
+                        if (dbId > 0) {
+                            ApiResponse fullResp = getSaleDetail(dbId);
+                            if (fullResp != null && fullResp.isSuccess && fullResp.data != null) {
+                                return fullResp;
+                            }
+                        }
                         JSONObject wrapper = new JSONObject();
                         wrapper.put("success", true);
                         wrapper.put("sale", bestMatch);
@@ -1814,6 +1830,7 @@ public class MiraApiClient {
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
+
 
     public ApiResponse getItemDetail(String code) {
         return getWithAuth("/item/" + sanitizePathSegment(code));
