@@ -1437,7 +1437,7 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun refreshPricesBeforeCheckout(itemIds: List<Int>) {
+        private fun refreshPricesBeforeCheckout(itemIds: List<Int>) {
         val loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic)
 
         miraExecutor?.networkExecutor?.execute {
@@ -1507,7 +1507,10 @@ class MiraPosFragment : MiraBaseFragment() {
                         val ratesObj = resp.data?.optJSONObject("exchange_rates")
                         val ratesJson = ratesObj?.toString() ?: "{}"
 
-                        openCheckoutDialogWithTotal(freshTotalUsd, ratesJson)
+                        val scrapDetailsObj = resp.data?.optJSONObject("scrap_details")
+                        val scrapDetailsJson = scrapDetailsObj?.toString() ?: "{}"
+
+                        openCheckoutDialogWithTotal(freshTotalUsd, ratesJson, scrapDetailsJson)
                     } catch (e: Exception) {
                         Log.e(TAG, "refreshPrices parse error", e)
                         showToast("⚠️ ${e.message}")
@@ -1522,6 +1525,49 @@ class MiraPosFragment : MiraBaseFragment() {
             }
         }
     }
+
+    private fun openCheckoutDialogWithTotal(
+        totalUsd: Double,
+        ratesJson: String,
+        scrapDetailsJson: String = "{}"
+    ) {
+        try {
+            if (!isFragmentAlive()) return
+            val manager = cartManager ?: return
+
+            isCheckoutDialogShowing = true
+            val snap = manager.snapshot()
+
+            val dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count, ratesJson, scrapDetailsJson)
+            activeCheckoutDialog = dialog
+
+            dialog.setCheckoutListener(object : POSCheckoutDialog.OnCheckoutListener {
+                override fun onCheckout(data: POSCheckoutDialog.POSCheckoutData?) {
+                    if (data != null) executeCheckoutDirectly(data)
+                }
+            })
+
+            dialog.setOnDismissListener(object : POSCheckoutDialog.OnDialogDismissListener {
+                override fun onDialogDismissed() {
+                    isCheckoutDialogShowing = false
+                    activeCheckoutDialog = null
+                }
+            })
+
+            val fm = parentFragmentManager
+            if (!fm.isStateSaved) {
+                dialog.show(fm, "POSCheckoutDialog")
+            } else {
+                isCheckoutDialogShowing = false
+                activeCheckoutDialog = null
+            }
+        } catch (e: Exception) {
+            isCheckoutDialogShowing = false
+            activeCheckoutDialog = null
+            Log.e(TAG, "openCheckoutDialogWithTotal error", e)
+        }
+    }
+
 
     private fun openCheckoutDialogWithTotal(totalUsd: Double, ratesJson: String) {
         try {
@@ -1561,7 +1607,7 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun executeCheckoutDirectly(data: POSCheckoutDialog.POSCheckoutData) {
+        private fun executeCheckoutDirectly(data: POSCheckoutDialog.POSCheckoutData) {
         if (!isFragmentAlive()) return
         if (!hasPosPermission() || !canPerformCheckout()) {
             showToast(getString(R.string.pos_msg_no_permission))
@@ -1599,12 +1645,12 @@ class MiraPosFragment : MiraBaseFragment() {
                         } else {
                             val errorMsg = response?.error ?: "حدث خطأ غير معروف"
                             when (response?.errorCode) {
-                                "RATE_MISMATCH" -> {
+                                "RATE_MISMATCH", "TRADE_IN_RATE_CHANGED" -> {
                                     currentSaleUuid = null
                                     val msg = if (isArabic) {
-                                        "⚠️ سعر الصرف غير محدّث — أغلق النافذة وافتحها مجدداً"
+                                        "⚠️ تغيّرت الأسعار — أغلق النافذة وافتحها مجدداً"
                                     } else {
-                                        "⚠️ Exchange rate outdated — close and reopen"
+                                        "⚠️ Rates outdated — close and reopen"
                                     }
                                     if (activeCheckoutDialog?.isAdded == true) {
                                         activeCheckoutDialog?.onCheckoutError(msg)
@@ -1669,7 +1715,8 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun buildCheckoutPayload(
+
+        private fun buildCheckoutPayload(
         client: MiraApiClient?,
         data: POSCheckoutDialog.POSCheckoutData
     ): JSONObject {
@@ -1703,9 +1750,15 @@ class MiraPosFragment : MiraBaseFragment() {
         payload.put("customer_name", customerName)
         payload.put("customer_phone", customerPhone)
 
+        val customerNationalId = data.customerNationalId.trim()
+        if (customerNationalId.isNotEmpty()) {
+            payload.put("customer_national_id", customerNationalId)
+        }
+
         val customerObj = JSONObject().apply {
             put("name", customerName)
             put("phone", customerPhone)
+            put("national_id", customerNationalId)
             put("email", data.customerEmail ?: "")
             put("address", data.customerAddress ?: "")
             put("notes", data.customerNotes ?: "")
@@ -1729,6 +1782,9 @@ class MiraPosFragment : MiraBaseFragment() {
                 }
             }
             payload.put("trade_ins", tradeInsArr)
+            if (data.tradeInTotal > 0) {
+                payload.put("trade_in_total", data.tradeInTotal)
+            }
         }
 
         val itemsArr = JSONArray()
@@ -1798,6 +1854,7 @@ class MiraPosFragment : MiraBaseFragment() {
         payload.put("notes", if (isArabic) "بيع POS" else "POS Sale")
         return payload
     }
+
 
     private fun saveOfflineSale(payload: JSONObject, data: POSCheckoutDialog.POSCheckoutData) {
         try {
