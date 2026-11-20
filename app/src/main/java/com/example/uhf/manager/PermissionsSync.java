@@ -88,7 +88,7 @@ public class PermissionsSync {
     /**
      * فحص فوري متزامن (async) — يُستدعى عند onResume أو يدوياً.
      */
-    public void checkNow(Callback cb) {
+        public void checkNow(Callback cb) {
         if (!fetching.compareAndSet(false, true)) {
             if (cb != null) cb.onResult(false, null);
             return;
@@ -97,9 +97,16 @@ public class PermissionsSync {
         networkClient.get("/api/v1/me/permissions/version", new NetworkClient.JsonCallback() {
             @Override public void onSuccess(JSONObject versionResponse) {
                 try {
-                    String serverVersion = versionResponse != null
-                            ? versionResponse.optString("version", "")
-                            : "";
+                    String serverVersion = "";
+                    if (versionResponse != null) {
+                        serverVersion = versionResponse.optString("version", "");
+                        if (serverVersion.isEmpty() && versionResponse.has("data")) {
+                            JSONObject data = versionResponse.optJSONObject("data");
+                            if (data != null) {
+                                serverVersion = data.optString("version", "");
+                            }
+                        }
+                    }
 
                     if (!permissionManager.needsRefresh(serverVersion)) {
                         if (cb != null) cb.onResult(false, null);
@@ -117,12 +124,21 @@ public class PermissionsSync {
             }
 
             @Override public void onError(Throwable t) {
-                Log.w(TAG, "version endpoint failed: " + t.getMessage());
+                String msg = (t != null && t.getMessage() != null) ? t.getMessage() : "";
+                Log.w(TAG, "version endpoint failed: " + msg);
+
+                // إذا تم إلغاء التوكن من الويب (Force Logout) سيعود السيرفر بـ 401 → اطرد الجلسة فوراً
+                if (msg.contains("401") || msg.toLowerCase().contains("unauthenticated")
+                        || msg.toLowerCase().contains("unauthorized")) {
+                    PermissionSyncManager.triggerForceLogout(appContext, null);
+                }
+
                 if (cb != null) cb.onResult(false, t);
                 fetching.set(false);
             }
         });
     }
+
 
     private void fetchFullPermissions(String serverVersion, Callback cb) {
         networkClient.get("/api/v1/me/permissions", new NetworkClient.JsonCallback() {
