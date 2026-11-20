@@ -226,11 +226,14 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private var statusMessageState by mutableStateOf("")
     private var pendingSalesCountState by mutableIntStateOf(0)
+    
     private var activeBranchNameState by mutableStateOf("")
 
     private var canUsePosState by mutableStateOf(true)
     private var canPerformRefundState by mutableStateOf(false)
+
     private var isButtonsBusyState by mutableStateOf(false)
+
 
     private var scanFeedbackState by mutableStateOf<ScanFeedbackBanner?>(null)
     private var showExitDialogState by mutableStateOf(false)
@@ -350,6 +353,10 @@ class MiraPosFragment : MiraBaseFragment() {
             stopAfterFirstRead = false
             oneShotConsumed.set(false)
             cancelPendingStopIfAny()
+            
+            
+            applyPermissions()
+
 
             scaleManager?.connect()
             applyLowPowerForPos()
@@ -523,9 +530,9 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun applyPermissions() {
+        private fun applyPermissions() {
         canUsePosState = hasPosPermission()
-        canPerformRefundState = permissionManager.canRefund()
+        canPerformRefundState = canPerformRefund()
         if (!canUsePosState) {
             statusMessageState = if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied"
         }
@@ -549,13 +556,13 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
     private fun canPerformRefund(): Boolean {
-        val pm = permissionManager ?: return false
         return try {
-            pm.isManager() || pm.isAdmin() || pm.isFinanceManager()
+            permissionManager?.canRefund() == true
         } catch (_: Exception) {
             false
         }
     }
+
 
     private fun initSmartScale() {
         try {
@@ -1992,11 +1999,12 @@ class MiraPosFragment : MiraBaseFragment() {
     //  Refund V2
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun showRefundDialog() {
-    if (!permissionManager.canRefund()) {
-        showToast(if (isArabic) "لا صلاحيات لديك لإجراء عملية الإرجاع" else "No refund permission")
-        return
-    }
+        private fun showRefundDialog() {
+        if (!canPerformRefund()) {
+            showToast(if (isArabic) "لا صلاحيات لديك لإجراء عملية الإرجاع" else "No refund permission")
+            return
+        }
+
 
         try {
             isRefundDialogHiddenForScan = false
