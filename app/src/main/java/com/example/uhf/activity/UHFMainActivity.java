@@ -2588,9 +2588,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         try {
             MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
             // المسار الذي يعيد data.mobile_capabilities و permissions_version
-            MiraApiClient.ApiResponse res = api.get("auth/me");
-            if (res != null && res.isSuccess && res.rawJson != null && permissionManager != null) {
-                org.json.JSONObject root = new org.json.JSONObject(res.rawJson);
+            MiraApiClient.ApiResponse res = api.getCurrentUser();
+            if (res != null && res.isSuccess && res.data != null && permissionManager != null) {
+                org.json.JSONObject root = res.data;
                 org.json.JSONObject data = root.optJSONObject("data");
                 String serverVer = data != null
                         ? data.optString("permissions_version", "")
