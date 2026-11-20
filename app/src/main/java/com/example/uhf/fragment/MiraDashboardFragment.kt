@@ -48,6 +48,7 @@ import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
 import com.example.uhf.manager.MiraBranchesManager
 import com.example.uhf.manager.MiraPriceManager
+import com.example.uhf.manager.PermissionManager
 import com.example.uhf.tools.RecentActivityCache
 import com.example.uhf.tools.SecureSessionManager
 import com.example.uhf.ui.dashboard.*
@@ -91,6 +92,7 @@ class MiraDashboardFragment : Fragment() {
     private var sessionManager: SecureSessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
     private var activityCache: RecentActivityCache? = null
+    private var permissionManager: PermissionManager? = null
 
     // حالات واجهة المستخدم التفاعلية
     private var orgTitleState by mutableStateOf("MIRA JEWELRY")
@@ -170,6 +172,7 @@ class MiraDashboardFragment : Fragment() {
         sessionManager = SecureSessionManager.getInstance(ctx)
         branchesManager = MiraBranchesManager.getInstance(ctx)
         activityCache = RecentActivityCache(ctx)
+        permissionManager = PermissionManager.getInstance(ctx)
 
         initSessionAndBranchState()
         loadOfflineData()
@@ -235,7 +238,7 @@ class MiraDashboardFragment : Fragment() {
         currentUserId = readIntProp(sm, "userId", "id")
         userNameState = readStringProp(sm, "username", "fullName", "name")
         userRoleState = readStringProp(sm, "role", "userRole", "position").lowercase(Locale.ROOT)
-        isManagerState = resolveIsManagerOrAdmin(sm, userRoleState)
+        isManagerState = resolveIsManagerOrAdmin(sm, userRoleState) || (permissionManager?.isManager == true)
 
         val orgName = readStringProp(sm, "orgName", "organizationName", "companyName")
             .ifBlank { if (isArabic) "ميرا للمجوهرات" else "MIRA JEWELRY" }
@@ -688,7 +691,6 @@ class MiraDashboardFragment : Fragment() {
                 }
             }
 
-            // مزامنة نقطة اليوم مع ملخص مبيعات اليوم
             if (key == todayKey) {
                 if (sCount == 0 && todayInvoicesCountState > 0) {
                     sCount = todayInvoicesCountState
@@ -834,7 +836,6 @@ class MiraDashboardFragment : Fragment() {
             if (nv > 0.0) return nv
         }
 
-        // حساب مجموع الأوزان من مصفوفة الأصناف items إن وُجدت
         val items = op.optJSONArray("items") ?: nested?.optJSONArray("items")
         if (items != null && items.length() > 0) {
             var sum = 0.0
@@ -851,7 +852,6 @@ class MiraDashboardFragment : Fragment() {
             if (sum > 0.0) return sum
         }
 
-        // استخراج الوزن من النص الوصفي (مثل "12.50g" أو "12.5 جم")
         val textFields = listOf(
             op.optString("subtitle", ""),
             op.optString("description", ""),
@@ -1337,6 +1337,14 @@ class MiraDashboardFragment : Fragment() {
 
                 override fun onOpenRefund(activityData: JSONObject) {
                     if (!isAdded) return
+                    if (permissionManager?.canRefund() == false) {
+                        Toast.makeText(
+                            context,
+                            if (isArabic) "ليس لديك صلاحية تنفيذ عمليات الإرجاع" else "You do not have refund permission",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return
+                    }
                     val salesFragment = MiraPosFragment().apply {
                         arguments = Bundle().apply {
                             putString("refund_data_json", activityData.toString())
@@ -1393,7 +1401,31 @@ class MiraDashboardFragment : Fragment() {
         return fallback()
     }
 
+    /** التحقق من صلاحية كل زر في شبكة الوصول السريع بالداشبورد */
+    private fun isQuickActionAllowed(tag: String): Boolean {
+        val pm = permissionManager ?: return false
+        return when (tag) {
+            "Sales" -> pm.canViewPos()
+            "SalesHistory" -> pm.canViewSalesHistory()
+            "InventoryDashboard" -> pm.canViewInventory()
+            "Scan" -> pm.canViewInventory()
+            "Transfers" -> pm.canViewTransfers()
+            "Scrap" -> pm.canViewScrapGold()
+            "Encode" -> pm.canUseIdentity()
+            "AllActivities", "sync_rates" -> true
+            else -> pm.canAccessFragment(tag)
+        }
+    }
+
     private fun handleQuickAction(action: QuickActionItem) {
+        if (!isQuickActionAllowed(action.tag)) {
+            Toast.makeText(
+                context,
+                if (isArabic) "ليس لديك صلاحية للوصول إلى هذه الخدمة" else "You do not have permission to access this feature",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         if (action.tag == "sync_rates") {
             refreshAllDashboardData(forceNetwork = true)
             Toast.makeText(
@@ -1416,6 +1448,23 @@ class MiraDashboardFragment : Fragment() {
         val scrollState = rememberScrollState()
         val isAr = isArabic
 
+        // الاستماع اللحظي لتحديثات الصلاحيات أثناء عرض الداشبورد
+        val pm = permissionManager
+        var permTick by remember { mutableIntStateOf(0) }
+        DisposableEffect(pm) {
+            val listener = PermissionManager.OnPermissionsChangedListener {
+                mainHandler.post {
+                    isManagerState = resolveIsManagerOrAdmin(sessionManager, userRoleState) ||
+                        (permissionManager?.isManager == true)
+                    permTick++
+                }
+            }
+            pm?.addListener(listener)
+            onDispose {
+                pm?.removeListener(listener)
+            }
+        }
+
         LaunchedEffect(recentActivitiesState, isManagerState, selectedChartDaysState) {
             if (recentActivitiesState.isNotEmpty()) {
                 recomputeTodaySalesFromOperations(
@@ -1426,7 +1475,7 @@ class MiraDashboardFragment : Fragment() {
             }
         }
 
-        val quickActions = remember(isAr) {
+        val quickActions = remember(isAr, permTick) {
             listOf(
                 QuickActionItem(
                     tag = "Sales",
@@ -1509,7 +1558,7 @@ class MiraDashboardFragment : Fragment() {
                     accentColor = Color(0xFF14B8A6),
                     fragmentProvider = { MiraDashboardFragment() }
                 )
-            )
+            ).filter { isQuickActionAllowed(it.tag) }
         }
 
         Surface(
@@ -1631,11 +1680,13 @@ class MiraDashboardFragment : Fragment() {
                         )
                     }
 
-                    QuickActionsSection(
-                        isArabic = isAr,
-                        actions = quickActions,
-                        onActionClick = { handleQuickAction(it) }
-                    )
+                    if (quickActions.isNotEmpty()) {
+                        QuickActionsSection(
+                            isArabic = isAr,
+                            actions = quickActions,
+                            onActionClick = { handleQuickAction(it) }
+                        )
+                    }
 
                     RecentActivitySection(
                         isArabic = isAr,
