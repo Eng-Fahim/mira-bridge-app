@@ -27,7 +27,7 @@ public class NetworkClient {
                 }
 
                 MiraApiClient.ApiResponse res = apiClient.getWithAuth(cleanPath);
-                if (res != null && res.isSuccess()) {
+                if (res != null && res.isSuccess) {
                     JSONObject root = new JSONObject();
                     root.put("success", true);
 
