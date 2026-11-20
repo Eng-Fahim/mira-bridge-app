@@ -47,6 +47,7 @@ import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
 import com.example.uhf.manager.MiraBranchesManager
+import com.example.uhf.manager.MiraPriceManager
 import com.example.uhf.tools.RecentActivityCache
 import com.example.uhf.tools.SecureSessionManager
 import com.example.uhf.ui.dashboard.*
@@ -192,7 +193,6 @@ class MiraDashboardFragment : Fragment() {
             loadOfflineData()
             refreshAllDashboardData(forceNetwork = true)
         } else {
-            // تحديث فوري لآخر العمليات والملخص والرسوم عند العودة من شاشة البيع أو الكسر
             fetchRecentActivity()
             fetchDashboardCharts(selectedChartDaysState)
         }
@@ -502,6 +502,38 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
+    private fun resolveEffectiveExchangeRate(currency: String = localCurrencyState): Double {
+        if (currency.equals("USD", ignoreCase = true)) return 1.0
+        if (exchangeRateState > 0.0) return exchangeRateState
+
+        try {
+            val ctx = context
+            if (ctx != null) {
+                val pm = MiraPriceManager.getInstance(ctx)
+                val methodWithArg = pm.javaClass.methods.firstOrNull {
+                    it.name in setOf("getExchangeRate", "getRateForCurrency") && it.parameterCount == 1
+                }
+                val r1 = methodWithArg?.invoke(pm, currency)
+                if (r1 is Number && r1.toDouble() > 0.0) return r1.toDouble()
+
+                val noArgMethod = pm.javaClass.methods.firstOrNull {
+                    it.name in setOf("getExchangeRate", "getUsdRate", "getUsdToYerRate") && it.parameterCount == 0
+                }
+                val r2 = noArgMethod?.invoke(pm)
+                if (r2 is Number && r2.toDouble() > 0.0) return r2.toDouble()
+            }
+        } catch (_: Exception) {
+        }
+
+        return if (currency.equals("YER", ignoreCase = true)) 530.0 else 1.0
+    }
+
+    private fun convertUsdToActiveCurrency(amountUsd: Double): Double {
+        if (amountUsd <= 0.0) return 0.0
+        if (localCurrencyState.equals("USD", ignoreCase = true)) return amountUsd
+        return amountUsd * resolveEffectiveExchangeRate(localCurrencyState)
+    }
+
     private fun applyChartsJson(root: JSONObject) {
         val data = root.optJSONObject("data") ?: root
 
@@ -515,11 +547,28 @@ class MiraDashboardFragment : Fragment() {
             for (i in 0 until seriesArr.length()) {
                 val item = seriesArr.optJSONObject(i) ?: continue
                 val label = item.optString("label", item.optString("date", item.optString("day", "#${i + 1}")))
-                val sales = item.optDouble("sales", item.optDouble("total_local", item.optDouble("amount", 0.0)))
-                val scrap = item.optDouble("scrap", item.optDouble("scrap_total", 0.0))
-                val refund = item.optDouble("refunds", item.optDouble("returns", 0.0))
+                var sales = parseFlexibleDouble(item, "sales")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "total_local")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "amount")
+                val salesUsd = parseFlexibleDouble(item, "sales_usd")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "total_usd")
+                if (sales <= 0.0 && salesUsd > 0.0) {
+                    sales = convertUsdToActiveCurrency(salesUsd)
+                }
+
+                var scrap = parseFlexibleDouble(item, "scrap")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "scrap_total")
+                val scrapUsd = parseFlexibleDouble(item, "scrap_usd")
+                if (scrap <= 0.0 && scrapUsd > 0.0) {
+                    scrap = convertUsdToActiveCurrency(scrapUsd)
+                }
+
+                val refund = parseFlexibleDouble(item, "refunds")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "returns")
                 val count = item.optInt("count", item.optInt("invoices", 0))
-                val weight = item.optDouble("weight", item.optDouble("sold_weight", 0.0))
+                val weight = parseFlexibleDouble(item, "weight")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "sold_weight")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "total_weight")
                 parsedPoints.add(ChartPeriodPoint(label, sales, scrap, refund, count, weight))
             }
         }
@@ -530,7 +579,8 @@ class MiraDashboardFragment : Fragment() {
             buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
         }
 
-        val target = data.optDouble("staff_target", data.optDouble("target_amount", 0.0))
+        val target = parseFlexibleDouble(data, "staff_target")
+            .takeIf { it > 0.0 } ?: parseFlexibleDouble(data, "target_amount")
         if (target > 0.0) staffTargetAmountState = target
 
         val karatArr = data.optJSONArray("by_karat") ?: data.optJSONArray("karat_distribution")
@@ -540,8 +590,8 @@ class MiraDashboardFragment : Fragment() {
             for (i in 0 until karatArr.length()) {
                 val kObj = karatArr.optJSONObject(i) ?: continue
                 val kName = kObj.optString("karat", kObj.optString("gold_karat", "21K"))
-                val w = kObj.optDouble("weight", kObj.optDouble("total_weight", 0.0))
-                val amt = kObj.optDouble("amount", kObj.optDouble("total_local", 0.0))
+                val w = parseFlexibleDouble(kObj, "weight").takeIf { it > 0.0 } ?: parseFlexibleDouble(kObj, "total_weight")
+                val amt = parseFlexibleDouble(kObj, "amount").takeIf { it > 0.0 } ?: parseFlexibleDouble(kObj, "total_local")
                 if (w > 0.0 || amt > 0.0) {
                     karats.add(KaratDistributionItem(kName, w, amt, palette[i % palette.size]))
                 }
@@ -560,91 +610,6 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    private fun parseOperationDate(op: JSONObject): Date? {
-        val raw = op.optString("created_at", "")
-            .ifBlank { op.optString("timestamp", "") }
-            .ifBlank { op.optString("date", "") }
-            .ifBlank { op.optString("sold_at", "") }
-            .trim()
-        if (raw.isEmpty() || raw == "null") return null
-
-        val patterns = listOf(
-            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
-            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-            "yyyy-MM-dd'T'HH:mm:ss'Z'",
-            "yyyy-MM-dd'T'HH:mm:ssXXX",
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd",
-            "dd/MM/yyyy HH:mm:ss",
-            "dd/MM/yyyy HH:mm",
-            "dd/MM/yyyy",
-            "dd-MM-yyyy HH:mm:ss",
-            "dd-MM-yyyy"
-        )
-        for (p in patterns) {
-            try {
-                val sdf = SimpleDateFormat(p, Locale.US).apply {
-                    isLenient = false
-                    if (p.endsWith("'Z'")) {
-                        timeZone = TimeZone.getTimeZone("UTC")
-                    }
-                }
-                val parsed = sdf.parse(raw)
-                if (parsed != null) return parsed
-            } catch (_: Exception) {
-            }
-        }
-        return null
-    }
-
-    private fun isSaleOperation(op: JSONObject): Boolean {
-        val type = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
-        val invoiceNo = op.optString("invoice_number", op.optString("reference", "")).uppercase(Locale.US)
-        if (type.contains("refund") || type.contains("return") || type.contains("scrap") || type.contains("transfer")) {
-            return false
-        }
-        return type == "sale" || type == "pos_sale" || type == "invoice" ||
-            type.contains("sale") || invoiceNo.startsWith("INV")
-    }
-
-    private fun extractOperationAmountLocal(op: JSONObject): Double {
-        val candidates = listOf(
-            "final_amount", "total_local", "total_amount", "grand_total",
-            "net_amount", "paid_amount", "amount_local", "amount"
-        )
-        for (k in candidates) {
-            val v = op.optDouble(k, 0.0)
-            if (!v.isNaN() && v > 0.0) return v
-        }
-        return 0.0
-    }
-
-    private fun extractOperationAmountUsd(op: JSONObject): Double {
-        val candidates = listOf("final_amount_usd", "total_amount_usd", "total_usd", "amount_usd")
-        for (k in candidates) {
-            val v = op.optDouble(k, 0.0)
-            if (!v.isNaN() && v > 0.0) return v
-        }
-        return 0.0
-    }
-
-    private fun extractOperationWeight(op: JSONObject): Double {
-        val candidates = listOf("total_weight", "sold_weight", "weight_grams", "net_weight", "gross_weight", "weight")
-        for (k in candidates) {
-            val v = op.optDouble(k, 0.0)
-            if (!v.isNaN() && v > 0.0) return v
-        }
-        val items = op.optJSONArray("items") ?: op.optJSONArray("sold_items") ?: op.optJSONArray("lines")
-        var sum = 0.0
-        if (items != null) {
-            for (i in 0 until items.length()) {
-                val it = items.optJSONObject(i) ?: continue
-                sum += it.optDouble("weight", it.optDouble("gross_weight_grams", it.optDouble("net_weight", 0.0)))
-            }
-        }
-        return sum
-    }
-
     private fun buildFallbackChartsFromOperations(ops: List<JSONObject>, days: Int) {
         val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val sdfLabel = SimpleDateFormat("MM/dd", Locale.US)
@@ -653,7 +618,7 @@ class MiraDashboardFragment : Fragment() {
         val buckets = linkedMapOf<String, MutableList<JSONObject>>()
         val labelsMap = mutableMapOf<String, String>()
 
-        val displayDays = days.coerceAtMost(14)
+        val displayDays = days.coerceIn(7, 30)
         cal.add(Calendar.DAY_OF_YEAR, -(displayDays - 1))
         for (i in 0 until displayDays) {
             val d = cal.time
@@ -673,7 +638,11 @@ class MiraDashboardFragment : Fragment() {
         for (op in ops) {
             val type = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
             val parsedDate = parseOperationDate(op)
-            val dayKey = if (parsedDate != null) sdfKey.format(parsedDate) else todayKey
+            val dayKey = when {
+                parsedDate != null -> sdfKey.format(parsedDate)
+                isOperationToday(op, sdfKey, todayKey) -> todayKey
+                else -> todayKey
+            }
 
             if (buckets.containsKey(dayKey)) {
                 buckets[dayKey]?.add(op)
@@ -718,6 +687,24 @@ class MiraDashboardFragment : Fragment() {
                     t.contains("refund") || t.contains("return") -> rfAmt += amt
                 }
             }
+
+            // مزامنة نقطة اليوم مع ملخص مبيعات اليوم
+            if (key == todayKey) {
+                if (sCount == 0 && todayInvoicesCountState > 0) {
+                    sCount = todayInvoicesCountState
+                }
+                if (sAmt <= 0.0) {
+                    sAmt = when {
+                        todaySalesLocalState > 0.0 -> todaySalesLocalState
+                        todaySalesUsdState > 0.0 -> convertUsdToActiveCurrency(todaySalesUsdState)
+                        else -> 0.0
+                    }
+                }
+                if (sWeight <= 0.0 && todaySoldWeightState > 0.0) {
+                    sWeight = todaySoldWeightState
+                }
+            }
+
             ChartPeriodPoint(
                 label = labelsMap[key] ?: key,
                 salesAmount = sAmt,
@@ -747,6 +734,211 @@ class MiraDashboardFragment : Fragment() {
                 )
             }
         }
+    }
+
+    private fun parseFlexibleDouble(obj: JSONObject?, key: String): Double {
+        if (obj == null || !obj.has(key)) return 0.0
+        val raw = obj.opt(key) ?: return 0.0
+        if (raw is Number) {
+            val d = raw.toDouble()
+            return if (!d.isNaN() && d > 0.0) d else 0.0
+        }
+        val str = raw.toString().trim()
+        if (str.isEmpty() || str == "null") return 0.0
+        val cleaned = str.replace(",", "").replace(Regex("[^0-9.\\-]"), "")
+        return cleaned.toDoubleOrNull()?.takeIf { !it.isNaN() && it > 0.0 } ?: 0.0
+    }
+
+    private fun extractOperationAmountUsd(op: JSONObject): Double {
+        val nested = op.optJSONObject("data")
+            ?: op.optJSONObject("sale")
+            ?: op.optJSONObject("details")
+            ?: op.optJSONObject("summary")
+
+        val candidates = arrayOf("final_amount_usd", "total_amount_usd", "total_usd", "amount_usd", "subtotal_usd")
+        for (k in candidates) {
+            val v = parseFlexibleDouble(op, k)
+            if (v > 0.0) return v
+            val nv = parseFlexibleDouble(nested, k)
+            if (nv > 0.0) return nv
+        }
+        return 0.0
+    }
+
+    private fun extractOperationAmountLocal(op: JSONObject): Double {
+        val nested = op.optJSONObject("data")
+            ?: op.optJSONObject("sale")
+            ?: op.optJSONObject("details")
+            ?: op.optJSONObject("summary")
+
+        val activeCurrency = localCurrencyState.ifBlank { "YER" }
+        val yerRate = resolveEffectiveExchangeRate("YER")
+
+        val localKeys = arrayOf(
+            "total_yer", "amount_yer", "final_amount_yer", "local_amount",
+            "final_amount", "total_amount", "amount", "total", "price"
+        )
+        val usdKeys = arrayOf(
+            "total_usd", "amount_usd", "final_amount_usd", "total_amount_usd",
+            "subtotal_usd", "price_usd"
+        )
+
+        fun readFirstPositive(obj: JSONObject?, keys: Array<String>): Double {
+            if (obj == null) return 0.0
+            for (k in keys) {
+                val v = parseFlexibleDouble(obj, k)
+                if (v > 0.0) return v
+            }
+            return 0.0
+        }
+
+        val usdVal = readFirstPositive(op, usdKeys).takeIf { it > 0.0 }
+            ?: readFirstPositive(nested, usdKeys)
+
+        val rawLocalVal = readFirstPositive(op, localKeys).takeIf { it > 0.0 }
+            ?: readFirstPositive(nested, localKeys)
+
+        val opCurrency = op.optString("currency", op.optString("currency_code", "")).uppercase(Locale.US)
+        val isRawInUsd = opCurrency == "USD" || (usdVal > 0.0 && kotlin.math.abs(rawLocalVal - usdVal) < 0.01)
+
+        if (activeCurrency.equals("USD", ignoreCase = true)) {
+            if (usdVal > 0.0) return usdVal
+            if (rawLocalVal > 0.0) return if (isRawInUsd) rawLocalVal else (rawLocalVal / yerRate)
+            return 0.0
+        }
+
+        val targetRate = resolveEffectiveExchangeRate(activeCurrency)
+        if (rawLocalVal > 0.0 && !isRawInUsd) return rawLocalVal
+        if (usdVal > 0.0) return usdVal * targetRate
+        if (rawLocalVal > 0.0) return rawLocalVal * targetRate
+        return 0.0
+    }
+
+    private fun extractOperationWeight(op: JSONObject): Double {
+        val nested = op.optJSONObject("data")
+            ?: op.optJSONObject("sale")
+            ?: op.optJSONObject("details")
+            ?: op.optJSONObject("summary")
+            ?: op.optJSONObject("meta")
+
+        val weightKeys = arrayOf(
+            "weight", "total_weight", "total_weight_grams", "sold_weight",
+            "gross_weight", "gross_weight_grams", "net_weight", "net_weight_grams",
+            "weight_grams", "gold_weight", "gold_weight_grams", "grams", "total_grams", "item_weight"
+        )
+
+        for (k in weightKeys) {
+            val v = parseFlexibleDouble(op, k)
+            if (v > 0.0) return v
+            val nv = parseFlexibleDouble(nested, k)
+            if (nv > 0.0) return nv
+        }
+
+        // حساب مجموع الأوزان من مصفوفة الأصناف items إن وُجدت
+        val items = op.optJSONArray("items") ?: nested?.optJSONArray("items")
+        if (items != null && items.length() > 0) {
+            var sum = 0.0
+            for (i in 0 until items.length()) {
+                val it = items.optJSONObject(i) ?: continue
+                for (k in weightKeys) {
+                    val w = parseFlexibleDouble(it, k)
+                    if (w > 0.0) {
+                        sum += w
+                        break
+                    }
+                }
+            }
+            if (sum > 0.0) return sum
+        }
+
+        // استخراج الوزن من النص الوصفي (مثل "12.50g" أو "12.5 جم")
+        val textFields = listOf(
+            op.optString("subtitle", ""),
+            op.optString("description", ""),
+            op.optString("details_text", ""),
+            op.optString("summary_text", ""),
+            nested?.optString("subtitle", "") ?: "",
+            nested?.optString("description", "") ?: ""
+        )
+        val weightRegex = Regex("(\\d+(?:\\.\\d+)?)\\s*(?:g|gm|gram|grams|جم|جرام)(?:\\b|$)", RegexOption.IGNORE_CASE)
+        for (txt in textFields) {
+            if (txt.isBlank()) continue
+            val match = weightRegex.find(txt)
+            val parsed = match?.groupValues?.getOrNull(1)?.toDoubleOrNull()
+            if (parsed != null && parsed > 0.0 && parsed < 100_000.0) {
+                return parsed
+            }
+        }
+
+        return 0.0
+    }
+
+    private fun parseOperationDate(op: JSONObject): Date? {
+        val raw = op.optString("created_at", "")
+            .ifBlank { op.optString("timestamp", "") }
+            .ifBlank { op.optString("date", "") }
+            .ifBlank { op.optString("sold_at", "") }
+            .trim()
+        if (raw.isEmpty() || raw == "null") return null
+
+        val patterns = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd",
+            "dd/MM/yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm",
+            "dd/MM/yyyy",
+            "dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy"
+        )
+        for (p in patterns) {
+            try {
+                val sdf = SimpleDateFormat(p, Locale.US).apply {
+                    isLenient = false
+                    if (p.endsWith("'Z'")) {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }
+                }
+                val parsed = sdf.parse(raw)
+                if (parsed != null) return parsed
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun isOperationToday(op: JSONObject, sdfKey: SimpleDateFormat, todayKey: String): Boolean {
+        if (op.optBoolean("is_today", false)) return true
+        val parsedDate = parseOperationDate(op)
+        if (parsedDate != null) {
+            return sdfKey.format(parsedDate) == todayKey
+        }
+        val rawTime = (
+            op.optString("created_at", "") + " " +
+                op.optString("time_ago", "") + " " +
+                op.optString("date_label", "")
+            ).lowercase(Locale.ROOT)
+        return rawTime.contains(todayKey.lowercase(Locale.ROOT)) ||
+            rawTime.contains("today") ||
+            rawTime.contains("اليوم") ||
+            rawTime.contains("الآن") ||
+            rawTime.contains("دقيقة") ||
+            rawTime.contains("دقائق") ||
+            rawTime.contains("ساعة") ||
+            rawTime.contains("ساعات")
+    }
+
+    private fun isSaleOperation(op: JSONObject): Boolean {
+        val type = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
+        val invoiceNo = op.optString("invoice_number", op.optString("reference", "")).uppercase(Locale.US)
+        if (type.contains("refund") || type.contains("return") || type.contains("scrap") || type.contains("transfer")) {
+            return false
+        }
+        return type == "sale" || type == "pos_sale" || type == "invoice" ||
+            type.contains("sale") || invoiceNo.startsWith("INV")
     }
 
     private fun fetchRecentActivity() {
@@ -803,37 +995,61 @@ class MiraDashboardFragment : Fragment() {
 
         if (isManagerState) {
             val salesObj = data.optJSONObject("today_sales") ?: data.optJSONObject("sales") ?: data
-            val sLocal = salesObj.optDouble(
-                "today_total_local",
-                salesObj.optDouble("total_local", salesObj.optDouble("today_sales_local", 0.0))
-            )
-            val sUsd = salesObj.optDouble(
-                "today_total_usd",
-                salesObj.optDouble("total_usd", salesObj.optDouble("today_sales_usd", 0.0))
-            )
+            var sLocal = parseFlexibleDouble(salesObj, "today_total_local")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "total_local")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "today_sales_local")
+            val sUsd = parseFlexibleDouble(salesObj, "today_total_usd")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "total_usd")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "today_sales_usd")
             val sCount = salesObj.optInt(
                 "today_count",
                 salesObj.optInt("invoices_count", salesObj.optInt("sales_count", 0))
             )
-            val sWeight = salesObj.optDouble(
-                "today_weight",
-                salesObj.optDouble("sold_weight", 0.0)
-            )
+            var sWeight = parseFlexibleDouble(salesObj, "today_weight")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "sold_weight")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "total_weight")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "weight")
+
+            if (sLocal <= 0.0 && sUsd > 0.0) {
+                sLocal = convertUsdToActiveCurrency(sUsd)
+            }
 
             if (sLocal > 0.0) todaySalesLocalState = sLocal
             if (sUsd > 0.0) todaySalesUsdState = sUsd
             if (sCount > 0) todayInvoicesCountState = sCount
             if (sWeight > 0.0) todaySoldWeightState = sWeight
+
+            if (todaySoldWeightState <= 0.0 && recentActivitiesState.isNotEmpty()) {
+                recomputeTodaySalesFromOperations(recentActivitiesState, forceOverride = false)
+            }
         } else {
             val mySalesObj = data.optJSONObject("my_today_sales") ?: data.optJSONObject("user_sales")
-            val mLocal = mySalesObj?.optDouble("total_local", 0.0) ?: 0.0
-            if (mySalesObj != null && mLocal > 0.0) {
-                todaySalesLocalState = mLocal
-                todaySalesUsdState = mySalesObj.optDouble("total_usd", 0.0)
-                todayInvoicesCountState = mySalesObj.optInt("count", 0)
-                todaySoldWeightState = mySalesObj.optDouble("weight", 0.0)
-            } else {
-                recomputeTodaySalesFromOperations(recentActivitiesState, forceOverride = true)
+            if (mySalesObj != null) {
+                var mLocal = parseFlexibleDouble(mySalesObj, "total_local")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(mySalesObj, "today_total_local")
+                val mUsd = parseFlexibleDouble(mySalesObj, "total_usd")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(mySalesObj, "today_total_usd")
+                val mCount = mySalesObj.optInt("count", mySalesObj.optInt("invoices_count", 0))
+                val mWeight = parseFlexibleDouble(mySalesObj, "weight")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(mySalesObj, "sold_weight")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(mySalesObj, "total_weight")
+
+                if (mLocal <= 0.0 && mUsd > 0.0) {
+                    mLocal = convertUsdToActiveCurrency(mUsd)
+                }
+
+                if (mLocal > 0.0 || mUsd > 0.0 || mCount > 0) {
+                    if (mLocal > 0.0) todaySalesLocalState = mLocal
+                    if (mUsd > 0.0) todaySalesUsdState = mUsd
+                    if (mCount > 0) todayInvoicesCountState = mCount
+                    if (mWeight > 0.0) todaySoldWeightState = mWeight
+                }
+            }
+            if (recentActivitiesState.isNotEmpty()) {
+                recomputeTodaySalesFromOperations(
+                    recentActivitiesState,
+                    forceOverride = todaySalesLocalState <= 0.0 && todaySalesUsdState <= 0.0
+                )
             }
         }
 
@@ -842,14 +1058,10 @@ class MiraDashboardFragment : Fragment() {
             "total_pieces",
             vaultObj.optInt("in_stock_count", vaultObj.optInt("items_count", 0))
         )
-        val weight = vaultObj.optDouble(
-            "total_weight",
-            vaultObj.optDouble("gross_weight", 0.0)
-        )
-        val pure24 = vaultObj.optDouble(
-            "pure_24k_weight",
-            vaultObj.optDouble("equivalent_24k", 0.0)
-        )
+        val weight = parseFlexibleDouble(vaultObj, "total_weight")
+            .takeIf { it > 0.0 } ?: parseFlexibleDouble(vaultObj, "gross_weight")
+        val pure24 = parseFlexibleDouble(vaultObj, "pure_24k_weight")
+            .takeIf { it > 0.0 } ?: parseFlexibleDouble(vaultObj, "equivalent_24k")
         if (pieces > 0) totalVaultPiecesState = pieces
         if (weight > 0.0) totalVaultWeightState = weight
         if (pure24 > 0.0) pure24kWeightState = pure24
@@ -1020,7 +1232,16 @@ class MiraDashboardFragment : Fragment() {
     }
 
     private fun recomputeTodaySalesFromOperations(ops: List<JSONObject>, forceOverride: Boolean) {
-        if (!forceOverride && todayInvoicesCountState > 0 && todaySalesLocalState > 0.0) return
+        val needWeightOnly = !forceOverride && todayInvoicesCountState > 0 &&
+            (todaySalesLocalState > 0.0 || todaySalesUsdState > 0.0) &&
+            todaySoldWeightState <= 0.0
+
+        if (!forceOverride && !needWeightOnly && todayInvoicesCountState > 0 &&
+            (todaySalesLocalState > 0.0 || todaySalesUsdState > 0.0)
+        ) {
+            return
+        }
+
         val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val todayKey = sdfKey.format(Date())
 
@@ -1031,14 +1252,19 @@ class MiraDashboardFragment : Fragment() {
 
         for (op in ops) {
             if (!isSaleOperation(op)) continue
-            val parsedDate = parseOperationDate(op)
-            val opDayKey = if (parsedDate != null) sdfKey.format(parsedDate) else ""
-            if (opDayKey == todayKey) {
+            if (isOperationToday(op, sdfKey, todayKey)) {
                 count++
                 sumLocal += extractOperationAmountLocal(op)
                 sumUsd += extractOperationAmountUsd(op)
                 sumWeight += extractOperationWeight(op)
             }
+        }
+
+        if (needWeightOnly) {
+            if (sumWeight > 0.0) {
+                todaySoldWeightState = sumWeight
+            }
+            return
         }
 
         if (forceOverride || count > 0) {
