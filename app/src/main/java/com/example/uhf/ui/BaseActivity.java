@@ -4,7 +4,7 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.uhf.MiraApp;
+import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.PermissionsSync;
 
@@ -18,13 +18,14 @@ public abstract class BaseActivity extends AppCompatActivity
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         permissionManager = PermissionManager.getInstance(this);
-        permissionsSync   = MiraApp.get().getPermissionsSync();
+        permissionsSync   = MiraApplication.getInstance().getPermissionsSync();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         permissionManager.addListener(this);
+        enforceFragmentAccess();
         permissionsSync.startPolling();
         permissionsSync.onResumeCheck();
     }
