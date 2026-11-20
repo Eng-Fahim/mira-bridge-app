@@ -620,7 +620,7 @@ public class MiraApiClient {
                 DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT);
     }
 
-    private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
+        private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
 
         if (BuildConfig.DEBUG) {
@@ -694,7 +694,16 @@ public class MiraApiClient {
             apiResponse.message = serverMessage;
         }
 
-        // حفظ وثيقة الصلاحيات القادمة من السيرفر تلقائياً
+        // 1) التقاط بصمة الصلاحيات من الترويسة في أي استجابة ناجحة
+        String headerPermVer = null;
+        if (isSuccess) {
+            try {
+                headerPermVer = conn.getHeaderField("X-Permissions-Version");
+            } catch (Exception ignored) {}
+        }
+
+        // 2) حفظ وثيقة الصلاحيات القادمة من السيرفر تلقائياً (مع تحديث الـ version وإعلام الشاشات)
+        boolean savedCapabilitiesNow = false;
         if (isSuccess && json != null) {
             String path = "";
             try { path = conn.getURL().getPath(); } catch (Exception ignored) {}
@@ -704,20 +713,47 @@ public class MiraApiClient {
                  || path.endsWith("/auth/me")
                  || path.endsWith("/auth/reconnect")
                  || path.endsWith("/mobile/capabilities")
+                 || path.endsWith("/me/permissions")
                  || path.contains("/mobile/");
 
+            JSONObject dataObj = json.optJSONObject("data");
             boolean hasCapabilitiesPayload =
                     json.has("legacy_permissions")
-                 || (json.has("data") && json.optJSONObject("data") != null
-                     && json.optJSONObject("data").has("modules"));
+                 || (dataObj != null && (dataObj.has("modules") || dataObj.has("mobile_capabilities")));
 
             if (isCapabilitiesSource || hasCapabilitiesPayload) {
                 try {
-                    PermissionManager.getInstance(context).saveFromServer(json);
+                    String payloadVer = (dataObj != null) ? dataObj.optString("version", "") : "";
+                    if (payloadVer.isEmpty()) {
+                        payloadVer = json.optString("permissions_version", "");
+                    }
+                    if (payloadVer.isEmpty() && headerPermVer != null) {
+                        payloadVer = headerPermVer;
+                    }
+
+                    if (!payloadVer.isEmpty()) {
+                        PermissionManager.getInstance(context).applyFromServer(json, payloadVer);
+                    } else {
+                        PermissionManager.getInstance(context).saveFromServer(json);
+                    }
+                    savedCapabilitiesNow = true;
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to save capabilities: " + e.getMessage());
                 }
             }
+        }
+
+        // 3) إذا تغيّرت ترويسة X-Permissions-Version في أي طلب عادي → أطلق التحديث اللحظي فوراً
+        if (isSuccess && !savedCapabilitiesNow && headerPermVer != null && !headerPermVer.isEmpty()) {
+            try {
+                if (PermissionManager.getInstance(context).needsRefresh(headerPermVer)) {
+                    com.example.uhf.application.MiraApplication app =
+                            com.example.uhf.application.MiraApplication.tryGetInstance();
+                    if (app != null) {
+                        app.getPermissionsSync().checkNow(null);
+                    }
+                }
+            } catch (Exception ignored) {}
         }
 
         return apiResponse;
