@@ -17,20 +17,9 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v4.2 — Server-Driven, Zero Local Decisions
+ *  PermissionManager v4.3 — Server-Driven & Live Sync
  * ═══════════════════════════════════════════════════════════════════
- *
- *  المبدأ:
- *    ✅ التطبيق لا يتخذ أي قرار إداري.
- *    ✅ كل القرارات تأتي من السيرفر (capabilities.modules).
- *    ✅ legacyPermissions لم تعد مصدر الحقيقة — fallback فقط.
- *    ✅ كل الدوال القديمة محفوظة (توافق خلفي كامل).
- *
- *  التغييرات عن v4.1:
- *    ✅ canView/canEdit/canDelete/canExport تعمل من modules مباشرة
- *    ✅ canUsePos/canCreateTransfer/canApproveTransfer من modules.scope
- *    ✅ dashboard widgets من modules.dashboard.variant
- *    ✅ إزالة الاعتماد على legacyPermissions (كان يكسر كل شيء)
+ *  متطابق 100% مع PermissionsNormalizer::MODULES (23 وحدة قياسية)
  */
 public class PermissionManager {
 
@@ -39,10 +28,9 @@ public class PermissionManager {
     private static final String KEY_CAPABILITIES = "capabilities_json";
     private static final String KEY_LEGACY       = "legacy_permissions_json";
     private static final String KEY_FRAGMENTS    = "fragments_json";
-    private static final String KEY_VERSION = "permissions_version";
-    /** نسخة محفوظة في الذاكرة */
-    private String currentVersion = null;
+    private static final String KEY_VERSION      = "permissions_version";
 
+    private String currentVersion = null;
 
     private static volatile PermissionManager instance;
     private final Context context;
@@ -69,25 +57,31 @@ public class PermissionManager {
     public static final String FEATURE_DASHBOARD      = "dashboard";
     public static final String FEATURE_INVENTORY      = "inventory";
     public static final String FEATURE_POS            = "pos";
+    public static final String FEATURE_SCRAP          = "scrap";
     public static final String FEATURE_TRANSFERS      = "transfers";
-    public static final String FEATURE_IDENTITY       = "identity";
+    public static final String FEATURE_IDENTITY       = "rfid";
     public static final String FEATURE_RADAR          = "radar";
-    public static final String FEATURE_GATES          = "gates";
+    public static final String FEATURE_GATES          = "gate";
     public static final String FEATURE_REPORTS        = "reports";
     public static final String FEATURE_ACCOUNTING     = "accounting";
     public static final String FEATURE_ADMIN          = "admin";
     public static final String FEATURE_USERS          = "users";
     public static final String FEATURE_BRANCHES       = "branches";
-    public static final String FEATURE_SERVER_CONFIG  = "server_config";
+    public static final String FEATURE_SERVER_CONFIG  = "settings";
     public static final String FEATURE_GOLD_RATES     = "gold_rates";
     public static final String FEATURE_PROFILE        = "profile";
     public static final String FEATURE_SALES_HISTORY  = "sales_history";
-    public static final String FEATURE_QUICK_ACCESS   = "quick_access";
-    public static final String FEATURE_RFID_WRITE     = "rfid_write";
-    public static final String FEATURE_RFID_BINDINGS  = "rfid_bindings";
-    public static final String FEATURE_READER_SETUP   = "reader_setup";
+    public static final String FEATURE_QUICK_ACCESS   = "admin";
+    public static final String FEATURE_RFID_WRITE     = "rfid";
+    public static final String FEATURE_RFID_BINDINGS  = "rfid";
+    public static final String FEATURE_READER_SETUP   = "setup";
     public static final String FEATURE_SOUND_SETTINGS = "sound_settings";
-    public static final String FEATURE_SNAPSHOTS      = "snapshots";
+    public static final String FEATURE_SNAPSHOTS      = "inventory";
+    public static final String FEATURE_PARTIES        = "parties";
+    public static final String FEATURE_VOUCHERS       = "vouchers";
+    public static final String FEATURE_CHEQUES        = "cheques";
+    public static final String FEATURE_PURCHASES      = "purchases";
+    public static final String FEATURE_AUDIT          = "audit";
 
     // ═══════════════════════════════════════════════════════
     //  Singleton
@@ -161,50 +155,48 @@ public class PermissionManager {
     }
 
     public void saveFromServer(JSONObject fullResponseJson) {
-    saveFromServerInternal(fullResponseJson);
+        saveFromServerInternal(fullResponseJson);
     }
 
-/**
- * @return true إذا تم حفظ بيانات فعلية، false إذا تم تجاهل الاستجابة
- */
-private boolean saveFromServerInternal(JSONObject fullResponseJson) {
-    if (fullResponseJson == null) return false;
-    try {
-        JSONObject data = fullResponseJson.optJSONObject("data");
-        JSONObject legacy = parseJsonObjectField(fullResponseJson, "legacy_permissions");
+    private boolean saveFromServerInternal(JSONObject fullResponseJson) {
+        if (fullResponseJson == null) return false;
+        try {
+            JSONObject data = fullResponseJson.optJSONObject("data");
+            JSONObject legacy = parseJsonObjectField(fullResponseJson, "legacy_permissions");
 
-        if (data != null && data.has("mobile_capabilities")) {
-            JSONObject caps = parseJsonObjectField(data, "mobile_capabilities");
-            if (caps != null) capabilities = caps;
+            if (data != null && data.has("mobile_capabilities")) {
+                JSONObject caps = parseJsonObjectField(data, "mobile_capabilities");
+                if (caps != null) capabilities = caps;
 
-            JSONObject perms = parseJsonObjectField(data, "permissions");
-            if (perms != null) {
-                legacyPermissions = perms;
+                JSONObject perms = parseJsonObjectField(data, "permissions");
+                if (perms != null) {
+                    legacyPermissions = perms;
+                } else {
+                    JSONObject rootPerms = parseJsonObjectField(fullResponseJson, "permissions");
+                    if (rootPerms != null) legacyPermissions = rootPerms;
+                }
+            } else if (data != null && data.has("modules")) {
+                capabilities = data;
+                if (legacy != null) legacyPermissions = legacy;
             } else {
-                JSONObject rootPerms = parseJsonObjectField(fullResponseJson, "permissions");
-                if (rootPerms != null) legacyPermissions = rootPerms;
+                Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
+                return false;
             }
-        } else if (data != null && data.has("modules")) {
-            capabilities = data;
-            if (legacy != null) legacyPermissions = legacy;
-        } else {
-            Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
-            return false; // ← مهم: نشير للفشل
+
+            fragments = deriveFragments(capabilities);
+
+            prefs.edit()
+                 .putString(KEY_CAPABILITIES, capabilities.toString())
+                 .putString(KEY_LEGACY,       legacyPermissions.toString())
+                 .putString(KEY_FRAGMENTS,    fragments.toString())
+                 .apply();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "saveFromServer error: " + e.getMessage());
+            return false;
         }
-
-        fragments = deriveFragments(capabilities);
-
-        prefs.edit()
-             .putString(KEY_CAPABILITIES, capabilities.toString())
-             .putString(KEY_LEGACY,       legacyPermissions.toString())
-             .putString(KEY_FRAGMENTS,    fragments.toString())
-             .apply();
-        return true; // ← نجاح
-    } catch (Exception e) {
-        Log.e(TAG, "saveFromServer error: " + e.getMessage());
-        return false;
     }
-}
+
     private JSONObject parseJsonObjectField(JSONObject parent, String key) {
         if (parent == null || !parent.has(key) || parent.isNull(key)) return null;
         Object raw = parent.opt(key);
@@ -223,7 +215,6 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
         }
         return null;
     }
-
 
     @Deprecated
     public void savePermissions(String permissionsJson) {
@@ -252,7 +243,7 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Fragments — مشتقة من modules
+    //  Fragments — مشتقة بدقة من PermissionsNormalizer::MODULES
     // ═══════════════════════════════════════════════════════
     private JSONObject deriveFragments(JSONObject caps) {
         JSONObject out = new JSONObject();
@@ -261,42 +252,58 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
         if (modules == null) return out;
 
         String[][] map = {
+            // المحاسبة والمالية
             {"Accounting", "accounting"}, {"FiscalYears", "accounting"},
             {"OpeningBalances", "accounting"}, {"FinancialReports", "accounting"},
             {"ProfitReport", "accounting"}, {"AccountingCharts", "accounting"},
-            {"AccountingAuditLog", "accounting"}, {"Vouchers", "vouchers"},
+            {"AccountingAuditLog", "accounting"}, {"AccountingSetup", "accounting"},
+            {"CashReconciliation", "accounting"},
+            {"Vouchers", "vouchers"},
+            {"Cheques", "cheques"},
+
+            // نقاط البيع والمبيعات
             {"POS", "pos"}, {"PosFragment", "pos"},
+            {"SalesHistory", "sales_history"},
+
+            // المخزون والتحويلات والصياغة
             {"Inventory", "inventory"}, {"InventoryPro", "inventory"},
             {"MiraInventory", "inventory"}, {"Scan", "inventory"},
+            {"Snapshots", "inventory"}, {"GoldConversion", "inventory"},
             {"Transfers", "transfers"}, {"TransferDetail", "transfers"},
-            {"IdentityStudio", "inventory"},
+
+            // الذهب الكسر (مربوط بوحدة scrap المستقلة)
+            {"ScrapGoldBuy", "scrap"}, {"MiraScrapGoldBuy", "scrap"},
+            {"ScrapHistory", "scrap"}, {"MiraScrapHistory", "scrap"},
+            {"ScrapBatches", "scrap"}, {"MiraScrapBatches", "scrap"},
+            {"ScrapAging", "scrap"}, {"MiraScrapAging", "scrap"},
+            {"ScrapProfitReport", "scrap"},
+
+            // المشتريات والعملاء والأسعار
+            {"PurchaseInvoice", "purchases"},
+            {"Parties", "parties"}, {"MiraParties", "parties"},
+            {"GoldRates", "gold_rates"},
+
+            // RFID وتهيئة القارئ (مربوطة بوحدتي rfid و setup)
+            {"IdentityStudio", "rfid"},
+            {"RFIDWrite", "rfid"},
+            {"RfidBindings", "rfid"},
+            {"ReaderSetup", "setup"}, {"UHFSet", "setup"},
+            {"ReaderControl", "setup"},
+
+            // الرادار والبوابات
             {"Radar", "radar"}, {"Locator", "radar"},
             {"SecureGate", "gate"}, {"GateSettings", "gate"}, {"Gates", "gate"},
+
+            // التقارير والتدقيق والإدارة
             {"Reports", "reports"}, {"ReportsPro", "reports"},
+            {"AuditLogs", "audit"},
             {"AdminHub", "admin"},
+            {"QuickAccessSettings", "admin"},
             {"UsersManagement", "users"},
             {"Branches", "branches"}, {"BranchesManagement", "branches"},
-            {"GoldRates", "gold_rates"},
-            {"SalesHistory", "sales_history"},
-            {"QuickAccessSettings", "quick_access"},
-            {"ReaderSetup", "reader_setup"}, {"UHFSet", "reader_setup"},
-            {"ReaderControl", "reader_setup"},
-            {"RFIDWrite", "rfid_write"},
-            {"RfidBindings", "rfid_bindings"},
-            {"SoundSettings", "sound_settings"},
-            {"Snapshots", "snapshots"},
-            {"ScrapGoldBuy", "inventory"}, {"MiraScrapGoldBuy", "inventory"},
-            {"ScrapHistory", "inventory"}, {"MiraScrapHistory", "inventory"},
-            {"ScrapBatches", "inventory"}, {"MiraScrapBatches", "inventory"},
-            {"ScrapAging", "inventory"}, {"MiraScrapAging", "inventory"},
-            {"ScrapProfitReport", "inventory"},
-            {"Parties", "parties"}, {"MiraParties", "parties"},
-            {"CashReconciliation", "accounting"},
-            {"PurchaseInvoice", "purchases"},
-            {"AuditLogs", "audit"},
             {"ServerConfig", "settings"},
-            {"AccountingSetup", "accounting"},
-            {"GoldConversion", "inventory"},
+
+            // الشاشات الأساسية
             {"Dashboard", "dashboard"}, {"Home", "dashboard"},
             {"HomeFragment", "dashboard"},
             {"Profile", "profile"},
@@ -312,6 +319,7 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
             }
         }
 
+        // شاشات شخصية عامة لكل مستخدم مسجّل دخول
         try {
             out.put("Dashboard", true);
             out.put("Home", true);
@@ -320,10 +328,9 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
             out.put("Notifications", true);
             out.put("SoundSettings", true);
             out.put("Receipt", true);
-            out.put("GoldConversion", true);
         } catch (Exception ignored) {}
 
-        // ✅ اقرأ fragments الصريحة من السيرفر (إن وُجدت) — تتجاوز الاشتقاق
+        // تجاوز صريح من السيرفر إن وُجد
         JSONObject serverFragments = caps.optJSONObject("fragments");
         if (serverFragments != null) {
             Iterator<String> keys = serverFragments.keys();
@@ -360,15 +367,11 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
         return fragments != null && fragments.optBoolean(key, false);
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  ✅ Low-level — من modules (لا legacyPermissions)
-    //  legacyPermissions kept as fallback only
-    // ═══════════════════════════════════════════════════════
-        private boolean scopeAllows(String moduleName, String action) {
+    private boolean scopeAllows(String moduleName, String action) {
         JSONObject m = module(moduleName);
         if (m == null || !m.optBoolean("enabled", false)) return false;
 
-        // ✅ 1. أولوية قصوى للتخصيصات الفردية القادمة من السيرفر داخل actions
+        // 1. أولوية للتخصيصات الفردية القادمة من السيرفر داخل actions
         JSONObject actions = m.optJSONObject("actions");
         if (actions != null && actions.has(action)) {
             return actions.optBoolean(action, false);
@@ -394,23 +397,18 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
         }
     }
 
-    
     public boolean canRefund() {
         return hasPermission(FEATURE_POS, "refund")
             || hasPermission(FEATURE_SALES_HISTORY, "refund");
     }
 
-
     public boolean hasPermission(String feature, String action) {
-        // 1) من modules (المصدر الأساسي)
         if (scopeAllows(feature, action)) return true;
 
-        // 2) fallback: legacyPermissions (لو كان JSON object صحيحاً)
         if (legacyPermissions != null) {
             JSONObject f = legacyPermissions.optJSONObject(feature);
             if (f != null && f.optBoolean(action, false)) return true;
         }
-
         return false;
     }
 
@@ -433,7 +431,7 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Role checks — من الوثيقة (للعرض فقط، ليس قراراً)
+    //  Role checks — للعرض فقط
     // ═══════════════════════════════════════════════════════
     public String getRoleForDisplay() {
         return sessionManager.getRoleString();
@@ -482,8 +480,8 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
     public boolean canCreateTransfer()             { return scopeAllows("transfers", "edit"); }
     public boolean canApproveTransfer()            { return scopeAllows("transfers", "edit"); }
 
-    public boolean canViewIdentity()               { return moduleEnabled("inventory"); }
-    public boolean canUseIdentity()                { return scopeAllows("inventory", "edit"); }
+    public boolean canViewIdentity()               { return moduleEnabled("rfid"); }
+    public boolean canUseIdentity()                { return scopeAllows("rfid", "edit"); }
 
     public boolean canViewRadar()                  { return moduleEnabled("radar"); }
 
@@ -507,25 +505,25 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
     public boolean canEditGoldRates()              { return scopeAllows("gold_rates", "edit"); }
 
     public boolean canViewSalesHistory()           { return moduleEnabled("sales_history"); }
-    public boolean canManageQuickAccess()          { return scopeAllows("quick_access", "edit"); }
+    public boolean canManageQuickAccess()          { return scopeAllows("admin", "edit") || scopeAllows("settings", "edit"); }
 
     public boolean canViewAllBranches()            { return fragmentEnabled("SalesHistoryAllBranches"); }
 
     public boolean canWriteRfid()                  { return scopeAllows("rfid", "edit"); }
     public boolean canViewRfidBindings()           { return moduleEnabled("rfid"); }
-    public boolean canViewReaderSetup()            { return moduleEnabled("reader_setup") || moduleEnabled("rfid"); }
+    public boolean canViewReaderSetup()            { return moduleEnabled("setup") || moduleEnabled("rfid"); }
     public boolean canViewSoundSettings()          { return true; }
     public boolean canViewSnapshots()              { return canViewInventory(); }
 
-    public boolean canViewScrapGold()              { return moduleEnabled("scrap") || moduleEnabled("inventory"); }
-    public boolean canBuyScrapGold()               { return scopeAllows("scrap", "edit") || scopeAllows("inventory", "edit"); }
+    public boolean canViewScrapGold()              { return moduleEnabled("scrap"); }
+    public boolean canBuyScrapGold()               { return scopeAllows("scrap", "edit"); }
     public boolean canViewScrapAging()             { return canViewScrapGold(); }
 
     public boolean canViewParties()                { return moduleEnabled("parties"); }
     public boolean canViewCashReconciliation()     { return moduleEnabled("accounting"); }
     public boolean canCreatePurchaseInvoice()      { return scopeAllows("purchases", "edit"); }
     public boolean canViewAuditLogs()              { return moduleEnabled("audit"); }
-    public boolean canViewGoldConversion()         { return true; }
+    public boolean canViewGoldConversion()         { return scopeAllows("inventory", "edit"); }
 
     // Legacy aliases
     public boolean canAccessIdentityStudio() { return canUseIdentity(); }
@@ -599,115 +597,90 @@ private boolean saveFromServerInternal(JSONObject fullResponseJson) {
         String v = dashboardVariant();
         return "full".equals(v) || "hero_inventory".equals(v);
     }
-// ═══════════════════════════════════════════════════════
-//  ✅ إضافات v4.3 — Live Refresh + Listeners
-// ═══════════════════════════════════════════════════════
 
-/** مستمعون حيّون — أي شاشة تريد إعادة الرسم عند تغيّر الصلاحيات */
-public interface OnPermissionsChangedListener {
-    void onPermissionsChanged();
-}
-
-private final java.util.concurrent.CopyOnWriteArrayList<OnPermissionsChangedListener> listeners
-        = new java.util.concurrent.CopyOnWriteArrayList<>();
-
-public void addListener(OnPermissionsChangedListener l) {
-    if (l != null && !listeners.contains(l)) listeners.add(l);
-}
-
-public void removeListener(OnPermissionsChangedListener l) {
-    listeners.remove(l);
-}
-
-/**
- * يُعلم كل الشاشات الحيّة. يُستدعى تلقائياً من saveFromServer
- * فقط إذا تغيّرت النسخة فعلاً.
- */
-private void notifyListeners() {
-    for (OnPermissionsChangedListener l : listeners) {
-        try { l.onPermissionsChanged(); }
-        catch (Throwable t) { Log.e(TAG, "listener error", t); }
-    }
-}
-
-/** آخر نسخة استلمناها من السيرفر */
-public String getStoredVersion() {
-    if (currentVersion == null) {
-        currentVersion = prefs.getString(KEY_VERSION, "");
-    }
-    return currentVersion == null ? "" : currentVersion;
-}
-
-/**
- * يُقارن نسخة السيرفر بالنسخة المخزنة.
- * @return true إذا كانت مختلفة (وبالتالي يجب إعادة الجلب).
- */
-public boolean needsRefresh(String serverVersion) {
-    if (serverVersion == null || serverVersion.isEmpty()) return false;
-    String local = getStoredVersion();
-    if (local.isEmpty()) return true;          // أول مرة
-    return !local.equals(serverVersion);
-}
-
-/**
- * ✅ تحديث live لـ capabilities من استجابة السيرفر.
- *    يُستدعى من login + PermissionsSync.
- * @return true إذا تغيّرت الصلاحيات فعلاً (وبالتالي أُعلم المستمعون).
- */
-public boolean applyFromServer(JSONObject fullResponseJson, String serverVersion) {
-    if (fullResponseJson == null) return false;
-
-    String oldVersion = getStoredVersion();
-
-    // 1) حاول حفظ الصلاحيات أولاً
-    boolean saved = saveFromServerInternal(fullResponseJson);
-    if (!saved) {
-        Log.w(TAG, "applyFromServer: save failed, NOT updating version");
-        return false; // ← لا نُحدّث النسخة → PermissionsSync سيعيد المحاولة لاحقاً
+    // ═══════════════════════════════════════════════════════
+    //  Live Refresh + Listeners
+    // ═══════════════════════════════════════════════════════
+    public interface OnPermissionsChangedListener {
+        void onPermissionsChanged();
     }
 
-    // 2) الآن — حفظ آمن للنسخة
-    boolean versionChanged = false;
-    if (serverVersion != null && !serverVersion.isEmpty()) {
-        versionChanged = !serverVersion.equals(oldVersion);
-        currentVersion = serverVersion;
-        prefs.edit().putString(KEY_VERSION, serverVersion).apply();
+    private final java.util.concurrent.CopyOnWriteArrayList<OnPermissionsChangedListener> listeners
+            = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public void addListener(OnPermissionsChangedListener l) {
+        if (l != null && !listeners.contains(l)) listeners.add(l);
     }
 
-    // 3) إعلام المستمعين فقط إذا تغيّرت النسخة فعلاً
-    if (versionChanged) {
-        Log.i(TAG, "🔔 Permissions changed — notifying " + listeners.size() + " listener(s)");
+    public void removeListener(OnPermissionsChangedListener l) {
+        listeners.remove(l);
+    }
+
+    private void notifyListeners() {
+        for (OnPermissionsChangedListener l : listeners) {
+            try { l.onPermissionsChanged(); }
+            catch (Throwable t) { Log.e(TAG, "listener error", t); }
+        }
+    }
+
+    public String getStoredVersion() {
+        if (currentVersion == null) {
+            currentVersion = prefs.getString(KEY_VERSION, "");
+        }
+        return currentVersion == null ? "" : currentVersion;
+    }
+
+    public boolean needsRefresh(String serverVersion) {
+        if (serverVersion == null || serverVersion.isEmpty()) return false;
+        String local = getStoredVersion();
+        if (local.isEmpty()) return true;
+        return !local.equals(serverVersion);
+    }
+
+    public boolean applyFromServer(JSONObject fullResponseJson, String serverVersion) {
+        if (fullResponseJson == null) return false;
+
+        String oldVersion = getStoredVersion();
+
+        boolean saved = saveFromServerInternal(fullResponseJson);
+        if (!saved) {
+            Log.w(TAG, "applyFromServer: save failed, NOT updating version");
+            return false;
+        }
+
+        boolean versionChanged = false;
+        if (serverVersion != null && !serverVersion.isEmpty()) {
+            versionChanged = !serverVersion.equals(oldVersion);
+            currentVersion = serverVersion;
+            prefs.edit().putString(KEY_VERSION, serverVersion).apply();
+        }
+
+        if (versionChanged) {
+            Log.i(TAG, "🔔 Permissions changed — notifying " + listeners.size() + " listener(s)");
+            notifyListeners();
+        }
+        return versionChanged;
+    }
+
+    public void clearOnLogout() {
+        clearPermissions();
+        currentVersion = null;
+        prefs.edit().remove(KEY_VERSION).apply();
         notifyListeners();
     }
-    return versionChanged;
-}
 
-/**
- * ✅ عند تسجيل الخروج — امسح كل شيء بما فيه النسخة.
- */
-public void clearOnLogout() {
-    clearPermissions();
-    currentVersion = null;
-    prefs.edit().remove(KEY_VERSION).apply();
-    notifyListeners(); // لإعادة رسم الشاشات إن وُجدت
-}
+    @Deprecated
+    public void clearPermissions() {
+        capabilities = new JSONObject();
+        legacyPermissions = new JSONObject();
+        fragments = new JSONObject();
+        currentVersion = null;
+        prefs.edit().remove(KEY_CAPABILITIES)
+                    .remove(KEY_LEGACY)
+                    .remove(KEY_FRAGMENTS)
+                    .remove(KEY_VERSION).apply();
+    }
 
-// ═══════════════════════════════════════════════════════
-//  إضافة لـ clearPermissions() — امسح النسخة أيضاً
-// ═══════════════════════════════════════════════════════
-
-// استبدل الدالة الحالية:
-@Deprecated
-public void clearPermissions() {
-    capabilities = new JSONObject();
-    legacyPermissions = new JSONObject();
-    fragments = new JSONObject();
-    currentVersion = null;
-    prefs.edit().remove(KEY_CAPABILITIES)
-                .remove(KEY_LEGACY)
-                .remove(KEY_FRAGMENTS)
-                .remove(KEY_VERSION).apply();
-}
     // ═══════════════════════════════════════════════════════
     //  Master Gate
     // ═══════════════════════════════════════════════════════
@@ -730,27 +703,30 @@ public void clearPermissions() {
         switch (tag.toLowerCase()) {
             case "dashboard": case "home": case "homefragment":
             case "profile": case "soundsettings": case "notifications":
-            case "receipt": case "goldconversion":
+            case "receipt":
                 return null;
             case "serverconfig": return "settings";
             case "accountingsetup": return "accounting";
-            case "readercontrol": case "readersetup": case "uhfset": return "reader_setup";
+            case "cashreconciliation": return "accounting";
+            case "readercontrol": case "readersetup": case "uhfset": return "setup";
             case "scrapgoldbuy": case "mirascrapgoldbuy":
             case "scraphistory": case "mirascraphistory":
             case "scrapbatches": case "mirascrapbatches":
             case "scrapaging": case "mirascrapaging":
             case "scrapprofitreport":
+                return "scrap";
             case "inventory": case "inventorypro": case "mirainventory":
-            case "scan":
+            case "scan": case "snapshots": case "goldconversion":
                 return "inventory";
             case "parties": case "miraparties": return "parties";
-            case "cashreconciliation": return "accounting";
             case "purchaseinvoice": return "purchases";
             case "auditlogs": return "audit";
-            case "vouchers": return "accounting";
+            case "vouchers": return "vouchers";
+            case "cheques": return "cheques";
             case "pos": case "posfragment": return "pos";
             case "transfers": case "transferdetail": return "transfers";
-            case "identitystudio": return "inventory";
+            case "identitystudio": case "rfidwrite": case "rfidbindings": case "rfidsettings":
+                return "rfid";
             case "radar": case "locator": return "radar";
             case "securegate": case "gatesettings": case "gates": return "gate";
             case "reports": case "reportspro": return "reports";
@@ -758,17 +734,12 @@ public void clearPermissions() {
             case "financialreports": case "profitreport":
             case "accountingcharts": case "accountingauditlog":
                 return "accounting";
-            case "adminhub": return "admin";
+            case "adminhub": case "quickaccesssettings": case "nxpsecurity":
+                return "admin";
             case "usersmanagement": return "users";
             case "goldrates": return "gold_rates";
             case "saleshistory": return "sales_history";
-            case "quickaccesssettings": return "quick_access";
             case "branches": case "branchesmanagement": return "branches";
-            case "rfidwrite": return "rfid_write";
-            case "rfidbindings": return "rfid_bindings";
-            case "rfidsettings": return "rfid";
-            case "snapshots": return "inventory";
-            case "nxpsecurity": return "admin";
             default:
                 return null;
         }
