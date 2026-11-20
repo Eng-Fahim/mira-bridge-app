@@ -22,8 +22,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.uhf.ui.theme.MiraTheme
@@ -55,8 +57,7 @@ data class OperationSummaryMetric(
 )
 
 /**
- * 1) رسم بياني خاص بصلاحية البائع / الكاشير:
- * يوضح سجل إنجازه ومبيعاته خلال الفترة المختارة (7 / 14 / 30 يوماً) مع نسبة تحقيق الهدف
+ * 1) رسم بياني خاص بصلاحية البائع / الكاشير
  */
 @Composable
 fun StaffAchievementChartCard(
@@ -69,7 +70,8 @@ fun StaffAchievementChartCard(
     onPeriodChange: (Int) -> Unit
 ) {
     val colors = MiraTheme.colors
-    val goldAccent = Color(0xFFD4AF37)
+    val typography = MaterialTheme.typography
+    val goldAccent = colors.goldPrimary
     val emeraldAccent = Color(0xFF10B981)
 
     var selectedIndex by remember(points) {
@@ -115,14 +117,14 @@ fun StaffAchievementChartCard(
                     Column {
                         Text(
                             text = if (isArabic) "سجل إنجازك ومبيعاتك" else "Your Sales Performance",
-                            fontSize = 14.sp,
+                            style = typography.titleSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = colors.textPrimary
                         )
                         Text(
                             text = if (isArabic) "تطور الأداء خلال آخر $selectedDays يوم"
                             else "Performance trend ($selectedDays days)",
-                            fontSize = 11.sp,
+                            style = typography.labelSmall,
                             color = colors.textSecondary
                         )
                     }
@@ -151,21 +153,21 @@ fun StaffAchievementChartCard(
                 ) {
                     Text(
                         text = activePoint.label,
-                        fontSize = 12.sp,
+                        style = typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = goldAccent
                     )
                     Text(
                         text = if (maskAmounts) "•••••"
                         else "${formatChartNumber(activePoint.salesAmount)} $currency  •  ${activePoint.invoicesCount} ${if (isArabic) "فاتورة" else "inv"}",
-                        fontSize = 12.sp,
+                        style = typography.labelMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = emeraldAccent
                     )
                 }
             }
 
-            // الرسم البياني الخطي المساحي (Area + Line Chart)
+            // الرسم البياني الخطي المساحي
             if (points.isEmpty()) {
                 EmptyChartPlaceholder(
                     text = if (isArabic) "لا توجد مبيعات مسجلة في هذه الفترة بعد"
@@ -176,7 +178,7 @@ fun StaffAchievementChartCard(
                     points = points,
                     selectedIndex = selectedIndex,
                     lineColor = goldAccent,
-                    fillColor = goldAccent.copy(alpha = 0.25f),
+                    fillColor = goldAccent.copy(alpha = 0.24f),
                     onSelectIndex = { selectedIndex = it }
                 )
             }
@@ -190,12 +192,12 @@ fun StaffAchievementChartCard(
                     ) {
                         Text(
                             text = if (isArabic) "نسبة تحقيق المستهدف" else "Target Achievement",
-                            fontSize = 11.sp,
+                            style = typography.labelSmall,
                             color = colors.textSecondary
                         )
                         Text(
                             text = if (maskAmounts) "••%" else "${(achievementRatio * 100).toInt()}%",
-                            fontSize = 11.sp,
+                            style = typography.labelSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (achievementRatio >= 1f) emeraldAccent else goldAccent
                         )
@@ -241,10 +243,7 @@ fun StaffAchievementChartCard(
 }
 
 /**
- * 2) لوحة الرسوم البيانية المتعددة للمدراء والمشرفين:
- * - رسم مقارنة العمليات اليومية (مبيعات / شراء كسر / مرتجعات)
- * - رسم توزيع العيارات (24K / 21K / 18K)
- * - مؤشرات حركة العمليات التشغيلية
+ * 2) لوحة الرسوم البيانية المتعددة للمدراء والمشرفين
  */
 @Composable
 fun ManagerAnalyticsChartsSection(
@@ -258,12 +257,13 @@ fun ManagerAnalyticsChartsSection(
     onPeriodChange: (Int) -> Unit
 ) {
     val colors = MiraTheme.colors
+    val typography = MaterialTheme.typography
     val salesColor = Color(0xFF10B981)
     val scrapColor = Color(0xFFF59E0B)
     val refundColor = Color(0xFFEF4444)
 
     var selectedBarIndex by remember(points) {
-        mutableIntStateOf((points.size - 1).coerceAtLeast(0))
+        mutableIntStateOf((points.takeLast(10).size - 1).coerceAtLeast(0))
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -298,14 +298,14 @@ fun ManagerAnalyticsChartsSection(
                         Column {
                             Text(
                                 text = if (isArabic) "تحليل العمليات المالية" else "Operations Financial Analytics",
-                                fontSize = 14.sp,
+                                style = typography.titleSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = colors.textPrimary
                             )
                             Text(
                                 text = if (isArabic) "المبيعات مقابل الكسر والمرتجعات"
                                 else "Sales vs Scrap & Refunds",
-                                fontSize = 11.sp,
+                                style = typography.labelSmall,
                                 color = colors.textSecondary
                             )
                         }
@@ -319,7 +319,6 @@ fun ManagerAnalyticsChartsSection(
                     )
                 }
 
-                // مفتاح الألوان
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -329,8 +328,9 @@ fun ManagerAnalyticsChartsSection(
                     LegendDot(if (isArabic) "مرتجعات" else "Refunds", refundColor)
                 }
 
-                if (points.isNotEmpty() && selectedBarIndex in points.indices) {
-                    val p = points[selectedBarIndex]
+                val visiblePoints = remember(points) { points.takeLast(10) }
+                if (visiblePoints.isNotEmpty() && selectedBarIndex in visiblePoints.indices) {
+                    val p = visiblePoints[selectedBarIndex]
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -341,28 +341,28 @@ fun ManagerAnalyticsChartsSection(
                     ) {
                         Text(
                             text = p.label,
-                            fontSize = 11.sp,
+                            style = typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.goldPrimary
                         )
                         Text(
                             text = if (maskAmounts) "•••••"
-                            else "${if (isArabic) "مبيعات:" else "Sales:"} ${formatChartNumber(p.salesAmount)}  |  ${if (isArabic) "كسر:" else "Scrap:"} ${formatChartNumber(p.scrapAmount)}",
-                            fontSize = 11.sp,
+                            else "${if (isArabic) "مبيعات:" else "Sales:"} ${formatChartNumber(p.salesAmount)} $currency  |  ${if (isArabic) "كسر:" else "Scrap:"} ${formatChartNumber(p.scrapAmount)}",
+                            style = typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.textPrimary
                         )
                     }
                 }
 
-                if (points.isEmpty()) {
+                if (visiblePoints.isEmpty()) {
                     EmptyChartPlaceholder(
                         text = if (isArabic) "لا توجد بيانات تحليلية للفترة المحددة"
                         else "No analytics data for selected period"
                     )
                 } else {
                     MultiSeriesBarChart(
-                        points = points,
+                        points = visiblePoints,
                         selectedIndex = selectedBarIndex,
                         salesColor = salesColor,
                         scrapColor = scrapColor,
@@ -398,7 +398,7 @@ fun ManagerAnalyticsChartsSection(
                     )
                     Text(
                         text = if (isArabic) "توزيع العيارات وحركة العمليات" else "Karat Mix & Operations Breakdown",
-                        fontSize = 14.sp,
+                        style = typography.titleSmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.textPrimary
                     )
@@ -438,7 +438,7 @@ fun ManagerAnalyticsChartsSection(
                                         )
                                         Text(
                                             text = item.karat,
-                                            fontSize = 12.sp,
+                                            style = typography.labelMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = colors.textPrimary
                                         )
@@ -446,7 +446,7 @@ fun ManagerAnalyticsChartsSection(
                                     Text(
                                         text = if (maskAmounts) "••%"
                                         else "${String.format(Locale.US, "%.1fg", item.weightGrams)} ($pct%)",
-                                        fontSize = 11.sp,
+                                        style = typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = item.color
                                     )
@@ -456,7 +456,6 @@ fun ManagerAnalyticsChartsSection(
                     }
                 }
 
-                // أشرطة حركة العمليات التشغيلية (مبيعات، جرد، تحويلات، كسر)
                 if (operationsBreakdown.isNotEmpty()) {
                     val maxOps = operationsBreakdown.maxOf { it.count }.coerceAtLeast(1)
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -469,12 +468,12 @@ fun ManagerAnalyticsChartsSection(
                                 ) {
                                     Text(
                                         text = if (isArabic) op.labelAr else op.labelEn,
-                                        fontSize = 11.sp,
+                                        style = typography.labelSmall,
                                         color = colors.textSecondary
                                     )
                                     Text(
                                         text = if (maskAmounts) "••" else "${op.count}",
-                                        fontSize = 11.sp,
+                                        style = typography.labelSmall,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = op.color
                                     )
@@ -511,8 +510,21 @@ private fun InteractiveLineAreaChart(
     fillColor: Color,
     onSelectIndex: (Int) -> Unit
 ) {
-    val maxVal = remember(points) {
-        max(points.maxOfOrNull { it.salesAmount } ?: 1.0, 1.0)
+    val colors = MiraTheme.colors
+    val typography = MaterialTheme.typography
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
+    // إذا كانت المبالغ 0 ولكن توجد فواتير، نرسم منحنى عدد الفواتير تلقائياً حتى لا يبدو الرسم فارغاً
+    val useInvoicesFallback = remember(points) {
+        points.all { it.salesAmount <= 0.0 } && points.any { it.invoicesCount > 0 }
+    }
+
+    val values = remember(points, useInvoicesFallback) {
+        points.map { if (useInvoicesFallback) it.invoicesCount.toDouble() else it.salesAmount }
+    }
+
+    val maxVal = remember(values) {
+        max(values.maxOrNull() ?: 1.0, 1.0)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -520,11 +532,12 @@ private fun InteractiveLineAreaChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(145.dp)
-                .pointerInput(points) {
+                .pointerInput(points, isRtl) {
                     detectTapGestures { offset ->
                         if (points.isNotEmpty()) {
+                            val effectiveX = if (isRtl) (size.width - offset.x) else offset.x
                             val stepX = size.width / points.size.toFloat()
-                            val idx = (offset.x / stepX).toInt().coerceIn(0, points.lastIndex)
+                            val idx = (effectiveX / stepX).toInt().coerceIn(0, points.lastIndex)
                             onSelectIndex(idx)
                         }
                     }
@@ -532,32 +545,36 @@ private fun InteractiveLineAreaChart(
         ) {
             val w = size.width
             val h = size.height
+            val padHorizontal = 8.dp.toPx()
             val padTop = 16.dp.toPx()
-            val padBottom = 12.dp.toPx()
+            val padBottom = 14.dp.toPx()
+            val usableW = (w - padHorizontal * 2).coerceAtLeast(10f)
             val chartH = (h - padTop - padBottom).coerceAtLeast(10f)
+            val gridColor = colors.textSecondary.copy(alpha = 0.14f)
 
-            // خطوط شبكة أفقية خفيفة
+            // خطوط شبكة أفقية متوافقة مع الثيم الفاتح والداكن
             for (i in 0..3) {
                 val y = padTop + (chartH * i / 3f)
                 drawLine(
-                    color = Color.White.copy(alpha = 0.06f),
-                    start = Offset(0f, y),
-                    end = Offset(w, y),
+                    color = gridColor,
+                    start = Offset(padHorizontal, y),
+                    end = Offset(w - padHorizontal, y),
                     strokeWidth = 1.dp.toPx()
                 )
             }
 
-            if (points.size == 1) {
+            if (values.size == 1) {
                 val cx = w / 2f
-                val cy = padTop + chartH * (1f - (points[0].salesAmount / maxVal).toFloat())
+                val cy = padTop + chartH * (1f - (values[0] / maxVal).toFloat())
                 drawCircle(color = lineColor, radius = 6.dp.toPx(), center = Offset(cx, cy))
                 return@Canvas
             }
 
-            val stepX = w / (points.size - 1).toFloat()
-            val coords = points.mapIndexed { idx, pt ->
-                val x = idx * stepX
-                val ratio = (pt.salesAmount / maxVal).toFloat().coerceIn(0f, 1f)
+            val stepX = usableW / (values.size - 1).toFloat()
+            val coords = values.mapIndexed { idx, value ->
+                val rawX = padHorizontal + idx * stepX
+                val x = if (isRtl) (w - rawX) else rawX
+                val ratio = (value / maxVal).toFloat().coerceIn(0f, 1f)
                 val y = padTop + chartH * (1f - ratio)
                 Offset(x, y)
             }
@@ -582,7 +599,7 @@ private fun InteractiveLineAreaChart(
             drawPath(
                 path = linePath,
                 color = lineColor,
-                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                style = Stroke(width = 2.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
 
             coords.forEachIndexed { idx, pt ->
@@ -594,32 +611,55 @@ private fun InteractiveLineAreaChart(
                         end = Offset(pt.x, h - padBottom),
                         strokeWidth = 1.2.dp.toPx()
                     )
-                    drawCircle(color = lineColor.copy(alpha = 0.25f), radius = 10.dp.toPx(), center = pt)
+                    drawCircle(
+                        color = lineColor.copy(alpha = 0.22f),
+                        radius = 10.dp.toPx(),
+                        center = pt
+                    )
                 }
                 drawCircle(
-                    color = if (isSel) Color.White else lineColor,
-                    radius = if (isSel) 4.5.dp.toPx() else 3.dp.toPx(),
+                    color = if (isSel) colors.cardSurface else lineColor,
+                    radius = if (isSel) 5.dp.toPx() else 3.2.dp.toPx(),
                     center = pt
                 )
+                if (isSel) {
+                    drawCircle(
+                        color = lineColor,
+                        radius = 5.dp.toPx(),
+                        center = pt,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
             }
         }
 
-        // تسميات المحور الأفقي (الأول، المنتصف، الأخير)
+        // تسميات المحور الأفقي متطابقة تماماً مع اتجاه النقاط
         if (points.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = points.first().label, fontSize = 10.sp, color = MiraTheme.colors.textSecondary)
+                Text(
+                    text = points.first().label,
+                    style = typography.labelSmall,
+                    fontSize = 10.sp,
+                    color = colors.textSecondary
+                )
                 if (points.size > 2) {
                     Text(
                         text = points[points.size / 2].label,
+                        style = typography.labelSmall,
                         fontSize = 10.sp,
-                        color = MiraTheme.colors.textSecondary
+                        color = colors.textSecondary
                     )
                 }
                 if (points.size > 1) {
-                    Text(text = points.last().label, fontSize = 10.sp, color = MiraTheme.colors.textSecondary)
+                    Text(
+                        text = points.last().label,
+                        style = typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = colors.textSecondary
+                    )
                 }
             }
         }
@@ -635,9 +675,12 @@ private fun MultiSeriesBarChart(
     refundColor: Color,
     onSelectIndex: (Int) -> Unit
 ) {
-    val visiblePoints = remember(points) { points.takeLast(10) }
-    val maxVal = remember(visiblePoints) {
-        val m = visiblePoints.maxOfOrNull {
+    val colors = MiraTheme.colors
+    val typography = MaterialTheme.typography
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+
+    val maxVal = remember(points) {
+        val m = points.maxOfOrNull {
             max(it.salesAmount, max(it.scrapAmount, it.refundAmount))
         } ?: 1.0
         max(m, 1.0)
@@ -648,11 +691,12 @@ private fun MultiSeriesBarChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(145.dp)
-                .pointerInput(visiblePoints) {
+                .pointerInput(points, isRtl) {
                     detectTapGestures { offset ->
-                        if (visiblePoints.isNotEmpty()) {
-                            val groupW = size.width / visiblePoints.size.toFloat()
-                            val idx = (offset.x / groupW).toInt().coerceIn(0, visiblePoints.lastIndex)
+                        if (points.isNotEmpty()) {
+                            val effectiveX = if (isRtl) (size.width - offset.x) else offset.x
+                            val groupW = size.width / points.size.toFloat()
+                            val idx = (effectiveX / groupW).toInt().coerceIn(0, points.lastIndex)
                             onSelectIndex(idx)
                         }
                     }
@@ -663,27 +707,30 @@ private fun MultiSeriesBarChart(
             val padTop = 12.dp.toPx()
             val padBottom = 8.dp.toPx()
             val chartH = (h - padTop - padBottom).coerceAtLeast(10f)
-            val groupW = w / visiblePoints.size.toFloat()
+            val groupW = w / points.size.toFloat()
             val barW = (groupW * 0.22f).coerceIn(4.dp.toPx(), 12.dp.toPx())
 
-            visiblePoints.forEachIndexed { idx, pt ->
-                val centerX = groupW * idx + groupW / 2f
+            points.forEachIndexed { idx, pt ->
+                val visualIdx = if (isRtl) (points.lastIndex - idx) else idx
+                val groupLeft = groupW * visualIdx
+                val centerX = groupLeft + groupW / 2f
+
                 if (idx == selectedIndex) {
                     drawRoundRect(
-                        color = Color.White.copy(alpha = 0.06f),
-                        topLeft = Offset(groupW * idx + 2.dp.toPx(), 0f),
+                        color = colors.goldPrimary.copy(alpha = 0.10f),
+                        topLeft = Offset(groupLeft + 2.dp.toPx(), 0f),
                         size = Size(groupW - 4.dp.toPx(), h),
                         cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
                     )
                 }
 
-                val values = listOf(
+                val barValues = listOf(
                     pt.salesAmount to salesColor,
                     pt.scrapAmount to scrapColor,
                     pt.refundAmount to refundColor
                 )
 
-                values.forEachIndexed { bIdx, (value, color) ->
+                barValues.forEachIndexed { bIdx, (value, color) ->
                     val ratio = (value / maxVal).toFloat().coerceIn(0f, 1f)
                     val barH = (chartH * ratio).coerceAtLeast(if (value > 0) 4.dp.toPx() else 0f)
                     val xOffset = centerX + (bIdx - 1) * (barW + 2.dp.toPx()) - barW / 2f
@@ -703,11 +750,12 @@ private fun MultiSeriesBarChart(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            visiblePoints.forEach { pt ->
+            points.forEach { pt ->
                 Text(
                     text = pt.label.takeLast(5),
+                    style = typography.labelSmall,
                     fontSize = 9.sp,
-                    color = MiraTheme.colors.textSecondary,
+                    color = colors.textSecondary,
                     maxLines = 1
                 )
             }
@@ -749,6 +797,7 @@ private fun PeriodSelectorChips(
     onSelect: (Int) -> Unit
 ) {
     val colors = MiraTheme.colors
+    val typography = MaterialTheme.typography
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { days ->
             val isSel = days == selected
@@ -760,6 +809,7 @@ private fun PeriodSelectorChips(
             ) {
                 Text(
                     text = if (isArabic) "${days}ي" else "${days}d",
+                    style = typography.labelSmall,
                     fontSize = 10.sp,
                     fontWeight = if (isSel) FontWeight.ExtraBold else FontWeight.Medium,
                     color = if (isSel) colors.goldPrimary else colors.textSecondary,
@@ -784,7 +834,7 @@ private fun LegendDot(label: String, color: Color) {
         )
         Text(
             text = label,
-            fontSize = 11.sp,
+            style = MaterialTheme.typography.labelSmall,
             color = MiraTheme.colors.textSecondary
         )
     }
@@ -798,6 +848,7 @@ private fun MiniChartKpi(
     modifier: Modifier = Modifier
 ) {
     val colors = MiraTheme.colors
+    val typography = MaterialTheme.typography
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -805,11 +856,16 @@ private fun MiniChartKpi(
             .background(colors.backgroundTop.copy(alpha = 0.55f))
             .padding(vertical = 7.dp, horizontal = 6.dp)
     ) {
-        Text(text = label, fontSize = 10.sp, color = colors.textSecondary)
+        Text(
+            text = label,
+            style = typography.labelSmall,
+            fontSize = 10.sp,
+            color = colors.textSecondary
+        )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = value,
-            fontSize = 11.sp,
+            style = typography.labelMedium,
             fontWeight = FontWeight.ExtraBold,
             color = accent,
             maxLines = 1,
@@ -830,7 +886,7 @@ private fun EmptyChartPlaceholder(text: String) {
     ) {
         Text(
             text = text,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.bodySmall,
             color = MiraTheme.colors.textSecondary
         )
     }
