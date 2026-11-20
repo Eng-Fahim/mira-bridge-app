@@ -5,6 +5,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.example.uhf.network.NetworkClient;
+
 import org.json.JSONObject;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,7 +32,7 @@ public class PermissionsSync {
 
     private final Context appContext;
     private final PermissionManager permissionManager;
-    private final NetworkClient networkClient;   // ⚠️ استبدله بعميل الشبكة عندك
+    private final NetworkClient networkClient;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean polling = new AtomicBoolean(false);
     private final AtomicBoolean fetching = new AtomicBoolean(false);
