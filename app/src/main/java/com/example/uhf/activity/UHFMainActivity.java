@@ -135,9 +135,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private volatile boolean navigationLocked = false;
     private volatile boolean justUnlockedWithBiometric = false;
-
-    private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =
-            this::updateAppTitle;
+    private boolean isArabic = true;
+    private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =this::updateAppTitle;
     private final PermissionManager.OnPermissionsChangedListener permissionsListener = () -> {
     mainHandler.post(() -> {
         if (!isActivityAlive()) return;
@@ -173,7 +172,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public int selectIndex = -1;
     public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
     public boolean loopFlag = false;
-    private boolean isArabic = true;
+    
 
     private boolean lastKeyboardState = false;
 
