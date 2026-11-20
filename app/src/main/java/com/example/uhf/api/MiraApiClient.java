@@ -632,6 +632,9 @@ public class MiraApiClient {
                 : conn.getErrorStream();
 
         if (rawStream == null) {
+            if (responseCode == 401) {
+                handleUnauthorizedResponse(conn, null);
+            }
             return new ApiResponse(responseCode, null, "Empty response");
         }
 
@@ -692,6 +695,12 @@ public class MiraApiClient {
 
         if (isSuccess && serverMessage != null) {
             apiResponse.message = serverMessage;
+        }
+
+        // 0) اعتراض الطرد الإجباري / انتهاء الجلسة (HTTP 401) على أي مسار غير تسجيل الدخول
+        if (responseCode == 401) {
+            handleUnauthorizedResponse(conn, serverMessage);
+            return apiResponse;
         }
 
         // 1) التقاط بصمة الصلاحيات من الترويسة في أي استجابة ناجحة
@@ -758,6 +767,19 @@ public class MiraApiClient {
 
         return apiResponse;
     }
+
+    private void handleUnauthorizedResponse(HttpURLConnection conn, String serverMessage) {
+        try {
+            String path = conn.getURL().getPath();
+            if (path != null && (path.endsWith("/auth/login") || path.endsWith("/login"))) {
+                return;
+            }
+            com.example.uhf.manager.PermissionSyncManager.triggerForceLogout(context, serverMessage);
+        } catch (Exception e) {
+            Log.e(TAG, "handleUnauthorizedResponse error: " + e.getMessage());
+        }
+    }
+
 
     private InputStream wrapBrotli(InputStream rawStream) {
         try {
