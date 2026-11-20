@@ -328,13 +328,7 @@ class MiraTransferFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
     
     internal fun resolveCurrentBranchId(): Int {
-        val bmBranch = try {
-            branchesManager?.activeBranchId ?: 0
-        } catch (_: Exception) {
-            0
-        }
-        if (bmBranch > 0) return bmBranch
-
+        // 1. الأولوية لفرع المستخدم المسجل في الجلسة (يطابق $user->branch_id في Laravel)
         val secureMgr = try {
             val clazz = Class.forName("com.example.uhf.tools.SecureSessionManager")
             val getInst = clazz.methods.firstOrNull { it.name == "getInstance" && it.parameterCount == 1 }
@@ -343,7 +337,7 @@ class MiraTransferFragment : MiraBaseFragment() {
             null
         }
 
-        val targets = listOfNotNull(sessionManager, secureMgr)
+        val targets = listOfNotNull(secureMgr, sessionManager)
         for (target in targets) {
             for (methodName in listOf("getBranchId", "getActiveBranchId", "branchId")) {
                 try {
@@ -356,8 +350,18 @@ class MiraTransferFragment : MiraBaseFragment() {
                 }
             }
         }
+
+        // 2. ثانياً من MiraBranchesManager
+        val bmBranch = try {
+            branchesManager?.activeBranchId ?: 0
+        } catch (_: Exception) {
+            0
+        }
+        if (bmBranch > 0) return bmBranch
+
         return 1
     }
+
 
 
     internal fun isTriggerKeyCode(keyCode: Int): Boolean {
@@ -575,15 +579,14 @@ class MiraTransferFragment : MiraBaseFragment() {
                 allTransfersState.clear()
                 if (response != null && response.isSuccess) {
                     val transfers = extractJsonArray(response, "transfers")
-                    if (transfers != null) {
+                                        if (transfers != null) {
                         for (i in 0 until transfers.length()) {
                             val d = parseTransferData(transfers.optJSONObject(i))
                             if (d != null) {
-                                if (isTopLevel || d.fromBranchId == branchId || d.toBranchId == branchId) {
-                                    allTransfersState.add(d)
-                                }
+                                allTransfersState.add(d)
                             }
                         }
+                      }
                     }
                     saveTransfersOffline(transfers)
                 } else {
@@ -596,12 +599,24 @@ class MiraTransferFragment : MiraBaseFragment() {
     }
 
     private fun extractJsonArray(response: MiraApiClient.ApiResponse?, primaryKey: String): JSONArray? {
-    if (response == null) return null
-    val dataObj = response.data ?: return null
-    return dataObj.optJSONArray(primaryKey)
-        ?: dataObj.optJSONArray("data")
-        ?: dataObj.optJSONArray("items")
-}
+        if (response == null) return null
+        val dataObj = response.data ?: return null
+
+        // 1. البحث المباشر في المستوى الأول
+        dataObj.optJSONArray(primaryKey)?.let { return it }
+        dataObj.optJSONArray("data")?.let { return it }
+        dataObj.optJSONArray("items")?.let { return it }
+
+        // 2. دعم Laravel Paginator المتداخل (data -> data أو data -> transfers)
+        val nestedData = dataObj.optJSONObject("data")
+        if (nestedData != null) {
+            nestedData.optJSONArray(primaryKey)?.let { return it }
+            nestedData.optJSONArray("data")?.let { return it }
+            nestedData.optJSONArray("items")?.let { return it }
+        }
+
+        return null
+    }
 
 
     private fun parseTransferData(t: JSONObject?): TransferData? {
