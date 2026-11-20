@@ -328,7 +328,6 @@ class MiraTransferFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
     
     internal fun resolveCurrentBranchId(): Int {
-        // 1. الأولوية لفرع المستخدم المسجل في الجلسة (يطابق $user->branch_id في Laravel)
         val secureMgr = try {
             val clazz = Class.forName("com.example.uhf.tools.SecureSessionManager")
             val getInst = clazz.methods.firstOrNull { it.name == "getInstance" && it.parameterCount == 1 }
@@ -339,28 +338,59 @@ class MiraTransferFragment : MiraBaseFragment() {
 
         val targets = listOfNotNull(secureMgr, sessionManager)
         for (target in targets) {
-            for (methodName in listOf("getBranchId", "getActiveBranchId", "branchId")) {
+            for (methodName in listOf("getBranchId", "getActiveBranchId", "getUserBranchId", "branchId")) {
                 try {
                     val m = target.javaClass.methods.firstOrNull {
                         it.name.equals(methodName, ignoreCase = true) && it.parameterCount == 0
                     }
                     val v = m?.invoke(target)
-                    if (v is Number && v.toInt() > 0) return v.toInt()
+                    if (v is Number && v.toInt() > 0) {
+                        Log.d(TAG, "resolveCurrentBranchId -> ${v.toInt()} from ${target.javaClass.simpleName}.$methodName")
+                        return v.toInt()
+                    }
                 } catch (_: Exception) {
                 }
             }
         }
 
-        // 2. ثانياً من MiraBranchesManager
         val bmBranch = try {
             branchesManager?.activeBranchId ?: 0
         } catch (_: Exception) {
             0
         }
-        if (bmBranch > 0) return bmBranch
+        if (bmBranch > 0) {
+            Log.d(TAG, "resolveCurrentBranchId -> $bmBranch from branchesManager")
+            return bmBranch
+        }
 
+        appContext?.let { ctx ->
+            val prefNames = listOf("mira_session", "session_prefs", "auth_prefs", "user_prefs", "transfers_cache")
+            for (prefName in prefNames) {
+                try {
+                    val sp = ctx.getSharedPreferences(prefName, Context.MODE_PRIVATE)
+                    for (key in listOf("branch_id", "active_branch_id", "user_branch_id")) {
+                        if (sp.contains(key)) {
+                            val intVal = sp.getInt(key, -1)
+                            if (intVal > 0) {
+                                Log.d(TAG, "resolveCurrentBranchId -> $intVal from prefs:$prefName[$key]")
+                                return intVal
+                            }
+                            val strVal = sp.getString(key, null)?.toIntOrNull()
+                            if (strVal != null && strVal > 0) {
+                                Log.d(TAG, "resolveCurrentBranchId -> $strVal from prefs:$prefName[$key]")
+                                return strVal
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        Log.w(TAG, "resolveCurrentBranchId -> fallback 1")
         return 1
     }
+
 
 
 
@@ -626,11 +656,22 @@ internal fun loadTransfers() {
     }
 
 
-    private fun parseTransferData(t: JSONObject?): TransferData? {
+        private fun parseTransferData(t: JSONObject?): TransferData? {
         if (t == null) return null
         val id = t.optInt("id")
         val fromObj = t.optJSONObject("from_branch")
         val toObj = t.optJSONObject("to_branch")
+
+        val fromBranchId = t.optInt("from_branch_id", 0).let { branchId ->
+            if (branchId > 0) branchId
+            else t.optString("from_branch_id", "0").toIntOrNull()
+                ?: (fromObj?.optInt("id", 0) ?: 0)
+        }
+        val toBranchId = t.optInt("to_branch_id", 0).let { branchId ->
+            if (branchId > 0) branchId
+            else t.optString("to_branch_id", "0").toIntOrNull()
+                ?: (toObj?.optInt("id", 0) ?: 0)
+        }
 
         val fromBranchName = t.optString("from_branch_name_ar")
             .ifEmpty { t.optString("from_branch_name") }
@@ -647,8 +688,8 @@ internal fun loadTransfers() {
             transferNumber = t.optString("transfer_number", "TR-$id"),
             fromBranch = fromBranchName,
             toBranch = toBranchName,
-            fromBranchId = t.optInt("from_branch_id", fromObj?.optInt("id") ?: 0),
-            toBranchId = t.optInt("to_branch_id", toObj?.optInt("id") ?: 0),
+            fromBranchId = fromBranchId,
+            toBranchId = toBranchId,
             status = t.optString("status", "draft"),
             itemCount = t.optInt("item_count", 0),
             totalWeight = t.optDouble("total_weight", 0.0),
@@ -656,6 +697,7 @@ internal fun loadTransfers() {
             createdAt = t.optString("created_at", "")
         )
     }
+
 
     private fun saveTransfersOffline(transfers: JSONArray?) {
         try {
