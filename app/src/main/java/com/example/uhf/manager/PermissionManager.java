@@ -39,6 +39,10 @@ public class PermissionManager {
     private static final String KEY_CAPABILITIES = "capabilities_json";
     private static final String KEY_LEGACY       = "legacy_permissions_json";
     private static final String KEY_FRAGMENTS    = "fragments_json";
+    private static final String KEY_VERSION = "permissions_version";
+    /** نسخة محفوظة في الذاكرة */
+    private String currentVersion = null;
+
 
     private static volatile PermissionManager instance;
     private final Context context;
@@ -156,43 +160,51 @@ public class PermissionManager {
         }
     }
 
-        public void saveFromServer(JSONObject fullResponseJson) {
-        if (fullResponseJson == null) return;
-        try {
-            JSONObject data = fullResponseJson.optJSONObject("data");
-            JSONObject legacy = parseJsonObjectField(fullResponseJson, "legacy_permissions");
-
-            if (data != null && data.has("mobile_capabilities")) {
-                JSONObject caps = parseJsonObjectField(data, "mobile_capabilities");
-                if (caps != null) capabilities = caps;
-
-                JSONObject perms = parseJsonObjectField(data, "permissions");
-                if (perms != null) {
-                    legacyPermissions = perms;
-                } else {
-                    JSONObject rootPerms = parseJsonObjectField(fullResponseJson, "permissions");
-                    if (rootPerms != null) legacyPermissions = rootPerms;
-                }
-            } else if (data != null && data.has("modules")) {
-                capabilities = data;
-                if (legacy != null) legacyPermissions = legacy;
-            } else {
-                Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
-                return;
-            }
-
-            fragments = deriveFragments(capabilities);
-
-            prefs.edit()
-                 .putString(KEY_CAPABILITIES, capabilities.toString())
-                 .putString(KEY_LEGACY,       legacyPermissions.toString())
-                 .putString(KEY_FRAGMENTS,    fragments.toString())
-                 .apply();
-        } catch (Exception e) {
-            Log.e(TAG, "saveFromServer error: " + e.getMessage());
-        }
+    public void saveFromServer(JSONObject fullResponseJson) {
+    saveFromServerInternal(fullResponseJson);
     }
 
+/**
+ * @return true إذا تم حفظ بيانات فعلية، false إذا تم تجاهل الاستجابة
+ */
+private boolean saveFromServerInternal(JSONObject fullResponseJson) {
+    if (fullResponseJson == null) return false;
+    try {
+        JSONObject data = fullResponseJson.optJSONObject("data");
+        JSONObject legacy = parseJsonObjectField(fullResponseJson, "legacy_permissions");
+
+        if (data != null && data.has("mobile_capabilities")) {
+            JSONObject caps = parseJsonObjectField(data, "mobile_capabilities");
+            if (caps != null) capabilities = caps;
+
+            JSONObject perms = parseJsonObjectField(data, "permissions");
+            if (perms != null) {
+                legacyPermissions = perms;
+            } else {
+                JSONObject rootPerms = parseJsonObjectField(fullResponseJson, "permissions");
+                if (rootPerms != null) legacyPermissions = rootPerms;
+            }
+        } else if (data != null && data.has("modules")) {
+            capabilities = data;
+            if (legacy != null) legacyPermissions = legacy;
+        } else {
+            Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
+            return false; // ← مهم: نشير للفشل
+        }
+
+        fragments = deriveFragments(capabilities);
+
+        prefs.edit()
+             .putString(KEY_CAPABILITIES, capabilities.toString())
+             .putString(KEY_LEGACY,       legacyPermissions.toString())
+             .putString(KEY_FRAGMENTS,    fragments.toString())
+             .apply();
+        return true; // ← نجاح
+    } catch (Exception e) {
+        Log.e(TAG, "saveFromServer error: " + e.getMessage());
+        return false;
+    }
+}
     private JSONObject parseJsonObjectField(JSONObject parent, String key) {
         if (parent == null || !parent.has(key) || parent.isNull(key)) return null;
         Object raw = parent.opt(key);
@@ -228,16 +240,6 @@ public class PermissionManager {
     @Deprecated
     public void savePermissions(JSONObject permissionsJson) {
         if (permissionsJson != null) savePermissions(permissionsJson.toString());
-    }
-
-    @Deprecated
-    public void clearPermissions() {
-        capabilities = new JSONObject();
-        legacyPermissions = new JSONObject();
-        fragments = new JSONObject();
-        prefs.edit().remove(KEY_CAPABILITIES)
-                    .remove(KEY_LEGACY)
-                    .remove(KEY_FRAGMENTS).apply();
     }
 
     private JSONObject wrapLegacyOnly(JSONObject legacy) {
@@ -597,7 +599,115 @@ public class PermissionManager {
         String v = dashboardVariant();
         return "full".equals(v) || "hero_inventory".equals(v);
     }
+// ═══════════════════════════════════════════════════════
+//  ✅ إضافات v4.3 — Live Refresh + Listeners
+// ═══════════════════════════════════════════════════════
 
+/** مستمعون حيّون — أي شاشة تريد إعادة الرسم عند تغيّر الصلاحيات */
+public interface OnPermissionsChangedListener {
+    void onPermissionsChanged();
+}
+
+private final java.util.concurrent.CopyOnWriteArrayList<OnPermissionsChangedListener> listeners
+        = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+public void addListener(OnPermissionsChangedListener l) {
+    if (l != null && !listeners.contains(l)) listeners.add(l);
+}
+
+public void removeListener(OnPermissionsChangedListener l) {
+    listeners.remove(l);
+}
+
+/**
+ * يُعلم كل الشاشات الحيّة. يُستدعى تلقائياً من saveFromServer
+ * فقط إذا تغيّرت النسخة فعلاً.
+ */
+private void notifyListeners() {
+    for (OnPermissionsChangedListener l : listeners) {
+        try { l.onPermissionsChanged(); }
+        catch (Throwable t) { Log.e(TAG, "listener error", t); }
+    }
+}
+
+/** آخر نسخة استلمناها من السيرفر */
+public String getStoredVersion() {
+    if (currentVersion == null) {
+        currentVersion = prefs.getString(KEY_VERSION, "");
+    }
+    return currentVersion == null ? "" : currentVersion;
+}
+
+/**
+ * يُقارن نسخة السيرفر بالنسخة المخزنة.
+ * @return true إذا كانت مختلفة (وبالتالي يجب إعادة الجلب).
+ */
+public boolean needsRefresh(String serverVersion) {
+    if (serverVersion == null || serverVersion.isEmpty()) return false;
+    String local = getStoredVersion();
+    if (local.isEmpty()) return true;          // أول مرة
+    return !local.equals(serverVersion);
+}
+
+/**
+ * ✅ تحديث live لـ capabilities من استجابة السيرفر.
+ *    يُستدعى من login + PermissionsSync.
+ * @return true إذا تغيّرت الصلاحيات فعلاً (وبالتالي أُعلم المستمعون).
+ */
+public boolean applyFromServer(JSONObject fullResponseJson, String serverVersion) {
+    if (fullResponseJson == null) return false;
+
+    String oldVersion = getStoredVersion();
+
+    // 1) حاول حفظ الصلاحيات أولاً
+    boolean saved = saveFromServerInternal(fullResponseJson);
+    if (!saved) {
+        Log.w(TAG, "applyFromServer: save failed, NOT updating version");
+        return false; // ← لا نُحدّث النسخة → PermissionsSync سيعيد المحاولة لاحقاً
+    }
+
+    // 2) الآن — حفظ آمن للنسخة
+    boolean versionChanged = false;
+    if (serverVersion != null && !serverVersion.isEmpty()) {
+        versionChanged = !serverVersion.equals(oldVersion);
+        currentVersion = serverVersion;
+        prefs.edit().putString(KEY_VERSION, serverVersion).apply();
+    }
+
+    // 3) إعلام المستمعين فقط إذا تغيّرت النسخة فعلاً
+    if (versionChanged) {
+        Log.i(TAG, "🔔 Permissions changed — notifying " + listeners.size() + " listener(s)");
+        notifyListeners();
+    }
+    return versionChanged;
+}
+
+/**
+ * ✅ عند تسجيل الخروج — امسح كل شيء بما فيه النسخة.
+ */
+public void clearOnLogout() {
+    clearPermissions();
+    currentVersion = null;
+    prefs.edit().remove(KEY_VERSION).apply();
+    notifyListeners(); // لإعادة رسم الشاشات إن وُجدت
+}
+
+// ═══════════════════════════════════════════════════════
+//  إضافة لـ clearPermissions() — امسح النسخة أيضاً
+// ═══════════════════════════════════════════════════════
+
+// استبدل الدالة الحالية:
+@Deprecated
+public void clearPermissions() {
+    capabilities = new JSONObject();
+    legacyPermissions = new JSONObject();
+    fragments = new JSONObject();
+    currentVersion = null;
+    prefs.edit().remove(KEY_CAPABILITIES)
+                .remove(KEY_LEGACY)
+                .remove(KEY_FRAGMENTS)
+                .remove(KEY_VERSION).apply();
+}
     // ═══════════════════════════════════════════════════════
     //  Master Gate
     // ═══════════════════════════════════════════════════════
