@@ -2,11 +2,16 @@ package com.example.uhf.activity;
 
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.AppWatchdog;
+import com.example.uhf.manager.BottomNavManager;
+
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,107 +24,81 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
-import android.widget.TextView;
-import android.widget.Toast;
-import android.annotation.SuppressLint;
-
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.graphics.Typeface;
-import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import android.content.SharedPreferences;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ProcessLifecycleOwner;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-
-import com.example.uhf.utils.DiagTracer;
+import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.fragment.MiraDashboardFragment;
-import com.example.uhf.fragment.MiraInventoryFragment;
-import com.example.uhf.fragment.MiraPosFragment;
-import com.example.uhf.fragment.MiraScrapGoldBuyFragment;
+import com.example.uhf.application.AppLifecycleObserver;
+import com.example.uhf.fragment.MiraAccountingFragment;
 import com.example.uhf.fragment.MiraAccountingSetupFragment;
-
+import com.example.uhf.fragment.MiraDashboardFragment;
+import com.example.uhf.fragment.MiraGateSettingsFragment;
+import com.example.uhf.fragment.MiraGoldCurrencyFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
+import com.example.uhf.fragment.MiraInventoryFragment;
+import com.example.uhf.fragment.MiraInventoryProFragment;
+import com.example.uhf.fragment.MiraPosFragment;
+import com.example.uhf.fragment.MiraProfileFragment;
+import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
+import com.example.uhf.fragment.MiraReaderControlFragment;
+import com.example.uhf.fragment.MiraReaderSetupFragment;
+import com.example.uhf.fragment.MiraReceiptFragment;
+import com.example.uhf.fragment.MiraReportsProFragment;
+import com.example.uhf.fragment.MiraRfidSettingsFragment;
+import com.example.uhf.fragment.MiraSecureGateFragment;
+import com.example.uhf.fragment.MiraServerConfigFragment;
+import com.example.uhf.fragment.MiraTransferFragment;
+import com.example.uhf.fragment.MiraUHFLocatorFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
-
-import com.example.uhf.security.SessionLockManager;
 import com.example.uhf.fragment.QuickActionsBottomSheetFragment;
-import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.MiraOrgProfileManager;
-import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.manager.SessionMonitorManager;
-import com.example.uhf.navigation.NavigationManager;
-import com.example.uhf.navigation.FragmentFactory;
 import com.example.uhf.manager.HardwareManager;
+import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraMessagingManager;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.NotificationManager;
-import com.example.uhf.utils.SoundManager;
-import com.example.uhf.utils.StatusIndicatorManager;
+import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.manager.SecondaryToolbarManager;
+import com.example.uhf.manager.SessionMonitorManager;
+import com.example.uhf.model.MessageModel;
+import com.example.uhf.model.NotificationModel;
+import com.example.uhf.navigation.FragmentFactory;
+import com.example.uhf.navigation.NavigationManager;
+import com.example.uhf.security.SessionLockManager;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
-import com.example.uhf.manager.SecondaryToolbarManager;
-import com.example.uhf.fragment.MiraReaderControlFragment;
-
-import androidx.lifecycle.ProcessLifecycleOwner;
-import com.example.uhf.application.AppLifecycleObserver;
-import androidx.biometric.BiometricManager;
-import androidx.biometric.BiometricPrompt;
-import androidx.core.content.ContextCompat;
-import java.util.concurrent.Executor;
-
+import com.example.uhf.utils.DiagTracer;
+import com.example.uhf.utils.SoundManager;
+import com.example.uhf.utils.StatusIndicatorManager;
 import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import com.example.uhf.model.MessageModel;
-import com.example.uhf.model.NotificationModel;
-import com.example.uhf.fragment.MiraUHFReadWriteFragment;
-import com.example.uhf.fragment.MiraAccountingFragment;
-import com.example.uhf.fragment.MiraAdminHubFragment;
-import com.example.uhf.fragment.MiraBranchesManagementFragment;
-import com.example.uhf.fragment.MiraGoldCurrencyFragment;
-import com.example.uhf.fragment.MiraInventoryProFragment;
-import com.example.uhf.fragment.MiraProfileFragment;
-import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
-import com.example.uhf.fragment.MiraReceiptFragment;
-import com.example.uhf.fragment.MiraReportsProFragment;
-import com.example.uhf.fragment.MiraRfidBindingsFragment;
-import com.example.uhf.fragment.MiraSalesHistoryFragment;
-import com.example.uhf.fragment.MiraSecureGateFragment;
-import com.example.uhf.fragment.MiraServerConfigFragment;
-import com.example.uhf.fragment.MiraTransferFragment;
-import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
-import com.example.uhf.fragment.MiraUHFLocatorFragment;
-import com.example.uhf.manager.MiraQuickAccessSettings;
-import com.example.uhf.MiraRfid.sound.MiraSoundSettingsFragment;
-import com.example.uhf.fragment.MiraReaderSetupFragment;
-import com.example.uhf.fragment.MiraGateSettingsFragment;
-import com.example.uhf.fragment.MiraRfidSettingsFragment;
-
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-import com.google.android.material.badge.BadgeDrawable;
 
 /**
  * UHFMainActivity — نسخة نظيفة كاملة
  *
  * ✅ Setup Guard المركزي
  * ✅ Setup Stamp لكشف التغييرات
- * ✅ BottomNav container + items management
+ * ✅ BottomNavManager مفصول لإدارة الشريط السفلي والزر العائم
  * ✅ Transfers counter + Badge
  * ✅ MIRA License Heartbeat + Blob refresh
  * ✅ Long-press toolbar → LicenseStatusActivity
@@ -154,11 +133,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final long MIN_TRANSFER_REFRESH_INTERVAL = 3_000L;
     private static final String PREFS_TRANSFERS_BADGE = "transfers_badge_prefs";
     private static final String KEY_LAST_TRANSFERS_COUNT = "last_transfers_count";
-    
-    private boolean isFabMenuOpen = false;
+
     private int loadingCounter = 0;
 
     private NavigationManager navigationManager;
+    private BottomNavManager bottomNavManager;
     private HardwareManager hardwareManager;
     private SoundManager soundManager;
     private NotificationManager notificationManager;
@@ -254,6 +233,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== Getters ====================
     public NavigationManager getNavigationManager() { return navigationManager; }
     public PermissionManager getPermissionManager() { return permissionManager; }
+    public BottomNavManager getBottomNavManager() { return bottomNavManager; }
 
     public String getCurrentFragmentTag() {
         return navigationManager != null
@@ -296,46 +276,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             default: return "UNKNOWN(" + mode + ")";
         }
     }
-    // ═══════════════════════════════════════════════════════════
-//  ⭐ مصدر الحقيقة الوحيد لعناصر التنقّل
-//  إضافة عنصر = سطر واحد هنا فقط
-// ═══════════════════════════════════════════════════════════
-private static final class NavItemCfg {
-    final int     itemId;
-    final int     iconRes;
-    final int     titleArRes;
-    final int     titleEnRes;
-    final String  tag;
-    final boolean alwaysAllowed;
-
-    NavItemCfg(int itemId, int iconRes,
-               int titleArRes, int titleEnRes,
-               String tag, boolean alwaysAllowed) {
-        this.itemId        = itemId;
-        this.iconRes       = iconRes;
-        this.titleArRes    = titleArRes;
-        this.titleEnRes    = titleEnRes;
-        this.tag           = tag;
-        this.alwaysAllowed = alwaysAllowed;
-    }
-}
-
-private static final NavItemCfg[] NAV_CONFIGS = {
-    // الرئيسية (للجميع)
-    new NavItemCfg(R.id.nav_home,       R.drawable.ic_home,       R.string.nav_home,       R.string.nav_home,       NavigationManager.TAG_DASHBOARD,    true),
-    
-    // المالية (للمحاسب والمدير المالي والإدارة)
-    new NavItemCfg(R.id.nav_accounting, R.drawable.ic_accounting, R.string.nav_accounting, R.string.nav_accounting, NavigationManager.TAG_ACCOUNTING,   false),
-    
-    // المخزون (لمدير المخزون ومدير الفرع)
-    new NavItemCfg(R.id.nav_inventory,  R.drawable.ic_inventory,  R.string.nav_inventory,  R.string.nav_inventory,  NavigationManager.TAG_INVENTORY,    false),
-    
-    // المبيعات (لموظف المبيعات ومدير الفرع)
-    new NavItemCfg(R.id.nav_sales,      R.drawable.ic_sales,      R.string.nav_sales,      R.string.nav_sales,      NavigationManager.TAG_POS,          false),
-    
-    // كسر الذهب (لمدير المخزون ومدير الفرع)
-    new NavItemCfg(R.id.nav_scrap,      R.drawable.ic_diamond,    R.string.nav_scrap,      R.string.nav_scrap,      NavigationManager.TAG_SCRAP_GOLD_BUY, false),
-};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -475,7 +415,56 @@ private static final NavItemCfg[] NAV_CONFIGS = {
             statusIndicatorManager = new StatusIndicatorManager(
                     findViewById(android.R.id.content), hardwareManager);
 
-            setupQuickNav();
+            // ═══ تهيئة مدير الشريط السفلي والزر العائم ═══
+            bottomNavManager = new BottomNavManager(
+                    this,
+                    findViewById(android.R.id.content),
+                    permissionManager,
+                    navigationManager,
+                    new BottomNavManager.HostCallback() {
+                        @NonNull
+                        @Override
+                        public String getCurrentFragmentTag() {
+                            return UHFMainActivity.this.getCurrentFragmentTag();
+                        }
+
+                        @Override
+                        public boolean isSetupCompleted() {
+                            if (setupCompletedThisSession || isWithinSetupGracePeriod()) {
+                                return true;
+                            }
+                            String s = getCachedSetupStatus();
+                            return SETUP_COMPLETED.equals(s) || SETUP_LOCKED.equals(s);
+                        }
+
+                        @Override
+                        public boolean isInventoryActive() {
+                            return UHFMainActivity.this.isInventoryActive();
+                        }
+
+                        @Override
+                        public void stopActiveInventory() {
+                            UHFMainActivity.this.stopActiveInventory();
+                        }
+
+                        @Override
+                        public void navigateToFragment(@NonNull Fragment fragment, @NonNull String tag, boolean direct) {
+                            if (direct) {
+                                loadFragmentDirectly(fragment, tag);
+                            } else {
+                                loadFragment(fragment, tag);
+                            }
+                        }
+
+                        @Override
+                        public void showQuickActionsSheet() {
+                            showQuickActionMenu();
+                        }
+                    },
+                    isArabic
+            );
+            bottomNavManager.setup();
+
             setupOrgProfileListener();
 
             disableNavigationUntilSetupChecked();
@@ -547,50 +536,22 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  🛡️ Navigation Enable/Disable
+    //  🛡️ Navigation Enable/Disable (مفوضة إلى BottomNavManager)
     // ═══════════════════════════════════════════════════════
 
     private void disableNavigationUntilSetupChecked() {
-        try {
-            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-            if (nav != null) {
-                nav.setEnabled(false);
-                nav.setAlpha(0.4f);
-            }
-
-            FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-            if (fab != null) {
-                fab.setEnabled(false);
-                fab.setAlpha(0.4f);
-            }
-
-            Log.d(TAG, "🔒 Navigation disabled until setup check");
-        } catch (Exception e) {
-            Log.e(TAG, "disableNavigationUntilSetupChecked error: " + e.getMessage());
+        if (bottomNavManager != null) {
+            bottomNavManager.setEnabled(false);
         }
+        Log.d(TAG, "🔒 Navigation disabled until setup check");
     }
 
     private void enableNavigationAfterSetup() {
         setBottomNavVisible(true);
-        applyNavEnabledState(true);
-        Log.d(TAG, "✅ Navigation enabled (container + items)");
-    }
-
-    private void applyNavEnabledState(boolean enabled) {
-        try {
-            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-            if (nav != null) {
-                nav.setEnabled(enabled);
-                nav.setAlpha(enabled ? 1.0f : 0.4f);
-            }
-            FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-            if (fab != null) {
-                fab.setEnabled(enabled);
-                fab.setAlpha(enabled ? 1.0f : 0.4f);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "applyNavEnabledState error: " + e.getMessage());
+        if (bottomNavManager != null) {
+            bottomNavManager.setEnabled(true);
         }
+        Log.d(TAG, "✅ Navigation enabled (container + items)");
     }
 
     // ═══════════════════════════════════════════════════════
@@ -612,50 +573,50 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     }
 
     private void fetchSetupStatusAndNavigate() {
-    showSetupLoadingScreen();
+        showSetupLoadingScreen();
 
-    // ✅ Safety Timeout: إخفاء الغطاء بعد 8 ثوانٍ مهما كان الوضع
-    final Runnable safetyTimeout = () -> {
-        Log.w(TAG, "⚠️ Setup status fetch timed out after 8s — navigating to dashboard");
-        hideSetupLoadingScreen();
-        if (isActivityAlive()) {
-            cacheSetupStatus(SETUP_COMPLETED);
-            enableNavigationAfterSetup();
-            navigateByRole();
-        }
-    };
-    mainHandler.postDelayed(safetyTimeout, 8000);
-
-    new Thread(() -> {
-        String status = SETUP_PENDING;
-        String stamp  = null;
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-            MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
-
-            if (response != null && response.isSuccess && response.data != null) {
-                status = response.data.optString("status", SETUP_PENDING);
-                stamp  = response.data.optString("setup_stamp", null);
-                Log.d(TAG, "✅ Setup status from API: " + status);
-            } else {
-                Log.w(TAG, "⚠️ API returned no data — using fallback");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
-        }
-
-        final String finalStatus = status;
-        final String finalStamp  = stamp;
-        runOnUiThread(() -> {
-            mainHandler.removeCallbacks(safetyTimeout);
+        // ✅ Safety Timeout: إخفاء الغطاء بعد 8 ثوانٍ مهما كان الوضع
+        final Runnable safetyTimeout = () -> {
+            Log.w(TAG, "⚠️ Setup status fetch timed out after 8s — navigating to dashboard");
             hideSetupLoadingScreen();
             if (isActivityAlive()) {
-                cacheSetupStatus(finalStatus, finalStamp);
-                navigateBySetupStatus(finalStatus);
+                cacheSetupStatus(SETUP_COMPLETED);
+                enableNavigationAfterSetup();
+                navigateByRole();
             }
-        });
-    }).start();
-}
+        };
+        mainHandler.postDelayed(safetyTimeout, 8000);
+
+        new Thread(() -> {
+            String status = SETUP_PENDING;
+            String stamp  = null;
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                MiraApiClient.ApiResponse response = api.getAccounting("setup/status");
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    status = response.data.optString("status", SETUP_PENDING);
+                    stamp  = response.data.optString("setup_stamp", null);
+                    Log.d(TAG, "✅ Setup status from API: " + status);
+                } else {
+                    Log.w(TAG, "⚠️ API returned no data — using fallback");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error fetching setup status: " + e.getMessage());
+            }
+
+            final String finalStatus = status;
+            final String finalStamp  = stamp;
+            runOnUiThread(() -> {
+                mainHandler.removeCallbacks(safetyTimeout);
+                hideSetupLoadingScreen();
+                if (isActivityAlive()) {
+                    cacheSetupStatus(finalStatus, finalStamp);
+                    navigateBySetupStatus(finalStatus);
+                }
+            });
+        }).start();
+    }
 
     private void refreshSetupStatusInBackground() {
         if (isWithinSetupGracePeriod()) {
@@ -797,10 +758,10 @@ private static final NavItemCfg[] NAV_CONFIGS = {
         }
     }
 
-        private void navigateByRole() {
+    private void navigateByRole() {
         try {
             enableNavigationAfterSetup();
-            refreshAllPermissionsUI(); // ✅ تحديث القوائم والزر الأصفر فوراً
+            refreshAllPermissionsUI();
 
             Fragment targetFragment;
             String targetTag;
@@ -839,8 +800,6 @@ private static final NavItemCfg[] NAV_CONFIGS = {
             loadFragmentDirectly(new MiraDashboardFragment(), NavigationManager.TAG_DASHBOARD);
         }
     }
-
-
 
     private void showSetupBlockedScreen() {
         if (isFinishing() || isDestroyed()) return;
@@ -1430,129 +1389,36 @@ private static final NavItemCfg[] NAV_CONFIGS = {
     private void applyKeyboardVisibility(boolean isKeyboardVisible,
                                          View bottomNavContainer,
                                          View fragmentContainer) {
-        try {
-            if (bottomNavContainer != null) {
-                float targetY = isKeyboardVisible
-                        ? bottomNavContainer.getHeight() : 0f;
-
-                if (bottomNavContainer.getTranslationY() != targetY) {
-                    bottomNavContainer.animate()
-                            .translationY(targetY)
-                            .setDuration(250)
-                            .setInterpolator(
-                                    new android.view.animation.DecelerateInterpolator())
-                            .start();
-                }
-            }
-
-            if (fragmentContainer != null) {
-                int targetPadding = isKeyboardVisible ? 8 : 90;
-                if (fragmentContainer.getPaddingBottom() != targetPadding) {
-                    fragmentContainer.setPadding(
-                            fragmentContainer.getPaddingLeft(),
-                            fragmentContainer.getPaddingTop(),
-                            fragmentContainer.getPaddingRight(),
-                            targetPadding);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "applyKeyboardVisibility error: " + e.getMessage());
+        if (bottomNavManager != null) {
+            bottomNavManager.onKeyboardVisibilityChanged(isKeyboardVisible);
         }
     }
 
     // ═══════════════════════════════════════════════════════
-    //  BottomNav Visibility
+    //  BottomNav Visibility (مفوضة إلى BottomNavManager)
     // ═══════════════════════════════════════════════════════
 
     public void setBottomNavVisible(boolean visible) {
-        try {
-            final View bottomNavContainer = findViewById(R.id.bottomNavContainer);
-            if (bottomNavContainer == null) {
-                Log.w(TAG, "setBottomNavVisible: container not found");
-                return;
-            }
-
-            if (visible) {
-                if (bottomNavContainer.getVisibility() == View.VISIBLE
-                        && bottomNavContainer.getAlpha() == 1f
-                        && bottomNavContainer.getTranslationY() == 0f) {
-                    applyNavEnabledState(true);
-                    return;
-                }
-
-                bottomNavContainer.animate().cancel();
-                bottomNavContainer.setVisibility(View.VISIBLE);
-
-                float startY = bottomNavContainer.getTranslationY() > 0
-                        ? bottomNavContainer.getTranslationY()
-                        : (bottomNavContainer.getHeight() > 0
-                            ? bottomNavContainer.getHeight() : 200f);
-
-                bottomNavContainer.setTranslationY(startY);
-                bottomNavContainer.setAlpha(0f);
-
-                bottomNavContainer.animate()
-                        .translationY(0f)
-                        .alpha(1f)
-                        .setDuration(250)
-                        .setInterpolator(new android.view.animation.DecelerateInterpolator())
-                        .withEndAction(() -> applyNavEnabledState(true))
-                        .start();
-
-            } else {
-                if (bottomNavContainer.getVisibility() == View.GONE) {
-                    return;
-                }
-
-                bottomNavContainer.animate().cancel();
-
-                float endY = bottomNavContainer.getHeight() > 0
-                        ? bottomNavContainer.getHeight() : 200f;
-
-                bottomNavContainer.animate()
-                        .translationY(endY)
-                        .alpha(0f)
-                        .setDuration(250)
-                        .setInterpolator(new android.view.animation.AccelerateInterpolator())
-                        .withEndAction(() -> {
-                            bottomNavContainer.setVisibility(View.GONE);
-                            bottomNavContainer.setTranslationY(0f);
-                        })
-                        .start();
-            }
-
-            View fragmentContainer = findViewById(R.id.fragment_container);
-            if (fragmentContainer != null) {
-                int targetPadding = visible ? 90 : 0;
-                if (fragmentContainer.getPaddingBottom() != targetPadding) {
-                    fragmentContainer.setPadding(
-                            fragmentContainer.getPaddingLeft(),
-                            fragmentContainer.getPaddingTop(),
-                            fragmentContainer.getPaddingRight(),
-                            targetPadding
-                    );
-                }
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "setBottomNavVisible error: " + e.getMessage(), e);
+        if (bottomNavManager != null) {
+            bottomNavManager.setVisible(visible);
         }
     }
 
     // ═══════════════════════════════════════════════════════
     //  دورة الحياة
     // ═══════════════════════════════════════════════════════
-    
+
     @Override
-public void onResume() {
-    super.onResume();
-    
-    // ✅ حماية دائمة: أغلق أي غطاء تحميل عالق
-    View overlay = findViewById(R.id.successOverlayMain);
-    if (overlay != null && overlay.getVisibility() == View.VISIBLE) {
-        overlay.setVisibility(View.GONE);
-        Log.w(TAG, "⚠️ Force-hid stuck loading overlay in onResume");
-    }
+    public void onResume() {
+        super.onResume();
+
+        // ✅ حماية دائمة: أغلق أي غطاء تحميل عالق
+        View overlay = findViewById(R.id.successOverlayMain);
+        if (overlay != null && overlay.getVisibility() == View.VISIBLE) {
+            overlay.setVisibility(View.GONE);
+            Log.w(TAG, "⚠️ Force-hid stuck loading overlay in onResume");
+        }
+
         // ⚡ MIRA License Heartbeat
         try {
             com.example.uhf.license.HeartbeatScheduler.triggerNow(this);
@@ -1588,13 +1454,13 @@ public void onResume() {
 
             checkSetupStampOnResume();
             return;
-            
         }
+
         if (!checkAutoLock()) return;
         refreshAllPermissionsUI();
 
-updateToolbarTitle();
-if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
+        updateToolbarTitle();
+        if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
 
         if (navigationManager != null) {
             navigationManager.notifyExternalChange();
@@ -1604,7 +1470,6 @@ if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         checkSetupStampOnResume();
     }
 
-    // ⚡ NEW — دالة checkSetupStampOnResume (كانت مفقودة)
     private void checkSetupStampOnResume() {
         if (isWithinSetupGracePeriod()) {
             Log.d(TAG, "🛡️ Skipping stamp check during grace period");
@@ -1700,36 +1565,32 @@ if (statusIndicatorManager != null) statusIndicatorManager.scheduleUpdates();
         }
     }
 
+    private void showAutoLockDialog() {
+        if (!isActivityAlive() || sessionManager == null) return;
 
-// 2. استبدل showAutoLockDialog() و triggerBiometricUnlock() بهذه الدالة الواحدة فقط:
-private void showAutoLockDialog() {
-    if (!isActivityAlive() || sessionManager == null) return;
+        if (justUnlockedWithBiometric) {
+            Log.d(TAG, "⏭️ Skipping lock screen (just unlocked)");
+            justUnlockedWithBiometric = false;
+            return;
+        }
 
-    if (justUnlockedWithBiometric) {
-        Log.d(TAG, "⏭️ Skipping lock screen (just unlocked)");
-        justUnlockedWithBiometric = false;
-        return;
+        SessionLockManager.show(
+                this,
+                sessionManager,
+                isArabic,
+                new SessionLockManager.LockCallback() {
+                    @Override
+                    public void onSessionUnlocked() {
+                        justUnlockedWithBiometric = true;
+                    }
+
+                    @Override
+                    public void onLogoutRequested() {
+                        performFullLogout();
+                    }
+                }
+        );
     }
-
-    SessionLockManager.show(
-            this,
-            sessionManager,
-            isArabic,
-            new SessionLockManager.LockCallback() {
-                @Override
-                public void onSessionUnlocked() {
-                    justUnlockedWithBiometric = true;
-                }
-
-                @Override
-                public void onLogoutRequested() {
-                    performFullLogout();
-                }
-            }
-    );
-}
-
-
 
     private void performFullLogout() {
         try {
@@ -1819,10 +1680,6 @@ private void showAutoLockDialog() {
             updateToolbarTitle();
 
             supportInvalidateOptionsMenu();
-            View bottomNav = findViewById(R.id.bottomNavigationView);
-            if (bottomNav != null) {
-                bottomNav.refreshDrawableState();
-            }
         } catch (Exception e) {
             Log.e(TAG, "Configuration change error: " + e.getMessage());
         }
@@ -2062,259 +1919,15 @@ private void showAutoLockDialog() {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  التنقل السريع
+    //  الشريط السفلي والصلاحيات (مفوضة إلى BottomNavManager)
     // ═══════════════════════════════════════════════════════
 
-    // ⚠️ تأكد أن هذا المتغير معرّف في أعلى الكلاس (خارج الدوال)
-// private boolean isFabMenuOpen = false;
-
-private void setupQuickNav() {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
-        FloatingActionButton fabReports = findViewById(R.id.fabReports);
-        FloatingActionButton fabProfile = findViewById(R.id.fabProfile);
-
-        // ✅ أولاً: قرر ظهور الزر الأصفر (قبل تطبيق الصلاحيات لتجنب تعارض التوقيت)
-        boolean hideFabForSecurity = permissionManager != null && permissionManager.isGateUser();
-        boolean hasQuickActions = !hideFabForSecurity
-            && permissionManager != null
-            && permissionManager.getAllowedQuickActions().size() > 0;
-
-        if (fabActionCenter != null) {
-            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-        }
-        if (fabReports != null) fabReports.setVisibility(View.GONE);
-        if (fabProfile != null) fabProfile.setVisibility(View.GONE);
-
-        // ✅ ثانياً: طبق صلاحيات القائمة السفلية
-        applyNavPermissions();
-
-        if (fabActionCenter != null && hasQuickActions) {
-            fabActionCenter.setOnClickListener(v -> {
-                boolean isPos = permissionManager != null && permissionManager.isPosOperator();
-
-                if (isPos && fabReports != null && fabProfile != null) {
-                    if (!isFabMenuOpen) {
-                        fabReports.setVisibility(View.VISIBLE);
-                        fabProfile.setVisibility(View.VISIBLE);
-                        fabReports.animate().translationX(-150f).translationY(-150f).setDuration(300).start();
-                        fabProfile.animate().translationX(150f).translationY(-150f).setDuration(300).start();
-                        fabActionCenter.animate().rotation(45f).setDuration(300).start();
-                        isFabMenuOpen = true;
-                    } else {
-                        closePosFabMenu(fabActionCenter, fabReports, fabProfile);
-                    }
-                } else {
-                    showQuickActionMenu();
-                }
-            });
-
-            if (fabReports != null) {
-                fabReports.setOnClickListener(v -> {
-                    loadFragment(new MiraReportsProFragment(), NavigationManager.TAG_REPORTS);
-                    closePosFabMenu(fabActionCenter, fabReports, fabProfile);
-                });
-            }
-
-            if (fabProfile != null) {
-                fabProfile.setOnClickListener(v -> {
-                    loadFragment(new MiraProfileFragment(), "Profile");
-                    closePosFabMenu(fabActionCenter, fabReports, fabProfile);
-                });
-            }
-        }
-
-        if (quickNav != null) {
-            attachNavListener(quickNav);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
-    }
-}
-
-private void closePosFabMenu(FloatingActionButton fabActionCenter, FloatingActionButton fabReports, FloatingActionButton fabProfile) {
-    if (fabReports != null && fabProfile != null) {
-        fabReports.animate().translationX(0f).translationY(0f).setDuration(300).withEndAction(() -> fabReports.setVisibility(View.GONE)).start();
-        fabProfile.animate().translationX(0f).translationY(0f).setDuration(300).withEndAction(() -> fabProfile.setVisibility(View.GONE)).start();
-        fabActionCenter.animate().rotation(0f).setDuration(300).start();
-        isFabMenuOpen = false;
-    }
-}
-
-private void attachNavListener(@NonNull BottomNavigationView nav) {
-    nav.setOnItemSelectedListener(item -> {
-        int id = item.getItemId();
-        String tag = getFragmentTagForNavItem(id);
-        if (tag == null || tag.isEmpty()) return false;
-
-        // ✅ إذا كانت الشاشة الحالية هي نفسها — لا شيء
-        if (navigationManager != null
-                && tag.equals(navigationManager.getCurrentFragmentTag())) {
-            return true;
-        }
-
-        // حماية الجرد النشط
-        if (navigationLocked || isInventoryActive()) {
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل"
-                            : "⚠️ Inventory Active")
-                    .setMessage(isArabic
-                            ? "لا يمكن التنقل أثناء الجرد النشط.\n\n" +
-                            "هل تريد إيقاف الجرد والانتقال؟"
-                            : "Cannot navigate during active inventory.\n\n" +
-                            "Stop inventory and proceed?")
-                    .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed",
-                            (d, w) -> {
-                                stopActiveInventory();
-                                setNavigationLocked(false);
-                                mainHandler.postDelayed(() -> {
-                                    Fragment f = navigationManager != null
-                                            ? navigationManager.createFragmentByTag(tag)
-                                            : FragmentFactory.createFragmentByTag(tag);
-                                    if (f != null) loadFragmentDirectly(f, tag);
-                                }, 500);
-                            })
-                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel",
-                            (d, w) -> {
-                                String currentTag = navigationManager != null
-                                        ? navigationManager.getCurrentFragmentTag() : "";
-                                updateBottomNavSelectionByTag(currentTag);
-                            })
-                    .setCancelable(false)
-                    .show();
-            return false;
-        }
-
-        Fragment fragment = navigationManager != null
-                ? navigationManager.createFragmentByTag(tag)
-                : FragmentFactory.createFragmentByTag(tag);
-
-        if (fragment != null) {
-            loadFragmentDirectly(fragment, tag);
-            return true;
-        }
-        return false;
-    });
-}
-// ═══════════════════════════════════════════════════════════
-//  ⭐ الفلترة + إعادة البناء + تكييف الفاب
-// ═══════════════════════════════════════════════════════════
-private void applyNavPermissions() {
-    try {
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        View bottomContainer     = findViewById(R.id.bottomNavContainer);
-        FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-
-        if (nav == null || bottomContainer == null || permissionManager == null) return;
-
-        // 1) افصل الـ listener مؤقتاً
-        nav.setOnItemSelectedListener(null);
-        nav.getMenu().clear();
-
-        int index = 0;
-        int added = 0;
-
-        // 2) أضف العناصر المسموحة
-        for (NavItemCfg cfg : NAV_CONFIGS) {
-            if (!isNavItemAllowedForRole(cfg)) continue;
-
-            MenuItem item = nav.getMenu().add(Menu.NONE, cfg.itemId, index++, "");
-            item.setIcon(cfg.iconRes);
-            item.setTitle(getString(isArabic ? cfg.titleArRes : cfg.titleEnRes));
-            added++;
-        }
-
-        // 3) التحكم في الرؤية — [نسخة إصلاح إظهار الشريط السفلي إجبارياً]
-        String setupStatus = getCachedSetupStatus();
-        boolean setupComplete = SETUP_COMPLETED.equals(setupStatus) || SETUP_LOCKED.equals(setupStatus);
-
-        if (setupComplete) {
-            // 🛡️ اجعل الشريط السفلي يظهر دائماً إذا كان المستخدم مسجلاً وصار الإعداد مكتملًا
-            nav.setVisibility(View.VISIBLE);
-            bottomContainer.setVisibility(View.VISIBLE);
-            
-            if (permissionManager != null && permissionManager.isGateUser()) {
-                // استثناء خاص لأمن البوابات فقط إن رغبت، أو اتركه ظاهراً
-                // nav.setVisibility(View.GONE);
-            }
-
-            if (fab != null) {
-                resetFabConstraintsToNav(fab);
-            }
-        }
-
-
-        // 4) ضبط التحديد على العنصر الحالي
-        String currentTag = (navigationManager != null)
-                ? navigationManager.getCurrentFragmentTag()
-                : NavigationManager.TAG_DASHBOARD;
-        if (currentTag == null) currentTag = NavigationManager.TAG_DASHBOARD;
-
-        for (NavItemCfg cfg : NAV_CONFIGS) {
-            if (cfg.tag.equals(currentTag)) {
-                MenuItem mi = nav.getMenu().findItem(cfg.itemId);
-                if (mi != null) nav.setSelectedItemId(cfg.itemId);
-                break;
-            }
-        }
-
-        // 5) أعِد إرفاق الـ listener
-        attachNavListener(nav);
-
-        Log.i(TAG, "applyNavPermissions: added=" + added + ", currentTag=" + currentTag);
-    } catch (Exception e) {
-        Log.e(TAG, "applyNavPermissions error: " + e.getMessage(), e);
-    }
-}
-/**
- * ✅ مصفوفة صريحة: ماذا يرى كل دور في القائمة السفلية؟
- * تعتمد على R.id.* الفعلية الموجودة في NAV_CONFIGS
- */
-    private boolean isNavItemAllowedForRole(NavItemCfg cfg) {
-        if (cfg == null) return false;
-        if (cfg.alwaysAllowed) return true;
-        if (permissionManager == null) return false;
-
-        int id = cfg.itemId;
-
-        if (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin() || permissionManager.isAdmin()) {
-            return true;
-        }
-
-        if (id == R.id.nav_accounting) {
-            return permissionManager.canViewAccounting();
-        }
-        if (id == R.id.nav_inventory) {
-            return permissionManager.canViewInventory();
-        }
-        if (id == R.id.nav_sales) {
-            return permissionManager.canUsePos();
-        }
-        if (id == R.id.nav_scrap) {
-            return permissionManager.canViewInventory() || permissionManager.canUsePos();
-        }
-
-        return false;
-    }
     public void refreshAllPermissionsUI() {
         try {
-            // 1. تحديث القائمة السفلية
-            applyNavPermissions();
-
-            // 2. تحديث زر الإجراءات السريعة (FAB)
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
-            if (fabActionCenter != null && permissionManager != null) {
-                boolean hideFabForSecurity = permissionManager.isGateUser();
-                boolean hasQuickActions = !hideFabForSecurity
-                        && (permissionManager.isSystemAdmin()
-                            || permissionManager.isOrgAdmin()
-                            || !permissionManager.getAllowedQuickActions().isEmpty());
-
-                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+            if (bottomNavManager != null) {
+                bottomNavManager.applyPermissions();
             }
 
-            // 3. إعادة رسم أيقونات الشريط العلوي والثانوي
             invalidateOptionsMenu();
             if (navigationManager != null) {
                 updateSecondaryToolbar(navigationManager.getCurrentFragmentTag());
@@ -2324,78 +1937,17 @@ private void applyNavPermissions() {
         }
     }
 
-
-
-private void resetFabConstraintsToNav(FloatingActionButton fab) {
-    ViewGroup.LayoutParams lp = fab.getLayoutParams();
-    if (!(lp instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)) return;
-
-    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams clp =
-            (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) lp;
-    clp.topToTop       = R.id.bottomNavigationView;
-    clp.bottomToTop    = R.id.bottomNavigationView;
-    clp.startToStart   = R.id.bottomNavigationView;
-    clp.endToEnd       = R.id.bottomNavigationView;
-    clp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
-    clp.bottomMargin   = 0;
-    fab.setLayoutParams(clp);
-}
-
-private void anchorFabToContainerCenter(FloatingActionButton fab, View container) {
-    ViewGroup.LayoutParams lp = fab.getLayoutParams();
-    if (!(lp instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)) return;
-
-    androidx.constraintlayout.widget.ConstraintLayout.LayoutParams clp =
-            (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) lp;
-    clp.topToTop       = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
-    clp.bottomToTop    = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.UNSET;
-    clp.startToStart   = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-    clp.endToEnd       = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-    clp.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-
-    float density = getResources().getDisplayMetrics().density;
-    clp.bottomMargin = (int) (32 * density);
-    fab.setLayoutParams(clp);
-}
-    private String getFragmentTagForNavItem(int itemId) {
-    for (NavItemCfg cfg : NAV_CONFIGS) {
-        if (cfg.itemId == itemId) return cfg.tag;
-    }
-    return "";
-}
-
     private void updateBottomNavSelectionByTag(String tag) {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-        if (quickNav == null || tag == null) return;
-
-        for (NavItemCfg cfg : NAV_CONFIGS) {
-            if (cfg.tag.equals(tag)) {
-                MenuItem mi = quickNav.getMenu().findItem(cfg.itemId);
-                if (mi != null) mi.setChecked(true);
-                return;
-            }
+        if (bottomNavManager != null) {
+            bottomNavManager.selectByTag(tag);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "updateBottomNavSelectionByTag error: " + e.getMessage());
     }
-}
 
     private void updateBottomNavLanguage() {
-    try {
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        if (nav == null || nav.getMenu() == null) return;
-
-        for (NavItemCfg cfg : NAV_CONFIGS) {
-            MenuItem item = nav.getMenu().findItem(cfg.itemId);
-            if (item != null) {
-                item.setTitle(getString(isArabic ? cfg.titleArRes : cfg.titleEnRes));
-            }
+        if (bottomNavManager != null) {
+            bottomNavManager.updateLanguage(isArabic);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "updateBottomNavLanguage error: " + e.getMessage());
     }
-}
 
     // ═══════════════════════════════════════════════════════
     //  القوائم
@@ -2465,11 +2017,8 @@ private void anchorFabToContainerCenter(FloatingActionButton fab, View container
         setMenuVisible(menu, R.id.action_locator, pm.canViewRadar());
 
         setMenuVisible(menu, R.id.action_accounting,       pm.canViewAccounting());
-        // ═══════════════════════════════════════════════════════
-//  9. حالة الترخيص (للمدراء فقط)
-// ═══════════════════════════════════════════════════════
-setMenuVisible(menu, R.id.action_license_status,
-        pm.isAdmin() || pm.isManager());
+        setMenuVisible(menu, R.id.action_license_status,
+                pm.isAdmin() || pm.isManager());
         setMenuVisible(menu, R.id.action_accounting_setup, pm.canPerformAccountingSetup());
 
         setMenuVisible(menu, R.id.action_export_data, pm.canExportReports());
@@ -2507,9 +2056,9 @@ setMenuVisible(menu, R.id.action_license_status,
             toggleLanguage();
             return true;
         // [REMOVED-TO-WEB] } else if (id == R.id.action_branches) {
-//     loadFragment(new MiraBranchesManagementFragment(), "Branches");
-//     return true;
-// }
+        //     loadFragment(new MiraBranchesManagementFragment(), "Branches");
+        //     return true;
+        // }
         } else if (id == R.id.action_export_data) {
             loadFragment(new MiraReportsProFragment(), "Reports");
             return true;
@@ -2524,18 +2073,18 @@ setMenuVisible(menu, R.id.action_license_status,
             loadFragment(frag, "AccountingSetup");
             return true;
         } else if (id == R.id.action_license_status) {
-    try {
-        Intent intent = new Intent(this,
-                com.example.uhf.license.LicenseStatusActivity.class);
-        startActivity(intent);
-        Log.d(TAG, "✅ License status opened from menu");
-    } catch (Exception e) {
-        Log.e(TAG, "Failed to open LicenseStatusActivity", e);
-        Toast.makeText(this,
-                "شاشة الترخيص غير متاحة — أعد بناء التطبيق",
-                Toast.LENGTH_LONG).show();
-    }
-    return true;
+            try {
+                Intent intent = new Intent(this,
+                        com.example.uhf.license.LicenseStatusActivity.class);
+                startActivity(intent);
+                Log.d(TAG, "✅ License status opened from menu");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to open LicenseStatusActivity", e);
+                Toast.makeText(this,
+                        "شاشة الترخيص غير متاحة — أعد بناء التطبيق",
+                        Toast.LENGTH_LONG).show();
+            }
+            return true;
         } else if (id == R.id.action_accounting) {
             openAccounting();
             return true;
@@ -3214,26 +2763,26 @@ setMenuVisible(menu, R.id.action_license_status,
     // ═══════════════════════════════════════════════════════
 
     private void showQuickActionMenu() {
-    try {
-        QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
-        sheet.show(getSupportFragmentManager(), "QuickActions");
-        Log.d(TAG, "✅ QuickActions bottom sheet shown");
-    } catch (Exception e) {
-        Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
+        try {
+            QuickActionsBottomSheetFragment sheet = new QuickActionsBottomSheetFragment();
+            sheet.show(getSupportFragmentManager(), "QuickActions");
+            Log.d(TAG, "✅ QuickActions bottom sheet shown");
+        } catch (Exception e) {
+            Log.e(TAG, "showQuickActionMenu error: " + e.getMessage(), e);
+        }
     }
-}
 
-// ⚡ فتح شاشة الترخيص من أي مكان
-public void openLicenseStatus() {
-    try {
-        Intent intent = new Intent(this,
-                com.example.uhf.license.LicenseStatusActivity.class);
-        startActivity(intent);
-    } catch (Exception e) {
-        Log.e(TAG, "openLicenseStatus error: " + e.getMessage());
-        Toast.makeText(this, "تعذر فتح شاشة الترخيص", Toast.LENGTH_SHORT).show();
+    // ⚡ فتح شاشة الترخيص من أي مكان
+    public void openLicenseStatus() {
+        try {
+            Intent intent = new Intent(this,
+                    com.example.uhf.license.LicenseStatusActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "openLicenseStatus error: " + e.getMessage());
+            Toast.makeText(this, "تعذر فتح شاشة الترخيص", Toast.LENGTH_SHORT).show();
+        }
     }
-}
 
     // ═══════════════════════════════════════════════════════
     //  حالة الجرد
@@ -3379,23 +2928,8 @@ public void openLicenseStatus() {
         try {
             this.navigationLocked = locked;
 
-            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-            if (nav != null) {
-                nav.setEnabled(!locked);
-                nav.setAlpha(locked ? 0.4f : 1.0f);
-
-                Menu menu = nav.getMenu();
-                if (menu != null) {
-                    for (int i = 0; i < menu.size(); i++) {
-                        menu.getItem(i).setEnabled(!locked);
-                    }
-                }
-            }
-
-            FloatingActionButton fab = findViewById(R.id.fabActionCenter);
-            if (fab != null) {
-                fab.setEnabled(!locked);
-                fab.setAlpha(locked ? 0.4f : 1.0f);
+            if (bottomNavManager != null) {
+                bottomNavManager.setLocked(locked);
             }
 
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
@@ -3422,7 +2956,7 @@ public void openLicenseStatus() {
     }
 
     public boolean isNavigationLocked() {
-        return navigationLocked;
+        return bottomNavManager != null ? bottomNavManager.isLocked() : navigationLocked;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -3432,6 +2966,10 @@ public void openLicenseStatus() {
     @Override
     protected void onDestroy() {
         try {
+            if (bottomNavManager != null) {
+                bottomNavManager.cleanup();
+                bottomNavManager = null;
+            }
             if (appLifecycleObserver != null) {
                 ProcessLifecycleOwner.get().getLifecycle()
                         .removeObserver(appLifecycleObserver);
@@ -3504,29 +3042,6 @@ public void openLicenseStatus() {
         if (imm != null) imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
 
-    private void pulseFab(View fab) {
-        try {
-            if (fab == null) return;
-
-            android.animation.ObjectAnimator scaleX = android.animation.ObjectAnimator
-                    .ofFloat(fab, "scaleX", 1f, 1.15f, 1f);
-            android.animation.ObjectAnimator scaleY = android.animation.ObjectAnimator
-                    .ofFloat(fab, "scaleY", 1f, 1.15f, 1f);
-
-            scaleX.setDuration(600);
-            scaleY.setDuration(600);
-            scaleX.setRepeatCount(2);
-            scaleY.setRepeatCount(2);
-            scaleX.setStartDelay(1500);
-            scaleY.setStartDelay(1500);
-
-            scaleX.start();
-            scaleY.start();
-        } catch (Exception e) {
-            Log.e(TAG, "pulseFab error: " + e.getMessage());
-        }
-    }
-
     // ═══════════════════════════════════════════════════════
     //  عداد التحويلات
     // ═══════════════════════════════════════════════════════
@@ -3567,68 +3082,11 @@ public void openLicenseStatus() {
     }
 
     private void updateTransfersBadge(int count) {
-    try {
         this.incomingTransfersCount = count;
         saveTransfersCountLocally(count);
-
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        if (nav == null) return;
-
-        // ⚠️ تحقق من وجود العنصر أولاً — قد لا يكون ضمن صلاحيات هذا المستخدم
-        MenuItem transfersItem = nav.getMenu().findItem(R.id.nav_transfers);
-        if (transfersItem == null) {
-            // العنصر غير موجود (معلق في XML أو محجوب بالصلاحيات) — لا شيء لإضافته
-            return;
+        if (bottomNavManager != null) {
+            bottomNavManager.updateTransfersBadge(count);
         }
-
-        BadgeDrawable badge = nav.getOrCreateBadge(R.id.nav_transfers);
-        if (badge == null) return;
-
-        if (count > 0) {
-            badge.setVisible(true);
-            badge.setNumber(count);
-            badge.setBackgroundColor(getResources().getColor(android.R.color.holo_red_dark));
-            badge.setBadgeTextColor(getResources().getColor(android.R.color.white));
-            pulseNavItem(nav, R.id.nav_transfers);
-        } else {
-            badge.setVisible(false);
-            badge.clearNumber();
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "updateTransfersBadge error: " + e.getMessage());
-    }
-}
-
-    private void pulseNavItem(BottomNavigationView nav, int itemId) {
-        try {
-            View itemView = null;
-            for (int i = 0; i < nav.getChildCount(); i++) {
-                View child = nav.getChildAt(i);
-                if (child instanceof com.google.android.material.navigation.NavigationBarItemView) {
-                    com.google.android.material.navigation.NavigationBarItemView navItem =
-                            (com.google.android.material.navigation.NavigationBarItemView) child;
-                    if (navItem.getItemData() != null
-                            && navItem.getItemData().getItemId() == itemId) {
-                        itemView = navItem;
-                        break;
-                    }
-                }
-            }
-
-            if (itemView == null) return;
-
-            android.animation.ObjectAnimator scaleX = android.animation.ObjectAnimator
-                    .ofFloat(itemView, "scaleX", 1f, 1.15f, 1f);
-            android.animation.ObjectAnimator scaleY = android.animation.ObjectAnimator
-                    .ofFloat(itemView, "scaleY", 1f, 1.15f, 1f);
-
-            scaleX.setDuration(400);
-            scaleY.setDuration(400);
-            scaleX.setRepeatCount(1);
-            scaleY.setRepeatCount(1);
-            scaleX.start();
-            scaleY.start();
-        } catch (Exception ignored) {}
     }
 
     private void saveTransfersCountLocally(int count) {
@@ -3651,4 +3109,4 @@ public void openLicenseStatus() {
             return 0;
         }
     }
-        }
+}
