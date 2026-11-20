@@ -1,6 +1,5 @@
 package com.example.uhf.network;
 
-import com.example.uhf.api.ApiResponse;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.utils.MiraExecutorService;
 
@@ -27,14 +26,13 @@ public class NetworkClient {
                     cleanPath = "/" + cleanPath;
                 }
 
-                ApiResponse res = apiClient.getWithAuth(cleanPath);
+                MiraApiClient.ApiResponse res = apiClient.getWithAuth(cleanPath);
                 if (res != null && res.isSuccess()) {
                     JSONObject root = new JSONObject();
                     root.put("success", true);
 
                     if (res.data instanceof JSONObject) {
                         JSONObject dataJson = (JSONObject) res.data;
-                        // إذا كانت الاستجابة هي الجذر نفسه (تحتوي على version أو data)
                         if (dataJson.has("version") || dataJson.has("data")) {
                             root = dataJson;
                         } else {
