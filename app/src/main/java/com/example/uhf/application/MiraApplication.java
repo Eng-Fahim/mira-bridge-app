@@ -25,6 +25,8 @@ import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.utils.MiraExecutorService;
+import com.example.uhf.manager.PermissionsSync;
+import com.example.uhf.network.NetworkClient;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -71,6 +73,10 @@ public class MiraApplication extends AppContext {
     private static volatile MiraApplication instance;
 
     private volatile InventoryDatabase inventoryDatabase;
+    private volatile NetworkClient networkClient;
+    private volatile PermissionsSync permissionsSync;
+    private int startedActivitiesCount = 0;
+
     private final AtomicBoolean isRestarting = new AtomicBoolean(false);
     private final AtomicBoolean isInitialized = new AtomicBoolean(false);
     private final AtomicBoolean isInitializing = new AtomicBoolean(false);
@@ -101,9 +107,34 @@ registerActivityLifecycleCallbacks(
             a.getWindow().clearFlags(
                 android.view.WindowManager.LayoutParams.FLAG_SECURE);
         }
-        @Override public void onActivityStarted(@NonNull android.app.Activity a) {}
+        @Override public void onActivityStarted(@NonNull android.app.Activity a) {
+            startedActivitiesCount++;
+            try {
+                SessionManager sm = new SessionManager(MiraApplication.this);
+                if (sm.isLoggedIn()) {
+                    getPermissionsSync().startPolling();
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "Failed to start permissions polling", t);
+            }
+        }
+
+
+        @Override public void onActivityStopped(@NonNull android.app.Activity a) {
+            startedActivitiesCount = Math.max(0, startedActivitiesCount - 1);
+            if (startedActivitiesCount == 0) {
+                try {
+                    if (permissionsSync != null) {
+                        permissionsSync.stopPolling();
+                    }
+                } catch (Throwable t) {
+                    Log.e(TAG, "Failed to stop permissions polling", t);
+                }
+            }
+        }
+
+
         @Override public void onActivityPaused(@NonNull android.app.Activity a) {}
-        @Override public void onActivityStopped(@NonNull android.app.Activity a) {}
         @Override public void onActivitySaveInstanceState(@NonNull android.app.Activity a, @NonNull Bundle s) {}
         @Override public void onActivityDestroyed(@NonNull android.app.Activity a) {}
     }
@@ -380,12 +411,19 @@ private void applySavedTheme() {
             MiraOrgProfileManager orgProfileManager = MiraOrgProfileManager.getInstance(appContext);
             PermissionManager permissionManager = PermissionManager.getInstance(appContext);
 
+            // ✅ تهيئة الشبكة ومزامنة الصلاحيات
+            PermissionsSync sync = getPermissionsSync();
+            if (sessionManager.isLoggedIn()) {
+                sync.checkNow(null);
+            }
+
             Log.d(TAG, "✅ Core Services Initialized successfully");
 
         } catch (Throwable t) {
             Log.e(TAG, "❌ Error initializing core services", t);
         }
     }
+
 
     // ==================== Database ====================
 
@@ -424,6 +462,38 @@ private void applySavedTheme() {
         } finally {
             dbLock.unlock();
         }
+    }
+
+
+    @NonNull
+    public NetworkClient getNetworkClient() {
+        NetworkClient local = networkClient;
+        if (local == null) {
+            synchronized (this) {
+                local = networkClient;
+                if (local == null) {
+                    // يربط NetworkClient بعميل API الأساسي للتطبيق
+                    local = new NetworkClient(MiraApiClient.getInstance(getApplicationContext()));
+                    networkClient = local;
+                }
+            }
+        }
+        return local;
+    }
+
+    @NonNull
+    public PermissionsSync getPermissionsSync() {
+        PermissionsSync local = permissionsSync;
+        if (local == null) {
+            synchronized (this) {
+                local = permissionsSync;
+                if (local == null) {
+                    local = PermissionsSync.getInstance(getApplicationContext(), getNetworkClient());
+                    permissionsSync = local;
+                }
+            }
+        }
+        return local;
     }
 
     /**
