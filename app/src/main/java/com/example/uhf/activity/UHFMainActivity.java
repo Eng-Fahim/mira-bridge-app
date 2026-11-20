@@ -138,6 +138,32 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =
             this::updateAppTitle;
+    private final PermissionManager.OnPermissionsChangedListener permissionsListener = () -> {
+    mainHandler.post(() -> {
+        if (!isActivityAlive()) return;
+
+        // 1. إعادة رسم الشريط السفلي، القائمة العلوية، والتولبار الثانوي فوراً
+        refreshAllPermissionsUI();
+
+        // 2. إذا كان الموظف يقف حالياً داخل شاشة تم سحب صلاحيتها -> أخرجه منها فوراً
+        String currentTag = getCurrentFragmentTag();
+        if (permissionManager != null
+                && currentTag != null
+                && !permissionManager.canAccessFragment(currentTag)) {
+            Toast.makeText(this,
+                    isArabic ? "⚠️ تم سحب صلاحية الوصول لهذه الشاشة"
+                             : "⚠️ Access to this screen has been revoked",
+                    Toast.LENGTH_LONG).show();
+            navigateByRole();
+            return;
+        }
+
+        Toast.makeText(this,
+                isArabic ? "🔄 تم تحديث صلاحياتك تلقائياً"
+                         : "🔄 Permissions updated live",
+                Toast.LENGTH_SHORT).show();
+    });
+};
 
     private MiraPosFragment activePOSFragment = null;
     private MiraIdentityStudioFragment activeEncodingFragment = null;
@@ -350,6 +376,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
+            permissionManager.addListener(permissionsListener);
+
 
             navigationManager = new NavigationManager(
                     getSupportFragmentManager(),
@@ -2449,6 +2477,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (orgProfileManager != null) {
                 orgProfileManager.removeListener(orgProfileListener);
             }
+            if (permissionManager != null) {
+                permissionManager.removeListener(permissionsListener);
+            }
+
 
             SessionMonitorManager.getInstance(this).stopMonitoring();
 
@@ -2474,6 +2506,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         super.onDestroy();
     }
+
 
     // ═══════════════════════════════════════════════════════
     //  التفاعل مع الكيبورد
@@ -2550,6 +2583,30 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             bottomNavManager.updateTransfersBadge(count);
         }
     }
+    
+    private void syncPermissionsInBackground() {
+    new Thread(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+            // المسار الذي يعيد data.mobile_capabilities و permissions_version
+            MiraApiClient.ApiResponse res = api.get("auth/me");
+            if (res != null && res.isSuccess && res.rawJson != null && permissionManager != null) {
+                org.json.JSONObject root = new org.json.JSONObject(res.rawJson);
+                org.json.JSONObject data = root.optJSONObject("data");
+                String serverVer = data != null
+                        ? data.optString("permissions_version", "")
+                        : root.optString("permissions_version", "");
+
+                if (!serverVer.isEmpty() && permissionManager.needsRefresh(serverVer)) {
+                    permissionManager.applyFromServer(root, serverVer);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "syncPermissionsInBackground skipped: " + e.getMessage());
+        }
+    }, "LivePermSync").start();
+}
+
 
     private void saveTransfersCountLocally(int count) {
         try {
