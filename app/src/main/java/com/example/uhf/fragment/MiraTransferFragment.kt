@@ -551,52 +551,59 @@ class MiraTransferFragment : MiraBaseFragment() {
     //  Data Loading, Filtering & Offline Cache
     // ═══════════════════════════════════════════════════════════════════
 
-    internal fun loadTransfers() {
-        val exec = executor ?: return
-        if (exec.isShutdown) return
-        val client = apiClient ?: return
+    
+internal fun loadTransfers() {
+    val exec = executor ?: return
+    if (exec.isShutdown) return
+    val client = apiClient ?: return
 
-        isLoadingTransfersState = true
+    isLoadingTransfersState = true
 
-        exec.execute {
-            val branchId = resolveCurrentBranchId()
-            val role = sessionManager?.roleString ?: ""
-            val isTopLevel = "SYSTEM_ADMIN".equals(role, ignoreCase = true) ||
-                "ORG_ADMIN".equals(role, ignoreCase = true) ||
-                "ADMIN".equals(role, ignoreCase = true)
+    exec.execute {
+        val branchId = resolveCurrentBranchId()
+        val role = sessionManager?.roleString ?: ""
 
-            val response = try {
-                client.getTransfers(branchId, "")
-            } catch (e: Exception) {
-                Log.e(TAG, "getTransfers failed", e)
-                null
-            }
+        val isTopLevel =
+            "SYSTEM_ADMIN".equals(role, ignoreCase = true) ||
+            "ORG_ADMIN".equals(role, ignoreCase = true) ||
+            "ADMIN".equals(role, ignoreCase = true)
 
-            mainHandler.post {
-                isLoadingTransfersState = false
-                if (!isAdded || context == null) return@post
+        val response = try {
+            client.getTransfers(branchId, "")
+        } catch (e: Exception) {
+            Log.e(TAG, "getTransfers failed", e)
+            null
+        }
 
-                allTransfersState.clear()
-                if (response != null && response.isSuccess) {
-                    val transfers = extractJsonArray(response, "transfers")
-                                        if (transfers != null) {
-                        for (i in 0 until transfers.length()) {
-                            val d = parseTransferData(transfers.optJSONObject(i))
-                            if (d != null) {
-                                allTransfersState.add(d)
-                            }
+        mainHandler.post {
+            isLoadingTransfersState = false
+
+            if (!isAdded || context == null) return@post
+
+            allTransfersState.clear()
+
+            if (response != null && response.isSuccess) {
+                val transfers = extractJsonArray(response, "transfers")
+
+                if (transfers != null) {
+                    for (i in 0 until transfers.length()) {
+                        val d = parseTransferData(transfers.optJSONObject(i))
+                        if (d != null) {
+                            allTransfersState.add(d)
                         }
-                      }
                     }
-                    saveTransfersOffline(transfers)
-                } else {
-                    loadOfflineTransfers(branchId, isTopLevel)
-                }
 
-                applyFilterAndRefreshList()
+                    saveTransfersOffline(transfers)
+                }
+            } else {
+                loadOfflineTransfers(branchId, isTopLevel)
             }
+
+            applyFilterAndRefreshList()
         }
     }
+}
+
 
     private fun extractJsonArray(response: MiraApiClient.ApiResponse?, primaryKey: String): JSONArray? {
         if (response == null) return null
