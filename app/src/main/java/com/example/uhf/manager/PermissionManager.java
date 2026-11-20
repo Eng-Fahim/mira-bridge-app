@@ -156,25 +156,30 @@ public class PermissionManager {
         }
     }
 
-    public void saveFromServer(JSONObject fullResponseJson) {
+        public void saveFromServer(JSONObject fullResponseJson) {
         if (fullResponseJson == null) return;
         try {
             JSONObject data = fullResponseJson.optJSONObject("data");
-            JSONObject legacy = fullResponseJson.optJSONObject("legacy_permissions");
+            JSONObject legacy = parseJsonObjectField(fullResponseJson, "legacy_permissions");
 
             if (data != null && data.has("mobile_capabilities")) {
-                JSONObject caps = data.optJSONObject("mobile_capabilities");
+                JSONObject caps = parseJsonObjectField(data, "mobile_capabilities");
                 if (caps != null) capabilities = caps;
-                JSONObject perms = data.optJSONObject("permissions");
-                if (perms != null) legacyPermissions = perms;
+
+                JSONObject perms = parseJsonObjectField(data, "permissions");
+                if (perms != null) {
+                    legacyPermissions = perms;
+                } else {
+                    JSONObject rootPerms = parseJsonObjectField(fullResponseJson, "permissions");
+                    if (rootPerms != null) legacyPermissions = rootPerms;
+                }
             } else if (data != null && data.has("modules")) {
-    capabilities = data;
-    if (legacy != null) legacyPermissions = legacy;
-} else {
-    // ❌ استجابة بدون capabilities — لا تُحدِّث شيئاً
-    Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
-    return;
-}
+                capabilities = data;
+                if (legacy != null) legacyPermissions = legacy;
+            } else {
+                Log.w(TAG, "saveFromServer: ignoring response (no capabilities payload)");
+                return;
+            }
 
             fragments = deriveFragments(capabilities);
 
@@ -187,6 +192,26 @@ public class PermissionManager {
             Log.e(TAG, "saveFromServer error: " + e.getMessage());
         }
     }
+
+    private JSONObject parseJsonObjectField(JSONObject parent, String key) {
+        if (parent == null || !parent.has(key) || parent.isNull(key)) return null;
+        Object raw = parent.opt(key);
+        if (raw instanceof JSONObject) {
+            return (JSONObject) raw;
+        }
+        if (raw instanceof String) {
+            String str = ((String) raw).trim();
+            if (str.startsWith("{")) {
+                try {
+                    return new JSONObject(str);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed parsing JSON string for key: " + key, e);
+                }
+            }
+        }
+        return null;
+    }
+
 
     @Deprecated
     public void savePermissions(String permissionsJson) {
@@ -337,15 +362,23 @@ public class PermissionManager {
     //  ✅ Low-level — من modules (لا legacyPermissions)
     //  legacyPermissions kept as fallback only
     // ═══════════════════════════════════════════════════════
-    private boolean scopeAllows(String moduleName, String action) {
+        private boolean scopeAllows(String moduleName, String action) {
         JSONObject m = module(moduleName);
         if (m == null || !m.optBoolean("enabled", false)) return false;
 
+        // ✅ 1. أولوية قصوى للتخصيصات الفردية القادمة من السيرفر داخل actions
+        JSONObject actions = m.optJSONObject("actions");
+        if (actions != null && actions.has(action)) {
+            return actions.optBoolean(action, false);
+        }
+
+        // 2. الاشتقاق الافتراضي من scope للدور
         String scope = m.optString("scope", "view");
 
         switch (action) {
             case "view":
-                return true; // enabled = يمكنه الرؤية
+                return true;
+            case "create":
             case "edit":
             case "write":
             case "operate":
@@ -358,6 +391,13 @@ public class PermissionManager {
                 return false;
         }
     }
+
+    
+    public boolean canRefund() {
+        return hasPermission(FEATURE_POS, "refund")
+            || hasPermission(FEATURE_SALES_HISTORY, "refund");
+    }
+
 
     public boolean hasPermission(String feature, String action) {
         // 1) من modules (المصدر الأساسي)
