@@ -1253,6 +1253,16 @@ public class MiraApiClient {
     public ApiResponse getUserPermissions(int userId) {
         return getWithAuth("/auth/users/" + userId + "/permissions");
     }
+    
+        // ==================== مزامنة الصلاحيات الحية ====================
+    public ApiResponse getPermissionsVersion() {
+        return getWithAuth("/me/permissions/version");
+    }
+
+    public ApiResponse getMyPermissions() {
+        return getWithAuth("/me/permissions");
+    }
+
 
     public ApiResponse updateUserStatus(int userId, String status) {
         JSONObject payload = new JSONObject();
