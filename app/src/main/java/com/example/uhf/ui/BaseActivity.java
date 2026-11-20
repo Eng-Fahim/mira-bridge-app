@@ -4,33 +4,28 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.uhf.MiraApp;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.PermissionsSync;
 
 public abstract class BaseActivity extends AppCompatActivity
         implements PermissionManager.OnPermissionsChangedListener {
 
-    private PermissionsSync permissionsSync;
-    private PermissionManager permissionManager;
+    protected PermissionManager permissionManager;
+    protected PermissionsSync permissionsSync;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         permissionManager = PermissionManager.getInstance(this);
-        permissionsSync = PermissionsSync.getInstance(this, /* NetworkClient */ buildNetworkClient());
+        permissionsSync   = MiraApp.get().getPermissionsSync();
     }
-
-    /** يجب على كل Activity أن تُعيد نفس العميل المستخدم في التطبيق */
-    protected abstract com.example.uhf.network.NetworkClient buildNetworkClient();
 
     @Override
     protected void onResume() {
         super.onResume();
-        // 1) سجّل الاستماع للتغيّرات
         permissionManager.addListener(this);
-        // 2) ابدأ الفحص الدوري أثناء الاستخدام
         permissionsSync.startPolling();
-        // 3) افحص فوراً (onResume قد يكون بعد بقاء التطبيق في الخلفية)
         permissionsSync.onResumeCheck();
     }
 
@@ -41,17 +36,42 @@ public abstract class BaseActivity extends AppCompatActivity
         super.onPause();
     }
 
-    /**
-     * الافتراضي: إعادة إنشاء النشاط ليعيد كل شيء التقييم.
-     * يمكنك تجاوزه في النشاطات التي تدعم التحديث الجزئي (مثلاً عبر ViewModel)
-     */
     @Override
     public void onPermissionsChanged() {
-        runOnUiThread(this::handlePermissionsChanged);
+        runOnUiThread(() -> {
+            enforceFragmentAccess();
+            handlePermissionsChanged();
+        });
     }
 
+    /** إعادة الرسم الافتراضية */
     protected void handlePermissionsChanged() {
-        // إعادة إنشاء الشاشة — الحل الأبسط والأكثر أماناً
         recreate();
+    }
+
+    /** إغلاق أي Fragment فقد صلاحيته */
+    protected void enforceFragmentAccess() {
+        androidx.fragment.app.FragmentManager fm = getSupportFragmentManager();
+        java.util.List<androidx.fragment.app.Fragment> toRemove = new java.util.ArrayList<>();
+
+        for (androidx.fragment.app.Fragment f : fm.getFragments()) {
+            if (f == null || !f.isAdded()) continue;
+            String tag = f.getTag();
+            if (tag == null) continue;
+            if (!permissionManager.canAccessFragment(tag)) {
+                toRemove.add(f);
+            }
+        }
+
+        for (androidx.fragment.app.Fragment f : toRemove) {
+            try {
+                fm.beginTransaction().remove(f).commitNowAllowingStateLoss();
+                android.widget.Toast.makeText(this,
+                        "تم إغلاق شاشة فقدت صلاحيتها",
+                        android.widget.Toast.LENGTH_LONG).show();
+            } catch (Throwable t) {
+                android.util.Log.e("BaseActivity", "remove unauthorized fragment", t);
+            }
+        }
     }
 }
