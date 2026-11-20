@@ -525,7 +525,7 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private fun applyPermissions() {
         canUsePosState = hasPosPermission()
-        canPerformRefundState = canPerformRefund()
+        canPerformRefundState = permissionManager.canRefund()
         if (!canUsePosState) {
             statusMessageState = if (isArabic) "⛔ غير مصرح" else "⛔ Access Denied"
         }
@@ -1993,11 +1993,10 @@ class MiraPosFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     private fun showRefundDialog() {
-        if (!isFragmentAlive()) return
-        if (!canPerformRefund()) {
-            showToast(if (isArabic) "⛔ غير مصرح بالاسترجاع" else "⛔ Not authorized to refund")
-            return
-        }
+    if (!permissionManager.canRefund()) {
+        showToast(if (isArabic) "لا صلاحيات لديك لإجراء عملية الإرجاع" else "No refund permission")
+        return
+    }
 
         try {
             isRefundDialogHiddenForScan = false
