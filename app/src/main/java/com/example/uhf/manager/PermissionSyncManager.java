@@ -1,5 +1,6 @@
 package com.example.uhf.manager;
 
+import com.example.uhf.tools.SessionManager;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  PermissionsSync — يجعل الصلاحيات تنعكس فوراً دون إعادة تسجيل دخول
+ *  PermissionSyncManager — يجعل الصلاحيات تنعكس فوراً دون إعادة تسجيل دخول
  * ═══════════════════════════════════════════════════════════════
  *
  *  آليتان تعملان معاً:
@@ -23,12 +24,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *  كل فحص = GET /me/permissions/version (~50 bytes)
  *  عند اختلاف النسخة → GET /me/permissions → applyFromServer → notify
  */
-public class PermissionsSync {
+public class PermissionSyncManager {
 
-    private static final String TAG = "PermissionsSync";
+    private static final String TAG = "PermissionSyncManager";
     private static final long POLL_INTERVAL_MS = 30_000L;
 
-    private static volatile PermissionsSync instance;
+    private static volatile PermissionSyncManager instance;
 
     private final Context appContext;
     private final PermissionManager permissionManager;
@@ -50,16 +51,16 @@ public class PermissionsSync {
         void onResult(boolean changed, Throwable error);
     }
 
-    private PermissionsSync(Context ctx, NetworkClient client) {
+    private PermissionSyncManager(Context ctx, NetworkClient client) {
         this.appContext = ctx.getApplicationContext();
         this.permissionManager = PermissionManager.getInstance(appContext);
         this.networkClient = client;
     }
 
-    public static PermissionsSync getInstance(Context ctx, NetworkClient client) {
+    public static PermissionSyncManager getInstance(Context ctx, NetworkClient client) {
         if (instance == null) {
-            synchronized (PermissionsSync.class) {
-                if (instance == null) instance = new PermissionsSync(ctx, client);
+            synchronized (PermissionSyncManager.class) {
+                if (instance == null) instance = new PermissionSyncManager(ctx, client);
             }
         }
         return instance;
@@ -168,5 +169,35 @@ public class PermissionsSync {
     private static String shortV(String v) {
         if (v == null || v.length() < 10) return String.valueOf(v);
         return v.substring(0, 8) + "…";
+    }
+    public static void triggerForceLogout(Context context, String serverMessage) {
+    try {
+        Log.w(TAG, "Force logout triggered by server");
+
+        SessionManager sessionManager = new SessionManager(context);
+        sessionManager.logoutUser();
+
+        new Handler(Looper.getMainLooper()).post(() -> {
+            android.content.Intent intent =
+                    new android.content.Intent(
+                            context,
+                            com.example.uhf.LoginActivity.class
+                    );
+
+            intent.addFlags(
+                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+            );
+
+            if (serverMessage != null && !serverMessage.trim().isEmpty()) {
+                intent.putExtra("force_logout_message", serverMessage);
+            }
+
+            context.startActivity(intent);
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "Force logout failed", e);
+    }
     }
 }
