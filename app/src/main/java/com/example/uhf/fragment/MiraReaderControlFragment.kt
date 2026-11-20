@@ -1263,29 +1263,28 @@ class MiraReaderControlFragment : Fragment() {
                         )
                     }
                 }
-
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    containerColor = colors.cardSurface
-                ) {
-                    options.forEachIndexed { idx, opt ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = opt,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (idx == safeIdx) colors.goldPrimary else colors.textPrimary
-                                )
-                            },
-                            onClick = {
-                                expanded = false
-                                onSelect(idx)
-                            }
-                        )
-                    }
-                }
+    expanded = expanded,
+    onDismissRequest = { expanded = false },
+    modifier = Modifier.background(colors.cardSurface)
+) {
+    options.forEachIndexed { idx, opt ->
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = opt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (idx == safeIdx) colors.goldPrimary else colors.textPrimary
+                )
+            },
+            onClick = {
+                expanded = false
+                onSelect(idx)
             }
+        )
+    }
+}
+   }
         }
     }
 
