@@ -16,7 +16,9 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+//import androidx.appcompat.app.AppCompatActivity;
+import com.example.uhf.ui.BaseActivity;
+
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -57,7 +59,9 @@ import java.util.concurrent.atomic.AtomicReference;
  *  ✅ applyReaderSettingsToSharedReader() — دالة عامة static للاستخدام
  *     اليدوي من أي مكان عند الحاجة.
  */
-public class BaseTabFragmentActivity extends AppCompatActivity {
+public class BaseTabFragmentActivity extends BaseActivity {
+
+//public class BaseTabFragmentActivity extends AppCompatActivity {
 
     private static final String TAG = "BaseTabFragmentActivity";
 
