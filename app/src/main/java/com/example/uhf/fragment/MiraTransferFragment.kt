@@ -326,6 +326,39 @@ class MiraTransferFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
     //  Physical RFID Trigger Integration (Handheld Reader + Dialog Hook)
     // ═══════════════════════════════════════════════════════════════════
+    
+    internal fun resolveCurrentBranchId(): Int {
+        val bmBranch = try {
+            branchesManager?.activeBranchId ?: 0
+        } catch (_: Exception) {
+            0
+        }
+        if (bmBranch > 0) return bmBranch
+
+        val secureMgr = try {
+            val clazz = Class.forName("com.example.uhf.tools.SecureSessionManager")
+            val getInst = clazz.methods.firstOrNull { it.name == "getInstance" && it.parameterCount == 1 }
+            appContext?.let { getInst?.invoke(null, it) }
+        } catch (_: Exception) {
+            null
+        }
+
+        val targets = listOfNotNull(sessionManager, secureMgr)
+        for (target in targets) {
+            for (methodName in listOf("getBranchId", "getActiveBranchId", "branchId")) {
+                try {
+                    val m = target.javaClass.methods.firstOrNull {
+                        it.name.equals(methodName, ignoreCase = true) && it.parameterCount == 0
+                    }
+                    val v = m?.invoke(target)
+                    if (v is Number && v.toInt() > 0) return v.toInt()
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return 1
+    }
+
 
     internal fun isTriggerKeyCode(keyCode: Int): Boolean {
         return keyCode == KEYCODE_TRIGGER_1 ||
@@ -498,7 +531,8 @@ class MiraTransferFragment : MiraBaseFragment() {
 
     internal fun canReceiveTransfer(t: TransferData?): Boolean {
         if (t == null) return false
-        val userBranchId = branchesManager?.activeBranchId ?: 0
+        val userBranchId = resolveCurrentBranchId()
+
         if (t.fromBranchId == userBranchId) return false
 
         val role = sessionManager?.roleString ?: ""
@@ -521,7 +555,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         isLoadingTransfersState = true
 
         exec.execute {
-            val branchId = branchesManager?.activeBranchId ?: 0
+            val branchId = resolveCurrentBranchId()
             val role = sessionManager?.roleString ?: ""
             val isTopLevel = "SYSTEM_ADMIN".equals(role, ignoreCase = true) ||
                 "ORG_ADMIN".equals(role, ignoreCase = true) ||
@@ -824,7 +858,7 @@ class MiraTransferFragment : MiraBaseFragment() {
         isLoadingBranchesState = true
         showNewTransferSheetState = true
 
-        val fromBranchId = branchesManager?.activeBranchId ?: 0
+        val fromBranchId = resolveCurrentBranchId()
         val exec = executor ?: return
         val client = apiClient ?: return
         val isAr = isArabicState
@@ -937,39 +971,58 @@ class MiraTransferFragment : MiraBaseFragment() {
         activeScanTransferState = null
     }
 
-    internal fun verifyAndAddEpcToTransfer(rawEpc: String) {
-        val epc = rawEpc.trim().uppercase(Locale.US)
-        if (epc.isEmpty()) return
+        internal fun verifyAndAddEpcToTransfer(rawEpc: String) {
+        val inputCode = rawEpc.trim().uppercase(Locale.US)
+        if (inputCode.isEmpty()) return
         val isAr = isArabicState
-        if (activeScanEpcSet.contains(epc) || verifyingEpcSet.contains(epc)) {
-            showToast(if (isAr) "⚠️ هذه القطعة ممسوحة مسبقاً" else "⚠️ Item already scanned")
+
+        val alreadyExists = activeScanEpcSet.contains(inputCode) ||
+            verifyingEpcSet.contains(inputCode) ||
+            scannedItemsState.any { it.serialNumber.equals(inputCode, ignoreCase = true) }
+
+        if (alreadyExists) {
+            showToast(if (isAr) "⚠️ هذه القطعة ممسوحة أو مضافة مسبقاً" else "⚠️ Item already added")
             return
         }
 
         val exec = executor ?: return
         val client = apiClient ?: return
-        verifyingEpcSet.add(epc)
+        val activeBranch = resolveCurrentBranchId()
+        verifyingEpcSet.add(inputCode)
 
         exec.execute {
             try {
                 val params = JSONObject().apply {
-                    put("branch_id", branchesManager?.activeBranchId ?: 0)
+                    put("branch_id", activeBranch)
+                    put("from_branch_id", activeBranch)
                 }
-                val response = client.authorize(epc, "transfer", params)
+                val response = client.authorize(inputCode, "transfer", params)
 
                 mainHandler.post {
-                    verifyingEpcSet.remove(epc)
+                    verifyingEpcSet.remove(inputCode)
                     if (!isAdded || activeScanTransferState == null) return@post
-                    if (activeScanEpcSet.contains(epc)) return@post
 
                     if (response != null && response.isSuccess && response.data != null) {
                         val allowed = response.data!!.optBoolean("allowed", false)
                         val itemObj = response.data!!.optJSONObject("item")
 
                         if (allowed || itemObj != null) {
+                            // استخراج رمز RFID EPC الفعلي حتى لو أدخل المستخدم Serial Number يدوياً
+                            val resolvedEpc = (itemObj?.optString("rfid_epc", "")
+                                ?.ifEmpty { itemObj.optString("epc", "") }
+                                ?.trim()
+                                ?.uppercase(Locale.US))
+                                ?.ifEmpty { inputCode }
+                                ?: inputCode
+
+                            if (activeScanEpcSet.contains(resolvedEpc)) {
+                                showToast(if (isAr) "⚠️ هذه القطعة مضافة مسبقاً" else "⚠️ Item already added")
+                                return@post
+                            }
+
                             val title = itemObj?.optString("item_title", "")
-                                ?.ifEmpty { itemObj.optString("title", epc) }
-                                ?: epc
+                                ?.ifEmpty { itemObj.optString("title", resolvedEpc) }
+                                ?: resolvedEpc
                             val serial = itemObj?.optString("serial_number", "") ?: ""
                             val weight = itemObj?.optDouble(
                                 "gross_weight_grams",
@@ -980,11 +1033,11 @@ class MiraTransferFragment : MiraBaseFragment() {
                                 itemObj.optString("purity_code", "")
                             ) ?: ""
 
-                            activeScanEpcSet.add(epc)
+                            activeScanEpcSet.add(resolvedEpc)
                             scannedItemsState.add(
                                 0,
                                 ScannedTransferItem(
-                                    epc = epc,
+                                    epc = resolvedEpc,
                                     title = title,
                                     serialNumber = serial,
                                     weight = weight,
@@ -996,19 +1049,31 @@ class MiraTransferFragment : MiraBaseFragment() {
                         } else {
                             val reason = response.data!!.optString(
                                 "reason",
-                                if (isAr) "غير مسموح بنقل هذه القطعة" else "Not authorized for transfer"
+                                if (isAr) "غير متوفرة في هذا الفرع أو غير صالحة للنقل" else "Not available in this branch"
                             )
                             playErrorBeepSound()
-                            showToast("❌ $epc: $reason")
+                            showToast("❌ $inputCode: $reason")
                         }
+                    } else if (response != null) {
+                        // السيرفر ردّ برفض صريح (مثل 404 غير موجودة أو 422 غير متاحة)
+                                                val reason = response.data?.optString("reason", "")
+                            ?.ifEmpty { response.data?.optString("message", "") ?: "" }
+                            ?.ifEmpty { response.error ?: "" }
+                            ?.ifEmpty { response.message ?: "" }
+                            ?.ifEmpty {
+                                if (isAr) "القطعة غير موجودة أو غير متوفرة في الفرع الحالي"
+                                else "Item not found or unavailable in active branch"
+                            } ?: ""
+                        playErrorBeepSound()
+                        showToast("❌ $inputCode: $reason")
                     } else {
-                        // وضع التوافق في حال عدم توفر استجابة السيرفر التفصيلية — يُدقق نهائياً عند الحفظ
-                        activeScanEpcSet.add(epc)
+                        // انقطاع اتصال تام فقط — تُحفظ مؤقتاً للتحقق عند الحفظ
+                        activeScanEpcSet.add(inputCode)
                         scannedItemsState.add(
                             0,
                             ScannedTransferItem(
-                                epc = epc,
-                                title = epc,
+                                epc = inputCode,
+                                title = inputCode,
                                 serialNumber = "",
                                 weight = 0.0,
                                 karat = "",
@@ -1020,23 +1085,10 @@ class MiraTransferFragment : MiraBaseFragment() {
                 }
             } catch (e: Exception) {
                 mainHandler.post {
-                    verifyingEpcSet.remove(epc)
+                    verifyingEpcSet.remove(inputCode)
                     if (!isAdded || activeScanTransferState == null) return@post
-                    if (activeScanEpcSet.contains(epc)) return@post
-
-                    activeScanEpcSet.add(epc)
-                    scannedItemsState.add(
-                        0,
-                        ScannedTransferItem(
-                            epc = epc,
-                            title = epc,
-                            serialNumber = "",
-                            weight = 0.0,
-                            karat = "",
-                            isAuthorized = true
-                        )
-                    )
-                    playScanBeepSound()
+                    playErrorBeepSound()
+                    showToast("❌ ${e.message ?: "Error"}")
                 }
             }
         }
@@ -1046,7 +1098,6 @@ class MiraTransferFragment : MiraBaseFragment() {
         activeScanEpcSet.remove(epc)
         scannedItemsState.removeAll { it.epc == epc }
     }
-
     internal fun saveScannedItemsToTransfer(t: TransferData) {
         val isAr = isArabicState
         if (activeScanEpcSet.isEmpty()) {
@@ -1070,12 +1121,15 @@ class MiraTransferFragment : MiraBaseFragment() {
         exec.execute {
             try {
                 if (t.id == 0) {
+                    val effectiveFromBranchId = if (t.fromBranchId > 0) t.fromBranchId else resolveCurrentBranchId()
                     val createPayload = JSONObject().apply {
-                        put("from_branch_id", t.fromBranchId)
+                        put("from_branch_id", effectiveFromBranchId)
                         put("to_branch_id", t.toBranchId)
                         put("notes", t.notes)
                         put("items", itemsArray)
                     }
+
+
 
                     val createResponse = client.createTransfer(createPayload)
                     if (createResponse != null && createResponse.isSuccess) {
@@ -1679,7 +1733,7 @@ class MiraTransferFragment : MiraBaseFragment() {
                         transferNumber = "TR-NEW",
                         fromBranch = activeBranchNameState,
                         toBranch = targetBranch.name,
-                        fromBranchId = branchesManager?.activeBranchId ?: 0,
+                        fromBranchId = resolveCurrentBranchId(), // ✅ هنا المكان الصحيح
                         toBranchId = targetBranch.id,
                         status = "draft",
                         itemCount = 0,
@@ -2286,6 +2340,8 @@ class MiraTransferFragment : MiraBaseFragment() {
         onDismiss: () -> Unit,
         onProceedToScan: (BranchOption, String) -> Unit
     ) {
+    
+        
         val colors = MiraTheme.colors
         var selectedBranch by remember(branches.size) { mutableStateOf(branches.firstOrNull()) }
         var notesText by remember { mutableStateOf("") }
@@ -3110,4 +3166,4 @@ class MiraTransferFragment : MiraBaseFragment() {
             )
         }
     }
-}
+} 
