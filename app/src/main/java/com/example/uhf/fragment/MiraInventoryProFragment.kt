@@ -41,7 +41,7 @@ class MiraInventoryProFragment : Fragment() {
         val isArabic = Locale.getDefault().language.startsWith("ar")
 
         rfidManager = runCatching { RFIDManager.getInstance(ctx) }.getOrNull()
-        soundManager = runCatching { SoundManager.getInstance(ctx) }.getOrNull()
+        soundManager = runCatching { SoundManager(ctx) }.getOrNull()
         val apiClient = runCatching { MiraApiClient.getInstance(ctx) }.getOrNull()
         val branchesManager = runCatching { MiraBranchesManager.getInstance(ctx) }.getOrNull()
 
