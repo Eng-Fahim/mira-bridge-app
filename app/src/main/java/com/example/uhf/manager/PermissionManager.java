@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v4.3 — Server-Driven & Live Sync
+ *  PermissionManager v4.4 — Server-Driven & Live Sync
  * ═══════════════════════════════════════════════════════════════════
  *  متطابق 100% مع PermissionsNormalizer::MODULES (23 وحدة قياسية)
  */
@@ -285,6 +285,7 @@ public class PermissionManager {
 
             // RFID وتهيئة القارئ (مربوطة بوحدتي rfid و setup)
             {"IdentityStudio", "rfid"},
+            {"MiraIdentityStudio", "rfid"},
             {"RFIDWrite", "rfid"},
             {"RfidBindings", "rfid"},
             {"ReaderSetup", "setup"}, {"UHFSet", "setup"},
@@ -319,7 +320,22 @@ public class PermissionManager {
             }
         }
 
-        // شاشات شخصية عامة لكل مستخدم مسجّل دخول
+        // شاشة استوديو التكويد تعمل بصلاحية rfid أو صلاحية تشغيل/تعديل المخزون inventory
+        JSONObject rfidMod = modules.optJSONObject("rfid");
+        JSONObject invMod  = modules.optJSONObject("inventory");
+        boolean canIdentity = (rfidMod != null && rfidMod.optBoolean("enabled", false))
+                || (invMod != null && invMod.optBoolean("enabled", false)
+                    && ("operate".equals(invMod.optString("scope"))
+                        || "write".equals(invMod.optString("scope"))
+                        || "full".equals(invMod.optString("scope"))));
+        if (canIdentity) {
+            try {
+                out.put("IdentityStudio", true);
+                out.put("MiraIdentityStudio", true);
+            } catch (Exception ignored) {}
+        }
+
+        // شاشات ونوافذ عامة لكل مستخدم مسجّل دخول
         try {
             out.put("Dashboard", true);
             out.put("Home", true);
@@ -328,6 +344,7 @@ public class PermissionManager {
             out.put("Notifications", true);
             out.put("SoundSettings", true);
             out.put("Receipt", true);
+            out.put("QuickActions", true);
         } catch (Exception ignored) {}
 
         // تجاوز صريح من السيرفر إن وُجد
@@ -480,8 +497,8 @@ public class PermissionManager {
     public boolean canCreateTransfer()             { return scopeAllows("transfers", "edit"); }
     public boolean canApproveTransfer()            { return scopeAllows("transfers", "edit"); }
 
-    public boolean canViewIdentity()               { return moduleEnabled("rfid"); }
-    public boolean canUseIdentity()                { return scopeAllows("rfid", "edit"); }
+    public boolean canViewIdentity()               { return moduleEnabled("rfid") || scopeAllows("inventory", "operate"); }
+    public boolean canUseIdentity()                { return scopeAllows("rfid", "edit") || scopeAllows("inventory", "operate"); }
 
     public boolean canViewRadar()                  { return moduleEnabled("radar"); }
 
@@ -688,6 +705,13 @@ public class PermissionManager {
         if (fragmentTag == null || fragmentTag.trim().isEmpty()) return false;
         final String tag = fragmentTag.trim();
 
+        if ("IdentityStudio".equalsIgnoreCase(tag) || "MiraIdentityStudio".equalsIgnoreCase(tag)) {
+            return canViewIdentity();
+        }
+        if ("QuickActions".equalsIgnoreCase(tag) || "Receipt".equalsIgnoreCase(tag)) {
+            return true;
+        }
+
         if (fragments != null && fragments.has(tag)) {
             return fragments.optBoolean(tag, false);
         }
@@ -703,7 +727,7 @@ public class PermissionManager {
         switch (tag.toLowerCase()) {
             case "dashboard": case "home": case "homefragment":
             case "profile": case "soundsettings": case "notifications":
-            case "receipt":
+            case "receipt": case "quickactions":
                 return null;
             case "serverconfig": return "settings";
             case "accountingsetup": return "accounting";
@@ -725,7 +749,8 @@ public class PermissionManager {
             case "cheques": return "cheques";
             case "pos": case "posfragment": return "pos";
             case "transfers": case "transferdetail": return "transfers";
-            case "identitystudio": case "rfidwrite": case "rfidbindings": case "rfidsettings":
+            case "identitystudio": case "miraidentitystudio":
+            case "rfidwrite": case "rfidbindings": case "rfidsettings":
                 return "rfid";
             case "radar": case "locator": return "radar";
             case "securegate": case "gatesettings": case "gates": return "gate";
