@@ -24,6 +24,38 @@ enum class TriggerMode {
     HOLD    // المسح طالما الزناد مضغوط
 }
 
+enum class ArchiveItemStatus {
+    MATCHED, MISSING, UNCATALOGUED
+}
+
+data class ArchiveReportItemDetail(
+    val epc: String,
+    val name: String,
+    val karat: String = "",
+    val weightGrams: Double = 0.0,
+    val estimatedValue: Double = 0.0,
+    val status: ArchiveItemStatus = ArchiveItemStatus.MATCHED
+)
+
+data class ArchiveReportDetails(
+    val reportId: String,
+    val reportCode: String,
+    val createdAt: String,
+    val branchName: String,
+    val auditorName: String,
+    val expectedCount: Int,
+    val matchedCount: Int,
+    val missingCount: Int,
+    val uncataloguedCount: Int,
+    val scannedWeightGrams: Double,
+    val estimatedValueUsd: Double,
+    val items: List<ArchiveReportItemDetail>
+) {
+    val matchRatePercent: Float
+        get() = if (expectedCount > 0) (matchedCount * 100f / expectedCount).coerceIn(0f, 100f) else 0f
+}
+
+
 @Immutable
 data class InventoryDisplayRow(
     val epc: String,
@@ -126,10 +158,13 @@ data class InventoryUiState(
     val isArchiveLoading: Boolean = false,
     val archiveReports: List<InventoryReport> = emptyList(),
     val selectedArchiveDetails: Pair<String, List<ScannedItemDisplay>>? = null,
-    val snackbarMessage: String? = null,
+    val snackbarMessage: String? = null
     val showScannerSettingsSheet: Boolean = false,
     val showSessionSettingsSheet: Boolean = false,
-
+    val selectedArchiveReportId: String? = null,
+    val archiveReportDetails: ArchiveReportDetails? = null,
+    val isLoadingArchiveDetails: Boolean = false,
+    val archiveDetailsError: String? = null,
 ) {
     val accuracyPercent: Float
         get() = if (expectedCount > 0) {
