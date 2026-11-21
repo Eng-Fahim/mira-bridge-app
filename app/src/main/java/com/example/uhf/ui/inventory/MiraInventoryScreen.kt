@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Print
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -86,6 +87,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -100,16 +102,19 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import java.util.Locale
-import androidx.compose.runtime.DisposableEffect
+
 /**
  * محول ألوان متجاوب يربط شاشة الجرد تلقائياً بثيم التطبيق (MiraJewelryTheme + MiraTypography / Cairo)
  * في كلٍّ من الوضع الليلي والنهاري.
@@ -208,12 +213,13 @@ fun MiraInventoryScreen(
     val layoutDirection = if (state.isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
 
     // معالجة زر الرجوع في الجهاز للخروج المنظم وإظهار شريط التنقل السفلي
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var isExiting by remember { mutableStateOf(false) }
+    var showMicroScanner by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
                 isExiting = false
             }
         }
@@ -225,7 +231,6 @@ fun MiraInventoryScreen(
         isExiting = true
         onNavigateBack()
     }
-
 
     LaunchedEffect(state.snackbarMessage) {
         val msg = state.snackbarMessage
@@ -263,6 +268,7 @@ fun MiraInventoryScreen(
                         state = state,
                         colors = colors,
                         onToggleScan = viewModel::toggleScanning,
+                        onOpenMicroScanner = { showMicroScanner = true },
                         onPowerChange = viewModel::setAntennaPower,
                         onTriggerModeChange = viewModel::setTriggerMode,
                         onCommit = viewModel::commitCurrentInventory,
@@ -348,6 +354,18 @@ fun MiraInventoryScreen(
                         }
                     }
                 }
+            }
+
+            // نافذة الماسح البصري المجهري البديل للأكواد الدقيقة (3×3 مم GS1 DataMatrix / MIRA QR)
+            if (showMicroScanner) {
+                MicroOpticalTagScannerDialog(
+                    isArabic = state.isArabic,
+                    onCodeCaptured = { parsed ->
+                        showMicroScanner = false
+                        viewModel.onMicroOpticalCodeScanned(parsed)
+                    },
+                    onDismiss = { showMicroScanner = false }
+                )
             }
 
             // نافذة رادار تتبع القطعة المفقودة (Geiger RSSI Radar)
@@ -1157,6 +1175,7 @@ private fun ScannerControlDock(
     state: InventoryUiState,
     colors: AdaptiveAuditColors,
     onToggleScan: () -> Unit,
+    onOpenMicroScanner: () -> Unit,
     onPowerChange: (Int) -> Unit,
     onTriggerModeChange: (TriggerMode) -> Unit,
     onCommit: () -> Unit,
@@ -1259,6 +1278,21 @@ private fun ScannerControlDock(
                         imageVector = Icons.Rounded.Tune,
                         contentDescription = "Power Settings",
                         tint = colors.goldPrimary
+                    )
+                }
+
+                // زر الماسح البصري المجهري (3×3 مم GS1 DataMatrix / MIRA QR)
+                IconButton(
+                    onClick = onOpenMicroScanner,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.bgCard)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.QrCodeScanner,
+                        contentDescription = if (state.isArabic) "ماسح الكود المجهري 3×3 مم" else "Micro 3x3mm Optical Scanner",
+                        tint = colors.cyanExtra
                     )
                 }
 
