@@ -773,4 +773,10 @@ public static MiraApplication getInstance() {
 
         return sb.toString();
     }
+    @NonNull
+public PermissionSyncManager getPermissionsSync() {
+    return getPermissionSyncManager();
+}
+
+    
                     }
