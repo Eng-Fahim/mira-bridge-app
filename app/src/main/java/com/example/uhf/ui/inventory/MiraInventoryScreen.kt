@@ -99,6 +99,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.Print
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiraInventoryScreen(
@@ -375,7 +380,6 @@ fun MiraInventoryScreen(
                     onClose = viewModel::closeSessionSettingsSheet
                 )
             }
-        }
         }
     }
 }
