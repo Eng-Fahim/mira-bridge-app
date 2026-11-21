@@ -10,7 +10,6 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
-import com.example.uhf.activity.LoginActivity;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.PermissionManager;
@@ -38,7 +37,10 @@ public abstract class BaseActivity extends AppCompatActivity
     }
 
     private boolean isLoginScreenOrLoggedOut() {
-        if (this instanceof LoginActivity) {
+        String className = getClass().getSimpleName();
+        if ("LoginActivity".equals(className)
+                || "ActivationActivity".equals(className)
+                || "SplashActivity".equals(className)) {
             return true;
         }
         if (sessionManager == null) {
@@ -91,7 +93,6 @@ public abstract class BaseActivity extends AppCompatActivity
 
     /** إعادة الرسم الافتراضية */
     protected void handlePermissionsChanged() {
-        // UHFMainActivity تدير التحديث الحي للواجهة عبر permissionsListener دون تدمير النشاط أو قطع القارئ
         if (this instanceof UHFMainActivity) {
             ((UHFMainActivity) this).refreshAllPermissionsUI();
             return;
@@ -110,7 +111,6 @@ public abstract class BaseActivity extends AppCompatActivity
 
         for (Fragment f : fm.getFragments()) {
             if (f == null || !f.isAdded() || f.isRemoving()) continue;
-            // لا نحذف النوافذ المنبثقة العامة أو فراجمنتات الدعم الداخلية
             if (f instanceof DialogFragment) continue;
 
             String tag = f.getTag();
@@ -144,7 +144,6 @@ public abstract class BaseActivity extends AppCompatActivity
             }
         }
 
-        // منع ترك الشاشة بيضاء بعد إغلاق الفراجمنت الرئيسي
         if (removedMainContent && this instanceof UHFMainActivity) {
             UHFMainActivity main = (UHFMainActivity) this;
             if (main.getNavigationManager() != null) {
