@@ -158,7 +158,7 @@ data class InventoryUiState(
     val isArchiveLoading: Boolean = false,
     val archiveReports: List<InventoryReport> = emptyList(),
     val selectedArchiveDetails: Pair<String, List<ScannedItemDisplay>>? = null,
-    val snackbarMessage: String? = null
+    val snackbarMessage: String? = null,
     val showScannerSettingsSheet: Boolean = false,
     val showSessionSettingsSheet: Boolean = false,
     val selectedArchiveReportId: String? = null,
