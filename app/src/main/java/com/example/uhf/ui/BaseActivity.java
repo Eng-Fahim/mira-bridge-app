@@ -1,45 +1,89 @@
 package com.example.uhf.ui;
 
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.Toast;
+
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 
+import com.example.uhf.activity.LoginActivity;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.PermissionSyncManager;
+import com.example.uhf.tools.SessionManager;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public abstract class BaseActivity extends AppCompatActivity
         implements PermissionManager.OnPermissionsChangedListener {
 
+    private static final String TAG = "BaseActivity";
+
     protected PermissionManager permissionManager;
     protected PermissionSyncManager PermissionSyncManager;
+    protected SessionManager sessionManager;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         permissionManager = PermissionManager.getInstance(this);
-        PermissionSyncManager   = MiraApplication.getInstance().getPermissionSyncManager();
+        PermissionSyncManager = MiraApplication.getInstance().getPermissionSyncManager();
+        sessionManager = new SessionManager(getApplicationContext());
+    }
+
+    private boolean isLoginScreenOrLoggedOut() {
+        if (this instanceof LoginActivity) {
+            return true;
+        }
+        if (sessionManager == null) {
+            sessionManager = new SessionManager(getApplicationContext());
+        }
+        return !sessionManager.isLoggedIn();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+
+        if (isLoginScreenOrLoggedOut()) {
+            if (PermissionSyncManager != null) {
+                PermissionSyncManager.stopPolling();
+            }
+            return;
+        }
+
         permissionManager.addListener(this);
         enforceFragmentAccess();
-        PermissionSyncManager.startPolling();
-        PermissionSyncManager.onResumeCheck();
+        if (PermissionSyncManager != null) {
+            PermissionSyncManager.startPolling();
+            PermissionSyncManager.onResumeCheck();
+        }
     }
 
     @Override
     protected void onPause() {
-        permissionManager.removeListener(this);
-        PermissionSyncManager.stopPolling();
+        if (permissionManager != null) {
+            permissionManager.removeListener(this);
+        }
+        if (PermissionSyncManager != null) {
+            PermissionSyncManager.stopPolling();
+        }
         super.onPause();
     }
 
     @Override
     public void onPermissionsChanged() {
+        if (isLoginScreenOrLoggedOut()) {
+            return;
+        }
         runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
             enforceFragmentAccess();
             handlePermissionsChanged();
         });
@@ -47,31 +91,64 @@ public abstract class BaseActivity extends AppCompatActivity
 
     /** إعادة الرسم الافتراضية */
     protected void handlePermissionsChanged() {
+        // UHFMainActivity تدير التحديث الحي للواجهة عبر permissionsListener دون تدمير النشاط أو قطع القارئ
+        if (this instanceof UHFMainActivity) {
+            ((UHFMainActivity) this).refreshAllPermissionsUI();
+            return;
+        }
         recreate();
     }
 
-    /** إغلاق أي Fragment فقد صلاحيته */
+    /** إغلاق أي Fragment فقد صلاحيته مع الرجوع للرئيسية بدلاً من ترك الشاشة بيضاء */
     protected void enforceFragmentAccess() {
-        androidx.fragment.app.FragmentManager fm = getSupportFragmentManager();
-        java.util.List<androidx.fragment.app.Fragment> toRemove = new java.util.ArrayList<>();
+        if (isLoginScreenOrLoggedOut()) {
+            return;
+        }
 
-        for (androidx.fragment.app.Fragment f : fm.getFragments()) {
-            if (f == null || !f.isAdded()) continue;
+        FragmentManager fm = getSupportFragmentManager();
+        List<Fragment> toRemove = new ArrayList<>();
+
+        for (Fragment f : fm.getFragments()) {
+            if (f == null || !f.isAdded() || f.isRemoving()) continue;
+            // لا نحذف النوافذ المنبثقة العامة أو فراجمنتات الدعم الداخلية
+            if (f instanceof DialogFragment) continue;
+
             String tag = f.getTag();
-            if (tag == null) continue;
+            if (tag == null || tag.trim().isEmpty()) continue;
+            if (tag.startsWith("androidx.") || tag.startsWith("android.")
+                    || "QuickActions".equals(tag) || "Receipt".equals(tag)) {
+                continue;
+            }
+
             if (!permissionManager.canAccessFragment(tag)) {
                 toRemove.add(f);
             }
         }
 
-        for (androidx.fragment.app.Fragment f : toRemove) {
+        if (toRemove.isEmpty()) {
+            return;
+        }
+
+        boolean removedMainContent = false;
+        for (Fragment f : toRemove) {
             try {
+                if (f.getId() == com.example.uhf.R.id.fragment_container) {
+                    removedMainContent = true;
+                }
                 fm.beginTransaction().remove(f).commitNowAllowingStateLoss();
-                android.widget.Toast.makeText(this,
+                Toast.makeText(this,
                         "تم إغلاق شاشة فقدت صلاحيتها",
-                        android.widget.Toast.LENGTH_LONG).show();
+                        Toast.LENGTH_LONG).show();
             } catch (Throwable t) {
-                android.util.Log.e("BaseActivity", "remove unauthorized fragment", t);
+                Log.e(TAG, "remove unauthorized fragment", t);
+            }
+        }
+
+        // منع ترك الشاشة بيضاء بعد إغلاق الفراجمنت الرئيسي
+        if (removedMainContent && this instanceof UHFMainActivity) {
+            UHFMainActivity main = (UHFMainActivity) this;
+            if (main.getNavigationManager() != null) {
+                main.getNavigationManager().goToDashboard();
             }
         }
     }
