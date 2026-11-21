@@ -127,6 +127,9 @@ data class InventoryUiState(
     val archiveReports: List<InventoryReport> = emptyList(),
     val selectedArchiveDetails: Pair<String, List<ScannedItemDisplay>>? = null,
     val snackbarMessage: String? = null
+    val showScannerSettingsSheet: Boolean = false,
+    val showSessionSettingsSheet: Boolean = false,
+
 ) {
     val accuracyPercent: Float
         get() = if (expectedCount > 0) {
