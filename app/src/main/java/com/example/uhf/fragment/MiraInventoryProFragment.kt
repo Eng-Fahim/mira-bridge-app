@@ -54,6 +54,13 @@ class MiraInventoryProFragment : Fragment() {
             hwOps = createHardwareBridge()
         )
 
+        // تحميل طاقة الانتينا المحفوظة مسبقاً في القارئ
+        rfidManager?.power?.let { savedPower ->
+            if (savedPower in 5..30) {
+                viewModel.setAntennaPower(savedPower)
+            }
+        }
+
         return ComposeView(ctx).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             isFocusableInTouchMode = true
@@ -109,34 +116,37 @@ class MiraInventoryProFragment : Fragment() {
 
     private fun createHardwareBridge() = object : MiraInventoryViewModel.HardwareOperations {
         override fun applyAntennaPower(powerDbm: Int): Boolean {
-            val mgr = rfidManager ?: return false
-            return try {
-                // استدعاء مرن يدعم setPower أو setAntennaPower في RFIDManager
-                val method = mgr.javaClass.methods.firstOrNull {
-                    (it.name == "setPower" || it.name == "setAntennaPower") && it.parameterTypes.size == 1
-                }
-                val result = method?.invoke(mgr, powerDbm)
-                (result as? Boolean) ?: true
-            } catch (e: Exception) {
-                Log.w(TAG, "applyAntennaPower fallback: ${e.message}")
-                false
-            }
+            return rfidManager?.setPower(powerDbm) ?: false
         }
 
         override fun readTagTidDirect(epc: String): String? {
             val mgr = rfidManager ?: return null
             return try {
-                // استدعاء مرن يدعم readTid(epc) أو readTid() في RFIDManager
-                val withEpc = mgr.javaClass.methods.firstOrNull {
-                    it.name == "readTid" && it.parameterTypes.size == 1
-                }
-                if (withEpc != null) {
-                    withEpc.invoke(mgr, epc) as? String
-                } else {
-                    val noArg = mgr.javaClass.methods.firstOrNull {
+                // 1. المحاولة عبر MiraIRFIDReader إن كانت دالة readTid معرفة فيه
+                val reader = mgr.activeReader
+                if (reader != null) {
+                    val m1 = reader.javaClass.methods.firstOrNull {
+                        it.name == "readTid" && it.parameterTypes.size == 1
+                    }
+                    if (m1 != null) return m1.invoke(reader, epc) as? String
+
+                    val m0 = reader.javaClass.methods.firstOrNull {
                         it.name == "readTid" && it.parameterTypes.isEmpty()
                     }
-                    noArg?.invoke(mgr) as? String
+                    if (m0 != null) return m0.invoke(reader) as? String
+                }
+
+                // 2. القراءة المباشرة من Chainway SDK (Bank_TID, ptr=0, len=6 words = 12 bytes)
+                val rawSdk = mgr.rawSdkReader
+                if (rawSdk != null) {
+                    rawSdk.readData(
+                        "00000000",
+                        com.rscja.deviceapi.RFIDWithUHFUART.Bank_TID,
+                        0,
+                        6
+                    )
+                } else {
+                    null
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "readTagTidDirect error: ${e.message}")
@@ -146,7 +156,6 @@ class MiraInventoryProFragment : Fragment() {
 
         override fun playGeigerTick(proximityPercent: Int) {
             val now = SystemClock.elapsedRealtime()
-            // كلما اقتربت القطعة (proximity أعلى)، زاد تردد النبضة الصوتية
             val intervalMs = (600L - (proximityPercent * 5L)).coerceIn(90L, 600L)
             if (now - lastGeigerBeepMs >= intervalMs) {
                 lastGeigerBeepMs = now
