@@ -25,7 +25,7 @@ import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.utils.MiraExecutorService;
-import com.example.uhf.manager.PermissionsSync;
+import com.example.uhf.manager.PermissionSyncManager;
 import com.example.uhf.network.NetworkClient;
 
 import java.util.concurrent.CountDownLatch;
@@ -74,7 +74,7 @@ public class MiraApplication extends AppContext {
 
     private volatile InventoryDatabase inventoryDatabase;
     private volatile NetworkClient networkClient;
-    private volatile PermissionsSync permissionsSync;
+    private volatile PermissionSyncManager PermissionSyncManager;
     private int startedActivitiesCount = 0;
 
     private final AtomicBoolean isRestarting = new AtomicBoolean(false);
@@ -112,7 +112,7 @@ registerActivityLifecycleCallbacks(
             try {
                 SessionManager sm = new SessionManager(MiraApplication.this);
                 if (sm.isLoggedIn()) {
-                    getPermissionsSync().startPolling();
+                    getPermissionSyncManager().startPolling();
                 }
             } catch (Throwable t) {
                 Log.e(TAG, "Failed to start permissions polling", t);
@@ -124,8 +124,8 @@ registerActivityLifecycleCallbacks(
             startedActivitiesCount = Math.max(0, startedActivitiesCount - 1);
             if (startedActivitiesCount == 0) {
                 try {
-                    if (permissionsSync != null) {
-                        permissionsSync.stopPolling();
+                    if (PermissionSyncManager != null) {
+                        PermissionSyncManager.stopPolling();
                     }
                 } catch (Throwable t) {
                     Log.e(TAG, "Failed to stop permissions polling", t);
@@ -412,7 +412,7 @@ private void applySavedTheme() {
             PermissionManager permissionManager = PermissionManager.getInstance(appContext);
 
             // ✅ تهيئة الشبكة ومزامنة الصلاحيات
-            PermissionsSync sync = getPermissionsSync();
+            PermissionSyncManager sync = getPermissionSyncManager();
             if (sessionManager.isLoggedIn()) {
                 sync.checkNow(null);
             }
@@ -482,14 +482,14 @@ private void applySavedTheme() {
     }
 
     @NonNull
-    public PermissionsSync getPermissionsSync() {
-        PermissionsSync local = permissionsSync;
+    public PermissionSyncManager getPermissionSyncManager() {
+        PermissionSyncManager local = PermissionSyncManager;
         if (local == null) {
             synchronized (this) {
-                local = permissionsSync;
+                local = PermissionSyncManager;
                 if (local == null) {
-                    local = PermissionsSync.getInstance(getApplicationContext(), getNetworkClient());
-                    permissionsSync = local;
+                    local = PermissionSyncManager.getInstance(getApplicationContext(), getNetworkClient());
+                    PermissionSyncManager = local;
                 }
             }
         }
