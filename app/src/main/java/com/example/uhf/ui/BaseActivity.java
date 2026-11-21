@@ -6,19 +6,19 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.uhf.application.MiraApplication;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.manager.PermissionsSync;
+import com.example.uhf.manager.PermissionSyncManager;
 
 public abstract class BaseActivity extends AppCompatActivity
         implements PermissionManager.OnPermissionsChangedListener {
 
     protected PermissionManager permissionManager;
-    protected PermissionsSync permissionsSync;
+    protected PermissionSyncManager PermissionSyncManager;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         permissionManager = PermissionManager.getInstance(this);
-        permissionsSync   = MiraApplication.getInstance().getPermissionsSync();
+        PermissionSyncManager   = MiraApplication.getInstance().getPermissionSyncManager();
     }
 
     @Override
@@ -26,14 +26,14 @@ public abstract class BaseActivity extends AppCompatActivity
         super.onResume();
         permissionManager.addListener(this);
         enforceFragmentAccess();
-        permissionsSync.startPolling();
-        permissionsSync.onResumeCheck();
+        PermissionSyncManager.startPolling();
+        PermissionSyncManager.onResumeCheck();
     }
 
     @Override
     protected void onPause() {
         permissionManager.removeListener(this);
-        permissionsSync.stopPolling();
+        PermissionSyncManager.stopPolling();
         super.onPause();
     }
 
