@@ -311,7 +311,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         try {
             when (status) {
                 ItemAuditStatus.MATCHED -> sm.playBeep(SoundManager.FeedbackType.KNOWN_ITEM)
-                ItemAuditStatus.WRONG_CATEGORY -> sm.playBeep(SoundManager.FeedbackType.WARNING)
+                ItemAuditStatus.WRONG_CATEGORY -> sm.playBeep(SoundManager.FeedbackType.ERROR)
                 ItemAuditStatus.UNCATALOGUED -> sm.playBeep(SoundManager.FeedbackType.UNKNOWN_ITEM)
                 else -> Unit
             }
