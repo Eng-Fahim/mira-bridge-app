@@ -16,6 +16,7 @@ import com.example.uhf.manager.inventory.InventorySessionManager
 import com.example.uhf.model.InventoryItem
 import com.example.uhf.model.InventoryReport
 import com.example.uhf.model.ScannedItemDisplay
+import com.example.uhf.utils.MiraUhfSoundEngine
 import com.example.uhf.utils.SoundManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,6 +60,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     private var apiClient: MiraApiClient? = null
     private var branchesManager: MiraBranchesManager? = null
     private var soundManager: SoundManager? = null
+    private var uhfSoundEngine: MiraUhfSoundEngine? = null
     private var rfidManager: RFIDManager? = null
 
     private val processingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -107,6 +109,11 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             this.rfidManager = rfid
             this.hardwareOps = hwOps
             if (rfid != null) scanController.attachRfidManager(rfid)
+            // إعادة تحديث الكتالوج عند العودة للشاشة إذا كان فارغاً أو تغير الفرع
+            val currentBranch = branches?.activeBranchId ?: _uiState.value.branchId
+            if (fullCatalog.isEmpty() || currentBranch != _uiState.value.branchId) {
+                loadCatalog(checkRestoreAfterLoad = false)
+            }
             return
         }
         initialized = true
@@ -114,6 +121,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         this.apiClient = api
         this.branchesManager = branches
         this.soundManager = sound
+        this.uhfSoundEngine = MiraUhfSoundEngine()
         this.rfidManager = rfid
         this.hardwareOps = hwOps
 
@@ -124,10 +132,10 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         persistenceManager = InventoryPersistenceManager(appCtx, isArabic, ioExecutor)
 
         val sessionId = "SESS-${UUID.randomUUID().toString().take(8).uppercase(Locale.US)}"
-        inventoryEngine = MiraInventoryEngine(appCtx, sessionId, persistenceManager.getDeviceId())
+        inventoryEngine = MiraInventoryEngine(appCtx, sessionId, persistenceManager.deviceId)
 
         scanController.setInventoryEngine(inventoryEngine)
-        if (sound != null) scanController.setSoundManager(sound)
+        // نستخدم MiraUhfSoundEngine المدمج بدلاً من أصوات SoundManager القديمة لمنع التداخل والإزعاج
         if (rfid != null) scanController.attachRfidManager(rfid)
 
         val categories = if (isArabic) {
@@ -136,7 +144,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             listOf("", "24K", "22K", "21K", "18K", "14K", "BULLION", "OUNCE", "SILVER", "DIAMOND", "OTHER")
         }
 
-        val branchId = branches?.getActiveBranchId() ?: 0
+        val branchId = branches?.activeBranchId ?: 0
         _uiState.update {
             it.copy(
                 isArabic = isArabic,
@@ -181,6 +189,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
             override fun onTagDebounced(epc: String) {
                 readsInCurrentSecond.incrementAndGet()
+                uhfSoundEngine?.playDuplicateTick()
                 // تحديث رادار التتبع إن كان مفتوحاً لهذه القطعة
                 val radar = _uiState.value.radarTarget
                 if (radar != null && radar.epc.equals(epc, ignoreCase = true)) {
@@ -295,6 +304,9 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                 persistenceManager.currentUserId,
                 branchId
             )
+        } else {
+            // نبضة صوتية خفيفة جداً لتأكيد استمرار القراءة دون إزعاج
+            uhfSoundEngine?.playDuplicateTick()
         }
 
         // تحديث رادار التتبع المباشر للقطعة المفقودة
@@ -307,16 +319,16 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private fun playFeedbackForStatus(status: ItemAuditStatus) {
-        val sm = soundManager ?: return
+        val engine = uhfSoundEngine ?: return
         try {
             when (status) {
-                ItemAuditStatus.MATCHED -> sm.playBeep(SoundManager.FeedbackType.KNOWN_ITEM)
-                ItemAuditStatus.WRONG_CATEGORY -> sm.playBeep(SoundManager.FeedbackType.ERROR)
-                ItemAuditStatus.UNCATALOGUED -> sm.playBeep(SoundManager.FeedbackType.UNKNOWN_ITEM)
+                ItemAuditStatus.MATCHED -> engine.playMatchTick()
+                ItemAuditStatus.WRONG_CATEGORY -> engine.playAlertChirp()
+                ItemAuditStatus.UNCATALOGUED -> engine.playAlertChirp()
                 else -> Unit
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Sound feedback error: ${e.message}")
+            Log.w(TAG, "UHF Sound feedback error: ${e.message}")
         }
     }
 
@@ -342,7 +354,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                     }
                     secondCounterMs = 0L
 
-                    // حفظ تلقائي دوري أثناء المسح الطويل
                     val now = SystemClock.elapsedRealtime()
                     if (scanning && now - lastAutoSaveMs >= AUTO_SAVE_INTERVAL_MS) {
                         lastAutoSaveMs = now
@@ -370,7 +381,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         var expectedWeight = 0.0
         var scannedValue = 0.0
 
-        val karatMap = LinkedHashMap<String, Triple<Int, Int, Double>>() // karat -> (matched, expected, weight)
+        val karatMap = LinkedHashMap<String, Triple<Int, Int, Double>>()
         val filteredList = ArrayList<InventoryDisplayRow>(rowsByEpc.size)
 
         for (row in rowsByEpc.values) {
@@ -419,7 +430,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             }
         }
 
-        // ترتيب ذكي: المقروء حديثاً أولاً، ثم خارج الفئة، ثم المفقود
         filteredList.sortWith(
             compareBy<InventoryDisplayRow> {
                 when (it.status) {
@@ -459,46 +469,255 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    // ==================== تحميل الكتالوج وإدارة الفئات ====================
+    // ==================== تحميل الكتالوج وإدارة الفئات (مع دعم كامل لجدول jewelry_items) ====================
 
     fun loadCatalog(checkRestoreAfterLoad: Boolean = false) {
         val api = apiClient ?: return
         val branches = branchesManager ?: return
+        val activeBranchId = branches.activeBranchId
 
-        _uiState.update { it.copy(isCatalogLoading = true, catalogError = null) }
+        _uiState.update {
+            it.copy(
+                isCatalogLoading = true,
+                catalogError = null,
+                branchId = activeBranchId
+            )
+        }
 
         ioExecutor.execute {
             catalogManager.fetchCatalog(api, branches, object : InventoryCatalogManager.CatalogCallback {
                 override fun onCatalogLoaded(catalog: MutableMap<String, InventoryItem>) {
-                    fullCatalog.clear()
-                    catalog.forEach { (k, v) ->
-                        fullCatalog[InventoryItem.normalizeEpc(k)] = v
+                    if (catalog.isNotEmpty()) {
+                        val cleaned = LinkedHashMap<String, InventoryItem>()
+                        catalog.forEach { (k, v) ->
+                            val norm = InventoryItem.normalizeEpc(k)
+                            if (norm.isNotEmpty()) {
+                                cleaned[norm] = v.apply {
+                                    if (karat.isNullOrBlank()) karat = "21K"
+                                }
+                            }
+                        }
+                        if (cleaned.isNotEmpty()) {
+                            applyLoadedCatalogSuccess(cleaned, activeBranchId, checkRestoreAfterLoad)
+                            return
+                        }
                     }
-                    scanController.setBarcodeToEpcMap(catalogManager.barcodeToEpcMap)
-                    applyCategoryFilter(_uiState.value.selectedCategory, preserveScanned = true)
 
-                    _uiState.update {
-                        it.copy(
-                            isCatalogLoading = false,
-                            catalogError = null,
-                            branchId = branches.activeBranchId
-                        )
-                    }
-
-                    if (checkRestoreAfterLoad) {
-                        checkPendingSessionRestore()
-                    }
+                    // إذا عاد InventoryCatalogManager بقائمة فارغة بسبب اختلاف أسماء الأعمدة في jewelry_items
+                    Log.w(TAG, "Primary catalog empty for branch=$activeBranchId, running jewelry_items smart parser...")
+                    fetchCatalogSmartFallback(api, activeBranchId, null, checkRestoreAfterLoad)
                 }
 
                 override fun onError(error: String) {
+                    Log.w(TAG, "Primary catalog error ($error), trying jewelry_items smart fallback...")
+                    fetchCatalogSmartFallback(api, activeBranchId, error, checkRestoreAfterLoad)
+                }
+            })
+        }
+    }
+
+    /**
+     * قارئ احتياطي مباشر يطابق أسماء أعمدة جدول jewelry_items الفعلية:
+     * (rfid_epc, item_title, gold_karat, net_weight_grams, gross_weight_grams, retail_price_usd, vault_status, barcode, serial_no)
+     */
+    private fun fetchCatalogSmartFallback(
+        api: MiraApiClient,
+        branchId: Int,
+        primaryError: String?,
+        checkRestoreAfterLoad: Boolean
+    ) {
+        try {
+            val responses = listOfNotNull(
+                runCatching { api.getInventoryExpectedCatalog(branchId, "") }.getOrNull(),
+                runCatching { api.getBranchItemsListWithLongTimeout(branchId) }.getOrNull(),
+                runCatching { api.getMyBranchInventoryItems("") }.getOrNull()
+            )
+
+            val parsedMap = LinkedHashMap<String, InventoryItem>()
+            val barcodeMap = HashMap<String, String>()
+            var lastError = primaryError
+
+            for (resp in responses) {
+                if (!resp.isSuccess) {
+                    if (!resp.error.isNullOrBlank()) lastError = resp.error
+                    continue
+                }
+                val root = resp.data ?: continue
+                val itemsArray = extractJewelryItemsArray(root) ?: continue
+
+                for (i in 0 until itemsArray.length()) {
+                    val obj = itemsArray.optJSONObject(i) ?: continue
+
+                    // التحقق من حالة القطعة (نستبعد المباع أو المرتجع أو المحذوف)
+                    val vaultStatus = obj.optString(
+                        "vault_status",
+                        obj.optString("status", "in_stock")
+                    ).trim().lowercase(Locale.US)
+
+                    if (vaultStatus in setOf("sold", "returned", "deleted", "transferred", "melted", "scrap")) {
+                        continue
+                    }
+
+                    // التحقق من الفرع إن وُجد في السجل وكان branchId محدداً (> 0)
+                    val itemBranchId = obj.optInt("branch_id", branchId)
+                    if (branchId > 0 && itemBranchId > 0 && itemBranchId != branchId) {
+                        continue
+                    }
+
+                    // استخراج رمز RFID EPC من جميع المسميات المحتملة
+                    val rawEpc = firstNonBlank(
+                        obj,
+                        "rfid_epc", "epc", "tag_epc", "uid", "rfid"
+                    )
+                    val normEpc = InventoryItem.normalizeEpc(rawEpc)
+                    if (normEpc.isEmpty()) continue
+
+                    val title = firstNonBlank(
+                        obj,
+                        "item_title", "title", "name", "item_name", "description"
+                    ).ifBlank { if (isArabic) "قطعة مجوهرات" else "Jewelry Item" }
+
+                    val rawKarat = firstNonBlank(
+                        obj,
+                        "gold_karat", "karat", "purity_code", "purity"
+                    )
+                    val formattedKarat = normalizeKaratLabel(rawKarat)
+
+                    val weight = firstPositiveDouble(
+                        obj,
+                        "net_weight_grams", "gross_weight_grams", "weight_grams", "weight", "net_weight", "gross_weight"
+                    )
+
+                    val price = firstPositiveDouble(
+                        obj,
+                        "retail_price_usd", "selling_price", "price_usd", "price", "estimated_value", "total_price"
+                    )
+
+                    val barcode = firstNonBlank(obj, "barcode", "gtin", "sku", "item_code")
+                    val serial = firstNonBlank(obj, "serial_no", "serial", "id")
+                    val category = firstNonBlank(obj, "category", "item_type", "type", "gold_karat")
+
+                    val item = InventoryItem().apply {
+                        this.epc = normEpc
+                        this.title = title
+                        this.karat = formattedKarat
+                        this.weight = weight
+                        this.price = price
+                        this.gtin = barcode
+                        this.serial = serial
+                        this.category = category
+                    }
+
+                    parsedMap[normEpc] = item
+                    if (barcode.isNotBlank()) {
+                        barcodeMap[barcode.trim()] = normEpc
+                    }
+                }
+
+                if (parsedMap.isNotEmpty()) break
+            }
+
+            if (parsedMap.isNotEmpty()) {
+                scanController.setBarcodeToEpcMap(barcodeMap)
+                applyLoadedCatalogSuccess(parsedMap, branchId, checkRestoreAfterLoad)
+            } else {
+                // إذا نجح الاتصال بالسيرفر فعلاً (HTTP 200) ولكن الفرع لا يحتوي قطعاً معرف عليها EPC
+                val anyHttp200 = responses.any { it.isSuccess }
+                if (anyHttp200) {
+                    applyLoadedCatalogSuccess(emptyMap(), branchId, checkRestoreAfterLoad)
+                } else {
                     _uiState.update {
                         it.copy(
                             isCatalogLoading = false,
-                            catalogError = error
+                            catalogError = lastError ?: if (isArabic) "تعذر تحميل مخزون الفرع" else "Failed to load branch catalog"
                         )
                     }
                 }
-            })
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchCatalogSmartFallback error: ${e.message}", e)
+            _uiState.update {
+                it.copy(
+                    isCatalogLoading = false,
+                    catalogError = e.message ?: primaryError
+                )
+            }
+        }
+    }
+
+    private fun applyLoadedCatalogSuccess(
+        loadedMap: Map<String, InventoryItem>,
+        branchId: Int,
+        checkRestoreAfterLoad: Boolean
+    ) {
+        fullCatalog.clear()
+        fullCatalog.putAll(loadedMap)
+
+        if (catalogManager.barcodeToEpcMap.isNotEmpty()) {
+            scanController.setBarcodeToEpcMap(catalogManager.barcodeToEpcMap)
+        }
+
+        applyCategoryFilter(_uiState.value.selectedCategory, preserveScanned = true)
+
+        _uiState.update {
+            it.copy(
+                isCatalogLoading = false,
+                catalogError = null,
+                branchId = branchId
+            )
+        }
+
+        if (checkRestoreAfterLoad) {
+            checkPendingSessionRestore()
+        }
+    }
+
+    private fun extractJewelryItemsArray(root: JSONObject): JSONArray? {
+        val candidateKeys = listOf("items", "jewelry_items", "catalog", "expected_items", "data", "records")
+        for (key in candidateKeys) {
+            val arr = root.optJSONArray(key)
+            if (arr != null) return arr
+        }
+        val dataObj = root.optJSONObject("data")
+        if (dataObj != null) {
+            for (key in candidateKeys) {
+                val arr = dataObj.optJSONArray(key)
+                if (arr != null) return arr
+            }
+        }
+        return null
+    }
+
+    private fun firstNonBlank(obj: JSONObject, vararg keys: String): String {
+        for (k in keys) {
+            if (obj.has(k) && !obj.isNull(k)) {
+                val v = obj.optString(k, "").trim()
+                if (v.isNotEmpty() && !v.equals("null", ignoreCase = true)) {
+                    return v
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun firstPositiveDouble(obj: JSONObject, vararg keys: String): Double {
+        for (k in keys) {
+            if (obj.has(k) && !obj.isNull(k)) {
+                val v = obj.optDouble(k, 0.0)
+                if (!v.isNaN() && v > 0.0) return v
+            }
+        }
+        return 0.0
+    }
+
+    private fun normalizeKaratLabel(raw: String): String {
+        val clean = raw.trim()
+        if (clean.isEmpty()) return "—"
+        val digits = clean.replace(Regex("[^0-9.]"), "")
+        return if (digits.isNotEmpty()) {
+            if (isArabic) "عيار $digits" else "${digits}K"
+        } else {
+            clean
         }
     }
 
@@ -519,7 +738,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         val filtered = if (category.isBlank()) {
             fullCatalog
         } else {
-            catalogManager.filterByCategory(fullCatalog, category)
+            fullCatalog.filterValues { item -> matchesCategorySmart(item, category) }
         }
 
         activeTargetCatalog.clear()
@@ -528,7 +747,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         }
         inventoryEngine.setCatalog(activeTargetCatalog)
 
-        // حفظ العناصر التي تم مسحها مسبقاً إذا طُلب ذلك
         val alreadyScanned = if (preserveScanned) {
             rowsByEpc.values.filter { it.status != ItemAuditStatus.MISSING }.associateBy { it.epc }
         } else {
@@ -589,6 +807,37 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         flushSnapshotToUi(force = true)
     }
 
+    private fun matchesCategorySmart(item: InventoryItem, selectedCategory: String): Boolean {
+        val target = selectedCategory.trim().lowercase(Locale.US)
+        if (target.isEmpty()) return true
+
+        val itemKarat = (item.karat ?: "").trim().lowercase(Locale.US)
+        val itemCat = (item.category ?: "").trim().lowercase(Locale.US)
+        val itemTitle = (item.title ?: "").trim().lowercase(Locale.US)
+        val combined = "$itemKarat $itemCat $itemTitle"
+
+        // مطابقة العيارات الرقمية (24, 22, 21, 18, 14) بأي صيغة ("21", "21K", "عيار 21")
+        val targetDigits = target.replace(Regex("[^0-9]"), "")
+        if (targetDigits.isNotEmpty()) {
+            val itemDigits = itemKarat.replace(Regex("[^0-9]"), "")
+            if (itemDigits == targetDigits) return true
+            if (combined.contains(targetDigits)) return true
+            return false
+        }
+
+        return when {
+            target.contains("سبائك") || target.contains("bullion") ->
+                combined.contains("سبيكة") || combined.contains("سبائك") || combined.contains("bullion") || combined.contains("bar")
+            target.contains("أونصة") || target.contains("ounce") ->
+                combined.contains("أونصة") || combined.contains("اونصة") || combined.contains("ounce") || combined.contains("oz")
+            target.contains("فضة") || target.contains("silver") ->
+                combined.contains("فضة") || combined.contains("silver") || combined.contains("925")
+            target.contains("ألماس") || target.contains("diamond") ->
+                combined.contains("ألماس") || combined.contains("الماس") || combined.contains("diamond")
+            else -> combined.contains(target)
+        }
+    }
+
     // ==================== التحكم بالمسح والزناد الفيزيائي ====================
 
     fun toggleScanning() {
@@ -619,7 +868,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun onPhysicalTriggerDown() {
-        // تجاهل الزناد إذا كانت هناك نافذة حوار مفتوحة
         val state = _uiState.value
         if (state.commitReport != null || state.showArchiveSheet) return
 
@@ -687,7 +935,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                 )
             )
         }
-        // تشغيل القارئ تلقائياً إذا لم يكن يعمل لتسهيل البحث الفوري
         if (!_uiState.value.isScanning) {
             startScanning()
         }
@@ -773,10 +1020,8 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         val pending = cachedPendingSession ?: return
         val (itemsJson, _, savedCategory) = pending
 
-        // 1. ضبط الفئة والكتالوج أولاً حتى لا تُفقد بيانات المطابقة!
         applyCategoryFilter(savedCategory, preserveScanned = false)
 
-        // 2. استرجاع القطع الممسوحة ودمجها مع الكتالوج
         for (i in 0 until itemsJson.length()) {
             val obj = itemsJson.optJSONObject(i) ?: continue
             val epc = InventoryItem.normalizeEpc(obj.optString("epc", ""))
@@ -979,8 +1224,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
-    // ==================== أدوات مساعدة ====================
-        // ==================== دوال الربط مع UHFMainActivity ====================
+    // ==================== دوال الربط مع UHFMainActivity ====================
 
     fun getScannedCount(): Int {
         val s = _uiState.value
@@ -1038,12 +1282,13 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             scanController.cleanup()
             persistenceManager.cleanup()
         }
+        uhfSoundEngine?.release()
+        uhfSoundEngine = null
         processingExecutor.shutdownNow()
         ioExecutor.shutdownNow()
     }
-    
-    
-        // ==================== تفاصيل التقرير المؤرشف والطباعة والتصدير ====================
+
+    // ==================== تفاصيل التقرير المؤرشف والطباعة والتصدير ====================
 
     fun openArchiveReportDetails(
         reportId: String,
@@ -1077,7 +1322,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // استدعاء مرن يدعم getInventoryReportDetails أو getAuditReportDetails في MiraApiClient
                 val method = api.javaClass.methods.firstOrNull {
                     (it.name == "getInventoryReportDetails" || it.name == "getAuditReportDetails") &&
                         it.parameterTypes.size == 2
@@ -1091,7 +1335,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                     ) { _, m, args ->
                         when (m.name) {
                             "onSuccess" -> {
-                                val json = args?.firstOrNull() as? org.json.JSONObject
+                                val json = args?.firstOrNull() as? JSONObject
                                 val parsed = parseArchiveDetailsJson(
                                     json = json,
                                     reportId = reportId,
@@ -1126,7 +1370,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                     }
                     method.invoke(api, reportId, proxy)
                 } else {
-                    // بناء ملخص فوري إذا لم تتوفر نقطة نهاية التفاصيل التفصيلية بعد
                     val summaryOnly = ArchiveReportDetails(
                         reportId = reportId,
                         reportCode = fallbackCode,
@@ -1181,7 +1424,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private fun parseArchiveDetailsJson(
-        json: org.json.JSONObject?,
+        json: JSONObject?,
         reportId: String,
         fallbackCode: String,
         fallbackDate: String,
@@ -1194,7 +1437,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         val root = json?.optJSONObject("data") ?: json?.optJSONObject("report") ?: json
         val itemsList = mutableListOf<ArchiveReportItemDetail>()
 
-        fun parseArray(arr: org.json.JSONArray?, defaultStatus: ArchiveItemStatus) {
+        fun parseArray(arr: JSONArray?, defaultStatus: ArchiveItemStatus) {
             if (arr == null) return
             for (i in 0 until arr.length()) {
                 val obj = arr.optJSONObject(i) ?: continue
@@ -1207,11 +1450,11 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                 }
                 itemsList.add(
                     ArchiveReportItemDetail(
-                        epc = obj.optString("epc", obj.optString("tag_epc", "-")),
-                        name = obj.optString("name", obj.optString("item_name", obj.optString("title", "قطعة مجوهرات"))),
-                        karat = obj.optString("karat", obj.optString("purity", "")),
-                        weightGrams = obj.optDouble("weight", obj.optDouble("weight_grams", 0.0)),
-                        estimatedValue = obj.optDouble("price", obj.optDouble("estimated_value", 0.0)),
+                        epc = obj.optString("rfid_epc", obj.optString("epc", obj.optString("tag_epc", "-"))),
+                        name = obj.optString("item_title", obj.optString("name", obj.optString("item_name", obj.optString("title", "قطعة مجوهرات")))),
+                        karat = obj.optString("gold_karat", obj.optString("karat", obj.optString("purity", ""))),
+                        weightGrams = obj.optDouble("net_weight_grams", obj.optDouble("weight", obj.optDouble("weight_grams", 0.0))),
+                        estimatedValue = obj.optDouble("retail_price_usd", obj.optDouble("price", obj.optDouble("estimated_value", 0.0))),
                         status = status
                     )
                 )
@@ -1238,13 +1481,9 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             items = itemsList
         )
     }
-    
+
     // ==================== طباعة وتصدير ملخص الجلسة الحالية ====================
 
-    /**
-     * استدعِ هذه الدالة فور نجاح اعتماد الجرد (أو عند فتح نافذة ملخص الجلسة)
-     * لتثبيت بيانات التقرير برقم المرجع القادم من السيرفر.
-     */
     fun captureCommittedSessionReport(
         serverReportCode: String? = null,
         branchName: String = "",
@@ -1256,10 +1495,10 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         sessionItems: List<ArchiveReportItemDetail> = emptyList()
     ) {
         val s = _uiState.value
-        val now = java.util.Date()
+        val now = Date()
         val autoCode = serverReportCode?.takeIf { it.isNotBlank() }
-            ?: "INV-${java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(now)}"
-        val formattedDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(now)
+            ?: "INV-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(now)}"
+        val formattedDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(now)
 
         val resolvedExpected = if (expectedCount > 0) expectedCount else (s.matchedCount + missingCount)
 
@@ -1295,9 +1534,9 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
     private fun buildFallbackCurrentSessionDetails(): ArchiveReportDetails {
         val s = _uiState.value
-        val now = java.util.Date()
-        val code = "INV-${java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(now)}"
-        val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(now)
+        val now = Date()
+        val code = "INV-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(now)}"
+        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(now)
 
         return ArchiveReportDetails(
             reportId = code,
