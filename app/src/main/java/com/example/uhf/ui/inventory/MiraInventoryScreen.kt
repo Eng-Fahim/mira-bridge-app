@@ -275,6 +275,13 @@ fun MiraInventoryScreen(
         // نافذة أرشيف جلسات الجرد السابقة
                 if (state.showArchiveSheet) {
             val context = androidx.compose.ui.platform.LocalContext.current
+            SessionReportExportActions(
+            isArabic = state.isArabic,
+            reportCode = state.lastCommittedReportDetails?.reportCode,
+            onPrintPdf = { viewModel.printCurrentSessionReport(context) },
+            onExportCsv = { viewModel.exportCurrentSessionReportCsv(context) }
+            )
+
             ModalBottomSheet(
                 onDismissRequest = {
                     viewModel.closeArchiveReportDetails()
@@ -2106,6 +2113,95 @@ private fun ArchiveReportsSheetContent(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SessionReportExportActions(
+    isArabic: Boolean,
+    reportCode: String?,
+    onPrintPdf: () -> Unit,
+    onExportCsv: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MiraPalette.NavyDeep,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MiraPalette.GoldPrimary.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isArabic) "تصدير وطباعة تقرير الاعتماد" else "Export & Print Audit Report",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MiraPalette.GoldPrimary
+                )
+                if (!reportCode.isNullOrBlank()) {
+                    Text(
+                        text = "#$reportCode",
+                        fontSize = 11.sp,
+                        color = MiraPalette.TextSecondary
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onPrintPdf,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MiraPalette.GoldPrimary,
+                        contentColor = MiraPalette.NavyDeep
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Print,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (isArabic) "طباعة / PDF" else "Print / PDF",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onExportCsv,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.FileDownload,
+                        contentDescription = null,
+                        tint = MiraPalette.GoldPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (isArabic) "تصدير CSV" else "Export CSV",
+                        color = MiraPalette.GoldPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
