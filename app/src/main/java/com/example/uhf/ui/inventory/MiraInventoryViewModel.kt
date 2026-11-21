@@ -596,17 +596,18 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                     val barcode = firstNonBlank(obj, "barcode", "gtin", "sku", "item_code")
                     val serial = firstNonBlank(obj, "serial_no", "serial", "id")
                     val category = firstNonBlank(obj, "category", "item_type", "type", "gold_karat")
-
-                    val item = InventoryItem().apply {
-                        this.epc = normEpc
-                        this.title = title
-                        this.karat = formattedKarat
-                        this.weight = weight
-                        this.price = price
-                        this.gtin = barcode
-                        this.serial = serial
-                        this.category = category
-                    }
+                    
+                val item = InventoryItem(
+                    normEpc,
+                    barcode,
+                    serial,
+                    title,
+                    formattedKarat
+                    ).apply {
+                    this.weight = weight
+                    this.price = price
+                    this.category = category
+                }
 
                     parsedMap[normEpc] = item
                     if (barcode.isNotBlank()) {
@@ -807,14 +808,16 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         flushSnapshotToUi(force = true)
     }
 
+
     private fun matchesCategorySmart(item: InventoryItem, selectedCategory: String): Boolean {
         val target = selectedCategory.trim().lowercase(Locale.US)
         if (target.isEmpty()) return true
-
+        
         val itemKarat = (item.karat ?: "").trim().lowercase(Locale.US)
         val itemCat = (item.category ?: "").trim().lowercase(Locale.US)
         val itemTitle = (item.title ?: "").trim().lowercase(Locale.US)
         val combined = "$itemKarat $itemCat $itemTitle"
+
 
         // مطابقة العيارات الرقمية (24, 22, 21, 18, 14) بأي صيغة ("21", "21K", "عيار 21")
         val targetDigits = target.replace(Regex("[^0-9]"), "")
