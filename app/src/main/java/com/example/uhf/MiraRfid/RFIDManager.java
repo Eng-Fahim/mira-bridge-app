@@ -789,6 +789,27 @@ private void applyMiraReaderSettingsWithRetry(int attempt) {
     }
 }
 
+    /**
+     * ضبط الجلسة S1 والهدف A لمنع تكرار قراءة الشرائح القريبة وحجب البعيدة في صواني المجوهرات
+     */
+    public boolean configureDenseJewelrySession() {
+        try {
+            com.rscja.deviceapi.RFIDWithUHFUART reader = getRawSdkReader();
+            if (reader == null) return false;
+
+            com.rscja.deviceapi.entity.Gen2Entity gen2 = reader.getGen2();
+            if (gen2 == null) {
+                gen2 = new com.rscja.deviceapi.entity.Gen2Entity();
+            }
+            gen2.setQuerySession(1); // Session S1
+            gen2.setQueryTarget(0);  // Target A
+            return reader.setGen2(gen2);
+        } catch (Throwable t) {
+            android.util.Log.w("RFIDManager", "configureDenseJewelrySession skipped: " + t.getMessage());
+            return false;
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  ✅ [v4.0.2] Backward-Compatibility Layer
     // ═══════════════════════════════════════════════════════════
