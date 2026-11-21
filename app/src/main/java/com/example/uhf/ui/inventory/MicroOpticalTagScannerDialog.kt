@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,7 +71,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -82,6 +82,7 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import kotlinx.coroutines.delay
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -130,7 +131,10 @@ fun MicroOpticalTagScannerDialog(
             val pv = previewViewRef ?: continue
             if (pv.width > 0 && pv.height > 0) {
                 val point = pv.meteringPointFactory.createPoint(pv.width / 2f, pv.height / 2f)
-                val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                val action = FocusMeteringAction.Builder(
+                    point,
+                    FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+                )
                     .setAutoCancelDuration(2, TimeUnit.SECONDS)
                     .build()
                 runCatching { cam.cameraControl.startFocusAndMetering(action) }
@@ -303,7 +307,6 @@ fun MicroOpticalTagScannerDialog(
                             val corner = 20.dp.toPx()
                             val gold = Color(0xFFD4AF37)
 
-                            // زوايا ذهبية دقيقة
                             drawLine(gold, Offset(0f, 0f), Offset(corner, 0f), stroke, StrokeCap.Round)
                             drawLine(gold, Offset(0f, 0f), Offset(0f, corner), stroke, StrokeCap.Round)
 
@@ -353,7 +356,7 @@ fun MicroOpticalTagScannerDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = String.format(java.util.Locale.US, "%.1fx", zoomRatio),
+                            text = String.format(Locale.US, "%.1fx", zoomRatio),
                             color = Color(0xFFD4AF37),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
