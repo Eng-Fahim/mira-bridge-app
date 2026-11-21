@@ -7,7 +7,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-// ✅ استيرادات مطلوبة لـ addListener/removeListener
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -15,12 +14,14 @@ import com.example.uhf.MiraRfid.model.RFIDDevice;
 import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.example.uhf.tools.DeviceDetector;
 import com.rscja.deviceapi.RFIDWithUHFUART;
+import com.rscja.deviceapi.entity.Gen2Entity;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,17 +29,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  RFIDManager v4.0.2 — State Machine + Backward Compatibility (Fixed)
+ *  RFIDManager v4.1.0 — State Machine + Dense Jewelry Session S1 + Backward Compatibility
  * ═══════════════════════════════════════════════════════════════════════════
- *
- * [v4.0.2] إصلاحات:
- *   ✅ startScan() no-arg — تُعيد boolean (للتوافق مع HardwareManager)
- *
- * [v4.0.1] طبقة التوافق العكسي:
- *   ✅ addListener / removeListener
- *   ✅ startScan(ReadyCallback) / startScan() / stopScan()
- *   ✅ release() / reset()
- *   ✅ testConnection / waitForReaderReady / isRealReaderConnected
  */
 public class RFIDManager {
 
@@ -79,8 +71,9 @@ public class RFIDManager {
         if (instance == null) {
             synchronized (RFIDManager.class) {
                 if (instance == null) {
-                    instance = new RFIDManager(context.getApplicationContext());
-                    RFIDReaderFactory.init(context);
+                    Context appCtx = context.getApplicationContext();
+                    instance = new RFIDManager(appCtx);
+                    RFIDReaderFactory.init(appCtx);
                 }
             }
         }
@@ -107,11 +100,9 @@ public class RFIDManager {
     private final List<StateListener> stateListeners =
             new CopyOnWriteArrayList<>();
 
-    // ✅ مستمعون متعددون
     private final List<MiraIRFIDReader.OnTagReadListener> tagReadListeners =
             new CopyOnWriteArrayList<>();
 
-    // ✅ مستمع مركّب — يُوزّع الأحداث على كل المستمعين
     private final MiraIRFIDReader.OnTagReadListener compositeListener =
             new MiraIRFIDReader.OnTagReadListener() {
         @Override
@@ -153,6 +144,7 @@ public class RFIDManager {
 
     private volatile MiraIRFIDReader activeReader;
     private volatile RFIDDevice activeDevice;
+    private volatile boolean denseJewelrySessionActive = false;
 
     private RFIDManager(Context context) {
         this.context = context;
@@ -175,15 +167,11 @@ public class RFIDManager {
         return state.get() == State.SCANNING;
     }
 
-    /**
-     * ✅ نقطة الدخول الرئيسية — غير حاجبة، idempotent.
-     */
     public void ensureReady(ReadyCallback callback) {
         if (callback == null) return;
 
         State current = state.get();
 
-        // ✅ جاهز بالفعل
         if (current == State.READY || current == State.SCANNING) {
             MiraIRFIDReader reader = activeReader;
             if (reader != null) {
@@ -195,14 +183,12 @@ public class RFIDManager {
             current = State.UNINITIALIZED;
         }
 
-        // ✅ التهيئة جارية
         if (current == State.INITIALIZING) {
             Log.d(TAG, "⏳ Init in progress — queueing callback");
             pendingReadyCallbacks.add(callback);
             return;
         }
 
-        // ✅ ابدأ التهيئة
         Log.i(TAG, "🚀 Starting initialization (state=" + current + ")");
         pendingReadyCallbacks.add(callback);
 
@@ -222,9 +208,6 @@ public class RFIDManager {
         initExecutor.execute(this::runInitialization);
     }
 
-    /**
-     * ✅ نسخة متزامنة — للخيوط الخلفية فقط.
-     */
     public boolean ensureReadySync(long timeoutMs) {
         if (isReady()) return true;
 
@@ -288,6 +271,41 @@ public class RFIDManager {
         }
     }
 
+    /**
+     * ضبط الجلسة S1 والهدف A لمنع تداخل الشرائح المتلاصقة في صواني المجوهرات
+     * وتثبيتها تلقائياً حتى لو تأخرت تهيئة الـ SDK.
+     */
+    public boolean configureDenseJewelrySession() {
+        denseJewelrySessionActive = true;
+        return applyGen2SessionS1TargetA();
+    }
+
+    public void clearDenseJewelrySession() {
+        denseJewelrySessionActive = false;
+    }
+
+    private boolean applyGen2SessionS1TargetA() {
+        try {
+            RFIDWithUHFUART reader = getRawSdkReader();
+            if (reader == null) return false;
+
+            Gen2Entity gen2 = reader.getGen2();
+            if (gen2 == null) {
+                gen2 = new Gen2Entity();
+            }
+            gen2.setQuerySession(1); // Session S1
+            gen2.setQueryTarget(0);  // Target A
+            boolean applied = reader.setGen2(gen2);
+            if (applied) {
+                Log.i(TAG, "✅ Dense Jewelry Gen2 applied: Session S1 / Target A");
+            }
+            return applied;
+        } catch (Throwable t) {
+            Log.w(TAG, "applyGen2SessionS1TargetA skipped: " + t.getMessage());
+            return false;
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  🔧 التنفيذ الداخلي
     // ═══════════════════════════════════════════════════════════
@@ -328,38 +346,34 @@ public class RFIDManager {
             }
         }
 
-        // ✅ اربط المستمع المركّب
-    activeReader.setOnTagReadListener(compositeListener);
+        activeReader.setOnTagReadListener(compositeListener);
 
-    if (!activeReader.isConnected()) {
-        Log.i(TAG, "🔧 Calling reader.initialize()...");
-        if (!activeReader.initialize()) {
-            Log.e(TAG, "❌ initialize() failed");
-            return false;
+        if (!activeReader.isConnected()) {
+            Log.i(TAG, "🔧 Calling reader.initialize()...");
+            if (!activeReader.initialize()) {
+                Log.e(TAG, "❌ initialize() failed");
+                return false;
+            }
+
+            Log.i(TAG, "🔧 Calling reader.connect()...");
+            if (!activeReader.connect()) {
+                Log.e(TAG, "❌ connect() failed");
+                return false;
+            }
         }
 
-        Log.i(TAG, "🔧 Calling reader.connect()...");
-        if (!activeReader.connect()) {
-            Log.e(TAG, "❌ connect() failed");
-            return false;
+        try {
+            int power = MiraReaderSettings.getInstance(context).getPowerDbm();
+            activeReader.setPower(power);
+            Log.i(TAG, "✅ [B1] Power applied: " + power + " dBm");
+        } catch (Exception e) {
+            Log.w(TAG, "⚠️ [B1] Power apply failed: " + e.getMessage());
         }
-    }
 
-    // ✅ [Fix-B1] طبّق Power فوراً — مضمون عبر MiraIRFIDReader interface
-    try {
-        int power = MiraReaderSettings.getInstance(context).getPowerDbm();
-        activeReader.setPower(power);
-        Log.i(TAG, "✅ [B1] Power applied: " + power + " dBm");
-    } catch (Exception e) {
-        Log.w(TAG, "⚠️ [B1] Power apply failed: " + e.getMessage());
-    }
+        applyMiraReaderSettingsWithRetry(0);
 
-    // ✅ [Fix-B1] طبّق باقي الإعدادات (Frequency/Miller/Q/Session/RFLink)
-    // يعيد المحاولة إذا raw SDK لم يكن جاهزاً بعد
-    applyMiraReaderSettingsWithRetry(0);
-
-    Log.i(TAG, "✅ Initialization SUCCESS");
-    return true;
+        Log.i(TAG, "✅ Initialization SUCCESS");
+        return true;
     }
 
     private void onInitializationComplete(boolean success) {
@@ -377,7 +391,7 @@ public class RFIDManager {
 
         for (ReadyCallback cb : queue) {
             if (success) safeOnReady(cb, reader);
-            else        safeOnError(cb, "فشل تهيئة القارئ");
+            else         safeOnError(cb, "فشل تهيئة القارئ");
         }
     }
 
@@ -402,7 +416,6 @@ public class RFIDManager {
     //  📡 Scan API
     // ═══════════════════════════════════════════════════════════
 
-    /** ✅ إضافة مستمع — لا يستبدل الموجودين */
     public void addListener(@NonNull MiraIRFIDReader.OnTagReadListener listener) {
         if (listener == null) return;
         if (!tagReadListeners.contains(listener)) {
@@ -412,7 +425,6 @@ public class RFIDManager {
         ensureCompositeAttached();
     }
 
-    /** ✅ إزالة مستمع */
     public void removeListener(@Nullable MiraIRFIDReader.OnTagReadListener listener) {
         if (listener == null) return;
         if (tagReadListeners.remove(listener)) {
@@ -420,22 +432,13 @@ public class RFIDManager {
         }
     }
 
-    /**
-     * ✅ توافق عكسي — يستبدل كل المستمعين بمستمع واحد.
-     * @deprecated استخدم addListener/removeListener
-     */
-    /**
- * ✅ [v4.0.3] setListener — نسخة آمنة
- *    لم تعد تمسح المستمعين الآخرين.
- *    أُبقيت فقط للتوافق العكسي.
- */
-@Deprecated
-public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
-    if (listener != null) {
-        addListener(listener);   // ✅ آمن
-        Log.d(TAG, "⚠️ Deprecated setListener → delegated to addListener");
+    @Deprecated
+    public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
+        if (listener != null) {
+            addListener(listener);
+            Log.d(TAG, "⚠️ Deprecated setListener → delegated to addListener");
+        }
     }
-}
 
     private void ensureCompositeAttached() {
         if (activeReader != null) {
@@ -443,10 +446,6 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         }
     }
 
-    /**
-     * ✅ startScan — النسخة الحديثة (callback-based).
-     *    يضمن الجاهزية ثم يبدأ المسح.
-     */
     public void startScan(final ReadyCallback callback) {
         if (callback == null) return;
         ensureReady(new ReadyCallback() {
@@ -454,6 +453,9 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
                 if (!state.compareAndSet(State.READY, State.SCANNING)) {
                     safeOnError(callback, "الحالة ليست READY");
                     return;
+                }
+                if (denseJewelrySessionActive) {
+                    applyGen2SessionS1TargetA();
                 }
                 boolean ok;
                 try {
@@ -475,15 +477,6 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         });
     }
 
-    /**
-     * ✅ [v4.0.2] startScan() — النسخة القديمة.
-     *
-     * تُعيد:
-     *   - true  → القارئ كان جاهزاً، وبدأ المسح.
-     *   - false → لم يكن جاهزاً (سيبدأ تلقائياً عند الجاهزية).
-     *
-     * @deprecated استخدم startScan(ReadyCallback)
-     */
     @Deprecated
     public boolean startScan() {
         boolean wasReady = isReady();
@@ -510,9 +503,6 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         }
     }
 
-    /**
-     * ✅ reset — للاختبارات ولإعادة التهيئة القسرية.
-     */
     public void reset() {
         stopScan();
         if (activeReader != null) {
@@ -522,8 +512,8 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         }
         activeDevice = null;
         pendingReadyCallbacks.clear();
-        state.set(State.UNINITIALIZED);
-        notifyStateChanged(State.READY, State.UNINITIALIZED);
+        State old = state.getAndSet(State.UNINITIALIZED);
+        notifyStateChanged(old, State.UNINITIALIZED);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -557,7 +547,6 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
             return activeDevice;
         }
 
-        // لا SIMULATOR صامت في الإنتاج
         if (com.example.uhf.BuildConfig.ALLOW_SIMULATOR) {
             Log.w(TAG, "🧪 SIMULATOR allowed by build config");
             activeDevice = new RFIDDevice(
@@ -684,9 +673,11 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
     }
 
     public void deleteDevice(RFIDDevice device) {
+        if (device == null) return;
         List<RFIDDevice> devices = getAllDevices();
-        devices.removeIf(d -> d == device
-                || (device != null && d.toString().equals(device.toString())));
+        devices.removeIf(d ->
+                (d.getType() == device.getType() && Objects.equals(d.getAddress(), device.getAddress()))
+                || d.toString().equals(device.toString()));
         saveDevices(devices);
     }
 
@@ -703,8 +694,8 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         device.setLastUsedAt(System.currentTimeMillis());
         saveDevice(device);
 
-        state.set(State.UNINITIALIZED);
-        notifyStateChanged(State.READY, State.UNINITIALIZED);
+        State old = state.getAndSet(State.UNINITIALIZED);
+        notifyStateChanged(old, State.UNINITIALIZED);
 
         return true;
     }
@@ -739,95 +730,63 @@ public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
             RFIDWithUHFUART sdkReader = getRawSdkReader();
             if (sdkReader != null) {
                 MiraReaderSettings.getInstance(context).applyToReader(sdkReader);
+                if (denseJewelrySessionActive) {
+                    applyGen2SessionS1TargetA();
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "applyMiraReaderSettings error", e);
         }
     }
-    
-    /**
- * ✅ [Fix-B1] تطبيق كامل لإعدادات MiraReaderSettings بعد التهيئة
- *
- * - يحاول عبر raw SDK: Frequency, Miller, Q, Session, RFLink, FastID, Gen2
- * - يعيد المحاولة إذا getRawSdkReader() لم يكن جاهزاً بعد (UHFMainActivity قد يتأخر)
- * - لا يُفشل التهيئة إذا لم يتمكن — Power مُطبَّق مسبقاً كضمان
- * - 3 محاولات كحد أقصى: 800ms, 1600ms, 2400ms
- */
-private void applyMiraReaderSettingsWithRetry(int attempt) {
-    final int MAX_ATTEMPTS = 3;
-    final MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
 
-    try {
-        RFIDWithUHFUART sdkReader = getRawSdkReader();
+    private void applyMiraReaderSettingsWithRetry(int attempt) {
+        final int MAX_ATTEMPTS = 3;
+        final MiraReaderSettings settings = MiraReaderSettings.getInstance(context);
 
-        if (sdkReader != null) {
-            MiraReaderSettings.ApplyResult result = settings.applyToReader(sdkReader);
-            if (result.isSuccess()) {
-                Log.i(TAG, "✅ [B1] Full settings applied ("
-                        + result.applied + " items)");
-                return;
-            }
-            Log.w(TAG, "⚠️ [B1] Partial failure: " + result.failedNames);
-            // تابع للمحاولة التالية — قد يكون SDK في منتصف التهيئة
-        } else {
-            Log.d(TAG, "⏳ [B1] Raw SDK not ready yet (attempt "
-                    + attempt + "/" + MAX_ATTEMPTS + ")");
-        }
-
-        if (attempt < MAX_ATTEMPTS) {
-            final int next = attempt + 1;
-            mainHandler.postDelayed(() -> {
-                Log.d(TAG, "🔄 [B1] Retry " + next + "/" + MAX_ATTEMPTS);
-                applyMiraReaderSettingsWithRetry(next);
-            }, 800L * next);
-        } else {
-            Log.w(TAG, "⚠️ [B1] Max attempts reached — Power only");
-        }
-
-    } catch (Exception e) {
-        Log.e(TAG, "❌ [B1] applyMiraReaderSettingsWithRetry error", e);
-    }
-}
-
-    /**
-     * ضبط الجلسة S1 والهدف A لمنع تكرار قراءة الشرائح القريبة وحجب البعيدة في صواني المجوهرات
-     */
-    public boolean configureDenseJewelrySession() {
         try {
-            com.rscja.deviceapi.RFIDWithUHFUART reader = getRawSdkReader();
-            if (reader == null) return false;
+            RFIDWithUHFUART sdkReader = getRawSdkReader();
 
-            com.rscja.deviceapi.entity.Gen2Entity gen2 = reader.getGen2();
-            if (gen2 == null) {
-                gen2 = new com.rscja.deviceapi.entity.Gen2Entity();
+            if (sdkReader != null) {
+                MiraReaderSettings.ApplyResult result = settings.applyToReader(sdkReader);
+                if (denseJewelrySessionActive) {
+                    applyGen2SessionS1TargetA();
+                }
+                if (result.isSuccess()) {
+                    Log.i(TAG, "✅ [B1] Full settings applied ("
+                            + result.applied + " items)");
+                    return;
+                }
+                Log.w(TAG, "⚠️ [B1] Partial failure: " + result.failedNames);
+            } else {
+                Log.d(TAG, "⏳ [B1] Raw SDK not ready yet (attempt "
+                        + attempt + "/" + MAX_ATTEMPTS + ")");
             }
-            gen2.setQuerySession(1); // Session S1
-            gen2.setQueryTarget(0);  // Target A
-            return reader.setGen2(gen2);
-        } catch (Throwable t) {
-            android.util.Log.w("RFIDManager", "configureDenseJewelrySession skipped: " + t.getMessage());
-            return false;
+
+            if (attempt < MAX_ATTEMPTS) {
+                final int next = attempt + 1;
+                mainHandler.postDelayed(() -> {
+                    Log.d(TAG, "🔄 [B1] Retry " + next + "/" + MAX_ATTEMPTS);
+                    applyMiraReaderSettingsWithRetry(next);
+                }, 800L * next);
+            } else {
+                Log.w(TAG, "⚠️ [B1] Max attempts reached — Power only");
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ [B1] applyMiraReaderSettingsWithRetry error", e);
         }
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  ✅ [v4.0.2] Backward-Compatibility Layer
+    //  ✅ Backward-Compatibility Layer
     // ═══════════════════════════════════════════════════════════
 
-    /**
-     * ✅ نسخة قديمة من release — استُبدلت بـ reset().
-     * @deprecated استخدم reset()
-     */
     @Deprecated
     public void release() {
         Log.d(TAG, "⚠️ [legacy release] → delegating to reset()");
         reset();
     }
 
-    /**
-     * ✅ نسخة قديمة من testConnection — تفحص جاهزية القارئ الحالي.
-     * @deprecated استخدم ensureReadySync()
-     */
     @Deprecated
     public boolean testConnection(RFIDDevice device) {
         if (device == null) {
@@ -842,19 +801,11 @@ private void applyMiraReaderSettingsWithRetry(int attempt) {
         }
     }
 
-    /**
-     * ✅ نسخة قديمة من waitForReaderReady — تحجب حتى الجاهزية.
-     * @deprecated استخدم ensureReady(callback)
-     */
     @Deprecated
     public boolean waitForReaderReady(long timeoutMs) {
         return ensureReadySync(timeoutMs);
     }
 
-    /**
-     * ✅ نسخة قديمة من isRealReaderConnected.
-     * @deprecated استخدم isReady()
-     */
     @Deprecated
     public boolean isRealReaderConnected() {
         return isReady();
