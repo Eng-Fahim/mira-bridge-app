@@ -65,7 +65,8 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
     private val processingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val ioExecutor: ExecutorService = Executors.newFixedThreadPool(2)
-
+    private val opticalVerifiedEpcs = java.util.concurrent.ConcurrentHashMap.newKeySet<String>() 
+    
     private var isArabic: Boolean = true
     private var initialized = false
 
@@ -897,9 +898,10 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         hardwareOps?.applyAntennaPower(clamped)
         _uiState.update { it.copy(powerDbm = clamped) }
     }
-
+    
     fun resetCurrentAudit() {
         if (_uiState.value.isScanning) stopScanning()
+        opticalVerifiedEpcs.clear()
         sessionManager.clearSession()
         applyCategoryFilter(_uiState.value.selectedCategory, preserveScanned = false)
         _uiState.update {
@@ -1108,8 +1110,8 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             return
         }
 
-        _uiState.update { it.copy(isCommitting = true) }
-
+        _uiState.update { it.copy(isCommitting = true) 
+        }
         val state = _uiState.value
         persistenceManager.commitInventory(
             inventoryEngine.clientSessionId,
@@ -1425,6 +1427,75 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         val details = _uiState.value.archiveReportDetails ?: return
         InventoryReportExporter.exportCsv(context, details, _uiState.value.isArabic)
     }
+    
+          /**
+     * معالجة قراءة الكود المجهري (3×3 مم GS1 DataMatrix أو MIRA QR أو Serial)
+     */
+    fun onMicroOpticalCodeScanned(parsed: ParsedOpticalCode) {
+        if (parsed.candidateKeys.isEmpty()) return
+
+        // البحث عن القطعة في fullCatalog عبر أي من المفاتيح المستخرجة (Serial / GTIN / EPC)
+        val matchedCatalogItem = fullCatalog.values.firstOrNull { item ->
+            val keys = setOf(
+                item.epc.uppercase(Locale.US),
+                item.gtin.uppercase(Locale.US),
+                item.serial.uppercase(Locale.US)
+            ).filter { it.isNotEmpty() }
+
+            parsed.candidateKeys.any { cand -> cand.uppercase(Locale.US) in keys }
+        }
+
+        if (matchedCatalogItem != null) {
+            opticalVerifiedEpcs.add(matchedCatalogItem.epc)
+            handleTagEvent(
+                epc = matchedCatalogItem.epc,
+                rssi = -45,
+                isNewUniqueHint = true
+            )
+
+            uhfSoundEngine?.playMatchTick()
+            _uiState.update {
+                it.copy(
+                    snackbarMessage = if (it.isArabic)
+                        "✅ تم التحقق البصري (3×3مم): ${matchedCatalogItem.title}"
+                    else
+                        "✅ Micro-code verified: ${matchedCatalogItem.title}"
+                )
+            }
+        } else {
+            val fallbackCode = parsed.primaryCode.uppercase(Locale.US)
+            opticalVerifiedEpcs.add(fallbackCode)
+            handleTagEvent(
+                epc = fallbackCode,
+                rssi = -45,
+                isNewUniqueHint = true
+            )
+
+            uhfSoundEngine?.playAlertChirp()
+            _uiState.update {
+                it.copy(
+                    snackbarMessage = if (it.isArabic)
+                        "⚠️ كود بصري غير مدرج في كتالوج الفرع: $fallbackCode"
+                    else
+                        "⚠️ Optical code not in branch catalog: $fallbackCode"
+                )
+            }
+        }
+    }
+
+    /**
+     * تنبيه أمني فوري عند اكتشاف قطعة مباعة أو موقوفة أو مستنسخة من السيرفر
+     */
+    fun triggerSecurityAnomalyAlert(title: String, reason: String) {
+        uhfSoundEngine?.playAlertChirp()
+        _uiState.update {
+            it.copy(
+                snackbarMessage = "🚨 تنبيه أمني ($title): $reason"
+            )
+        }
+    }
+
+
 
     private fun parseArchiveDetailsJson(
         json: JSONObject?,
