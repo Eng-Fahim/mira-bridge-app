@@ -452,8 +452,7 @@ private class DualMicroCodeAnalyzer(
                     BarcodeFormat.EAN_13,
                     BarcodeFormat.CODE_128
                 ),
-                DecodeHintType.TRY_HARDER to true,
-                DecodeHintType.ALSO_INVERTED to true
+                DecodeHintType.TRY_HARDER to true
             )
         )
     }
@@ -515,8 +514,20 @@ private class DualMicroCodeAnalyzer(
                 cropH,
                 false
             )
-            val bitmap = BinaryBitmap(HybridBinarizer(source))
-            zxingReader.decodeWithState(bitmap).text
+
+            // 1. محاولة القراءة العادية أولاً
+            val normalResult = runCatching {
+                zxingReader.decodeWithState(BinaryBitmap(HybridBinarizer(source))).text
+            }.getOrNull()
+            if (!normalResult.isNullOrBlank()) {
+                return normalResult
+            }
+
+            // 2. محاولة القراءة المعكوسة لونياً (للأكواد المحفورة بالليزر على الذهب)
+            zxingReader.reset()
+            runCatching {
+                zxingReader.decodeWithState(BinaryBitmap(HybridBinarizer(source.invert()))).text
+            }.getOrNull()
         } catch (_: Exception) {
             null
         } finally {
