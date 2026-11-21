@@ -89,10 +89,14 @@ class MiraInventoryProFragment : Fragment() {
                     false
                 }
             }
+            
 
             setContent {
-                MiraInventoryScreen(viewModel = viewModel)
-            }
+               MiraInventoryScreen(
+               viewModel = viewModel,
+               onNavigateBack = { exitInventoryScreen() }
+               )
+               }
         }
     }
 
