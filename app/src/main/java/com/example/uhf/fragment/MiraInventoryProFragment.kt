@@ -16,7 +16,10 @@ import com.example.uhf.api.MiraApiClient
 import com.example.uhf.manager.MiraBranchesManager
 import com.example.uhf.ui.inventory.MiraInventoryScreen
 import com.example.uhf.ui.inventory.MiraInventoryViewModel
+import com.example.uhf.utils.MiraUhfSoundEngine
 import com.example.uhf.utils.SoundManager
+import com.google.android.material.bottomappbar.BottomAppBar
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import java.util.Locale
 
 class MiraInventoryProFragment : Fragment() {
@@ -30,6 +33,7 @@ class MiraInventoryProFragment : Fragment() {
     private val viewModel: MiraInventoryViewModel by viewModels()
     private var rfidManager: RFIDManager? = null
     private var soundManager: SoundManager? = null
+    private var uhfSoundEngine: MiraUhfSoundEngine? = null
     private var lastGeigerBeepMs = 0L
 
     override fun onCreateView(
@@ -42,6 +46,8 @@ class MiraInventoryProFragment : Fragment() {
 
         rfidManager = runCatching { RFIDManager.getInstance(ctx) }.getOrNull()
         soundManager = runCatching { SoundManager(ctx) }.getOrNull()
+        uhfSoundEngine = MiraUhfSoundEngine()
+
         val apiClient = runCatching { MiraApiClient.getInstance(ctx) }.getOrNull()
         val branchesManager = runCatching { MiraBranchesManager.getInstance(ctx) }.getOrNull()
 
@@ -90,14 +96,67 @@ class MiraInventoryProFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        setHostBottomBarVisible(false)
+    }
+
     override fun onPause() {
         super.onPause()
         viewModel.saveCurrentSessionSnapshot()
+        setHostBottomBarVisible(true)
+    }
+
+    override fun onDestroyView() {
+        setHostBottomBarVisible(true)
+        uhfSoundEngine?.release()
+        uhfSoundEngine = null
+        super.onDestroyView()
     }
 
     /**
-     * دوال متوافقة لاستقبال أحداث الزناد إذا كانت MainActivity تمررها للـ Fragment مباشرة
+     * الخروج المنظم من شاشة الجرد وإعادة إظهار القائمة السفلية للتطبيق
      */
+    fun exitInventoryScreen() {
+        if (viewModel.isScanning()) {
+            viewModel.stopScanning()
+        }
+        setHostBottomBarVisible(true)
+        activity?.onBackPressedDispatcher?.onBackPressed()
+    }
+
+    /**
+     * إخفاء / إظهار شريط التنقل السفلي الخاص بـ UHFMainActivity لمنع تغطية أزرار الجرد
+     */
+    private fun setHostBottomBarVisible(visible: Boolean) {
+        val rootView = activity?.window?.decorView ?: return
+        val targetVisibility = if (visible) View.VISIBLE else View.GONE
+
+        fun traverse(view: View) {
+            val idName = runCatching {
+                if (view.id != View.NO_ID) resources.getResourceEntryName(view.id).lowercase() else ""
+            }.getOrDefault("")
+
+            if (view is BottomNavigationView ||
+                view is BottomAppBar ||
+                idName.contains("bottom_nav") ||
+                idName.contains("bottombar") ||
+                idName.contains("bottom_bar") ||
+                idName.contains("nav_bar_container") ||
+                idName.contains("fab_scan") ||
+                idName.contains("fab_inventory")
+            ) {
+                view.visibility = targetVisibility
+            }
+            if (view is ViewGroup) {
+                for (i in 0 until view.childCount) {
+                    traverse(view.getChildAt(i))
+                }
+            }
+        }
+        traverse(rootView)
+    }
+
     fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode in TRIGGER_KEYCODES && (event == null || event.repeatCount == 0)) {
             viewModel.onPhysicalTriggerDown()
@@ -113,8 +172,8 @@ class MiraInventoryProFragment : Fragment() {
         }
         return false
     }
-    
-        // ═══════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════
     //  واجهة التوافق الكاملة مع UHFMainActivity.java
     // ═══════════════════════════════════════════════════════════
 
@@ -153,7 +212,6 @@ class MiraInventoryProFragment : Fragment() {
         viewModel.openArchive()
     }
 
-
     private fun createHardwareBridge() = object : MiraInventoryViewModel.HardwareOperations {
         override fun applyAntennaPower(powerDbm: Int): Boolean {
             return rfidManager?.setPower(powerDbm) ?: false
@@ -162,7 +220,6 @@ class MiraInventoryProFragment : Fragment() {
         override fun readTagTidDirect(epc: String): String? {
             val mgr = rfidManager ?: return null
             return try {
-                // 1. المحاولة عبر MiraIRFIDReader إن كانت دالة readTid معرفة فيه
                 val reader = mgr.activeReader
                 if (reader != null) {
                     val m1 = reader.javaClass.methods.firstOrNull {
@@ -176,7 +233,6 @@ class MiraInventoryProFragment : Fragment() {
                     if (m0 != null) return m0.invoke(reader) as? String
                 }
 
-                // 2. القراءة المباشرة من Chainway SDK (Bank_TID, ptr=0, len=6 words = 12 bytes)
                 val rawSdk = mgr.rawSdkReader
                 if (rawSdk != null) {
                     rawSdk.readData(
@@ -196,10 +252,10 @@ class MiraInventoryProFragment : Fragment() {
 
         override fun playGeigerTick(proximityPercent: Int) {
             val now = SystemClock.elapsedRealtime()
-            val intervalMs = (600L - (proximityPercent * 5L)).coerceIn(90L, 600L)
+            val intervalMs = (550L - (proximityPercent * 4.5).toLong()).coerceIn(85L, 550L)
             if (now - lastGeigerBeepMs >= intervalMs) {
                 lastGeigerBeepMs = now
-                soundManager?.playBeep(SoundManager.FeedbackType.KNOWN_ITEM)
+                uhfSoundEngine?.playGeigerPing(proximityPercent)
             }
         }
     }
