@@ -165,6 +165,8 @@ data class InventoryUiState(
     val archiveReportDetails: ArchiveReportDetails? = null,
     val isLoadingArchiveDetails: Boolean = false,
     val archiveDetailsError: String? = null,
+    val lastCommittedReportDetails: ArchiveReportDetails? = null,
+
 ) {
     val accuracyPercent: Float
         get() = if (expectedCount > 0) {
