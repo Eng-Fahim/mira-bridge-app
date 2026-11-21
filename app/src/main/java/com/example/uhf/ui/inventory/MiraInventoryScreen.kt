@@ -286,6 +286,47 @@ fun MiraInventoryScreen(
                     onClose = viewModel::closeArchive
                 )
             }
+                    // نافذة إعدادات القارئ والزناد (تُفتح من شريط التطبيق أو من UHFMainActivity)
+        if (state.showScannerSettingsSheet) {
+            ModalBottomSheet(
+                onDismissRequest = viewModel::closeScannerSettingsSheet,
+                containerColor = MiraPalette.NavySurface,
+                contentColor = MiraPalette.TextPrimary
+            ) {
+                ScannerSettingsSheetContent(
+                    state = state,
+                    onPowerChange = viewModel::setAntennaPower,
+                    onTriggerModeChange = viewModel::setTriggerMode,
+                    onClose = viewModel::closeScannerSettingsSheet
+                )
+            }
+        }
+
+        // نافذة إعدادات جلسة الجرد والفئات (تُفتح من UHFMainActivity)
+        if (state.showSessionSettingsSheet) {
+            ModalBottomSheet(
+                onDismissRequest = viewModel::closeSessionSettingsSheet,
+                containerColor = MiraPalette.NavySurface,
+                contentColor = MiraPalette.TextPrimary
+            ) {
+                SessionSettingsSheetContent(
+                    state = state,
+                    onSelectCategory = { cat ->
+                        viewModel.selectCategory(cat)
+                        viewModel.closeSessionSettingsSheet()
+                    },
+                    onSaveSnapshot = {
+                        viewModel.saveCurrentSessionSnapshot()
+                        viewModel.closeSessionSettingsSheet()
+                    },
+                    onResetAudit = {
+                        viewModel.resetCurrentAudit()
+                        viewModel.closeSessionSettingsSheet()
+                    },
+                    onClose = viewModel::closeSessionSettingsSheet
+                )
+            }
+        }
         }
     }
 }
@@ -1338,6 +1379,189 @@ private fun EmptyInventoryPlaceholder(isArabic: Boolean, tab: InventoryFilterTab
         )
     }
 }
+
+@Composable
+private fun ScannerSettingsSheetContent(
+    state: InventoryUiState,
+    onPowerChange: (Int) -> Unit,
+    onTriggerModeChange: (TriggerMode) -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (state.isArabic) "إعدادات قارئ UHF والزناد" else "UHF Scanner & Trigger Settings",
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = MiraPalette.GoldPrimary
+            )
+            IconButton(onClick = onClose) {
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = MiraPalette.TextSecondary)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (state.isArabic) "قوة إشارة الانتينا" else "Antenna Output Power",
+                color = MiraPalette.TextSecondary,
+                fontSize = 13.sp
+            )
+            Text(
+                text = "${state.powerDbm} dBm",
+                color = MiraPalette.GoldPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
+        }
+
+        Slider(
+            value = state.powerDbm.toFloat(),
+            onValueChange = { onPowerChange(it.toInt()) },
+            valueRange = 5f..30f,
+            steps = 24,
+            colors = SliderDefaults.colors(
+                thumbColor = MiraPalette.GoldPrimary,
+                activeTrackColor = MiraPalette.GoldPrimary
+            )
+        )
+
+        Text(
+            text = if (state.isArabic) "وضع الزناد الفيزيائي (Trigger Mode)" else "Physical Trigger Mode",
+            color = MiraPalette.TextSecondary,
+            fontSize = 13.sp
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FilterChip(
+                selected = state.triggerMode == TriggerMode.TOGGLE,
+                onClick = { onTriggerModeChange(TriggerMode.TOGGLE) },
+                label = {
+                    Text(if (state.isArabic) "ضغطة تشغيل / ضغطة إيقاف" else "Toggle (Click Start/Stop)")
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MiraPalette.GoldContainer,
+                    selectedLabelColor = MiraPalette.GoldPrimary
+                )
+            )
+            FilterChip(
+                selected = state.triggerMode == TriggerMode.HOLD,
+                onClick = { onTriggerModeChange(TriggerMode.HOLD) },
+                label = {
+                    Text(if (state.isArabic) "ضغط مستمر" else "Hold to Scan")
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MiraPalette.GoldContainer,
+                    selectedLabelColor = MiraPalette.GoldPrimary
+                )
+            )
+        }
+
+        Button(
+            onClick = onClose,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MiraPalette.GoldPrimary,
+                contentColor = MiraPalette.NavyDeep
+            )
+        ) {
+            Text(if (state.isArabic) "حفظ وإغلاق" else "Apply & Close", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun SessionSettingsSheetContent(
+    state: InventoryUiState,
+    onSelectCategory: (String) -> Unit,
+    onSaveSnapshot: () -> Unit,
+    onResetAudit: () -> Unit,
+    onClose: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (state.isArabic) "إعدادات جلسة الجرد" else "Audit Session Settings",
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = MiraPalette.GoldPrimary
+            )
+            IconButton(onClick = onClose) {
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = MiraPalette.TextSecondary)
+            }
+        }
+
+        Text(
+            text = if (state.isArabic) "نطاق الجرد (شامل أو حسب العيار)" else "Audit Scope (Full or by Karat)",
+            color = MiraPalette.TextSecondary,
+            fontSize = 13.sp
+        )
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(state.availableCategories, key = { it }) { cat ->
+                val label = cat.ifBlank { if (state.isArabic) "جرد شامل" else "Full Audit" }
+                FilterChip(
+                    selected = cat == state.selectedCategory,
+                    onClick = { onSelectCategory(cat) },
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MiraPalette.GoldContainer,
+                        selectedLabelColor = MiraPalette.GoldPrimary
+                    )
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onSaveSnapshot,
+                modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+            ) {
+                Text(
+                    text = if (state.isArabic) "حفظ مسودة الجلسة" else "Save Draft",
+                    color = MiraPalette.GoldPrimary
+                )
+            }
+
+            Button(
+                onClick = onResetAudit,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = MiraPalette.CrimsonMissing)
+            ) {
+                Text(
+                    text = if (state.isArabic) "تصفير الجرد" else "Reset Audit",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun CommitReportDialog(
