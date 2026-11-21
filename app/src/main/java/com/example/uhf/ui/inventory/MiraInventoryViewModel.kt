@@ -980,6 +980,30 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     }
 
     // ==================== أدوات مساعدة ====================
+        // ==================== دوال الربط مع UHFMainActivity ====================
+
+    fun getScannedCount(): Int {
+        val s = _uiState.value
+        return s.matchedCount + s.uncataloguedCount + s.wrongCategoryCount
+    }
+
+    fun isScanning(): Boolean = _uiState.value.isScanning
+
+    fun openScannerSettingsSheet() {
+        _uiState.update { it.copy(showScannerSettingsSheet = true) }
+    }
+
+    fun closeScannerSettingsSheet() {
+        _uiState.update { it.copy(showScannerSettingsSheet = false) }
+    }
+
+    fun openSessionSettingsSheet() {
+        _uiState.update { it.copy(showSessionSettingsSheet = true) }
+    }
+
+    fun closeSessionSettingsSheet() {
+        _uiState.update { it.copy(showSessionSettingsSheet = false) }
+    }
 
     private fun calculateTotalElapsedMs(): Long {
         val running = if (activeSegmentStartMs > 0L) {
