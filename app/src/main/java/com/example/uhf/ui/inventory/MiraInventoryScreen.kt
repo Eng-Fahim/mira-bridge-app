@@ -273,20 +273,62 @@ fun MiraInventoryScreen(
         }
 
         // نافذة أرشيف جلسات الجرد السابقة
-        if (state.showArchiveSheet) {
+                if (state.showArchiveSheet) {
+            val context = androidx.compose.ui.platform.LocalContext.current
             ModalBottomSheet(
-                onDismissRequest = viewModel::closeArchive,
+                onDismissRequest = {
+                    viewModel.closeArchiveReportDetails()
+                    viewModel.closeArchive()
+                },
                 containerColor = MiraPalette.NavySurface,
                 contentColor = MiraPalette.TextPrimary
             ) {
-                ArchiveReportsSheetContent(
-                    state = state,
-                    onOpenDetails = viewModel::loadArchiveReportDetails,
-                    onDeleteReport = viewModel::deleteArchiveReport,
-                    onClose = viewModel::closeArchive
-                )
+                if (state.selectedArchiveReportId != null) {
+                    ArchiveReportDetailsSheetContent(
+                        isArabic = state.isArabic,
+                        isLoading = state.isLoadingArchiveDetails,
+                        errorMessage = state.archiveDetailsError,
+                        details = state.archiveReportDetails,
+                        onBack = viewModel::closeArchiveReportDetails,
+                        onRetry = {
+                            state.selectedArchiveReportId?.let { viewModel.openArchiveReportDetails(it) }
+                        },
+                        onPrintPdf = { viewModel.printSelectedArchiveReport(context) },
+                        onExportCsv = { viewModel.exportSelectedArchiveReportCsv(context) }
+                    )
+                } else {
+                    // قائمة التقارير المؤرشفة الحالية — عند النقر على أي تقرير استدعِ:
+                    // viewModel.openArchiveReportDetails(
+                    //     reportId = report.id,
+                    //     fallbackCode = report.code,
+                    //     fallbackDate = report.date,
+                    //     fallbackBranch = report.branchName,
+                    //     fallbackMatched = report.matchedCount,
+                    //     fallbackExpected = report.expectedCount,
+                    //     fallbackMissing = report.missingCount,
+                    //     fallbackWeight = report.scannedWeight
+                    // )
+                    ArchiveReportsListContent(
+                        state = state,
+                        onSelectReport = { id, code, date, branch, matched, expected, missing, weight ->
+                            viewModel.openArchiveReportDetails(
+                                reportId = id,
+                                fallbackCode = code,
+                                fallbackDate = date,
+                                fallbackBranch = branch,
+                                fallbackMatched = matched,
+                                fallbackExpected = expected,
+                                fallbackMissing = missing,
+                                fallbackWeight = weight
+                            )
+                        },
+                        onClose = viewModel::closeArchive
+                    )
+                }
             }
-                    // نافذة إعدادات القارئ والزناد (تُفتح من شريط التطبيق أو من UHFMainActivity)
+        }
+
+     // نافذة إعدادات القارئ والزناد (تُفتح من شريط التطبيق أو من UHFMainActivity)
         if (state.showScannerSettingsSheet) {
             ModalBottomSheet(
                 onDismissRequest = viewModel::closeScannerSettingsSheet,
@@ -1625,6 +1667,360 @@ private fun CommitReportDialog(
         }
     )
 }
+
+@Composable
+private fun ArchiveReportDetailsSheetContent(
+    isArabic: Boolean,
+    isLoading: Boolean,
+    errorMessage: String?,
+    details: ArchiveReportDetails?,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    onPrintPdf: () -> Unit,
+    onExportCsv: () -> Unit
+) {
+    var selectedFilter by remember { mutableStateOf<ArchiveItemStatus?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // شريط العنوان وزر العودة لقائمة الأرشيف
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = null,
+                        tint = MiraPalette.GoldPrimary
+                    )
+                }
+                Column {
+                    Text(
+                        text = if (isArabic) "تفاصيل تقرير الجرد" else "Audit Report Details",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MiraPalette.GoldPrimary
+                    )
+                    if (details != null) {
+                        Text(
+                            text = "#${details.reportCode} • ${details.createdAt}",
+                            fontSize = 12.sp,
+                            color = MiraPalette.TextSecondary
+                        )
+                    }
+                }
+            }
+        }
+
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MiraPalette.GoldPrimary)
+                }
+            }
+
+            errorMessage != null -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = errorMessage,
+                        color = MiraPalette.CrimsonMissing,
+                        fontSize = 13.sp
+                    )
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = MiraPalette.GoldPrimary)
+                    ) {
+                        Text(
+                            text = if (isArabic) "إعادة المحاولة" else "Retry",
+                            color = MiraPalette.NavyDeep,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            details != null -> {
+                // أزرار الطباعة / PDF وتصدير CSV
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = onPrintPdf,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MiraPalette.GoldPrimary,
+                            contentColor = MiraPalette.NavyDeep
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Print,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (isArabic) "طباعة / PDF" else "Print / PDF",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onExportCsv,
+                        modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FileDownload,
+                            contentDescription = null,
+                            tint = MiraPalette.GoldPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (isArabic) "تصدير CSV" else "Export CSV",
+                            color = MiraPalette.GoldPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+
+                // بطاقة ملخص المؤشرات
+                Surface(
+                    color = MiraPalette.NavyDeep,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MiraPalette.GoldPrimary.copy(alpha = 0.25f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${if (isArabic) "الفرع:" else "Branch:"} ${details.branchName}",
+                                fontSize = 12.sp,
+                                color = MiraPalette.TextSecondary
+                            )
+                            Text(
+                                text = "${if (isArabic) "الموظف:" else "Auditor:"} ${details.auditorName}",
+                                fontSize = 12.sp,
+                                color = MiraPalette.TextSecondary
+                            )
+                        }
+
+                        HorizontalDivider(color = MiraPalette.TextSecondary.copy(alpha = 0.15f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            ArchiveMetricBadge(
+                                label = if (isArabic) "نسبة المطابقة" else "Match",
+                                value = String.format(Locale.US, "%.1f%%", details.matchRatePercent),
+                                color = MiraPalette.GoldPrimary
+                            )
+                            ArchiveMetricBadge(
+                                label = if (isArabic) "مطابق" else "Matched",
+                                value = "${details.matchedCount}/${details.expectedCount}",
+                                color = MiraPalette.EmeraldMatched
+                            )
+                            ArchiveMetricBadge(
+                                label = if (isArabic) "مفقود" else "Missing",
+                                value = "${details.missingCount}",
+                                color = MiraPalette.CrimsonMissing
+                            )
+                            ArchiveMetricBadge(
+                                label = if (isArabic) "الوزن" else "Weight",
+                                value = String.format(Locale.US, "%.1fg", details.scannedWeightGrams),
+                                color = MiraPalette.TextPrimary
+                            )
+                        }
+                    }
+                }
+
+                // شرائح فلترة القطع داخل التقرير
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedFilter == null,
+                            onClick = { selectedFilter = null },
+                            label = {
+                                Text(if (isArabic) "الكل (${details.items.size})" else "All (${details.items.size})")
+                            }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = selectedFilter == ArchiveItemStatus.MATCHED,
+                            onClick = { selectedFilter = ArchiveItemStatus.MATCHED },
+                            label = {
+                                Text(if (isArabic) "مطابق (${details.matchedCount})" else "Matched (${details.matchedCount})")
+                            }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = selectedFilter == ArchiveItemStatus.MISSING,
+                            onClick = { selectedFilter = ArchiveItemStatus.MISSING },
+                            label = {
+                                Text(if (isArabic) "مفقود (${details.missingCount})" else "Missing (${details.missingCount})")
+                            }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = selectedFilter == ArchiveItemStatus.UNCATALOGUED,
+                            onClick = { selectedFilter = ArchiveItemStatus.UNCATALOGUED },
+                            label = {
+                                Text(if (isArabic) "غير مسجل (${details.uncataloguedCount})" else "Uncatalogued (${details.uncataloguedCount})")
+                            }
+                        )
+                    }
+                }
+
+                // قائمة القطع المفصلة
+                val filteredItems = remember(details.items, selectedFilter) {
+                    if (selectedFilter == null) details.items
+                    else details.items.filter { it.status == selectedFilter }
+                }
+
+                if (filteredItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isArabic) "لا توجد قطع مسجلة ضمن هذا التصنيف" else "No items in this filter",
+                            color = MiraPalette.TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filteredItems, key = { "${it.epc}_${it.status}" }) { item ->
+                            val (statusText, statusColor) = when (item.status) {
+                                ArchiveItemStatus.MATCHED ->
+                                    (if (isArabic) "مطابق" else "Matched") to MiraPalette.EmeraldMatched
+                                ArchiveItemStatus.MISSING ->
+                                    (if (isArabic) "مفقود" else "Missing") to MiraPalette.CrimsonMissing
+                                ArchiveItemStatus.UNCATALOGUED ->
+                                    (if (isArabic) "غير مسجل" else "Uncatalogued") to MiraPalette.AmberWarning
+                            }
+
+                            Surface(
+                                color = MiraPalette.NavyDeep.copy(alpha = 0.85f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, statusColor.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = item.name,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 13.sp,
+                                                color = MiraPalette.TextPrimary
+                                            )
+                                            if (item.karat.isNotBlank()) {
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(
+                                                    text = item.karat,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MiraPalette.GoldPrimary
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = item.epc,
+                                            fontSize = 11.sp,
+                                            color = MiraPalette.TextSecondary
+                                        )
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = statusText,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor
+                                        )
+                                        Text(
+                                            text = String.format(Locale.US, "%.2f g", item.weightGrams),
+                                            fontSize = 12.sp,
+                                            color = MiraPalette.TextPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun ArchiveMetricBadge(
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = color
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = MiraPalette.TextSecondary
+        )
+    }
+}
+
 
 @Composable
 private fun ArchiveReportsSheetContent(
