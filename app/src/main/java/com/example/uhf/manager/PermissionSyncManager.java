@@ -181,7 +181,7 @@ public class PermissionSyncManager {
             android.content.Intent intent =
                     new android.content.Intent(
                             context,
-                            com.example.uhf.LoginActivity.class
+                            com.example.uhf.activity.LoginActivity.class
                     );
 
             intent.addFlags(
