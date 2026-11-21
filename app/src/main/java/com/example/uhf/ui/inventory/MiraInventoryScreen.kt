@@ -208,9 +208,24 @@ fun MiraInventoryScreen(
     val layoutDirection = if (state.isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
 
     // معالجة زر الرجوع في الجهاز للخروج المنظم وإظهار شريط التنقل السفلي
-    BackHandler {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var isExiting by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isExiting = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    BackHandler(enabled = !isExiting) {
+        isExiting = true
         onNavigateBack()
     }
+
 
     LaunchedEffect(state.snackbarMessage) {
         val msg = state.snackbarMessage
@@ -231,7 +246,12 @@ fun MiraInventoryScreen(
                     InventoryTopBar(
                         state = state,
                         colors = colors,
-                        onNavigateBack = onNavigateBack,
+                        onNavigateBack = {
+                            if (!isExiting) {
+                                isExiting = true
+                                onNavigateBack()
+                            }
+                        },
                         onSelectCategory = viewModel::selectCategory,
                         onSyncOffline = viewModel::syncOfflineQueue,
                         onOpenArchive = viewModel::openArchive,
