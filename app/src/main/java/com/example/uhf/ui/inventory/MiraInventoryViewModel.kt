@@ -1041,4 +1041,201 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         processingExecutor.shutdownNow()
         ioExecutor.shutdownNow()
     }
+    
+    
+        // ==================== تفاصيل التقرير المؤرشف والطباعة والتصدير ====================
+
+    fun openArchiveReportDetails(
+        reportId: String,
+        fallbackCode: String = reportId,
+        fallbackDate: String = "",
+        fallbackBranch: String = "",
+        fallbackMatched: Int = 0,
+        fallbackExpected: Int = 0,
+        fallbackMissing: Int = 0,
+        fallbackWeight: Double = 0.0
+    ) {
+        _uiState.update {
+            it.copy(
+                selectedArchiveReportId = reportId,
+                isLoadingArchiveDetails = true,
+                archiveDetailsError = null,
+                archiveReportDetails = null
+            )
+        }
+
+        val api = apiClient
+        if (api == null) {
+            _uiState.update {
+                it.copy(
+                    isLoadingArchiveDetails = false,
+                    archiveDetailsError = if (it.isArabic) "تعذر الاتصال بالخادم" else "API client unavailable"
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // استدعاء مرن يدعم getInventoryReportDetails أو getAuditReportDetails في MiraApiClient
+                val method = api.javaClass.methods.firstOrNull {
+                    (it.name == "getInventoryReportDetails" || it.name == "getAuditReportDetails") &&
+                        it.parameterTypes.size == 2
+                }
+
+                if (method != null) {
+                    val callbackType = method.parameterTypes[1]
+                    val proxy = java.lang.reflect.Proxy.newProxyInstance(
+                        callbackType.classLoader,
+                        arrayOf(callbackType)
+                    ) { _, m, args ->
+                        when (m.name) {
+                            "onSuccess" -> {
+                                val json = args?.firstOrNull() as? org.json.JSONObject
+                                val parsed = parseArchiveDetailsJson(
+                                    json = json,
+                                    reportId = reportId,
+                                    fallbackCode = fallbackCode,
+                                    fallbackDate = fallbackDate,
+                                    fallbackBranch = fallbackBranch,
+                                    fallbackMatched = fallbackMatched,
+                                    fallbackExpected = fallbackExpected,
+                                    fallbackMissing = fallbackMissing,
+                                    fallbackWeight = fallbackWeight
+                                )
+                                _uiState.update {
+                                    it.copy(
+                                        isLoadingArchiveDetails = false,
+                                        archiveReportDetails = parsed,
+                                        archiveDetailsError = null
+                                    )
+                                }
+                            }
+                            "onError" -> {
+                                val err = args?.firstOrNull()?.toString()
+                                    ?: if (_uiState.value.isArabic) "فشل تحميل تفاصيل التقرير" else "Failed to load report details"
+                                _uiState.update {
+                                    it.copy(
+                                        isLoadingArchiveDetails = false,
+                                        archiveDetailsError = err
+                                    )
+                                }
+                            }
+                        }
+                        null
+                    }
+                    method.invoke(api, reportId, proxy)
+                } else {
+                    // بناء ملخص فوري إذا لم تتوفر نقطة نهاية التفاصيل التفصيلية بعد
+                    val summaryOnly = ArchiveReportDetails(
+                        reportId = reportId,
+                        reportCode = fallbackCode,
+                        createdAt = fallbackDate,
+                        branchName = fallbackBranch,
+                        auditorName = "-",
+                        expectedCount = fallbackExpected,
+                        matchedCount = fallbackMatched,
+                        missingCount = fallbackMissing,
+                        uncataloguedCount = 0,
+                        scannedWeightGrams = fallbackWeight,
+                        estimatedValueUsd = 0.0,
+                        items = emptyList()
+                    )
+                    _uiState.update {
+                        it.copy(
+                            isLoadingArchiveDetails = false,
+                            archiveReportDetails = summaryOnly
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingArchiveDetails = false,
+                        archiveDetailsError = e.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun closeArchiveReportDetails() {
+        _uiState.update {
+            it.copy(
+                selectedArchiveReportId = null,
+                archiveReportDetails = null,
+                isLoadingArchiveDetails = false,
+                archiveDetailsError = null
+            )
+        }
+    }
+
+    fun printSelectedArchiveReport(context: android.content.Context) {
+        val details = _uiState.value.archiveReportDetails ?: return
+        InventoryReportExporter.printOrSavePdf(context, details, _uiState.value.isArabic)
+    }
+
+    fun exportSelectedArchiveReportCsv(context: android.content.Context) {
+        val details = _uiState.value.archiveReportDetails ?: return
+        InventoryReportExporter.exportCsv(context, details, _uiState.value.isArabic)
+    }
+
+    private fun parseArchiveDetailsJson(
+        json: org.json.JSONObject?,
+        reportId: String,
+        fallbackCode: String,
+        fallbackDate: String,
+        fallbackBranch: String,
+        fallbackMatched: Int,
+        fallbackExpected: Int,
+        fallbackMissing: Int,
+        fallbackWeight: Double
+    ): ArchiveReportDetails {
+        val root = json?.optJSONObject("data") ?: json?.optJSONObject("report") ?: json
+        val itemsList = mutableListOf<ArchiveReportItemDetail>()
+
+        fun parseArray(arr: org.json.JSONArray?, defaultStatus: ArchiveItemStatus) {
+            if (arr == null) return
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val statusStr = obj.optString("status", "").lowercase()
+                val status = when {
+                    statusStr.contains("miss") -> ArchiveItemStatus.MISSING
+                    statusStr.contains("uncat") || statusStr.contains("unknown") -> ArchiveItemStatus.UNCATALOGUED
+                    statusStr.contains("match") || statusStr.contains("found") -> ArchiveItemStatus.MATCHED
+                    else -> defaultStatus
+                }
+                itemsList.add(
+                    ArchiveReportItemDetail(
+                        epc = obj.optString("epc", obj.optString("tag_epc", "-")),
+                        name = obj.optString("name", obj.optString("item_name", obj.optString("title", "قطعة مجوهرات"))),
+                        karat = obj.optString("karat", obj.optString("purity", "")),
+                        weightGrams = obj.optDouble("weight", obj.optDouble("weight_grams", 0.0)),
+                        estimatedValue = obj.optDouble("price", obj.optDouble("estimated_value", 0.0)),
+                        status = status
+                    )
+                )
+            }
+        }
+
+        parseArray(root?.optJSONArray("items"), ArchiveItemStatus.MATCHED)
+        parseArray(root?.optJSONArray("matched_items"), ArchiveItemStatus.MATCHED)
+        parseArray(root?.optJSONArray("missing_items"), ArchiveItemStatus.MISSING)
+        parseArray(root?.optJSONArray("uncatalogued_items"), ArchiveItemStatus.UNCATALOGUED)
+
+        return ArchiveReportDetails(
+            reportId = reportId,
+            reportCode = root?.optString("report_number", root.optString("code", fallbackCode)) ?: fallbackCode,
+            createdAt = root?.optString("created_at", root.optString("date", fallbackDate)) ?: fallbackDate,
+            branchName = root?.optString("branch_name", fallbackBranch) ?: fallbackBranch,
+            auditorName = root?.optString("auditor_name", root.optString("user_name", "-")) ?: "-",
+            expectedCount = root?.optInt("expected_count", fallbackExpected) ?: fallbackExpected,
+            matchedCount = root?.optInt("matched_count", fallbackMatched) ?: fallbackMatched,
+            missingCount = root?.optInt("missing_count", fallbackMissing) ?: fallbackMissing,
+            uncataloguedCount = root?.optInt("uncatalogued_count", 0) ?: 0,
+            scannedWeightGrams = root?.optDouble("scanned_weight", fallbackWeight) ?: fallbackWeight,
+            estimatedValueUsd = root?.optDouble("estimated_value", 0.0) ?: 0.0,
+            items = itemsList
+        )
+    }
 }
