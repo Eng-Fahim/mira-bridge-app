@@ -36,7 +36,7 @@ class MiraInventoryProFragment : Fragment() {
     private var uhfSoundEngine: MiraUhfSoundEngine? = null
     private var lastGeigerBeepMs = 0L
     private var isClosing = false
-    
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -51,6 +51,9 @@ class MiraInventoryProFragment : Fragment() {
 
         val apiClient = runCatching { MiraApiClient.getInstance(ctx) }.getOrNull()
         val branchesManager = runCatching { MiraBranchesManager.getInstance(ctx) }.getOrNull()
+
+        // ضبط Session S1 / Target A لتقليل تداخل الشرائح في صواني المجوهرات الكثيفة
+        rfidManager?.configureDenseJewelrySession()
 
         viewModel.initDependencies(
             isArabicLang = isArabic,
@@ -90,17 +93,15 @@ class MiraInventoryProFragment : Fragment() {
                     false
                 }
             }
-            
 
             setContent {
-               MiraInventoryScreen(
-               viewModel = viewModel,
-               onNavigateBack = { exitInventoryScreen() }
-               )
-               }
+                MiraInventoryScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { exitInventoryScreen() }
+                )
+            }
         }
     }
-    
 
     override fun onResume() {
         super.onResume()
@@ -108,8 +109,21 @@ class MiraInventoryProFragment : Fragment() {
         setHostBottomBarVisible(false)
     }
 
+    override fun onPause() {
+        super.onPause()
+        viewModel.saveCurrentSessionSnapshot()
+        setHostBottomBarVisible(true)
+    }
+
+    override fun onDestroyView() {
+        setHostBottomBarVisible(true)
+        uhfSoundEngine?.release()
+        uhfSoundEngine = null
+        super.onDestroyView()
+    }
+
     /**
-     * الخروج المنظم من شاشة الجرد وإعادة إظهار القائمة السفلية للتطبيق
+     * الخروج الآمن والمنظم من شاشة الجرد دون حلقة رجوع أو انهيار
      */
     fun exitInventoryScreen() {
         if (isClosing || !isAdded) return
@@ -126,21 +140,6 @@ class MiraInventoryProFragment : Fragment() {
             activity?.onBackPressedDispatcher?.onBackPressed()
         }
     }
-
-    override fun onPause() {
-        super.onPause()
-        viewModel.saveCurrentSessionSnapshot()
-        setHostBottomBarVisible(true)
-    }
-
-    override fun onDestroyView() {
-        setHostBottomBarVisible(true)
-        uhfSoundEngine?.release()
-        uhfSoundEngine = null
-        super.onDestroyView()
-    }
-
-
 
     /**
      * إخفاء / إظهار شريط التنقل السفلي الخاص بـ UHFMainActivity لمنع تغطية أزرار الجرد
