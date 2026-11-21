@@ -113,6 +113,46 @@ class MiraInventoryProFragment : Fragment() {
         }
         return false
     }
+    
+        // ═══════════════════════════════════════════════════════════
+    //  واجهة التوافق الكاملة مع UHFMainActivity.java
+    // ═══════════════════════════════════════════════════════════
+
+    fun showInventoryScannerSettings() {
+        if (!isAdded) return
+        viewModel.openScannerSettingsSheet()
+    }
+
+    fun showInventorySessionSettings() {
+        if (!isAdded) return
+        viewModel.openSessionSettingsSheet()
+    }
+
+    fun getScannedCount(): Int {
+        if (!isAdded) return 0
+        return viewModel.getScannedCount()
+    }
+
+    fun isCurrentlyScanning(): Boolean {
+        if (!isAdded) return false
+        return viewModel.isScanning()
+    }
+
+    fun isScanning(): Boolean {
+        if (!isAdded) return false
+        return viewModel.isScanning()
+    }
+
+    fun stopScanning() {
+        if (!isAdded) return
+        viewModel.stopScanning()
+    }
+
+    fun showArchiveReportsPublic() {
+        if (!isAdded) return
+        viewModel.openArchive()
+    }
+
 
     private fun createHardwareBridge() = object : MiraInventoryViewModel.HardwareOperations {
         override fun applyAntennaPower(powerDbm: Int): Boolean {
