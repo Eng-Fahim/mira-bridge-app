@@ -1472,7 +1472,7 @@ private fun ArchiveReportsSheetContent(
                                     fontSize = 13.sp
                                 )
                                 Text(
-                                    text = "${rep.createdAt} • ${rep.scannedCount}/${rep.expectedCount}",
+                                    text = "${rep.date} • ${rep.scannedCount}/${rep.expectedCount}",
                                     color = MiraPalette.TextSecondary,
                                     fontSize = 11.sp
                                 )
