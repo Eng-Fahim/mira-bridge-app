@@ -8,7 +8,8 @@ public class InventoryItem {
     private final String serial;
     private String title;       // ✅ تم إزالة final
     private String karat;
-    
+    private String category = "";
+
     private double weight;
     private double price;
     
@@ -55,6 +56,12 @@ public class InventoryItem {
     public String getEpc() { return epc; }
     public String getGtin() { return gtin; }
     public String getSerial() { return serial; }
+    
+    public String getCategory() {
+    return category != null ? category : "";}
+    public void setCategory(String category) {
+    this.category = category != null ? category : "";}
+    
     
     // ✅ title أصبح قابل للتعديل
     public String getTitle() { return title; }
