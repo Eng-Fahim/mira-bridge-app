@@ -35,7 +35,8 @@ class MiraInventoryProFragment : Fragment() {
     private var soundManager: SoundManager? = null
     private var uhfSoundEngine: MiraUhfSoundEngine? = null
     private var lastGeigerBeepMs = 0L
-
+    private var isClosing = false
+    
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -99,10 +100,31 @@ class MiraInventoryProFragment : Fragment() {
                }
         }
     }
+    
 
     override fun onResume() {
         super.onResume()
+        isClosing = false
         setHostBottomBarVisible(false)
+    }
+
+    /**
+     * الخروج المنظم من شاشة الجرد وإعادة إظهار القائمة السفلية للتطبيق
+     */
+    fun exitInventoryScreen() {
+        if (isClosing || !isAdded) return
+        isClosing = true
+
+        if (viewModel.isScanning()) {
+            viewModel.stopScanning()
+        }
+        setHostBottomBarVisible(true)
+
+        if (parentFragmentManager.backStackEntryCount > 0) {
+            parentFragmentManager.popBackStack()
+        } else {
+            activity?.onBackPressedDispatcher?.onBackPressed()
+        }
     }
 
     override fun onPause() {
@@ -118,16 +140,7 @@ class MiraInventoryProFragment : Fragment() {
         super.onDestroyView()
     }
 
-    /**
-     * الخروج المنظم من شاشة الجرد وإعادة إظهار القائمة السفلية للتطبيق
-     */
-    fun exitInventoryScreen() {
-        if (viewModel.isScanning()) {
-            viewModel.stopScanning()
-        }
-        setHostBottomBarVisible(true)
-        activity?.onBackPressedDispatcher?.onBackPressed()
-    }
+
 
     /**
      * إخفاء / إظهار شريط التنقل السفلي الخاص بـ UHFMainActivity لمنع تغطية أزرار الجرد
