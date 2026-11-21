@@ -1238,4 +1238,80 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             items = itemsList
         )
     }
+    
+    // ==================== طباعة وتصدير ملخص الجلسة الحالية ====================
+
+    /**
+     * استدعِ هذه الدالة فور نجاح اعتماد الجرد (أو عند فتح نافذة ملخص الجلسة)
+     * لتثبيت بيانات التقرير برقم المرجع القادم من السيرفر.
+     */
+    fun captureCommittedSessionReport(
+        serverReportCode: String? = null,
+        branchName: String = "",
+        auditorName: String = "-",
+        expectedCount: Int = 0,
+        missingCount: Int = 0,
+        scannedWeightGrams: Double = 0.0,
+        estimatedValueUsd: Double = 0.0,
+        sessionItems: List<ArchiveReportItemDetail> = emptyList()
+    ) {
+        val s = _uiState.value
+        val now = java.util.Date()
+        val autoCode = serverReportCode?.takeIf { it.isNotBlank() }
+            ?: "INV-${java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(now)}"
+        val formattedDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(now)
+
+        val resolvedExpected = if (expectedCount > 0) expectedCount else (s.matchedCount + missingCount)
+
+        val details = ArchiveReportDetails(
+            reportId = autoCode,
+            reportCode = autoCode,
+            createdAt = formattedDate,
+            branchName = branchName.ifBlank { if (s.isArabic) "الفرع الحالي" else "Current Branch" },
+            auditorName = auditorName,
+            expectedCount = resolvedExpected,
+            matchedCount = s.matchedCount,
+            missingCount = missingCount,
+            uncataloguedCount = s.uncataloguedCount + s.wrongCategoryCount,
+            scannedWeightGrams = scannedWeightGrams,
+            estimatedValueUsd = estimatedValueUsd,
+            items = sessionItems
+        )
+
+        _uiState.update { it.copy(lastCommittedReportDetails = details) }
+    }
+
+    fun printCurrentSessionReport(context: android.content.Context) {
+        val s = _uiState.value
+        val details = s.lastCommittedReportDetails ?: buildFallbackCurrentSessionDetails()
+        InventoryReportExporter.printOrSavePdf(context, details, s.isArabic)
+    }
+
+    fun exportCurrentSessionReportCsv(context: android.content.Context) {
+        val s = _uiState.value
+        val details = s.lastCommittedReportDetails ?: buildFallbackCurrentSessionDetails()
+        InventoryReportExporter.exportCsv(context, details, s.isArabic)
+    }
+
+    private fun buildFallbackCurrentSessionDetails(): ArchiveReportDetails {
+        val s = _uiState.value
+        val now = java.util.Date()
+        val code = "INV-${java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.US).format(now)}"
+        val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(now)
+
+        return ArchiveReportDetails(
+            reportId = code,
+            reportCode = code,
+            createdAt = dateStr,
+            branchName = if (s.isArabic) "الفرع الحالي" else "Current Branch",
+            auditorName = "-",
+            expectedCount = s.matchedCount,
+            matchedCount = s.matchedCount,
+            missingCount = 0,
+            uncataloguedCount = s.uncataloguedCount + s.wrongCategoryCount,
+            scannedWeightGrams = 0.0,
+            estimatedValueUsd = 0.0,
+            items = emptyList()
+        )
+    }
 }
