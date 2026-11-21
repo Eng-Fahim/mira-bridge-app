@@ -1,12 +1,12 @@
 package com.example.uhf.manager;
 
-import com.example.uhf.tools.SessionManager;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
 import com.example.uhf.network.NetworkClient;
+import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
 
@@ -30,18 +30,25 @@ public class PermissionSyncManager {
     private static final long POLL_INTERVAL_MS = 30_000L;
 
     private static volatile PermissionSyncManager instance;
+    private static volatile boolean forceLogoutInProgress = false;
 
     private final Context appContext;
     private final PermissionManager permissionManager;
     private final NetworkClient networkClient;
+    private final SessionManager sessionManager;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean polling = new AtomicBoolean(false);
     private final AtomicBoolean fetching = new AtomicBoolean(false);
 
     private final Runnable pollRunnable = new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
+            if (!isActiveSession()) {
+                stopPolling();
+                return;
+            }
             checkNow(null);
-            if (polling.get()) {
+            if (polling.get() && isActiveSession()) {
                 handler.postDelayed(this, POLL_INTERVAL_MS);
             }
         }
@@ -55,49 +62,83 @@ public class PermissionSyncManager {
         this.appContext = ctx.getApplicationContext();
         this.permissionManager = PermissionManager.getInstance(appContext);
         this.networkClient = client;
+        this.sessionManager = new SessionManager(appContext);
     }
 
     public static PermissionSyncManager getInstance(Context ctx, NetworkClient client) {
         if (instance == null) {
             synchronized (PermissionSyncManager.class) {
-                if (instance == null) instance = new PermissionSyncManager(ctx, client);
+                if (instance == null) {
+                    instance = new PermissionSyncManager(ctx, client);
+                }
             }
         }
         return instance;
     }
 
+    private boolean isActiveSession() {
+        return sessionManager != null && sessionManager.isLoggedIn();
+    }
+
+    public static void resetForceLogoutGuard() {
+        forceLogoutInProgress = false;
+    }
+
     /** يُستدعى من BaseActivity.onResume() */
     public void onResumeCheck() {
+        if (!isActiveSession()) {
+            stopPolling();
+            return;
+        }
+        forceLogoutInProgress = false;
         checkNow(null);
     }
 
     /** بدء الفحص الدوري — استدعها من أي شاشة مفتوحة */
     public void startPolling() {
+        if (!isActiveSession()) {
+            stopPolling();
+            return;
+        }
+        forceLogoutInProgress = false;
         if (polling.compareAndSet(false, true)) {
-            handler.post(pollRunnable);
+            handler.removeCallbacks(pollRunnable);
+            handler.postDelayed(pollRunnable, POLL_INTERVAL_MS);
             Log.d(TAG, "▶ polling started");
         }
     }
 
     public void stopPolling() {
-        if (polling.compareAndSet(true, false)) {
-            handler.removeCallbacks(pollRunnable);
-            Log.d(TAG, "⏸ polling stopped");
-        }
+        polling.set(false);
+        handler.removeCallbacks(pollRunnable);
+        Log.d(TAG, "⏸ polling stopped");
     }
 
     /**
      * فحص فوري متزامن (async) — يُستدعى عند onResume أو يدوياً.
      */
-        public void checkNow(Callback cb) {
+    public void checkNow(Callback cb) {
+        if (!isActiveSession()) {
+            stopPolling();
+            if (cb != null) cb.onResult(false, null);
+            return;
+        }
+
         if (!fetching.compareAndSet(false, true)) {
             if (cb != null) cb.onResult(false, null);
             return;
         }
 
         networkClient.get("/api/v1/me/permissions/version", new NetworkClient.JsonCallback() {
-            @Override public void onSuccess(JSONObject versionResponse) {
+            @Override
+            public void onSuccess(JSONObject versionResponse) {
                 try {
+                    if (!isActiveSession()) {
+                        stopPolling();
+                        if (cb != null) cb.onResult(false, null);
+                        return;
+                    }
+
                     String serverVersion = "";
                     if (versionResponse != null) {
                         serverVersion = versionResponse.optString("version", "");
@@ -111,7 +152,6 @@ public class PermissionSyncManager {
 
                     if (!permissionManager.needsRefresh(serverVersion)) {
                         if (cb != null) cb.onResult(false, null);
-                        fetching.set(false);
                         return;
                     }
 
@@ -124,13 +164,17 @@ public class PermissionSyncManager {
                 }
             }
 
-            @Override public void onError(Throwable t) {
+            @Override
+            public void onError(Throwable t) {
                 String msg = (t != null && t.getMessage() != null) ? t.getMessage() : "";
                 Log.w(TAG, "version endpoint failed: " + msg);
 
-                // إذا تم إلغاء التوكن من الويب (Force Logout) سيعود السيرفر بـ 401 → اطرد الجلسة فوراً
-                if (msg.contains("401") || msg.toLowerCase().contains("unauthenticated")
-                        || msg.toLowerCase().contains("unauthorized")) {
+                // إيقاف الفحص الدوري فوراً عند حدوث خطأ أو 401 لمنع التكرار
+                stopPolling();
+
+                if (isActiveSession() && (msg.contains("401")
+                        || msg.toLowerCase().contains("unauthenticated")
+                        || msg.toLowerCase().contains("unauthorized"))) {
                     PermissionSyncManager.triggerForceLogout(appContext, null);
                 }
 
@@ -140,10 +184,17 @@ public class PermissionSyncManager {
         });
     }
 
-
     private void fetchFullPermissions(String serverVersion, Callback cb) {
+        if (!isActiveSession()) {
+            stopPolling();
+            fetching.set(false);
+            if (cb != null) cb.onResult(false, null);
+            return;
+        }
+
         networkClient.get("/api/v1/me/permissions", new NetworkClient.JsonCallback() {
-            @Override public void onSuccess(JSONObject fullResponse) {
+            @Override
+            public void onSuccess(JSONObject fullResponse) {
                 try {
                     boolean changed = permissionManager.applyFromServer(fullResponse, serverVersion);
                     Log.i(TAG, changed
@@ -158,7 +209,8 @@ public class PermissionSyncManager {
                 }
             }
 
-            @Override public void onError(Throwable t) {
+            @Override
+            public void onError(Throwable t) {
                 Log.w(TAG, "full permissions fetch failed: " + t.getMessage());
                 if (cb != null) cb.onResult(false, t);
                 fetching.set(false);
@@ -170,34 +222,47 @@ public class PermissionSyncManager {
         if (v == null || v.length() < 10) return String.valueOf(v);
         return v.substring(0, 8) + "…";
     }
+
     public static void triggerForceLogout(Context context, String serverMessage) {
-    try {
-        Log.w(TAG, "Force logout triggered by server");
+        if (forceLogoutInProgress) {
+            return;
+        }
+        forceLogoutInProgress = true;
 
-        SessionManager sessionManager = new SessionManager(context);
-        sessionManager.logoutUser();
+        try {
+            Log.w(TAG, "Force logout triggered by server");
 
-        new Handler(Looper.getMainLooper()).post(() -> {
-            android.content.Intent intent =
-                    new android.content.Intent(
-                            context,
-                            com.example.uhf.activity.LoginActivity.class
-                    );
-
-            intent.addFlags(
-                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                    | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-            );
-
-            if (serverMessage != null && !serverMessage.trim().isEmpty()) {
-                intent.putExtra("force_logout_message", serverMessage);
+            Context appCtx = context.getApplicationContext();
+            if (instance != null) {
+                instance.stopPolling();
             }
 
-            context.startActivity(intent);
-        });
+            SessionManager sessionManager = new SessionManager(appCtx);
+            if (sessionManager.isLoggedIn()) {
+                sessionManager.logoutUser();
+            }
 
-    } catch (Exception e) {
-        Log.e(TAG, "Force logout failed", e);
-    }
+            new Handler(Looper.getMainLooper()).post(() -> {
+                android.content.Intent intent =
+                        new android.content.Intent(
+                                appCtx,
+                                com.example.uhf.activity.LoginActivity.class
+                        );
+
+                intent.addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                );
+
+                if (serverMessage != null && !serverMessage.trim().isEmpty()) {
+                    intent.putExtra("force_logout_message", serverMessage);
+                }
+
+                appCtx.startActivity(intent);
+            });
+        } catch (Exception e) {
+            forceLogoutInProgress = false;
+            Log.e(TAG, "Force logout failed", e);
+        }
     }
 }
