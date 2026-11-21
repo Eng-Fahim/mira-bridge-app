@@ -109,7 +109,7 @@ import androidx.compose.ui.unit.sp
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import java.util.Locale
-
+import androidx.compose.runtime.DisposableEffect
 /**
  * محول ألوان متجاوب يربط شاشة الجرد تلقائياً بثيم التطبيق (MiraJewelryTheme + MiraTypography / Cairo)
  * في كلٍّ من الوضع الليلي والنهاري.
@@ -211,7 +211,7 @@ fun MiraInventoryScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     var isExiting by remember { mutableStateOf(false) }
 
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 isExiting = false
