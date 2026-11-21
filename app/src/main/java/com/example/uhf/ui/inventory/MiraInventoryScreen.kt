@@ -1,5 +1,6 @@
 package com.example.uhf.ui.inventory
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,14 +32,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Print
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -80,6 +85,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -92,25 +98,119 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.uhf.ui.theme.MiraJewelryTheme
+import com.example.uhf.ui.theme.MiraTheme
 import java.util.Locale
 
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.FileDownload
-import androidx.compose.material.icons.rounded.Print
+/**
+ * محول ألوان متجاوب يربط شاشة الجرد تلقائياً بثيم التطبيق (MiraJewelryTheme + MiraTypography / Cairo)
+ * في كلٍّ من الوضع الليلي والنهاري.
+ */
+private data class AdaptiveAuditColors(
+    val bgDeep: Color,
+    val bgSurface: Color,
+    val bgCard: Color,
+    val bgElevated: Color,
+    val borderSubtle: Color,
+    val goldPrimary: Color,
+    val goldLight: Color,
+    val goldDark: Color,
+    val goldContainer: Color,
+    val onGoldButton: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textMuted: Color,
+    val emeraldMatched: Color,
+    val emeraldContainer: Color,
+    val crimsonMissing: Color,
+    val crimsonContainer: Color,
+    val amberWarning: Color,
+    val amberContainer: Color,
+    val cyanExtra: Color,
+    val cyanContainer: Color,
+    val isDark: Boolean
+)
+
+@Composable
+private fun rememberAuditColors(): AdaptiveAuditColors {
+    val mc = MiraTheme.colors
+    return remember(mc) {
+        if (mc.isDark) {
+            AdaptiveAuditColors(
+                bgDeep = mc.backgroundTop,
+                bgSurface = mc.backgroundMid,
+                bgCard = mc.cardSurface,
+                bgElevated = Color(0xFF17274D),
+                borderSubtle = mc.cardBorder,
+                goldPrimary = mc.goldPrimary,
+                goldLight = mc.goldHighlight,
+                goldDark = mc.goldDeep,
+                goldContainer = mc.goldPrimary.copy(alpha = 0.16f),
+                onGoldButton = Color(0xFF040814),
+                textPrimary = mc.textPrimary,
+                textSecondary = mc.textSecondary,
+                textMuted = mc.textSecondary.copy(alpha = 0.65f),
+                emeraldMatched = Color(0xFF10B981),
+                emeraldContainer = Color(0xFF10B981).copy(alpha = 0.16f),
+                crimsonMissing = Color(0xFFEF4444),
+                crimsonContainer = Color(0xFFEF4444).copy(alpha = 0.16f),
+                amberWarning = Color(0xFFF59E0B),
+                amberContainer = Color(0xFFF59E0B).copy(alpha = 0.16f),
+                cyanExtra = Color(0xFF38BDF8),
+                cyanContainer = Color(0xFF38BDF8).copy(alpha = 0.16f),
+                isDark = true
+            )
+        } else {
+            AdaptiveAuditColors(
+                bgDeep = mc.backgroundTop,         // عاجي لؤلؤي #FAF7F2
+                bgSurface = mc.backgroundMid,      // بيج ذهبي #F1EAE0
+                bgCard = mc.cardSurface,           // أبيض نقي #FFFFFF
+                bgElevated = Color(0xFFF6F1E8),
+                borderSubtle = mc.cardBorder,
+                goldPrimary = mc.goldPrimary,      // ذهب معتّق #B8860B
+                goldLight = mc.subtitleGold,       // #8A5A10
+                goldDark = mc.goldDeep,
+                goldContainer = mc.goldPrimary.copy(alpha = 0.14f),
+                onGoldButton = Color.White,
+                textPrimary = mc.textPrimary,      // كحلي داكن #0B152C
+                textSecondary = mc.textSecondary,  // #475569
+                textMuted = Color(0xFF64748B),
+                emeraldMatched = Color(0xFF059669),
+                emeraldContainer = Color(0xFF059669).copy(alpha = 0.12f),
+                crimsonMissing = Color(0xFFDC2626),
+                crimsonContainer = Color(0xFFDC2626).copy(alpha = 0.12f),
+                amberWarning = Color(0xFFD97706),
+                amberContainer = Color(0xFFD97706).copy(alpha = 0.12f),
+                cyanExtra = Color(0xFF0284C7),
+                cyanContainer = Color(0xFF0284C7).copy(alpha = 0.12f),
+                isDark = false
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiraInventoryScreen(
-    viewModel: MiraInventoryViewModel
+    viewModel: MiraInventoryViewModel,
+    onNavigateBack: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val layoutDirection = if (state.isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+
+    // معالجة زر الرجوع في الجهاز للخروج المنظم وإظهار شريط التنقل السفلي
+    BackHandler {
+        onNavigateBack()
+    }
 
     LaunchedEffect(state.snackbarMessage) {
         val msg = state.snackbarMessage
@@ -120,276 +220,287 @@ fun MiraInventoryScreen(
         }
     }
 
-    MiraInventoryTheme(isArabic = state.isArabic) {
-        Scaffold(
-            containerColor = MiraPalette.NavyDeep,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                InventoryTopBar(
-                    state = state,
-                    onSelectCategory = viewModel::selectCategory,
-                    onSyncOffline = viewModel::syncOfflineQueue,
-                    onOpenArchive = viewModel::openArchive,
-                    onReloadCatalog = { viewModel.loadCatalog(checkRestoreAfterLoad = false) }
-                )
-            },
-            bottomBar = {
-                ScannerControlDock(
-                    state = state,
-                    onToggleScan = viewModel::toggleScanning,
-                    onPowerChange = viewModel::setAntennaPower,
-                    onTriggerModeChange = viewModel::setTriggerMode,
-                    onCommit = viewModel::commitCurrentInventory,
-                    onReset = viewModel::resetCurrentAudit
-                )
-            }
-        ) { innerPadding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // 1. تنبيه استرجاع الجلسة السابقة
-                item(key = "restore_banner") {
-                    AnimatedVisibility(visible = state.restoreBanner != null) {
-                        state.restoreBanner?.let { banner ->
-                            RestoreSessionCard(
+    MiraJewelryTheme {
+        val colors = rememberAuditColors()
+
+        CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+            Scaffold(
+                containerColor = colors.bgDeep,
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                topBar = {
+                    InventoryTopBar(
+                        state = state,
+                        colors = colors,
+                        onNavigateBack = onNavigateBack,
+                        onSelectCategory = viewModel::selectCategory,
+                        onSyncOffline = viewModel::syncOfflineQueue,
+                        onOpenArchive = viewModel::openArchive,
+                        onReloadCatalog = { viewModel.loadCatalog(checkRestoreAfterLoad = false) }
+                    )
+                },
+                bottomBar = {
+                    ScannerControlDock(
+                        state = state,
+                        colors = colors,
+                        onToggleScan = viewModel::toggleScanning,
+                        onPowerChange = viewModel::setAntennaPower,
+                        onTriggerModeChange = viewModel::setTriggerMode,
+                        onCommit = viewModel::commitCurrentInventory,
+                        onReset = viewModel::resetCurrentAudit
+                    )
+                }
+            ) { innerPadding ->
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // 1. تنبيه استرجاع الجلسة السابقة
+                    item(key = "restore_banner") {
+                        AnimatedVisibility(visible = state.restoreBanner != null) {
+                            state.restoreBanner?.let { banner ->
+                                RestoreSessionCard(
+                                    isArabic = state.isArabic,
+                                    colors = colors,
+                                    banner = banner,
+                                    onRestore = viewModel::restoreSavedSession,
+                                    onDismiss = viewModel::dismissRestoreBanner
+                                )
+                            }
+                        }
+                    }
+
+                    // 2. شريط تحميل أو خطأ الكتالوج
+                    if (state.isCatalogLoading || state.catalogError != null) {
+                        item(key = "catalog_status") {
+                            CatalogStatusBanner(
                                 isArabic = state.isArabic,
-                                banner = banner,
-                                onRestore = viewModel::restoreSavedSession,
-                                onDismiss = viewModel::dismissRestoreBanner
+                                colors = colors,
+                                isLoading = state.isCatalogLoading,
+                                error = state.catalogError,
+                                onRetry = { viewModel.loadCatalog(checkRestoreAfterLoad = false) }
+                            )
+                        }
+                    }
+
+                    // 3. لوحة القياس والوزن وتفصيل العيارات
+                    item(key = "telemetry_card") {
+                        TelemetryDashboardCard(
+                            state = state,
+                            colors = colors,
+                            onMetricClick = viewModel::selectFilterTab
+                        )
+                    }
+
+                    // 4. شريط الفلترة والبحث الحي
+                    item(key = "filter_and_search") {
+                        FilterAndSearchSection(
+                            state = state,
+                            colors = colors,
+                            onTabSelected = viewModel::selectFilterTab,
+                            onQueryChanged = viewModel::updateSearchQuery
+                        )
+                    }
+
+                    // 5. قائمة القطع الافتراضية عالية الأداء (Virtualized LazyColumn)
+                    if (state.visibleItems.isEmpty() && !state.isCatalogLoading) {
+                        item(key = "empty_placeholder") {
+                            EmptyInventoryPlaceholder(
+                                isArabic = state.isArabic,
+                                colors = colors,
+                                tab = state.activeTab
+                            )
+                        }
+                    } else {
+                        items(
+                            items = state.visibleItems,
+                            key = { it.epc }
+                        ) { row ->
+                            JewelryInventoryItemCard(
+                                isArabic = state.isArabic,
+                                colors = colors,
+                                item = row,
+                                onLocateRadar = { viewModel.openRadarForItem(row) },
+                                onVerifyTid = { viewModel.verifyTagTid(row) }
                             )
                         }
                     }
                 }
-
-                // 2. شريط تحميل أو خطأ الكتالوج
-                if (state.isCatalogLoading || state.catalogError != null) {
-                    item(key = "catalog_status") {
-                        CatalogStatusBanner(
-                            isArabic = state.isArabic,
-                            isLoading = state.isCatalogLoading,
-                            error = state.catalogError,
-                            onRetry = { viewModel.loadCatalog(checkRestoreAfterLoad = false) }
-                        )
-                    }
-                }
-
-                // 3. لوحة القياس والوزن وتفصيل العيارات
-                item(key = "telemetry_card") {
-                    TelemetryDashboardCard(
-                        state = state,
-                        onMetricClick = viewModel::selectFilterTab
-                    )
-                }
-
-                // 4. شريط الفلترة والبحث الحي
-                item(key = "filter_and_search") {
-                    FilterAndSearchSection(
-                        state = state,
-                        onTabSelected = viewModel::selectFilterTab,
-                        onQueryChanged = viewModel::updateSearchQuery
-                    )
-                }
-
-                // 5. قائمة القطع الافتراضية عالية الأداء (Virtualized LazyColumn)
-                if (state.visibleItems.isEmpty() && !state.isCatalogLoading) {
-                    item(key = "empty_placeholder") {
-                        EmptyInventoryPlaceholder(isArabic = state.isArabic, tab = state.activeTab)
-                    }
-                } else {
-                    items(
-                        items = state.visibleItems,
-                        key = { it.epc }
-                    ) { row ->
-                        JewelryInventoryItemCard(
-                            isArabic = state.isArabic,
-                            item = row,
-                            onLocateRadar = { viewModel.openRadarForItem(row) },
-                            onVerifyTid = { viewModel.verifyTagTid(row) }
-                        )
-                    }
-                }
             }
-        }
 
-        // نافذة رادار تتبع القطعة المفقودة (Geiger RSSI Radar)
-        state.radarTarget?.let { target ->
-            ModalBottomSheet(
-                onDismissRequest = viewModel::closeRadar,
-                containerColor = MiraPalette.NavySurface,
-                contentColor = MiraPalette.TextPrimary
-            ) {
-                RssiRadarSheetContent(
-                    isArabic = state.isArabic,
-                    target = target,
-                    onClose = viewModel::closeRadar
-                )
-            }
-        }
-
-        // نافذة نتيجة فحص أصالة TID
-        state.tidVerificationResult?.let { (epc, resultText) ->
-            AlertDialog(
-                onDismissRequest = viewModel::dismissTidResult,
-                containerColor = MiraPalette.NavyCard,
-                title = {
-                    Text(
-                        text = if (state.isArabic) "فحص أصالة الشريحة (TID)" else "Chip TID Verification",
-                        color = MiraPalette.GoldPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "EPC: $epc",
-                            color = MiraPalette.TextSecondary,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = resultText,
-                            color = MiraPalette.TextPrimary,
-                            fontSize = 14.sp
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = viewModel::dismissTidResult) {
-                        Text(
-                            text = if (state.isArabic) "إغلاق" else "Close",
-                            color = MiraPalette.GoldPrimary
-                        )
-                    }
-                }
-            )
-        }
-
-        // نافذة تقرير الاعتماد النهائي
-        state.commitReport?.let { report ->
-            CommitReportDialog(
-                isArabic = state.isArabic,
-                report = report,
-                onDismiss = viewModel::dismissCommitReport
-            )
-        }
-
-        // نافذة أرشيف جلسات الجرد السابقة
-                if (state.showArchiveSheet) {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            SessionReportExportActions(
-            isArabic = state.isArabic,
-            reportCode = state.lastCommittedReportDetails?.reportCode,
-            onPrintPdf = { viewModel.printCurrentSessionReport(context) },
-            onExportCsv = { viewModel.exportCurrentSessionReportCsv(context) }
-            )
-
-            ModalBottomSheet(
-                onDismissRequest = {
-                    viewModel.closeArchiveReportDetails()
-                    viewModel.closeArchive()
-                },
-                containerColor = MiraPalette.NavySurface,
-                contentColor = MiraPalette.TextPrimary
-            ) {
-                if (state.selectedArchiveReportId != null) {
-                    ArchiveReportDetailsSheetContent(
+            // نافذة رادار تتبع القطعة المفقودة (Geiger RSSI Radar)
+            state.radarTarget?.let { target ->
+                ModalBottomSheet(
+                    onDismissRequest = viewModel::closeRadar,
+                    containerColor = colors.bgSurface,
+                    contentColor = colors.textPrimary
+                ) {
+                    RssiRadarSheetContent(
                         isArabic = state.isArabic,
-                        isLoading = state.isLoadingArchiveDetails,
-                        errorMessage = state.archiveDetailsError,
-                        details = state.archiveReportDetails,
-                        onBack = viewModel::closeArchiveReportDetails,
-                        onRetry = {
-                            state.selectedArchiveReportId?.let { viewModel.openArchiveReportDetails(it) }
-                        },
-                        onPrintPdf = { viewModel.printSelectedArchiveReport(context) },
-                        onExportCsv = { viewModel.exportSelectedArchiveReportCsv(context) }
-                    )
-                } else {
-                    // قائمة التقارير المؤرشفة الحالية — عند النقر على أي تقرير استدعِ:
-                    // viewModel.openArchiveReportDetails(
-                    //     reportId = report.id,
-                    //     fallbackCode = report.code,
-                    //     fallbackDate = report.date,
-                    //     fallbackBranch = report.branchName,
-                    //     fallbackMatched = report.matchedCount,
-                    //     fallbackExpected = report.expectedCount,
-                    //     fallbackMissing = report.missingCount,
-                    //     fallbackWeight = report.scannedWeight
-                    // )
-                    ArchiveReportsListContent(
-                        state = state,
-                        onSelectReport = { id, code, date, branch, matched, expected, missing, weight ->
-                            viewModel.openArchiveReportDetails(
-                                reportId = id,
-                                fallbackCode = code,
-                                fallbackDate = date,
-                                fallbackBranch = branch,
-                                fallbackMatched = matched,
-                                fallbackExpected = expected,
-                                fallbackMissing = missing,
-                                fallbackWeight = weight
-                            )
-                        },
-                        onClose = viewModel::closeArchive
+                        colors = colors,
+                        target = target,
+                        onClose = viewModel::closeRadar
                     )
                 }
             }
-        }
 
-     // نافذة إعدادات القارئ والزناد (تُفتح من شريط التطبيق أو من UHFMainActivity)
-        if (state.showScannerSettingsSheet) {
-            ModalBottomSheet(
-                onDismissRequest = viewModel::closeScannerSettingsSheet,
-                containerColor = MiraPalette.NavySurface,
-                contentColor = MiraPalette.TextPrimary
-            ) {
-                ScannerSettingsSheetContent(
-                    state = state,
-                    onPowerChange = viewModel::setAntennaPower,
-                    onTriggerModeChange = viewModel::setTriggerMode,
-                    onClose = viewModel::closeScannerSettingsSheet
+            // نافذة نتيجة فحص أصالة TID
+            state.tidVerificationResult?.let { (epc, resultText) ->
+                AlertDialog(
+                    onDismissRequest = viewModel::dismissTidResult,
+                    containerColor = colors.bgCard,
+                    title = {
+                        Text(
+                            text = if (state.isArabic) "فحص أصالة الشريحة (TID)" else "Chip TID Verification",
+                            color = colors.goldPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "EPC: $epc",
+                                color = colors.textSecondary,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = resultText,
+                                color = colors.textPrimary,
+                                fontSize = 14.sp
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = viewModel::dismissTidResult) {
+                            Text(
+                                text = if (state.isArabic) "إغلاق" else "Close",
+                                color = colors.goldPrimary
+                            )
+                        }
+                    }
                 )
             }
-        }
 
-        // نافذة إعدادات جلسة الجرد والفئات (تُفتح من UHFMainActivity)
-        if (state.showSessionSettingsSheet) {
-            ModalBottomSheet(
-                onDismissRequest = viewModel::closeSessionSettingsSheet,
-                containerColor = MiraPalette.NavySurface,
-                contentColor = MiraPalette.TextPrimary
-            ) {
-                SessionSettingsSheetContent(
-                    state = state,
-                    onSelectCategory = { cat ->
-                        viewModel.selectCategory(cat)
-                        viewModel.closeSessionSettingsSheet()
-                    },
-                    onSaveSnapshot = {
-                        viewModel.saveCurrentSessionSnapshot()
-                        viewModel.closeSessionSettingsSheet()
-                    },
-                    onResetAudit = {
-                        viewModel.resetCurrentAudit()
-                        viewModel.closeSessionSettingsSheet()
-                    },
-                    onClose = viewModel::closeSessionSettingsSheet
+            // نافذة تقرير الاعتماد النهائي (مع أزرار طباعة PDF وتصدير CSV)
+            state.commitReport?.let { report ->
+                val context = LocalContext.current
+                CommitReportDialog(
+                    isArabic = state.isArabic,
+                    colors = colors,
+                    report = report,
+                    onPrintPdf = { viewModel.printCurrentSessionReport(context) },
+                    onExportCsv = { viewModel.exportCurrentSessionReportCsv(context) },
+                    onDismiss = viewModel::dismissCommitReport
                 )
+            }
+
+            // نافذة أرشيف جلسات الجرد السابقة
+            if (state.showArchiveSheet) {
+                val context = LocalContext.current
+                ModalBottomSheet(
+                    onDismissRequest = {
+                        viewModel.closeArchiveReportDetails()
+                        viewModel.closeArchive()
+                    },
+                    containerColor = colors.bgSurface,
+                    contentColor = colors.textPrimary
+                ) {
+                    if (state.selectedArchiveReportId != null) {
+                        ArchiveReportDetailsSheetContent(
+                            isArabic = state.isArabic,
+                            colors = colors,
+                            isLoading = state.isLoadingArchiveDetails,
+                            errorMessage = state.archiveDetailsError,
+                            details = state.archiveReportDetails,
+                            onBack = viewModel::closeArchiveReportDetails,
+                            onRetry = {
+                                state.selectedArchiveReportId?.let { viewModel.openArchiveReportDetails(it) }
+                            },
+                            onPrintPdf = { viewModel.printSelectedArchiveReport(context) },
+                            onExportCsv = { viewModel.exportSelectedArchiveReportCsv(context) }
+                        )
+                    } else {
+                        ArchiveReportsSheetContent(
+                            state = state,
+                            colors = colors,
+                            onOpenDetails = { sessionId ->
+                                val rep = state.archiveReports.firstOrNull { it.sessionId == sessionId }
+                                viewModel.openArchiveReportDetails(
+                                    reportId = sessionId,
+                                    fallbackCode = sessionId,
+                                    fallbackDate = rep?.date ?: "",
+                                    fallbackBranch = "#${state.branchId}",
+                                    fallbackMatched = rep?.scannedCount ?: 0,
+                                    fallbackExpected = rep?.expectedCount ?: 0,
+                                    fallbackMissing = ((rep?.expectedCount ?: 0) - (rep?.scannedCount ?: 0)).coerceAtLeast(0),
+                                    fallbackWeight = 0.0
+                                )
+                            },
+                            onDeleteReport = viewModel::deleteArchiveReport,
+                            onClose = viewModel::closeArchive
+                        )
+                    }
+                }
+            }
+
+            // نافذة إعدادات القارئ والزناد
+            if (state.showScannerSettingsSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = viewModel::closeScannerSettingsSheet,
+                    containerColor = colors.bgSurface,
+                    contentColor = colors.textPrimary
+                ) {
+                    ScannerSettingsSheetContent(
+                        state = state,
+                        colors = colors,
+                        onPowerChange = viewModel::setAntennaPower,
+                        onTriggerModeChange = viewModel::setTriggerMode,
+                        onClose = viewModel::closeScannerSettingsSheet
+                    )
+                }
+            }
+
+            // نافذة إعدادات جلسة الجرد والفئات
+            if (state.showSessionSettingsSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = viewModel::closeSessionSettingsSheet,
+                    containerColor = colors.bgSurface,
+                    contentColor = colors.textPrimary
+                ) {
+                    SessionSettingsSheetContent(
+                        state = state,
+                        colors = colors,
+                        onSelectCategory = { cat ->
+                            viewModel.selectCategory(cat)
+                            viewModel.closeSessionSettingsSheet()
+                        },
+                        onSaveSnapshot = {
+                            viewModel.saveCurrentSessionSnapshot()
+                            viewModel.closeSessionSettingsSheet()
+                        },
+                        onResetAudit = {
+                            viewModel.resetCurrentAudit()
+                            viewModel.closeSessionSettingsSheet()
+                        },
+                        onClose = viewModel::closeSessionSettingsSheet
+                    )
+                }
             }
         }
     }
 }
 
-// ==================== 1. شريط التطبيق العلوي ====================
+// ==================== 1. شريط التطبيق العلوي (مع زر الرجوع) ====================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InventoryTopBar(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
+    onNavigateBack: () -> Unit,
     onSelectCategory: (String) -> Unit,
     onSyncOffline: () -> Unit,
     onOpenArchive: () -> Unit,
@@ -399,26 +510,37 @@ private fun InventoryTopBar(
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MiraPalette.NavySurface,
-            titleContentColor = MiraPalette.TextPrimary
+            containerColor = colors.bgSurface,
+            titleContentColor = colors.textPrimary
         ),
+        navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = if (state.isArabic) "رجوع" else "Back",
+                    tint = colors.goldPrimary
+                )
+            }
+        },
         title = {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = if (state.isArabic) "جرد المجوهرات الذكي" else "MIRA Smart Audit",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = MiraPalette.GoldPrimary
+                        fontSize = 16.sp,
+                        color = colors.goldPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
                             .size(9.dp)
                             .clip(CircleShape)
                             .background(
-                                if (state.isReaderConnected) MiraPalette.EmeraldMatched
-                                else MiraPalette.CrimsonMissing
+                                if (state.isReaderConnected) colors.emeraldMatched
+                                else colors.crimsonMissing
                             )
                     )
                 }
@@ -426,24 +548,23 @@ private fun InventoryTopBar(
                     text = if (state.isArabic) "فرع #${state.branchId} • ${state.selectedCategory.ifBlank { "جرد شامل" }}"
                     else "Branch #${state.branchId} • ${state.selectedCategory.ifBlank { "Full Audit" }}",
                     fontSize = 11.sp,
-                    color = MiraPalette.TextSecondary
+                    color = colors.textSecondary
                 )
             }
         },
         actions = {
-            // اختيار الفئة / العيار
             Box {
                 IconButton(onClick = { categoryMenuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Rounded.FilterList,
                         contentDescription = "Category",
-                        tint = if (state.selectedCategory.isNotEmpty()) MiraPalette.GoldPrimary else MiraPalette.TextSecondary
+                        tint = if (state.selectedCategory.isNotEmpty()) colors.goldPrimary else colors.textSecondary
                     )
                 }
                 DropdownMenu(
                     expanded = categoryMenuExpanded,
                     onDismissRequest = { categoryMenuExpanded = false },
-                    modifier = Modifier.background(MiraPalette.NavyCard)
+                    modifier = Modifier.background(colors.bgCard)
                 ) {
                     state.availableCategories.forEach { cat ->
                         val label = cat.ifBlank {
@@ -453,7 +574,7 @@ private fun InventoryTopBar(
                             text = {
                                 Text(
                                     text = label,
-                                    color = if (cat == state.selectedCategory) MiraPalette.GoldPrimary else MiraPalette.TextPrimary,
+                                    color = if (cat == state.selectedCategory) colors.goldPrimary else colors.textPrimary,
                                     fontWeight = if (cat == state.selectedCategory) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
@@ -470,7 +591,7 @@ private fun InventoryTopBar(
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = "Reload Catalog",
-                    tint = MiraPalette.TextSecondary
+                    tint = colors.textSecondary
                 )
             }
 
@@ -478,7 +599,7 @@ private fun InventoryTopBar(
                 Icon(
                     imageVector = Icons.Rounded.Sync,
                     contentDescription = "Sync Offline",
-                    tint = MiraPalette.CyanExtra
+                    tint = colors.cyanExtra
                 )
             }
 
@@ -486,7 +607,7 @@ private fun InventoryTopBar(
                 Icon(
                     imageVector = Icons.Rounded.History,
                     contentDescription = "Archive",
-                    tint = MiraPalette.GoldLight
+                    tint = colors.goldLight
                 )
             }
         }
@@ -498,6 +619,7 @@ private fun InventoryTopBar(
 @Composable
 private fun TelemetryDashboardCard(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
     onMetricClick: (InventoryFilterTab) -> Unit
 ) {
     val animatedProgress by animateFloatAsState(
@@ -508,8 +630,8 @@ private fun TelemetryDashboardCard(
 
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MiraPalette.NavyCard),
-        border = BorderStroke(1.dp, MiraPalette.BorderSubtle)
+        colors = CardDefaults.cardColors(containerColor = colors.bgCard),
+        border = BorderStroke(1.dp, colors.borderSubtle)
     ) {
         Column(
             modifier = Modifier
@@ -522,18 +644,17 @@ private fun TelemetryDashboardCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // حلقة نسبة المطابقة
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(76.dp)) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         drawArc(
-                            color = MiraPalette.NavyElevated,
+                            color = colors.bgElevated,
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
                             style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
                         )
                         drawArc(
-                            color = MiraPalette.GoldPrimary,
+                            color = colors.goldPrimary,
                             startAngle = -90f,
                             sweepAngle = 360f * animatedProgress,
                             useCenter = false,
@@ -545,17 +666,16 @@ private fun TelemetryDashboardCard(
                             text = "${(animatedProgress * 100).toInt()}%",
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 16.sp,
-                            color = MiraPalette.GoldPrimary
+                            color = colors.goldPrimary
                         )
                         Text(
                             text = if (state.isArabic) "مطابقة" else "Match",
                             fontSize = 10.sp,
-                            color = MiraPalette.TextSecondary
+                            color = colors.textSecondary
                         )
                     }
                 }
 
-                // شبكة العدادات الأربعة التفاعلية
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -563,32 +683,36 @@ private fun TelemetryDashboardCard(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         MetricMiniPill(
                             modifier = Modifier.weight(1f),
+                            colors = colors,
                             label = if (state.isArabic) "المتوقع" else "Expected",
                             value = state.expectedCount.toString(),
-                            accent = MiraPalette.TextPrimary,
+                            accent = colors.textPrimary,
                             onClick = { onMetricClick(InventoryFilterTab.ALL) }
                         )
                         MetricMiniPill(
                             modifier = Modifier.weight(1f),
+                            colors = colors,
                             label = if (state.isArabic) "المطابق" else "Matched",
                             value = state.matchedCount.toString(),
-                            accent = MiraPalette.EmeraldMatched,
+                            accent = colors.emeraldMatched,
                             onClick = { onMetricClick(InventoryFilterTab.MATCHED) }
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         MetricMiniPill(
                             modifier = Modifier.weight(1f),
+                            colors = colors,
                             label = if (state.isArabic) "المفقود" else "Missing",
                             value = state.missingCount.toString(),
-                            accent = MiraPalette.CrimsonMissing,
+                            accent = colors.crimsonMissing,
                             onClick = { onMetricClick(InventoryFilterTab.MISSING) }
                         )
                         MetricMiniPill(
                             modifier = Modifier.weight(1f),
+                            colors = colors,
                             label = if (state.isArabic) "زائد/مخالف" else "Extra/Alert",
                             value = (state.uncataloguedCount + state.wrongCategoryCount).toString(),
-                            accent = MiraPalette.AmberWarning,
+                            accent = colors.amberWarning,
                             onClick = {
                                 onMetricClick(
                                     if (state.wrongCategoryCount > 0) InventoryFilterTab.WRONG_CATEGORY
@@ -600,9 +724,8 @@ private fun TelemetryDashboardCard(
                 }
             }
 
-            HorizontalDivider(color = MiraPalette.BorderSubtle.copy(alpha = 0.6f))
+            HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
 
-            // شريط الأوزان والقيمة وسرعة القراءة
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -612,7 +735,7 @@ private fun TelemetryDashboardCard(
                     Text(
                         text = if (state.isArabic) "الوزن المقروء / المتوقع" else "Scanned / Expected Wt",
                         fontSize = 10.sp,
-                        color = MiraPalette.TextSecondary
+                        color = colors.textSecondary
                     )
                     Text(
                         text = String.format(
@@ -623,7 +746,7 @@ private fun TelemetryDashboardCard(
                         ),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = MiraPalette.GoldLight
+                        color = colors.goldLight
                     )
                 }
 
@@ -631,13 +754,13 @@ private fun TelemetryDashboardCard(
                     Text(
                         text = if (state.isArabic) "القيمة التقديرية" else "Est. Value",
                         fontSize = 10.sp,
-                        color = MiraPalette.TextSecondary
+                        color = colors.textSecondary
                     )
                     Text(
                         text = String.format(Locale.US, "$%,.0f", state.scannedValueUsd),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = MiraPalette.EmeraldMatched
+                        color = colors.emeraldMatched
                     )
                 }
 
@@ -647,24 +770,23 @@ private fun TelemetryDashboardCard(
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = MiraPalette.TextPrimary
+                        color = colors.textPrimary
                     )
                     Text(
                         text = "${state.readsPerSecond} tag/s",
                         fontSize = 10.sp,
-                        color = if (state.isScanning) MiraPalette.CyanExtra else MiraPalette.TextMuted
+                        color = if (state.isScanning) colors.cyanExtra else colors.textMuted
                     )
                 }
             }
 
-            // تفصيل العيارات الأفقي (24K, 22K, 21K, 18K...)
             if (state.karatSummaries.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.karatSummaries, key = { it.karat }) { ks ->
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = MiraPalette.NavyElevated,
-                            border = BorderStroke(1.dp, MiraPalette.GoldDark.copy(alpha = 0.5f))
+                            color = colors.bgElevated,
+                            border = BorderStroke(1.dp, colors.goldDark.copy(alpha = 0.45f))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -675,17 +797,17 @@ private fun TelemetryDashboardCard(
                                     text = ks.karat,
                                     fontWeight = FontWeight.ExtraBold,
                                     fontSize = 12.sp,
-                                    color = MiraPalette.GoldPrimary
+                                    color = colors.goldPrimary
                                 )
                                 Text(
                                     text = "${ks.matchedCount}/${ks.expectedCount}",
                                     fontSize = 11.sp,
-                                    color = MiraPalette.TextPrimary
+                                    color = colors.textPrimary
                                 )
                                 Text(
                                     text = String.format(Locale.US, "(%.1fg)", ks.scannedWeightGrams),
                                     fontSize = 11.sp,
-                                    color = MiraPalette.TextSecondary
+                                    color = colors.textSecondary
                                 )
                             }
                         }
@@ -699,6 +821,7 @@ private fun TelemetryDashboardCard(
 @Composable
 private fun MetricMiniPill(
     modifier: Modifier = Modifier,
+    colors: AdaptiveAuditColors,
     label: String,
     value: String,
     accent: Color,
@@ -707,14 +830,14 @@ private fun MetricMiniPill(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = MiraPalette.NavyElevated
+        color = colors.bgElevated
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = label, fontSize = 11.sp, color = MiraPalette.TextSecondary)
+            Text(text = label, fontSize = 11.sp, color = colors.textSecondary)
             Text(text = value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = accent)
         }
     }
@@ -725,6 +848,7 @@ private fun MetricMiniPill(
 @Composable
 private fun FilterAndSearchSection(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
     onTabSelected: (InventoryFilterTab) -> Unit,
     onQueryChanged: (String) -> Unit
 ) {
@@ -761,8 +885,8 @@ private fun FilterAndSearchSection(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ScrollableTabRow(
             selectedTabIndex = selectedIndex,
-            containerColor = MiraPalette.NavySurface,
-            contentColor = MiraPalette.GoldPrimary,
+            containerColor = colors.bgSurface,
+            contentColor = colors.goldPrimary,
             edgePadding = 4.dp,
             divider = {}
         ) {
@@ -775,7 +899,7 @@ private fun FilterAndSearchSection(
                             text = "$title ($count)",
                             fontSize = 12.sp,
                             fontWeight = if (index == selectedIndex) FontWeight.Bold else FontWeight.Medium,
-                            color = if (index == selectedIndex) MiraPalette.GoldPrimary else MiraPalette.TextSecondary
+                            color = if (index == selectedIndex) colors.goldPrimary else colors.textSecondary
                         )
                     }
                 )
@@ -793,26 +917,26 @@ private fun FilterAndSearchSection(
                     text = if (state.isArabic) "بحث بالاسم، EPC، الباركود، أو الرقم التسلسلي..."
                     else "Search by title, EPC, GTIN, or serial...",
                     fontSize = 12.sp,
-                    color = MiraPalette.TextMuted
+                    color = colors.textMuted
                 )
             },
             leadingIcon = {
-                Icon(Icons.Rounded.Search, contentDescription = null, tint = MiraPalette.TextSecondary)
+                Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.textSecondary)
             },
             trailingIcon = {
                 if (state.searchQuery.isNotEmpty()) {
                     IconButton(onClick = { onQueryChanged("") }) {
-                        Icon(Icons.Rounded.Close, contentDescription = null, tint = MiraPalette.TextSecondary)
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = colors.textSecondary)
                     }
                 }
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MiraPalette.GoldPrimary,
-                unfocusedBorderColor = MiraPalette.BorderSubtle,
-                focusedContainerColor = MiraPalette.NavySurface,
-                unfocusedContainerColor = MiraPalette.NavySurface,
-                focusedTextColor = MiraPalette.TextPrimary,
-                unfocusedTextColor = MiraPalette.TextPrimary
+                focusedBorderColor = colors.goldPrimary,
+                unfocusedBorderColor = colors.borderSubtle,
+                focusedContainerColor = colors.bgCard,
+                unfocusedContainerColor = colors.bgCard,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
             )
         )
     }
@@ -823,36 +947,37 @@ private fun FilterAndSearchSection(
 @Composable
 private fun JewelryInventoryItemCard(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     item: InventoryDisplayRow,
     onLocateRadar: () -> Unit,
     onVerifyTid: () -> Unit
 ) {
     val (statusColor, statusBg, statusLabel) = when (item.status) {
         ItemAuditStatus.MATCHED -> Triple(
-            MiraPalette.EmeraldMatched,
-            MiraPalette.EmeraldContainer,
+            colors.emeraldMatched,
+            colors.emeraldContainer,
             if (isArabic) "مطابق" else "Matched"
         )
         ItemAuditStatus.MISSING -> Triple(
-            MiraPalette.CrimsonMissing,
-            MiraPalette.CrimsonContainer,
+            colors.crimsonMissing,
+            colors.crimsonContainer,
             if (isArabic) "مفقود" else "Missing"
         )
         ItemAuditStatus.UNCATALOGUED -> Triple(
-            MiraPalette.CyanExtra,
-            MiraPalette.CyanContainer,
+            colors.cyanExtra,
+            colors.cyanContainer,
             if (isArabic) "غير مسجل" else "Uncatalogued"
         )
         ItemAuditStatus.WRONG_CATEGORY -> Triple(
-            MiraPalette.AmberWarning,
-            MiraPalette.AmberContainer,
+            colors.amberWarning,
+            colors.amberContainer,
             if (isArabic) "خارج الفئة" else "Wrong Category"
         )
     }
 
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MiraPalette.NavyCard),
+        colors = CardDefaults.cardColors(containerColor = colors.bgCard),
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.45f))
     ) {
         Column(
@@ -873,14 +998,14 @@ private fun JewelryInventoryItemCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MiraPalette.GoldContainer
+                        color = colors.goldContainer
                     ) {
                         Text(
                             text = item.karat,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = MiraPalette.GoldPrimary
+                            color = colors.goldPrimary
                         )
                     }
 
@@ -888,7 +1013,7 @@ private fun JewelryInventoryItemCard(
                         text = item.title,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = MiraPalette.TextPrimary,
+                        color = colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -908,7 +1033,6 @@ private fun JewelryInventoryItemCard(
                 }
             }
 
-            // EPC + الوزن + السعر + عداد القراءات
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -918,7 +1042,7 @@ private fun JewelryInventoryItemCard(
                     text = item.epc,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = MiraPalette.TextSecondary,
+                    color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -933,33 +1057,32 @@ private fun JewelryInventoryItemCard(
                             text = String.format(Locale.US, "%.2fg", item.weight),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MiraPalette.GoldLight
+                            color = colors.goldLight
                         )
                     }
                     if (item.price > 0) {
                         Text(
                             text = String.format(Locale.US, "$%.0f", item.price),
                             fontSize = 12.sp,
-                            color = MiraPalette.EmeraldMatched
+                            color = colors.emeraldMatched
                         )
                     }
                     if (item.readCount > 0) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MiraPalette.NavyElevated
+                            color = colors.bgElevated
                         ) {
                             Text(
                                 text = "×${item.readCount} • ${item.rssi}dBm",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 fontSize = 10.sp,
-                                color = MiraPalette.TextPrimary
+                                color = colors.textPrimary
                             )
                         }
                     }
                 }
             }
 
-            // أزرار الإجراءات السريعة (تتبع بالرادار للمفقود / فحص TID)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -973,13 +1096,13 @@ private fun JewelryInventoryItemCard(
                         imageVector = Icons.Rounded.Radar,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = if (item.status == ItemAuditStatus.MISSING) MiraPalette.CrimsonMissing else MiraPalette.CyanExtra
+                        tint = if (item.status == ItemAuditStatus.MISSING) colors.crimsonMissing else colors.cyanExtra
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = if (isArabic) "تتبع بالرادار" else "Radar Find",
                         fontSize = 11.sp,
-                        color = if (item.status == ItemAuditStatus.MISSING) MiraPalette.CrimsonMissing else MiraPalette.CyanExtra
+                        color = if (item.status == ItemAuditStatus.MISSING) colors.crimsonMissing else colors.cyanExtra
                     )
                 }
 
@@ -993,13 +1116,13 @@ private fun JewelryInventoryItemCard(
                         imageVector = Icons.Rounded.Verified,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = MiraPalette.GoldPrimary
+                        tint = colors.goldPrimary
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = if (isArabic) "فحص TID" else "Verify TID",
                         fontSize = 11.sp,
-                        color = MiraPalette.GoldPrimary
+                        color = colors.goldPrimary
                     )
                 }
             }
@@ -1012,6 +1135,7 @@ private fun JewelryInventoryItemCard(
 @Composable
 private fun ScannerControlDock(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
     onToggleScan: () -> Unit,
     onPowerChange: (Int) -> Unit,
     onTriggerModeChange: (TriggerMode) -> Unit,
@@ -1021,9 +1145,9 @@ private fun ScannerControlDock(
     var showPowerControls by remember { mutableStateOf(false) }
 
     Surface(
-        color = MiraPalette.NavySurface,
+        color = colors.bgSurface,
         shadowElevation = 12.dp,
-        border = BorderStroke(1.dp, MiraPalette.BorderSubtle)
+        border = BorderStroke(1.dp, colors.borderSubtle)
     ) {
         Column(
             modifier = Modifier
@@ -1036,7 +1160,7 @@ private fun ScannerControlDock(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MiraPalette.NavyCard)
+                        .background(colors.bgCard)
                         .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -1047,13 +1171,13 @@ private fun ScannerControlDock(
                         Text(
                             text = if (state.isArabic) "قوة إشارة القارئ (UHF Power)" else "UHF Antenna Power",
                             fontSize = 12.sp,
-                            color = MiraPalette.TextSecondary
+                            color = colors.textSecondary
                         )
                         Text(
                             text = "${state.powerDbm} dBm",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MiraPalette.GoldPrimary
+                            color = colors.goldPrimary
                         )
                     }
                     Slider(
@@ -1062,8 +1186,8 @@ private fun ScannerControlDock(
                         valueRange = 5f..30f,
                         steps = 24,
                         colors = SliderDefaults.colors(
-                            thumbColor = MiraPalette.GoldPrimary,
-                            activeTrackColor = MiraPalette.GoldPrimary
+                            thumbColor = colors.goldPrimary,
+                            activeTrackColor = colors.goldPrimary
                         )
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1077,8 +1201,8 @@ private fun ScannerControlDock(
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MiraPalette.GoldContainer,
-                                selectedLabelColor = MiraPalette.GoldPrimary
+                                selectedContainerColor = colors.goldContainer,
+                                selectedLabelColor = colors.goldPrimary
                             )
                         )
                         FilterChip(
@@ -1091,8 +1215,8 @@ private fun ScannerControlDock(
                                 )
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MiraPalette.GoldContainer,
-                                selectedLabelColor = MiraPalette.GoldPrimary
+                                selectedContainerColor = colors.goldContainer,
+                                selectedLabelColor = colors.goldPrimary
                             )
                         )
                     }
@@ -1104,22 +1228,20 @@ private fun ScannerControlDock(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // زر ضبط الطاقة والزناد
                 IconButton(
                     onClick = { showPowerControls = !showPowerControls },
                     modifier = Modifier
                         .size(46.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MiraPalette.NavyCard)
+                        .background(colors.bgCard)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Tune,
                         contentDescription = "Power Settings",
-                        tint = MiraPalette.GoldPrimary
+                        tint = colors.goldPrimary
                     )
                 }
 
-                // الزر الرئيسي لبدء/إيقاف الجرد
                 Button(
                     onClick = onToggleScan,
                     modifier = Modifier
@@ -1127,8 +1249,8 @@ private fun ScannerControlDock(
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (state.isScanning) MiraPalette.CrimsonMissing else MiraPalette.GoldPrimary,
-                        contentColor = if (state.isScanning) Color.White else MiraPalette.NavyDeep
+                        containerColor = if (state.isScanning) colors.crimsonMissing else colors.goldPrimary,
+                        contentColor = if (state.isScanning) Color.White else colors.onGoldButton
                     )
                 ) {
                     Icon(
@@ -1147,7 +1269,6 @@ private fun ScannerControlDock(
                     )
                 }
 
-                // زر اعتماد الجرد
                 Button(
                     onClick = onCommit,
                     enabled = !state.isCommitting && (state.matchedCount + state.uncataloguedCount + state.wrongCategoryCount) > 0,
@@ -1156,15 +1277,15 @@ private fun ScannerControlDock(
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MiraPalette.EmeraldMatched,
-                        contentColor = MiraPalette.NavyDeep
+                        containerColor = colors.emeraldMatched,
+                        contentColor = Color.White
                     )
                 ) {
                     if (state.isCommitting) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = MiraPalette.NavyDeep
+                            color = Color.White
                         )
                     } else {
                         Icon(Icons.Rounded.CloudDone, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1177,18 +1298,17 @@ private fun ScannerControlDock(
                     }
                 }
 
-                // زر تصفير الجرد
                 IconButton(
                     onClick = onReset,
                     modifier = Modifier
                         .size(46.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MiraPalette.NavyCard)
+                        .background(colors.bgCard)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.RestartAlt,
                         contentDescription = "Reset",
-                        tint = MiraPalette.TextSecondary
+                        tint = colors.textSecondary
                     )
                 }
             }
@@ -1201,6 +1321,7 @@ private fun ScannerControlDock(
 @Composable
 private fun RssiRadarSheetContent(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     target: RadarTargetState,
     onClose: () -> Unit
 ) {
@@ -1217,9 +1338,9 @@ private fun RssiRadarSheetContent(
 
     val proximity = target.proximityPercent
     val radarColor = when {
-        proximity >= 75 -> MiraPalette.EmeraldMatched
-        proximity >= 40 -> MiraPalette.GoldPrimary
-        else -> MiraPalette.CrimsonMissing
+        proximity >= 75 -> colors.emeraldMatched
+        proximity >= 40 -> colors.goldPrimary
+        else -> colors.crimsonMissing
     }
 
     Column(
@@ -1233,18 +1354,18 @@ private fun RssiRadarSheetContent(
             text = if (isArabic) "رادار تتبع القطعة المفقودة" else "Geiger Item Finder",
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
-            color = MiraPalette.GoldPrimary
+            color = colors.goldPrimary
         )
         Text(
             text = "${target.title} (${target.karat})",
             fontSize = 14.sp,
-            color = MiraPalette.TextPrimary
+            color = colors.textPrimary
         )
         Text(
             text = target.epc,
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
-            color = MiraPalette.TextSecondary
+            color = colors.textSecondary
         )
 
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(190.dp)) {
@@ -1281,7 +1402,7 @@ private fun RssiRadarSheetContent(
                 Text(
                     text = "${target.currentRssi} dBm",
                     fontSize = 12.sp,
-                    color = MiraPalette.TextSecondary
+                    color = colors.textSecondary
                 )
             }
         }
@@ -1290,17 +1411,17 @@ private fun RssiRadarSheetContent(
             text = if (isArabic) "حرّك القارئ ببطء حول الخزائن والفاترينات؛ تزداد النسبة وسرعة النغمة كلما اقتربت من القطعة."
             else "Sweep the reader slowly near display trays; percentage and beep rate increase as you get closer.",
             fontSize = 12.sp,
-            color = MiraPalette.TextSecondary
+            color = colors.textSecondary
         )
 
         Button(
             onClick = onClose,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MiraPalette.NavyCard)
+            colors = ButtonDefaults.buttonColors(containerColor = colors.bgCard)
         ) {
             Text(
                 text = if (isArabic) "إنهاء التتبع" else "Done",
-                color = MiraPalette.GoldPrimary
+                color = colors.goldPrimary
             )
         }
     }
@@ -1311,14 +1432,15 @@ private fun RssiRadarSheetContent(
 @Composable
 private fun RestoreSessionCard(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     banner: RestoreBannerState,
     onRestore: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MiraPalette.NavyElevated),
-        border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+        colors = CardDefaults.cardColors(containerColor = colors.bgElevated),
+        border = BorderStroke(1.dp, colors.goldPrimary)
     ) {
         Column(
             modifier = Modifier
@@ -1330,13 +1452,13 @@ private fun RestoreSessionCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = MiraPalette.GoldPrimary)
+                Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = colors.goldPrimary)
                 Text(
                     text = if (isArabic) "توجد جلسة جرد غير مكتملة (${banner.itemCount} قطعة • منذ ${banner.timeAgoText})"
                     else "Unfinished audit found (${banner.itemCount} items • ${banner.timeAgoText} ago)",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = MiraPalette.TextPrimary,
+                    color = colors.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1347,15 +1469,15 @@ private fun RestoreSessionCard(
                 TextButton(onClick = onDismiss) {
                     Text(
                         text = if (isArabic) "تجاهل" else "Discard",
-                        color = MiraPalette.TextSecondary
+                        color = colors.textSecondary
                     )
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = onRestore,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MiraPalette.GoldPrimary,
-                        contentColor = MiraPalette.NavyDeep
+                        containerColor = colors.goldPrimary,
+                        contentColor = colors.onGoldButton
                     )
                 ) {
                     Text(
@@ -1371,40 +1493,41 @@ private fun RestoreSessionCard(
 @Composable
 private fun CatalogStatusBanner(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     isLoading: Boolean,
     error: String?,
     onRetry: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MiraPalette.NavyCard)
+        colors = CardDefaults.cardColors(containerColor = colors.bgCard)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             if (isLoading) {
                 Text(
                     text = if (isArabic) "جاري مزامنة كتالوج مجوهرات الفرع..." else "Syncing branch jewelry catalog...",
                     fontSize = 12.sp,
-                    color = MiraPalette.GoldLight
+                    color = colors.goldLight
                 )
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
-                    color = MiraPalette.GoldPrimary
+                    color = colors.goldPrimary
                 )
             } else if (error != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MiraPalette.CrimsonMissing)
+                    Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = colors.crimsonMissing)
                     Text(
                         text = error,
                         fontSize = 12.sp,
-                        color = MiraPalette.TextPrimary,
+                        color = colors.textPrimary,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = onRetry) {
-                        Text(if (isArabic) "إعادة" else "Retry", color = MiraPalette.GoldPrimary)
+                        Text(if (isArabic) "إعادة" else "Retry", color = colors.goldPrimary)
                     }
                 }
             }
@@ -1413,7 +1536,11 @@ private fun CatalogStatusBanner(
 }
 
 @Composable
-private fun EmptyInventoryPlaceholder(isArabic: Boolean, tab: InventoryFilterTab) {
+private fun EmptyInventoryPlaceholder(
+    isArabic: Boolean,
+    colors: AdaptiveAuditColors,
+    tab: InventoryFilterTab
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1427,7 +1554,7 @@ private fun EmptyInventoryPlaceholder(isArabic: Boolean, tab: InventoryFilterTab
                 InventoryFilterTab.WRONG_CATEGORY -> if (isArabic) "لا توجد قطع خارج الفئة" else "No out-of-category items"
                 else -> if (isArabic) "اضغط «بدء الجرد» أو اسحب زناد القارئ" else "Tap Start Scan or pull reader trigger"
             },
-            color = MiraPalette.TextSecondary,
+            color = colors.textSecondary,
             fontSize = 13.sp
         )
     }
@@ -1436,6 +1563,7 @@ private fun EmptyInventoryPlaceholder(isArabic: Boolean, tab: InventoryFilterTab
 @Composable
 private fun ScannerSettingsSheetContent(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
     onPowerChange: (Int) -> Unit,
     onTriggerModeChange: (TriggerMode) -> Unit,
     onClose: () -> Unit
@@ -1455,10 +1583,10 @@ private fun ScannerSettingsSheetContent(
                 text = if (state.isArabic) "إعدادات قارئ UHF والزناد" else "UHF Scanner & Trigger Settings",
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
-                color = MiraPalette.GoldPrimary
+                color = colors.goldPrimary
             )
             IconButton(onClick = onClose) {
-                Icon(Icons.Rounded.Close, contentDescription = null, tint = MiraPalette.TextSecondary)
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = colors.textSecondary)
             }
         }
 
@@ -1468,12 +1596,12 @@ private fun ScannerSettingsSheetContent(
         ) {
             Text(
                 text = if (state.isArabic) "قوة إشارة الانتينا" else "Antenna Output Power",
-                color = MiraPalette.TextSecondary,
+                color = colors.textSecondary,
                 fontSize = 13.sp
             )
             Text(
                 text = "${state.powerDbm} dBm",
-                color = MiraPalette.GoldPrimary,
+                color = colors.goldPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
@@ -1485,14 +1613,14 @@ private fun ScannerSettingsSheetContent(
             valueRange = 5f..30f,
             steps = 24,
             colors = SliderDefaults.colors(
-                thumbColor = MiraPalette.GoldPrimary,
-                activeTrackColor = MiraPalette.GoldPrimary
+                thumbColor = colors.goldPrimary,
+                activeTrackColor = colors.goldPrimary
             )
         )
 
         Text(
             text = if (state.isArabic) "وضع الزناد الفيزيائي (Trigger Mode)" else "Physical Trigger Mode",
-            color = MiraPalette.TextSecondary,
+            color = colors.textSecondary,
             fontSize = 13.sp
         )
 
@@ -1504,8 +1632,8 @@ private fun ScannerSettingsSheetContent(
                     Text(if (state.isArabic) "ضغطة تشغيل / ضغطة إيقاف" else "Toggle (Click Start/Stop)")
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MiraPalette.GoldContainer,
-                    selectedLabelColor = MiraPalette.GoldPrimary
+                    selectedContainerColor = colors.goldContainer,
+                    selectedLabelColor = colors.goldPrimary
                 )
             )
             FilterChip(
@@ -1515,8 +1643,8 @@ private fun ScannerSettingsSheetContent(
                     Text(if (state.isArabic) "ضغط مستمر" else "Hold to Scan")
                 },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MiraPalette.GoldContainer,
-                    selectedLabelColor = MiraPalette.GoldPrimary
+                    selectedContainerColor = colors.goldContainer,
+                    selectedLabelColor = colors.goldPrimary
                 )
             )
         }
@@ -1525,8 +1653,8 @@ private fun ScannerSettingsSheetContent(
             onClick = onClose,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MiraPalette.GoldPrimary,
-                contentColor = MiraPalette.NavyDeep
+                containerColor = colors.goldPrimary,
+                contentColor = colors.onGoldButton
             )
         ) {
             Text(if (state.isArabic) "حفظ وإغلاق" else "Apply & Close", fontWeight = FontWeight.Bold)
@@ -1537,6 +1665,7 @@ private fun ScannerSettingsSheetContent(
 @Composable
 private fun SessionSettingsSheetContent(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
     onSelectCategory: (String) -> Unit,
     onSaveSnapshot: () -> Unit,
     onResetAudit: () -> Unit,
@@ -1557,16 +1686,16 @@ private fun SessionSettingsSheetContent(
                 text = if (state.isArabic) "إعدادات جلسة الجرد" else "Audit Session Settings",
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
-                color = MiraPalette.GoldPrimary
+                color = colors.goldPrimary
             )
             IconButton(onClick = onClose) {
-                Icon(Icons.Rounded.Close, contentDescription = null, tint = MiraPalette.TextSecondary)
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = colors.textSecondary)
             }
         }
 
         Text(
             text = if (state.isArabic) "نطاق الجرد (شامل أو حسب العيار)" else "Audit Scope (Full or by Karat)",
-            color = MiraPalette.TextSecondary,
+            color = colors.textSecondary,
             fontSize = 13.sp
         )
 
@@ -1578,8 +1707,8 @@ private fun SessionSettingsSheetContent(
                     onClick = { onSelectCategory(cat) },
                     label = { Text(label) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MiraPalette.GoldContainer,
-                        selectedLabelColor = MiraPalette.GoldPrimary
+                        selectedContainerColor = colors.goldContainer,
+                        selectedLabelColor = colors.goldPrimary
                     )
                 )
             }
@@ -1592,18 +1721,18 @@ private fun SessionSettingsSheetContent(
             OutlinedButton(
                 onClick = onSaveSnapshot,
                 modifier = Modifier.weight(1f),
-                border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+                border = BorderStroke(1.dp, colors.goldPrimary)
             ) {
                 Text(
                     text = if (state.isArabic) "حفظ مسودة الجلسة" else "Save Draft",
-                    color = MiraPalette.GoldPrimary
+                    color = colors.goldPrimary
                 )
             }
 
             Button(
                 onClick = onResetAudit,
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = MiraPalette.CrimsonMissing)
+                colors = ButtonDefaults.buttonColors(containerColor = colors.crimsonMissing)
             ) {
                 Text(
                     text = if (state.isArabic) "تصفير الجرد" else "Reset Audit",
@@ -1615,53 +1744,62 @@ private fun SessionSettingsSheetContent(
     }
 }
 
-
 @Composable
 private fun CommitReportDialog(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     report: CommitReportUi,
+    onPrintPdf: () -> Unit,
+    onExportCsv: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = MiraPalette.NavyCard,
+        containerColor = colors.bgCard,
         icon = {
             Icon(
                 imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = null,
-                tint = MiraPalette.EmeraldMatched,
+                tint = colors.emeraldMatched,
                 modifier = Modifier.size(36.dp)
             )
         },
         title = {
             Text(
                 text = if (isArabic) "تم اعتماد تقرير الجرد" else "Inventory Audit Committed",
-                color = MiraPalette.GoldPrimary,
+                color = colors.goldPrimary,
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = if (isArabic) "رقم الجلسة: ${report.sessionId}" else "Session: ${report.sessionId}",
                     fontSize = 12.sp,
-                    color = MiraPalette.TextSecondary
+                    color = colors.textSecondary
                 )
                 Text(
                     text = if (isArabic) "نسبة المطابقة: ${report.accuracy}" else "Accuracy: ${report.accuracy}",
                     fontWeight = FontWeight.Bold,
-                    color = MiraPalette.EmeraldMatched
+                    color = colors.emeraldMatched
                 )
                 Text(
                     text = if (isArabic) "المتوقع: ${report.expectedCount} | المطابق: ${report.foundCount} | المفقود: ${report.missingCount}"
                     else "Expected: ${report.expectedCount} | Found: ${report.foundCount} | Missing: ${report.missingCount}",
                     fontSize = 13.sp,
-                    color = MiraPalette.TextPrimary
+                    color = colors.textPrimary
                 )
                 Text(
                     text = report.recommendation,
                     fontSize = 12.sp,
-                    color = MiraPalette.GoldLight
+                    color = colors.goldLight
+                )
+                SessionReportExportActions(
+                    isArabic = isArabic,
+                    colors = colors,
+                    reportCode = report.sessionId,
+                    onPrintPdf = onPrintPdf,
+                    onExportCsv = onExportCsv
                 )
             }
         },
@@ -1669,8 +1807,8 @@ private fun CommitReportDialog(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MiraPalette.GoldPrimary,
-                    contentColor = MiraPalette.NavyDeep
+                    containerColor = colors.goldPrimary,
+                    contentColor = colors.onGoldButton
                 )
             ) {
                 Text(if (isArabic) "تم" else "Done", fontWeight = FontWeight.Bold)
@@ -1682,6 +1820,7 @@ private fun CommitReportDialog(
 @Composable
 private fun ArchiveReportDetailsSheetContent(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     isLoading: Boolean,
     errorMessage: String?,
     details: ArchiveReportDetails?,
@@ -1698,7 +1837,6 @@ private fun ArchiveReportDetailsSheetContent(
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // شريط العنوان وزر العودة لقائمة الأرشيف
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -1709,7 +1847,7 @@ private fun ArchiveReportDetailsSheetContent(
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = null,
-                        tint = MiraPalette.GoldPrimary
+                        tint = colors.goldPrimary
                     )
                 }
                 Column {
@@ -1717,13 +1855,13 @@ private fun ArchiveReportDetailsSheetContent(
                         text = if (isArabic) "تفاصيل تقرير الجرد" else "Audit Report Details",
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = MiraPalette.GoldPrimary
+                        color = colors.goldPrimary
                     )
                     if (details != null) {
                         Text(
                             text = "#${details.reportCode} • ${details.createdAt}",
                             fontSize = 12.sp,
-                            color = MiraPalette.TextSecondary
+                            color = colors.textSecondary
                         )
                     }
                 }
@@ -1738,7 +1876,7 @@ private fun ArchiveReportDetailsSheetContent(
                         .height(220.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = MiraPalette.GoldPrimary)
+                    CircularProgressIndicator(color = colors.goldPrimary)
                 }
             }
 
@@ -1752,16 +1890,16 @@ private fun ArchiveReportDetailsSheetContent(
                 ) {
                     Text(
                         text = errorMessage,
-                        color = MiraPalette.CrimsonMissing,
+                        color = colors.crimsonMissing,
                         fontSize = 13.sp
                     )
                     Button(
                         onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = MiraPalette.GoldPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.goldPrimary)
                     ) {
                         Text(
                             text = if (isArabic) "إعادة المحاولة" else "Retry",
-                            color = MiraPalette.NavyDeep,
+                            color = colors.onGoldButton,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -1769,7 +1907,6 @@ private fun ArchiveReportDetailsSheetContent(
             }
 
             details != null -> {
-                // أزرار الطباعة / PDF وتصدير CSV
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1778,8 +1915,8 @@ private fun ArchiveReportDetailsSheetContent(
                         onClick = onPrintPdf,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MiraPalette.GoldPrimary,
-                            contentColor = MiraPalette.NavyDeep
+                            containerColor = colors.goldPrimary,
+                            contentColor = colors.onGoldButton
                         )
                     ) {
                         Icon(
@@ -1798,29 +1935,28 @@ private fun ArchiveReportDetailsSheetContent(
                     OutlinedButton(
                         onClick = onExportCsv,
                         modifier = Modifier.weight(1f),
-                        border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+                        border = BorderStroke(1.dp, colors.goldPrimary)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.FileDownload,
                             contentDescription = null,
-                            tint = MiraPalette.GoldPrimary,
+                            tint = colors.goldPrimary,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
                             text = if (isArabic) "تصدير CSV" else "Export CSV",
-                            color = MiraPalette.GoldPrimary,
+                            color = colors.goldPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
                         )
                     }
                 }
 
-                // بطاقة ملخص المؤشرات
                 Surface(
-                    color = MiraPalette.NavyDeep,
+                    color = colors.bgCard,
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, MiraPalette.GoldPrimary.copy(alpha = 0.25f))
+                    border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.25f))
                 ) {
                     Column(
                         modifier = Modifier
@@ -1835,46 +1971,49 @@ private fun ArchiveReportDetailsSheetContent(
                             Text(
                                 text = "${if (isArabic) "الفرع:" else "Branch:"} ${details.branchName}",
                                 fontSize = 12.sp,
-                                color = MiraPalette.TextSecondary
+                                color = colors.textSecondary
                             )
                             Text(
                                 text = "${if (isArabic) "الموظف:" else "Auditor:"} ${details.auditorName}",
                                 fontSize = 12.sp,
-                                color = MiraPalette.TextSecondary
+                                color = colors.textSecondary
                             )
                         }
 
-                        HorizontalDivider(color = MiraPalette.TextSecondary.copy(alpha = 0.15f))
+                        HorizontalDivider(color = colors.textSecondary.copy(alpha = 0.15f))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
                             ArchiveMetricBadge(
+                                colors = colors,
                                 label = if (isArabic) "نسبة المطابقة" else "Match",
                                 value = String.format(Locale.US, "%.1f%%", details.matchRatePercent),
-                                color = MiraPalette.GoldPrimary
+                                color = colors.goldPrimary
                             )
                             ArchiveMetricBadge(
+                                colors = colors,
                                 label = if (isArabic) "مطابق" else "Matched",
                                 value = "${details.matchedCount}/${details.expectedCount}",
-                                color = MiraPalette.EmeraldMatched
+                                color = colors.emeraldMatched
                             )
                             ArchiveMetricBadge(
+                                colors = colors,
                                 label = if (isArabic) "مفقود" else "Missing",
                                 value = "${details.missingCount}",
-                                color = MiraPalette.CrimsonMissing
+                                color = colors.crimsonMissing
                             )
                             ArchiveMetricBadge(
+                                colors = colors,
                                 label = if (isArabic) "الوزن" else "Weight",
                                 value = String.format(Locale.US, "%.1fg", details.scannedWeightGrams),
-                                color = MiraPalette.TextPrimary
+                                color = colors.textPrimary
                             )
                         }
                     }
                 }
 
-                // شرائح فلترة القطع داخل التقرير
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         FilterChip(
@@ -1914,7 +2053,6 @@ private fun ArchiveReportDetailsSheetContent(
                     }
                 }
 
-                // قائمة القطع المفصلة
                 val filteredItems = remember(details.items, selectedFilter) {
                     if (selectedFilter == null) details.items
                     else details.items.filter { it.status == selectedFilter }
@@ -1929,7 +2067,7 @@ private fun ArchiveReportDetailsSheetContent(
                     ) {
                         Text(
                             text = if (isArabic) "لا توجد قطع مسجلة ضمن هذا التصنيف" else "No items in this filter",
-                            color = MiraPalette.TextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 13.sp
                         )
                     }
@@ -1943,15 +2081,15 @@ private fun ArchiveReportDetailsSheetContent(
                         items(filteredItems, key = { "${it.epc}_${it.status}" }) { item ->
                             val (statusText, statusColor) = when (item.status) {
                                 ArchiveItemStatus.MATCHED ->
-                                    (if (isArabic) "مطابق" else "Matched") to MiraPalette.EmeraldMatched
+                                    (if (isArabic) "مطابق" else "Matched") to colors.emeraldMatched
                                 ArchiveItemStatus.MISSING ->
-                                    (if (isArabic) "مفقود" else "Missing") to MiraPalette.CrimsonMissing
+                                    (if (isArabic) "مفقود" else "Missing") to colors.crimsonMissing
                                 ArchiveItemStatus.UNCATALOGUED ->
-                                    (if (isArabic) "غير مسجل" else "Uncatalogued") to MiraPalette.AmberWarning
+                                    (if (isArabic) "غير مسجل" else "Uncatalogued") to colors.amberWarning
                             }
 
                             Surface(
-                                color = MiraPalette.NavyDeep.copy(alpha = 0.85f),
+                                color = colors.bgCard,
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, statusColor.copy(alpha = 0.3f))
                             ) {
@@ -1968,7 +2106,7 @@ private fun ArchiveReportDetailsSheetContent(
                                                 text = item.name,
                                                 fontWeight = FontWeight.SemiBold,
                                                 fontSize = 13.sp,
-                                                color = MiraPalette.TextPrimary
+                                                color = colors.textPrimary
                                             )
                                             if (item.karat.isNotBlank()) {
                                                 Spacer(Modifier.width(6.dp))
@@ -1976,14 +2114,14 @@ private fun ArchiveReportDetailsSheetContent(
                                                     text = item.karat,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = MiraPalette.GoldPrimary
+                                                    color = colors.goldPrimary
                                                 )
                                             }
                                         }
                                         Text(
                                             text = item.epc,
                                             fontSize = 11.sp,
-                                            color = MiraPalette.TextSecondary
+                                            color = colors.textSecondary
                                         )
                                     }
 
@@ -1997,7 +2135,7 @@ private fun ArchiveReportDetailsSheetContent(
                                         Text(
                                             text = String.format(Locale.US, "%.2f g", item.weightGrams),
                                             fontSize = 12.sp,
-                                            color = MiraPalette.TextPrimary
+                                            color = colors.textPrimary
                                         )
                                     }
                                 }
@@ -2013,6 +2151,7 @@ private fun ArchiveReportDetailsSheetContent(
 
 @Composable
 private fun ArchiveMetricBadge(
+    colors: AdaptiveAuditColors,
     label: String,
     value: String,
     color: Color
@@ -2027,15 +2166,15 @@ private fun ArchiveMetricBadge(
         Text(
             text = label,
             fontSize = 11.sp,
-            color = MiraPalette.TextSecondary
+            color = colors.textSecondary
         )
     }
 }
 
-
 @Composable
 private fun ArchiveReportsSheetContent(
     state: InventoryUiState,
+    colors: AdaptiveAuditColors,
     onOpenDetails: (String) -> Unit,
     onDeleteReport: (String) -> Unit,
     onClose: () -> Unit
@@ -2055,10 +2194,10 @@ private fun ArchiveReportsSheetContent(
                 text = if (state.isArabic) "أرشيف تقارير الجرد" else "Inventory Audit Archive",
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
-                color = MiraPalette.GoldPrimary
+                color = colors.goldPrimary
             )
             IconButton(onClick = onClose) {
-                Icon(Icons.Rounded.Close, contentDescription = null, tint = MiraPalette.TextSecondary)
+                Icon(Icons.Rounded.Close, contentDescription = null, tint = colors.textSecondary)
             }
         }
 
@@ -2069,12 +2208,12 @@ private fun ArchiveReportsSheetContent(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = MiraPalette.GoldPrimary)
+                CircularProgressIndicator(color = colors.goldPrimary)
             }
         } else if (state.archiveReports.isEmpty()) {
             Text(
                 text = if (state.isArabic) "لا توجد تقارير محفوظة لهذا الفرع" else "No archived reports for this branch",
-                color = MiraPalette.TextSecondary,
+                color = colors.textSecondary,
                 modifier = Modifier.padding(vertical = 20.dp)
             )
         } else {
@@ -2085,8 +2224,8 @@ private fun ArchiveReportsSheetContent(
                 items(state.archiveReports, key = { it.sessionId }) { rep ->
                     Card(
                         modifier = Modifier.clickable { onOpenDetails(rep.sessionId) },
-                        colors = CardDefaults.cardColors(containerColor = MiraPalette.NavyCard),
-                        border = BorderStroke(1.dp, MiraPalette.BorderSubtle)
+                        colors = CardDefaults.cardColors(containerColor = colors.bgCard),
+                        border = BorderStroke(1.dp, colors.borderSubtle)
                     ) {
                         Row(
                             modifier = Modifier
@@ -2099,12 +2238,12 @@ private fun ArchiveReportsSheetContent(
                                 Text(
                                     text = rep.sessionId,
                                     fontWeight = FontWeight.Bold,
-                                    color = MiraPalette.GoldLight,
+                                    color = colors.goldLight,
                                     fontSize = 13.sp
                                 )
                                 Text(
                                     text = "${rep.date} • ${rep.scannedCount}/${rep.expectedCount}",
-                                    color = MiraPalette.TextSecondary,
+                                    color = colors.textSecondary,
                                     fontSize = 11.sp
                                 )
                             }
@@ -2112,7 +2251,7 @@ private fun ArchiveReportsSheetContent(
                                 Icon(
                                     imageVector = Icons.Rounded.DeleteOutline,
                                     contentDescription = "Delete",
-                                    tint = MiraPalette.CrimsonMissing
+                                    tint = colors.crimsonMissing
                                 )
                             }
                         }
@@ -2124,8 +2263,9 @@ private fun ArchiveReportsSheetContent(
 }
 
 @Composable
-fun SessionReportExportActions(
+private fun SessionReportExportActions(
     isArabic: Boolean,
+    colors: AdaptiveAuditColors,
     reportCode: String?,
     onPrintPdf: () -> Unit,
     onExportCsv: () -> Unit,
@@ -2133,15 +2273,15 @@ fun SessionReportExportActions(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MiraPalette.NavyDeep,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MiraPalette.GoldPrimary.copy(alpha = 0.3f))
+        color = colors.bgElevated,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -2149,62 +2289,62 @@ fun SessionReportExportActions(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isArabic) "تصدير وطباعة تقرير الاعتماد" else "Export & Print Audit Report",
+                    text = if (isArabic) "تصدير وطباعة التقرير" else "Export & Print Report",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = MiraPalette.GoldPrimary
+                    fontSize = 12.sp,
+                    color = colors.goldPrimary
                 )
                 if (!reportCode.isNullOrBlank()) {
                     Text(
                         text = "#$reportCode",
                         fontSize = 11.sp,
-                        color = MiraPalette.TextSecondary
+                        color = colors.textSecondary
                     )
                 }
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
                     onClick = onPrintPdf,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MiraPalette.GoldPrimary,
-                        contentColor = MiraPalette.NavyDeep
+                        containerColor = colors.goldPrimary,
+                        contentColor = colors.onGoldButton
                     )
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Print,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text(
-                        text = if (isArabic) "طباعة / PDF" else "Print / PDF",
+                        text = if (isArabic) "PDF / طباعة" else "Print / PDF",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
                 }
 
                 OutlinedButton(
                     onClick = onExportCsv,
                     modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, MiraPalette.GoldPrimary)
+                    border = BorderStroke(1.dp, colors.goldPrimary)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.FileDownload,
                         contentDescription = null,
-                        tint = MiraPalette.GoldPrimary,
-                        modifier = Modifier.size(18.dp)
+                        tint = colors.goldPrimary,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text(
-                        text = if (isArabic) "تصدير CSV" else "Export CSV",
-                        color = MiraPalette.GoldPrimary,
+                        text = if (isArabic) "CSV" else "CSV",
+                        color = colors.goldPrimary,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
                 }
             }
