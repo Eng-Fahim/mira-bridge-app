@@ -578,10 +578,11 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     ) {
         try {
             val fetchStrategies = listOf(
-                { runCatching { api.getInventoryExpectedCatalog(branchId, "") }.getOrNull() },
                 { runCatching { api.getBranchItemsListWithLongTimeout(branchId) }.getOrNull() },
-                { runCatching { api.getMyBranchInventoryItems("") }.getOrNull() }
+                { runCatching { api.getMyBranchInventoryItems("") }.getOrNull() },
+                { runCatching { api.getInventoryExpectedCatalog(branchId, "") }.getOrNull() }
             )
+
 
             val parsedMap = LinkedHashMap<String, InventoryItem>()
             val barcodeMap = HashMap<String, String>()
@@ -1250,7 +1251,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
     // ==================== الاعتماد والمزامنة والأرشيف ====================
 
-    fun commitCurrentInventory() {
+        fun commitCurrentInventory() {
         val api = apiClient ?: return
         if (_uiState.value.isCommitting) return
         if (_uiState.value.isScanning) stopScanning()
@@ -1285,6 +1286,39 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             )
         }
 
+        // تجهيز حمولة التقرير الشامل لإرسالها إلى /inventory/submit-audit
+        val fullItemsJson = JSONArray()
+        rowsByEpc.values.forEach { row ->
+            fullItemsJson.put(JSONObject().apply {
+                put("epc", row.epc)
+                put("rfid_epc", row.epc)
+                put("gtin", row.gtin)
+                put("serial", row.serial)
+                put("title", row.title)
+                put("karat", row.karat)
+                put("weight_grams", row.weight)
+                put("price_usd", row.price)
+                put("read_count", row.readCount)
+                put("rssi", row.rssi)
+                put("status", when (row.status) {
+                    ItemAuditStatus.MATCHED -> "matched"
+                    ItemAuditStatus.MISSING -> "missing"
+                    ItemAuditStatus.WRONG_CATEGORY -> "wrong_category"
+                    ItemAuditStatus.UNCATALOGUED -> "uncatalogued"
+                })
+            })
+        }
+
+        val karatSummaryJson = JSONArray()
+        state.karatSummaries.forEach { ks ->
+            karatSummaryJson.put(JSONObject().apply {
+                put("karat", ks.karat)
+                put("matched_count", ks.matchedCount)
+                put("expected_count", ks.expectedCount)
+                put("scanned_weight_grams", ks.scannedWeightGrams)
+            })
+        }
+
         persistenceManager.commitInventory(
             inventoryEngine.clientSessionId,
             state.branchId,
@@ -1298,20 +1332,67 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                     sessionManager.clearSession()
                     opticalVerifiedEpcs.clear()
 
-                    val finalSessionId = report.optString("session_id", inventoryEngine.clientSessionId)
-                    val expected = report.optInt("expected_count", state.expectedCount)
-                    val found = report.optInt("found_count", state.matchedCount)
-                    val missing = report.optInt("missing_count", state.missingCount)
+                    val finalSessionId = report.optString("session_id", "")
+                        .takeIf { it.isNotBlank() && it != "0" }
+                        ?: inventoryEngine.clientSessionId
+
+                    // استخدام القيم المحلية الدقيقة إذا أعاد السيرفر أصفاراً
+                    val serverExpected = report.optInt("expected_count", 0)
+                    val serverFound = report.optInt("found_count", 0)
+                    val expected = if (serverExpected > 0) serverExpected else state.expectedCount
+                    val found = if (serverFound > 0) serverFound else state.matchedCount
+                    val missing = (expected - found).coerceAtLeast(0)
+
+                    val calcAccuracyPct = if (expected > 0) {
+                        String.format(Locale.US, "%.1f%%", (found * 100.0) / expected)
+                    } else {
+                        "100%"
+                    }
+                    val rawAccuracy = report.optString("accuracy", "")
+                    val displayAccuracy = if (rawAccuracy.isBlank() || rawAccuracy.startsWith("0")) {
+                        calcAccuracyPct
+                    } else {
+                        rawAccuracy
+                    }
+
+                    val rawRisk = report.optString("risk_level", "")
+                    val rawRec = report.optString("recommendation", "")
+                    val localizedRec = localizeAuditRecommendation(
+                        rawRecommendation = rawRec,
+                        rawRiskLevel = rawRisk,
+                        missingCount = missing,
+                        extraCount = state.uncataloguedCount + state.wrongCategoryCount
+                    )
+
+                    // إرسال التفاصيل الكاملة للقطع والعيارات إلى السيرفر في الخلفية
+                    ioExecutor.execute {
+                        runCatching {
+                            val auditPayload = JSONObject().apply {
+                                put("session_id", finalSessionId)
+                                put("branch_id", state.branchId)
+                                put("category", state.selectedCategory)
+                                put("expected_count", expected)
+                                put("matched_count", found)
+                                put("missing_count", missing)
+                                put("uncatalogued_count", state.uncataloguedCount)
+                                put("wrong_category_count", state.wrongCategoryCount)
+                                put("scanned_weight_grams", state.scannedWeightGrams)
+                                put("expected_weight_grams", state.expectedWeightGrams)
+                                put("scanned_value_usd", state.scannedValueUsd)
+                                put("duration_seconds", state.elapsedSeconds)
+                                put("accuracy", displayAccuracy)
+                                put("items", fullItemsJson)
+                                put("karat_summaries", karatSummaryJson)
+                            }
+                            api.submitInventoryAuditReport(auditPayload)
+                        }
+                    }
 
                     val reportUi = CommitReportUi(
                         sessionId = finalSessionId,
-                        accuracy = report.optString("accuracy", "${(state.accuracyPercent * 100).toInt()}%"),
-                        riskLevel = report.optString("risk_level", "low"),
-                        recommendation = report.optString(
-                            "recommendation",
-                            if (isArabic) "تم اعتماد الجرد وحفظه في السجل الرسمي"
-                            else "Inventory committed and archived successfully"
-                        ),
+                        accuracy = displayAccuracy,
+                        riskLevel = rawRisk.ifBlank { if (missing > 0) "high" else "low" },
+                        recommendation = localizedRec,
                         expectedCount = expected,
                         foundCount = found,
                         missingCount = missing
@@ -1342,9 +1423,38 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         )
     }
 
-    fun dismissCommitReport() {
-        _uiState.update { it.copy(commitReport = null) }
+    private fun localizeAuditRecommendation(
+        rawRecommendation: String,
+        rawRiskLevel: String,
+        missingCount: Int,
+        extraCount: Int
+    ): String {
+        val code = "${rawRecommendation}_${rawRiskLevel}".lowercase(Locale.US)
+        return when {
+            code.contains("security_breach") || missingCount > 0 -> {
+                if (isArabic) {
+                    "⚠️ تنبيه: يوجد $missingCount قطعة مفقودة غير مقروءة — يُرجى مراجعة قائمة المفقودات أو تتبعها بالرادار قبل الإغلاق النهائي."
+                } else {
+                    "⚠️ Alert: $missingCount missing item(s) detected — please review missing items or locate via Radar."
+                }
+            }
+            extraCount > 0 -> {
+                if (isArabic) {
+                    "ℹ️ ملاحظة: تم رصد $extraCount قطعة زائدة أو خارج نطاق الفئة المحددة."
+                } else {
+                    "ℹ️ Note: $extraCount extra or out-of-category item(s) detected."
+                }
+            }
+            else -> {
+                if (isArabic) {
+                    "✅ مطابقة تامة (100%): جميع قطع المخزون المتوقعة حاضرة وموثقة بنجاح."
+                } else {
+                    "✅ Full Match (100%): All expected inventory items are accounted for."
+                }
+            }
+        }
     }
+
 
     fun syncOfflineQueue() {
         val api = apiClient ?: return
