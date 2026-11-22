@@ -285,7 +285,7 @@ public class MiraOrgProfileManager {
     }
 
     public String getOrgNameAr() {
-        return prefs.getString("org_name_ar", prefs.getString("org_name", "ميرا للتكنولوجيا"));
+        return prefs.getString("org_name_ar", prefs.getString("org_name", "منظومة الذهب الدولية"));
     }
 
     public long getLastSyncTime() {
