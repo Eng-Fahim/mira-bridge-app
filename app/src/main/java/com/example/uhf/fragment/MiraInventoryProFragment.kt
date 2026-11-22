@@ -2708,4 +2708,357 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
                     // شارة التقييم الأمني المترجمة
                     val riskBg = if (report.isHighRisk) Color(0xFFEF4444).copy(alpha = 0.14f)
-                    else Color(0xFF10B98
+                    else Color(0xFF10B981).copy(alpha = 0.14f)
+                    val riskFg = if (report.isHighRisk) Color(0xFFEF4444) else Color(0xFF10B981)
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = riskBg,
+                        border = BorderStroke(1.dp, riskFg.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = if (isArabic) report.riskTitleAr else report.riskTitleEn,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = riskFg,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    if (report.screenshotFilePath != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (isArabic) "📸 تم توثيق الجلسة بلقطة شاشة وحفظ التفاصيل"
+                            else "📸 Session verified with screenshot & full item log",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // صندوق تصدير وطباعة التقرير التفصيلي
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = colors.backgroundTop.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.2f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "#${report.sessionId}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.textSecondary
+                                )
+                                Text(
+                                    text = if (isArabic) "تصدير وطباعة التقرير التفصيلي"
+                                    else "Export & Print Detailed Report",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.goldPrimary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = onExportCsv,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(46.dp),
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(1.dp, colors.goldPrimary)
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Download,
+                                        contentDescription = null,
+                                        tint = colors.goldPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "CSV",
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.goldPrimary
+                                    )
+                                }
+
+                                Button(
+                                    onClick = onExportPdf,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(46.dp),
+                                    shape = RoundedCornerShape(50),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = colors.goldPrimary,
+                                        contentColor = Color(0xFF0A0F1D)
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Print,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isArabic) "PDF / طباعة" else "PDF / Print",
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .align(Alignment.Start)
+                            .height(42.dp),
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.goldPrimary,
+                            contentColor = Color(0xFF0A0F1D)
+                        )
+                    ) {
+                        Text(
+                            text = if (isArabic) "تم" else "Done",
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Risk Evaluation, Cache Extraction & Utilities
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun evaluateAuditRisk(
+        expected: Int,
+        matched: Int,
+        missing: Int,
+        unregistered: Int
+    ): Triple<String, String, Boolean> {
+        if (expected == 0) {
+            return Triple("no_expected_items", "لا توجد قطع مسجلة للفرع", false)
+        }
+        val missingRatio = missing.toDouble() / expected.toDouble()
+        return when {
+            missing == 0 && unregistered == 0 ->
+                Triple("verified_clean", "مطابقة تامة 100% — المخزون سليم", false)
+            missingRatio > 0.25 ->
+                Triple("security_breach_possible", "تنبيه: عجز مرتفع يتطلب مراجعة فورية", true)
+            missing > 0 ->
+                Triple("minor_variance", "يوجد فارق جرد ($missing قطعة غير مقروءة)", true)
+            else ->
+                Triple("unregistered_detected", "تم رصد بطاقات غير مسجلة في الفرع", true)
+        }
+    }
+
+    private fun translateRiskStatus(
+        riskCode: String,
+        missingCount: Int,
+        expectedCount: Int
+    ): Triple<String, String, Boolean> {
+        return when (riskCode.lowercase(Locale.US)) {
+            "verified_clean" ->
+                Triple("مطابقة تامة 100% — المخزون سليم", "100% Verified Clean", false)
+            "security_breach_possible" ->
+                Triple("تنبيه: عجز مرتفع يتطلب مراجعة أمنية", "Alert: High Variance — Review Required", true)
+            "minor_variance" ->
+                Triple("فارق جرد جزئي ($missingCount من $expectedCount مفقود)", "Partial Variance ($missingCount missing)", true)
+            "unregistered_detected" ->
+                Triple("تنبيه: بطاقات غير مسجلة بالفرع", "Alert: Unregistered Tags Found", true)
+            else -> evaluateAuditRisk(expectedCount, expectedCount - missingCount, missingCount, 0)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun extractBranchItemsFromCache(
+        cache: MiraLocalItemCache,
+        branchId: Int
+    ): List<CatalogJewelryItem> {
+        val result = ArrayList<CatalogJewelryItem>()
+        try {
+            val candidateMethods = listOf(
+                "getItemsForBranch",
+                "getBranchItems",
+                "getAllItems",
+                "getCachedItems"
+            )
+            var rawCollection: Any? = null
+            for (mName in candidateMethods) {
+                val m = cache.javaClass.methods.firstOrNull { it.name == mName && it.parameterTypes.size <= 1 }
+                if (m != null) {
+                    rawCollection = if (m.parameterTypes.isEmpty()) {
+                        m.invoke(cache)
+                    } else {
+                        m.invoke(cache, branchId)
+                    }
+                    if (rawCollection != null) break
+                }
+            }
+
+            val jsonItems = ArrayList<JSONObject>()
+            when (rawCollection) {
+                is JSONArray -> {
+                    for (i in 0 until rawCollection.length()) {
+                        rawCollection.optJSONObject(i)?.let { jsonItems.add(it) }
+                    }
+                }
+                is List<*> -> {
+                    for (el in rawCollection) {
+                        if (el is JSONObject) jsonItems.add(el)
+                    }
+                }
+                is Map<*, *> -> {
+                    for (v in rawCollection.values) {
+                        if (v is JSONObject) jsonItems.add(v)
+                    }
+                }
+            }
+
+            for (obj in jsonItems) {
+                val itemBranch = obj.optInt("branch_id", branchId)
+                if (itemBranch > 0 && itemBranch != branchId) continue
+
+                val status = obj.optString("vault_status", obj.optString("status", "in_vault")).lowercase(Locale.US)
+                if (status == "sold" || status == "exited" || status == "deleted") continue
+
+                val id = obj.optInt("id", obj.optInt("item_id", 0))
+                val epc = obj.optString("rfid_epc", obj.optString("epc_final", obj.optString("epc", ""))).trim()
+                val tid = obj.optString("tid", obj.optString("tag_tid", "")).trim()
+                val serial = obj.optString("serial", obj.optString("serial_number", "")).trim()
+                val gtin = obj.optString("gtin", obj.optString("barcode", "")).trim()
+                val title = obj.optString("title", obj.optString("item_title", if (isArabic) "قطعة مجوهرات" else "Jewelry Item"))
+                val karat = obj.optString("karat", obj.optString("gold_karat", "21K"))
+                val weight = obj.optDouble("weight", obj.optDouble("gross_weight", 0.0))
+                var priceUsd = obj.optDouble("retail_price_usd", obj.optDouble("price_usd", 0.0))
+                if (priceUsd <= 0.0 && weight > 0.0) {
+                    priceUsd = estimateItemUsdPrice(karat, weight)
+                }
+                val location = obj.optString("location", obj.optString("zone", ""))
+
+                result.add(
+                    CatalogJewelryItem(
+                        itemId = id,
+                        epc = epc,
+                        tid = tid,
+                        serialNo = serial,
+                        gtin = gtin,
+                        title = title,
+                        karat = karat,
+                        weight = weight,
+                        priceUsd = priceUsd,
+                        location = location,
+                        status = status
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "extractBranchItemsFromCache error", e)
+        }
+        return result
+    }
+
+    private fun invokeSyncManagerRefresh(syncManager: MiraItemSyncManager, branchId: Int) {
+        try {
+            val methods = syncManager.javaClass.methods
+            val syncMethod = methods.firstOrNull {
+                (it.name == "syncBranchItems" || it.name == "syncItems" || it.name == "syncAll") &&
+                        it.parameterTypes.size <= 1
+            }
+            if (syncMethod != null) {
+                if (syncMethod.parameterTypes.isEmpty()) {
+                    syncMethod.invoke(syncManager)
+                } else {
+                    syncMethod.invoke(syncManager, branchId)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "invokeSyncManagerRefresh warning: ${e.message}")
+        }
+    }
+
+    private fun estimateItemUsdPrice(karat: String, weight: Double): Double {
+        val pm = priceManager ?: return 0.0
+        val kNum = karat.uppercase(Locale.US).replace("K", "").toIntOrNull() ?: 21
+        return try {
+            val ratePerGram = pm.getGoldPricePerGram(kNum)
+            if (ratePerGram > 0.0) ratePerGram * weight else 0.0
+        } catch (_: Exception) {
+            0.0
+        }
+    }
+
+    private fun normalizeKaratLabel(raw: String): String {
+        val clean = raw.trim().uppercase(Locale.US)
+        return when {
+            clean.contains("24") -> "24K"
+            clean.contains("22") -> "22K"
+            clean.contains("21") -> "21K"
+            clean.contains("18") -> "18K"
+            clean.contains("14") -> "14K"
+            clean.isEmpty() -> "21K"
+            clean.endsWith("K") -> clean
+            else -> "${clean}K"
+        }
+    }
+
+    private fun getActiveBranchId(): Int {
+        return try {
+            branchesManager?.activeBranchId ?: 1
+        } catch (_: Exception) {
+            1
+        }
+    }
+
+    private fun getSafeAppContext(): Context? {
+        return try {
+            context?.applicationContext
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun isFragmentAlive(): Boolean {
+        return isAdded && !isRemoving && !isDetached &&
+                activity != null && !requireActivity().isFinishing && !requireActivity().isDestroyed
+    }
+
+    private fun safeRun(r: Runnable) {
+        try {
+            activity?.runOnUiThread {
+                if (isFragmentAlive()) {
+                    r.run()
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun showToast(msg: String) {
+        PosUIManager.toast(context, msg)
+    }
+
+    private fun playAlertSound(id: Int) {
+        try {
+            (activity as? UHFMainActivity)?.playSound(id)
+        } catch (_: Exception) {
+        }
+    }
+}
