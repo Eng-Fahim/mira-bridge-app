@@ -46,13 +46,10 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         private const val TAG = "MiraInventoryVM"
         private const val UI_COALESCE_INTERVAL_MS = 120L
         private const val AUTO_SAVE_INTERVAL_MS = 15_000L
-        private const val CATALOG_CACHE_TTL_MS = 5 * 60_000L // 5 دقائق كاش ذكي في الذاكرة
+        private const val CATALOG_CACHE_TTL_MS = 5 * 60_000L
         private const val SORT_THROTTLE_MS = 500L
     }
 
-    /**
-     * جسر للتعامل الآمن مع دوال العتاد الخاصة بـ RFIDManager (طاقة الانتينا وقراءة TID)
-     */
     interface HardwareOperations {
         fun applyAntennaPower(powerDbm: Int): Boolean
         fun readTagTidDirect(epc: String): String?
@@ -66,14 +63,12 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     private var uhfSoundEngine: MiraUhfSoundEngine? = null
     private var rfidManager: RFIDManager? = null
 
-    // أولوية قصوى لمعالجة نبضات UHF لمنع أي بطء أو فقدان للشرائح أثناء المسح
     private val processingExecutor: ExecutorService = Executors.newSingleThreadExecutor { r ->
         Thread(r, "Mira-UHF-FastStream").apply {
             priority = Thread.MAX_PRIORITY - 1
         }
     }
 
-    // أولوية منخفضة للشبكة والـ IO حتى لا تنافس قارئ RFID على المعالج
     private val ioExecutor: ExecutorService = Executors.newFixedThreadPool(2) { r ->
         Thread(r, "Mira-Net-LowPrio").apply {
             priority = Thread.NORM_PRIORITY - 1
@@ -91,7 +86,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
     private lateinit var persistenceManager: InventoryPersistenceManager
     private lateinit var inventoryEngine: MiraInventoryEngine
 
-    // مخازن الحالة السريعة في الذاكرة (O(1) Thread-Safe)
     private val fullCatalog = ConcurrentHashMap<String, InventoryItem>()
     private val activeTargetCatalog = ConcurrentHashMap<String, InventoryItem>()
     private val rowsByEpc = ConcurrentHashMap<String, InventoryDisplayRow>()
@@ -210,7 +204,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                 val canonical = InventoryItem.normalizeEpc(epc)
                 if (canonical.isEmpty()) return
 
-                // إذا كانت القطعة غير موجودة أو مصفّرة (MISSING بعد التصفير)، تُسجل كقراءة جديدة فوراً
                 val existing = rowsByEpc[canonical]
                 if (existing == null || existing.status == ItemAuditStatus.MISSING) {
                     handleTagEvent(canonical, -55, isNewUniqueHint = false)
@@ -383,7 +376,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                     val now = SystemClock.elapsedRealtime()
                     if (scanning && now - lastAutoSaveMs >= AUTO_SAVE_INTERVAL_MS) {
                         lastAutoSaveMs = now
-                        // حفظ المسودة في خيط الخلفية لمنع أي تجميد للواجهة مع آلاف القطع
                         ioExecutor.execute { saveCurrentSessionSnapshot() }
                     }
                 }
@@ -410,8 +402,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
         val karatMap = LinkedHashMap<String, Triple<Int, Int, Double>>()
         val filteredList = ArrayList<InventoryDisplayRow>(minOf(rowsByEpc.size, 500))
-
-        // سقف عرض بصري (400 بطاقة بدون بحث / 1000 مع البحث) لضمان 60fps حتى مع 10,000 قطعة
         val maxRenderLimit = if (query.isEmpty()) 400 else 1000
 
         for (row in rowsByEpc.values) {
@@ -505,17 +495,15 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    // ==================== تحميل الكتالوج وإدارة الفئات (مع الكاش الذكي والتحميل المتسلسل) ====================
+    // ==================== تحميل الكتالوج وإدارة الفئات ====================
 
     fun loadCatalog(checkRestoreAfterLoad: Boolean = false, forceRefresh: Boolean = false) {
         val api = apiClient ?: return
         val branches = branchesManager ?: return
         val activeBranchId = branches.activeBranchId
 
-        // حماية القارئ: لا تشغل الشبكة أو تعيد بناء الكتالوج أثناء المسح النشط
         if (_uiState.value.isScanning) return
 
-        // استخدام الكاش الفوري (O(1)) إذا لم تنتهِ صلاحيته (5 دقائق) ولم يُطلب تحديث قسري
         val now = SystemClock.elapsedRealtime()
         val isCacheFresh = !forceRefresh &&
             fullCatalog.isNotEmpty() &&
@@ -537,39 +525,10 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         }
 
         ioExecutor.execute {
-            catalogManager.fetchCatalog(api, branches, object : InventoryCatalogManager.CatalogCallback {
-                override fun onCatalogLoaded(catalog: MutableMap<String, InventoryItem>) {
-                    if (catalog.isNotEmpty()) {
-                        val cleaned = LinkedHashMap<String, InventoryItem>(catalog.size)
-                        catalog.forEach { (k, v) ->
-                            val norm = InventoryItem.normalizeEpc(k)
-                            if (norm.isNotEmpty()) {
-                                cleaned[norm] = v.apply {
-                                    if (karat.isNullOrBlank()) karat = "21K"
-                                }
-                            }
-                        }
-                        if (cleaned.isNotEmpty()) {
-                            lastCatalogBranchId = activeBranchId
-                            lastCatalogLoadedAtMs = SystemClock.elapsedRealtime()
-                            applyLoadedCatalogSuccess(cleaned, activeBranchId, checkRestoreAfterLoad)
-                            return
-                        }
-                    }
-
-                    fetchCatalogSmartFallback(api, activeBranchId, null, checkRestoreAfterLoad)
-                }
-
-                override fun onError(error: String) {
-                    fetchCatalogSmartFallback(api, activeBranchId, error, checkRestoreAfterLoad)
-                }
-            })
+            fetchCatalogSmartFallback(api, activeBranchId, null, checkRestoreAfterLoad)
         }
     }
 
-    /**
-     * قارئ احتياطي كسول (Lazy Sequential) ينفذ طلباً واحداً تلو الآخر ويتوقف فور أول استجابة ناجحة
-     */
     private fun fetchCatalogSmartFallback(
         api: MiraApiClient,
         branchId: Int,
@@ -582,7 +541,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                 { runCatching { api.getMyBranchInventoryItems("") }.getOrNull() },
                 { runCatching { api.getInventoryExpectedCatalog(branchId, "") }.getOrNull() }
             )
-
 
             val parsedMap = LinkedHashMap<String, InventoryItem>()
             val barcodeMap = HashMap<String, String>()
@@ -808,7 +766,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
         rowsByEpc.clear()
 
-        // 1. إدراج كل القطع المتوقعة في الكتالوج كـ MISSING مبدئياً
         for ((epc, item) in activeTargetCatalog) {
             val existingScan = alreadyScanned[epc]
             if (existingScan != null) {
@@ -836,7 +793,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             }
         }
 
-        // 2. إعادة تصنيف أي قطع ممسوحة مسبقاً وليست ضمن الفئة المستهدفة
         for ((epc, scannedRow) in alreadyScanned) {
             if (!rowsByEpc.containsKey(epc)) {
                 val catItem = fullCatalog[epc]
@@ -945,12 +901,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         _uiState.update { it.copy(powerDbm = clamped) }
     }
 
-    /**
-     * تصفير الجرد بالكامل:
-     * - تبقى قطع الكتالوج المتوقعة معروضة كـ MISSING مع تصفير عداداتها وأوزانها
-     * - تُحذف القطع الزائدة غير المسجلة (UNCATALOGUED)
-     * - تُمسح المسودة المؤقتة قبل إيقاف المسح لمنع أي إعادة حفظ متزامنة
-     */
     fun resetCurrentAudit() {
         opticalVerifiedEpcs.clear()
         cachedPendingSession = null
@@ -1209,9 +1159,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         flushSnapshotToUi(force = true)
     }
 
-    /**
-     * تجاهل الجلسة السابقة: يحذف المسودة نهائياً ويصفّر الشاشة بالكامل لبدء جلسة نظيفة
-     */
     fun dismissRestoreBanner() {
         opticalVerifiedEpcs.clear()
         cachedPendingSession = null
@@ -1251,7 +1198,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
 
     // ==================== الاعتماد والمزامنة والأرشيف ====================
 
-        fun commitCurrentInventory() {
+    fun commitCurrentInventory() {
         val api = apiClient ?: return
         if (_uiState.value.isCommitting) return
         if (_uiState.value.isScanning) stopScanning()
@@ -1286,7 +1233,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             )
         }
 
-        // تجهيز حمولة التقرير الشامل لإرسالها إلى /inventory/submit-audit
         val fullItemsJson = JSONArray()
         rowsByEpc.values.forEach { row ->
             fullItemsJson.put(JSONObject().apply {
@@ -1336,7 +1282,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                         .takeIf { it.isNotBlank() && it != "0" }
                         ?: inventoryEngine.clientSessionId
 
-                    // استخدام القيم المحلية الدقيقة إذا أعاد السيرفر أصفاراً
                     val serverExpected = report.optInt("expected_count", 0)
                     val serverFound = report.optInt("found_count", 0)
                     val expected = if (serverExpected > 0) serverExpected else state.expectedCount
@@ -1364,7 +1309,6 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
                         extraCount = state.uncataloguedCount + state.wrongCategoryCount
                     )
 
-                    // إرسال التفاصيل الكاملة للقطع والعيارات إلى السيرفر في الخلفية
                     ioExecutor.execute {
                         runCatching {
                             val auditPayload = JSONObject().apply {
@@ -1455,6 +1399,9 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun dismissCommitReport() {
+        _uiState.update { it.copy(commitReport = null) }
+    }
 
     fun syncOfflineQueue() {
         val api = apiClient ?: return
@@ -1844,6 +1791,22 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
         val code = "INV-${SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(now)}"
         val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(now)
 
+        val liveItems = rowsByEpc.values.map { row ->
+            ArchiveReportItemDetail(
+                epc = row.epc,
+                name = row.title,
+                karat = row.karat,
+                weightGrams = row.weight,
+                estimatedValue = row.price,
+                status = when (row.status) {
+                    ItemAuditStatus.MATCHED -> ArchiveItemStatus.MATCHED
+                    ItemAuditStatus.MISSING -> ArchiveItemStatus.MISSING
+                    ItemAuditStatus.UNCATALOGUED,
+                    ItemAuditStatus.WRONG_CATEGORY -> ArchiveItemStatus.UNCATALOGUED
+                }
+            )
+        }
+
         return ArchiveReportDetails(
             reportId = code,
             reportCode = code,
@@ -1856,7 +1819,7 @@ class MiraInventoryViewModel(application: Application) : AndroidViewModel(applic
             uncataloguedCount = s.uncataloguedCount + s.wrongCategoryCount,
             scannedWeightGrams = s.scannedWeightGrams,
             estimatedValueUsd = s.scannedValueUsd,
-            items = emptyList()
+            items = liveItems
         )
     }
 }
