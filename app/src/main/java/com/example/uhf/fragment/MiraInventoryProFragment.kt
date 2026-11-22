@@ -3078,4 +3078,65 @@ private fun encodeAndSaveScreenshot(
         } catch (_: Exception) {
         }
     }
+    // ═══════════════════════════════════════════════════════════════════
+//  Public API — تُستدعى من UHFMainActivity
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * تُستدعى من UHFMainActivity لمعرفة هل الجرد يعمل الآن.
+ */
+fun isCurrentlyScanning(): Boolean = isScanningState
+
+/**
+ * نسخة توافقية — بعض أجزاء UHFMainActivity تستخدم isScanning() بدلاً منها.
+ */
+fun isScanning(): Boolean = isScanningState
+
+/**
+ * إيقاف المسح من خارج الـ fragment (مثل زر FAB أو Home).
+ */
+fun stopScanning() {
+    stopInventoryScan()
+}
+
+/**
+ * فتح أرشيف التقارير المحفوظة (PDF/CSV) من ذاكرة التطبيق.
+ * تعرض آخر تقرير قابل للمشاركة، مع إشعار بعدد التقارير الكلي.
+ */
+fun showArchiveReportsPublic() {
+    try {
+        val appCtx = getSafeAppContext() ?: return
+        val dir = File(appCtx.cacheDir, "audit_reports")
+        val files = dir.listFiles()
+            ?.filter { it.isFile && (it.extension == "pdf" || it.extension == "csv") }
+            ?.sortedByDescending { it.lastModified() }
+            ?: emptyList()
+
+        if (files.isEmpty()) {
+            showToast(
+                if (isArabic) "📂 لا توجد تقارير محفوظة بعد"
+                else "📂 No archived reports yet"
+            )
+            return
+        }
+
+        val latest = files.first()
+        val mime = if (latest.extension == "pdf") "application/pdf" else "text/csv"
+        shareGeneratedFile(
+            ctx = appCtx,
+            file = latest,
+            mimeType = mime,
+            chooserTitle = if (isArabic)
+                "مشاركة آخر تقرير (${files.size} تقرير)"
+            else
+                "Share latest report (${files.size} total)"
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "showArchiveReportsPublic error", e)
+        showToast(
+            if (isArabic) "⚠️ تعذر فتح الأرشيف"
+            else "⚠️ Failed to open archive"
+        )
+    }
+}
 }
