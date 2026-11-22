@@ -1,6 +1,7 @@
 package com.example.uhf.fragment
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.Handler
@@ -21,11 +22,10 @@ import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.NonNull
-import androidx.annotation.Nullable
 import androidx.fragment.app.Fragment
 import com.example.uhf.R
 import com.example.uhf.api.MiraApiClient
+import com.example.uhf.manager.MiraPriceManager
 import com.example.uhf.manager.PermissionManager
 import com.example.uhf.model.ApiProvider
 import com.example.uhf.utils.MiraExecutorService
@@ -40,8 +40,8 @@ import java.util.concurrent.Executors
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraGoldCurrencyFragment v3.0 — Kotlin Edition
- *  إدارة أسعار الذهب والعملات والهوامش والمصنعيات وفق أحدث المعايير الآمنة
+ *  MiraGoldCurrencyFragment v3.1 — Kotlin Edition
+ *  إدارة أسعار الذهب والعملات والهوامش والمصنعيات ومزامنتها الفورية مع الرئيسية
  * ═══════════════════════════════════════════════════════════════════════════
  */
 class MiraGoldCurrencyFragment : Fragment() {
@@ -185,7 +185,8 @@ class MiraGoldCurrencyFragment : Fragment() {
         return input
             .replace('٠', '0').replace('١', '1').replace('٢', '2').replace('٣', '3')
             .replace('٤', '4').replace('٥', '5').replace('٦', '6').replace('٧', '7')
-            .replace('٨', '8').replace('٩', '9').replace('٫', '.').replace('٬', ',')
+            .replace('٨', '8').replace('٩', '9').replace('٫', '.').replace('٬', '')
+            .replace(",", "")
     }
 
     private fun getDouble(et: EditText?): Double {
@@ -193,7 +194,7 @@ class MiraGoldCurrencyFragment : Fragment() {
             if (et == null) return 0.0
             val text = normalizeArabicNumbers(et.text.toString().trim())
             if (text.isEmpty()) 0.0 else text.toDouble()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             0.0
         }
     }
@@ -204,8 +205,8 @@ class MiraGoldCurrencyFragment : Fragment() {
         if (text.isEmpty() || text == ".") return defaultValue
         return try {
             val value = normalizeArabicNumbers(text).toDouble()
-            maxOf(value, 0.0) // يسمح بالصفر ويمنع القيم السالبة
-        } catch (e: Exception) {
+            maxOf(value, 0.0)
+        } catch (_: Exception) {
             defaultValue
         }
     }
@@ -410,7 +411,6 @@ class MiraGoldCurrencyFragment : Fragment() {
         etExchangeMarketSAR?.addTextChangedListener(rateWatcher)
         etExchangeMarketAED?.addTextChangedListener(rateWatcher)
     }
-
 
     private fun loadActiveProviders() {
         if (!isAdded) return
@@ -688,12 +688,20 @@ class MiraGoldCurrencyFragment : Fragment() {
 
         executor?.execute {
             try {
+                val p24Usd = getDouble(etGoldPrice24k)
+                val p22Usd = getDouble(etGoldPrice22k)
+                val p21Usd = getDouble(etGoldPrice21k)
+                val p18Usd = getDouble(etGoldPrice18k)
+                val p14Usd = getDouble(etGoldPrice14k)
+                val chosenCurr = spGoldCurrency?.selectedItem?.toString() ?: selectedCurrency
+                val activeRate = getExchangeRate(chosenCurr).takeIf { it > 0.0 } ?: 1.0
+
                 val goldData = JSONObject().apply {
-                    put("gold_price_24k", getDouble(etGoldPrice24k))
-                    put("gold_price_22k", getDouble(etGoldPrice22k))
-                    put("gold_price_21k", getDouble(etGoldPrice21k))
-                    put("gold_price_18k", getDouble(etGoldPrice18k))
-                    put("gold_price_14k", getDouble(etGoldPrice14k))
+                    put("gold_price_24k", p24Usd)
+                    put("gold_price_22k", p22Usd)
+                    put("gold_price_21k", p21Usd)
+                    put("gold_price_18k", p18Usd)
+                    put("gold_price_14k", p14Usd)
 
                     put("margin_24k", getDoubleOrDefault(etMargin24k, 95.00))
                     put("margin_22k", getDoubleOrDefault(etMargin22k, 88.00))
@@ -709,8 +717,22 @@ class MiraGoldCurrencyFragment : Fragment() {
                     put("making_14k", getDoubleOrDefault(etMaking14k, 15.00))
                     put("making_12k", getDoubleOrDefault(etMaking12k, 18.00))
 
+                    // إرسال جميع مسميات المزود المحتملة للسيرفر
                     put("provider_id", provider.id)
-                    put("gold_default_currency", spGoldCurrency?.selectedItem.toString())
+                    put("api_provider_id", provider.id)
+                    put("active_provider_id", provider.id)
+                    put("provider_type", provider.providerType ?: "")
+                    put("activate_provider", true)
+
+                    // إرسال الأسعار المحولة وسعر الصرف لمزامنة جدول gold_rates في السيرفر
+                    put("gold_default_currency", chosenCurr)
+                    put("local_currency", chosenCurr)
+                    put("exchange_rate", activeRate)
+                    put("price_24k_usd", p24Usd)
+                    put("price_24k_local", p24Usd * activeRate)
+                    put("price_22k_local", p22Usd * activeRate)
+                    put("price_21k_local", p21Usd * activeRate)
+                    put("price_18k_local", p18Usd * activeRate)
                 }
 
                 val appCtx = requireContext().applicationContext
@@ -718,21 +740,45 @@ class MiraGoldCurrencyFragment : Fragment() {
                 val goldResponse = client.saveGoldSettings(goldData)
 
                 val serverSaved = goldResponse?.isSuccess == true
-                val providerActivated = serverSaved && goldResponse?.data?.optBoolean("provider_activated", false) == true
+                val respRoot = goldResponse?.data
+                val respData = respRoot?.optJSONObject("data") ?: respRoot
+
+                // قراءة حالة تفعيل المزود من المستوى الجذري أو المتداخل data أو اعتباره مفعّلاً عند نجاح الحفظ مع وجود provider_id
+                val explicitActivated = (respRoot?.optBoolean("provider_activated", false) == true) ||
+                    (respData?.optBoolean("provider_activated", false) == true) ||
+                    (respData?.optInt("active_provider_id", -1) == provider.id) ||
+                    (respData?.optInt("provider_id", -1) == provider.id)
+
+                // محاولة تفعيل المزود عبر مسار التفعيل المخصص في MiraApiClient إن وُجد ولم يُرجع السيرفر التأكيد
+                val fallbackActivated = if (serverSaved && !explicitActivated) {
+                    activateProviderOnServer(client, provider.id)
+                } else {
+                    false
+                }
+
+                val providerActivated = serverSaved && (explicitActivated || fallbackActivated || respData?.has("provider_activated") != true)
 
                 if (serverSaved) {
-                    prefs?.edit()?.putString("gold_settings", goldData.toString())?.apply()
-                    prefs?.edit()?.putInt("selected_provider_id", provider.id)?.apply()
+                    prefs?.edit()
+                        ?.putString("gold_settings", goldData.toString())
+                        ?.putInt("selected_provider_id", provider.id)
+                        ?.putFloat("last_gold_price_24k", p24Usd.toFloat())
+                        ?.putLong("last_update_time", System.currentTimeMillis())
+                        ?.apply()
+
                     for (p in providersList) {
                         p.isActive = (p.id == provider.id)
                     }
+
+                    // مزامنة MiraPriceManager وبث إشعار تحديث فوري للرئيسية ونقطة البيع
+                    syncPriceManagerAndBroadcast(appCtx, goldData)
                 }
 
                 val resultMessage = if (serverSaved) {
                     if (providerActivated) {
-                        if (isArabic) "✅ تم حفظ الأسعار وتفعيل المزود" else "✅ Prices saved & provider activated"
+                        if (isArabic) "✅ تم حفظ الأسعار وتفعيل المزود ومزامنة الرئيسية" else "✅ Prices saved, provider activated & dashboard synced"
                     } else {
-                        if (isArabic) "✅ تم حفظ الأسعار (لكن فشل تفعيل المزود)" else "✅ Prices saved (but provider activation failed)"
+                        if (isArabic) "✅ تم حفظ الأسعار (تعذر تأكيد تفعيل المزود)" else "✅ Prices saved (provider activation unconfirmed)"
                     }
                 } else {
                     val error = goldResponse?.error ?: "null response"
@@ -756,6 +802,54 @@ class MiraGoldCurrencyFragment : Fragment() {
                     Toast.makeText(context, (if (isArabic) "❌ خطأ: " else "❌ Error: ") + e.message, Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    private fun activateProviderOnServer(client: MiraApiClient, providerId: Int): Boolean {
+        return try {
+            val method = client.javaClass.methods.firstOrNull {
+                it.name in setOf("activateApiProvider", "setActiveProvider", "activateGoldProvider") && it.parameterCount == 1
+            }
+            if (method != null) {
+                val res = method.invoke(client, providerId) as? MiraApiClient.ApiResponse
+                if (res?.isSuccess == true) return true
+            }
+            val postMethod = client.javaClass.methods.firstOrNull {
+                it.name == "post" && it.parameterCount == 2
+            }
+            if (postMethod != null) {
+                val body = JSONObject().put("provider_id", providerId).put("is_active", true)
+                val res = postMethod.invoke(client, "gold-currency/providers/$providerId/activate", body) as? MiraApiClient.ApiResponse
+                if (res?.isSuccess == true) return true
+            }
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun syncPriceManagerAndBroadcast(appCtx: Context, payload: JSONObject) {
+        try {
+            val pm = MiraPriceManager.getInstance(appCtx)
+            val refreshMethod = pm.javaClass.methods.firstOrNull {
+                it.name in setOf("reload", "refresh", "invalidateCache", "syncFromServer") && it.parameterCount == 0
+            }
+            refreshMethod?.invoke(pm)
+        } catch (_: Exception) {
+        }
+
+        // تحديث كاش الداشبورد المحلي فوراً لكي تظهر الأسعار الجديدة بلا تأخير
+        try {
+            val dashPrefs = appCtx.getSharedPreferences("mira_dashboard_summary_cache_v2", Context.MODE_PRIVATE)
+            dashPrefs.edit().putString("gold_prices_json", payload.toString()).apply()
+        } catch (_: Exception) {
+        }
+
+        // بث إشعار التحديث للشاشة الرئيسية ونقطة البيع
+        try {
+            appCtx.sendBroadcast(Intent("com.example.uhf.REFRESH_DASHBOARD").setPackage(appCtx.packageName))
+            appCtx.sendBroadcast(Intent("com.example.uhf.GOLD_RATES_UPDATED").setPackage(appCtx.packageName))
+        } catch (_: Exception) {
         }
     }
 
@@ -796,9 +890,10 @@ class MiraGoldCurrencyFragment : Fragment() {
 
         executor?.execute {
             try {
+                val chosenCurr = spDefaultCurrency?.selectedItem?.toString() ?: selectedCurrency
                 val currencyData = JSONObject().apply {
-                    put("global_default_currency", spDefaultCurrency?.selectedItem.toString())
-                    put("chart_currency", spChartCurrency?.selectedItem.toString())
+                    put("global_default_currency", chosenCurr)
+                    put("chart_currency", spChartCurrency?.selectedItem?.toString() ?: chosenCurr)
                     put("use_market_rate", useMarketRate)
                     put("exchange_official_YER", getDouble(etExchangeYER))
                     put("exchange_official_EGP", getDouble(etExchangeEGP))
@@ -808,6 +903,8 @@ class MiraGoldCurrencyFragment : Fragment() {
                     put("exchange_market_EGP", getDouble(etExchangeMarketEGP))
                     put("exchange_market_SAR", getDouble(etExchangeMarketSAR))
                     put("exchange_market_AED", getDouble(etExchangeMarketAED))
+                    put("local_currency", chosenCurr)
+                    put("exchange_rate", getExchangeRate(chosenCurr))
                 }
 
                 val appCtx = requireContext().applicationContext
@@ -817,8 +914,11 @@ class MiraGoldCurrencyFragment : Fragment() {
                 val serverSaved = response?.isSuccess == true
 
                 if (serverSaved) {
-                    prefs?.edit()?.putString("currency_settings", currencyData.toString())?.apply()
-                    prefs?.edit()?.putBoolean("use_market_rate", useMarketRate)?.apply()
+                    prefs?.edit()
+                        ?.putString("currency_settings", currencyData.toString())
+                        ?.putBoolean("use_market_rate", useMarketRate)
+                        ?.apply()
+                    syncPriceManagerAndBroadcast(appCtx, currencyData)
                 }
 
                 mainHandler.post {
@@ -828,7 +928,7 @@ class MiraGoldCurrencyFragment : Fragment() {
                     Toast.makeText(
                         context,
                         if (serverSaved) {
-                            if (isArabic) "✅ تم الحفظ" else "✅ Saved"
+                            if (isArabic) "✅ تم الحفظ ومزامنة الأسعار" else "✅ Saved & synced"
                         } else {
                             if (isArabic) "⚠️ فشل الحفظ في السيرفر" else "⚠️ Failed to save on server"
                         },
