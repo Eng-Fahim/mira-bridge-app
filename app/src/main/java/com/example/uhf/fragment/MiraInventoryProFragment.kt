@@ -3082,27 +3082,21 @@ private fun encodeAndSaveScreenshot(
 //  Public API — تُستدعى من UHFMainActivity
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * تُستدعى من UHFMainActivity لمعرفة هل الجرد يعمل الآن.
- */
+/** هل المسح يعمل الآن؟ (UHFMainActivity:1694) */
 fun isCurrentlyScanning(): Boolean = isScanningState
 
-/**
- * نسخة توافقية — بعض أجزاء UHFMainActivity تستخدم isScanning() بدلاً منها.
- */
+/** اسم بديل مستخدم في UHFMainActivity:2286 */
 fun isScanning(): Boolean = isScanningState
 
-/**
- * إيقاف المسح من خارج الـ fragment (مثل زر FAB أو Home).
- */
+/** إيقاف المسح من خارج الـ fragment (UHFMainActivity:2318) */
 fun stopScanning() {
     stopInventoryScan()
 }
 
-/**
- * فتح أرشيف التقارير المحفوظة (PDF/CSV) من ذاكرة التطبيق.
- * تعرض آخر تقرير قابل للمشاركة، مع إشعار بعدد التقارير الكلي.
- */
+/** عدد الوسوم الفريدة التي قُرئت في الجلسة (UHFMainActivity:1693) */
+fun getScannedCount(): Int = scannedMetricsByEpc.size
+
+/** فتح أرشيف تقارير PDF/CSV (UHFMainActivity:1726, 1733, 1741) */
 fun showArchiveReportsPublic() {
     try {
         val appCtx = getSafeAppContext() ?: return
@@ -3113,10 +3107,7 @@ fun showArchiveReportsPublic() {
             ?: emptyList()
 
         if (files.isEmpty()) {
-            showToast(
-                if (isArabic) "📂 لا توجد تقارير محفوظة بعد"
-                else "📂 No archived reports yet"
-            )
+            showToast(if (isArabic) "📂 لا توجد تقارير محفوظة بعد" else "📂 No archived reports yet")
             return
         }
 
@@ -3127,16 +3118,59 @@ fun showArchiveReportsPublic() {
             file = latest,
             mimeType = mime,
             chooserTitle = if (isArabic)
-                "مشاركة آخر تقرير (${files.size} تقرير)"
+                "مشاركة آخر تقرير (${files.size} إجمالي)"
             else
                 "Share latest report (${files.size} total)"
         )
     } catch (e: Exception) {
         Log.e(TAG, "showArchiveReportsPublic error", e)
-        showToast(
-            if (isArabic) "⚠️ تعذر فتح الأرشيف"
-            else "⚠️ Failed to open archive"
-        )
+        showToast(if (isArabic) "⚠️ تعذر فتح الأرشيف" else "⚠️ Failed to open archive")
+    }
+}
+
+/** إعدادات الماسح — تفتح حوار القدرة (UHFMainActivity:674, 679) */
+fun showInventoryScannerSettings() {
+    val appCtx = getSafeAppContext() ?: return
+    PosPowerSettingsDialog.show(appCtx, isArabic) { newPower ->
+        MiraReaderSettings.getInstance(appCtx).inventoryPowerDbm = newPower
+        sdkExecutor.execute {
+            runCatching {
+                rfidManager?.setPower(newPower)
+                BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+            }
+        }
+    }
+}
+
+/** إعدادات جلسة المسح — تُظهر ملخصاً (UHFMainActivity:691, 696) */
+fun showInventorySessionSettings() {
+    try {
+        val appCtx = getSafeAppContext() ?: return
+        val s = MiraReaderSettings.getInstance(appCtx)
+        val rfLinkLabel = MiraReaderSettings.RFLINK_LABELS.getOrNull(s.rfLink) ?: "?"
+        val summary = if (isArabic) {
+            buildString {
+                appendLine("📊 إعدادات جلسة المسح الحالية:")
+                appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
+                appendLine("• Q: ${s.qValue} (${if (s.qMode == 0) "ثابت" else "ديناميكي"})")
+                appendLine("• Miller: ${s.miller}   |   LinkFreq: ${s.linkFreq}")
+                appendLine("• RFLink: $rfLinkLabel")
+                append("• القدرة: ${s.inventoryPowerDbm} dBm")
+            }
+        } else {
+            buildString {
+                appendLine("📊 Session Settings:")
+                appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
+                appendLine("• Q: ${s.qValue} (${if (s.qMode == 0) "fixed" else "dynamic"})")
+                appendLine("• Miller: ${s.miller}   |   LinkFreq: ${s.linkFreq}")
+                appendLine("• RFLink: $rfLinkLabel")
+                append("• Power: ${s.inventoryPowerDbm} dBm")
+            }
+        }
+        showToast(summary)
+    } catch (e: Exception) {
+        Log.e(TAG, "showInventorySessionSettings error", e)
+        showToast(if (isArabic) "⚠️ تعذر عرض إعدادات الجلسة" else "⚠️ Failed to show session settings")
     }
 }
 }
