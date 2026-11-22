@@ -368,7 +368,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                 val data = root.optJSONObject("data") ?: root
 
                 val totalValue = firstPositiveDouble(
-                    data,
+                    data, null,
                     "total_value", "total_value_usd", "inventory_value", "estimated_value"
                 )
                 val totalItems = firstNonNegativeInt(
@@ -376,7 +376,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                     "total_items", "items_count", "catalog_count", "expected_count"
                 )
                 val totalWeight = firstPositiveDouble(
-                    data,
+                    data, null,
                     "total_weight", "total_net_weight", "total_weight_grams", "net_weight"
                 )
 
@@ -386,15 +386,15 @@ class MiraInventoryDashboardFragment : Fragment() {
 
                 val rawMissing = firstNullableInt(
                     lastAuditObj, data,
-                    "missing_items", "missing_count"
+                    listOf("missing_items", "missing_count")
                 )
                 val rawMatched = firstNullableInt(
                     lastAuditObj, data,
-                    "matched_items", "matched_count", "found_count"
+                    listOf("matched_items", "matched_count", "found_count")
                 )
                 val rawExtra = firstNullableInt(
                     lastAuditObj, data,
-                    "extra_items", "uncatalogued_count", "extra_count"
+                    listOf("extra_items", "uncatalogued_count", "extra_count")
                 )
                 val pending = firstNonNegativeInt(
                     data,
@@ -403,11 +403,11 @@ class MiraInventoryDashboardFragment : Fragment() {
 
                 val auditCode = firstNonBlank(
                     lastAuditObj, data,
-                    "session_code", "audit_code", "report_number", "session_id"
+                    listOf("session_code", "audit_code", "report_number", "session_id")
                 )
                 val auditDate = firstNonBlank(
                     lastAuditObj, data,
-                    "audited_at", "completed_at", "last_audit_date", "created_at", "date"
+                    listOf("audited_at", "completed_at", "last_audit_date", "created_at", "date")
                 )
 
                 val hasExplicitAudit = lastAuditObj != null ||
@@ -509,7 +509,7 @@ class MiraInventoryDashboardFragment : Fragment() {
         return 0
     }
 
-    private fun firstNullableInt(primary: JSONObject?, secondary: JSONObject?, vararg keys: String): Int? {
+    private fun firstNullableInt(primary: JSONObject?, secondary: JSONObject?, keys: List<String>): Int? {
         for (obj in listOf(primary, secondary)) {
             if (obj == null) continue
             for (k in keys) {
@@ -522,7 +522,7 @@ class MiraInventoryDashboardFragment : Fragment() {
         return null
     }
 
-    private fun firstNonBlank(primary: JSONObject?, secondary: JSONObject?, vararg keys: String): String {
+    private fun firstNonBlank(primary: JSONObject?, secondary: JSONObject?, keys: List<String>): String {
         for (obj in listOf(primary, secondary)) {
             if (obj == null) continue
             for (k in keys) {
