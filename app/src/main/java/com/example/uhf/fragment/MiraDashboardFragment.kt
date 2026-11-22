@@ -402,13 +402,13 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-    private fun switchBranch(branchId: Int) {
+        private fun switchBranch(branchId: Int) {
         if (!isManagerState) return
         if (branchId <= 0 || branchId == currentBranchId) return
         currentBranchId = branchId
         selectedBranchIdState = branchId
         try {
-            val setter = branchesManager?.javaClass.methods.firstOrNull {
+            val setter = branchesManager?.javaClass?.methods?.firstOrNull {
                 it.name in setOf("setActiveBranchId", "selectBranch") && it.parameterCount == 1
             }
             setter?.invoke(branchesManager, branchId)
@@ -420,6 +420,7 @@ class MiraDashboardFragment : Fragment() {
         loadOfflineData()
         refreshAllDashboardData(forceNetwork = true)
     }
+
 
     private fun summaryCacheKey(branchId: Int): String {
         return if (isManagerState) "summary_b${branchId}_all" else "summary_b${branchId}_u${currentUserId}"
