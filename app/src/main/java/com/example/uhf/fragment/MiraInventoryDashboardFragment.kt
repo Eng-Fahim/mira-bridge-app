@@ -321,7 +321,14 @@ class MiraInventoryDashboardFragment : Fragment() {
         selectedBranchIdState = option.id
         selectedBranchNameState = option.name
         if (option.id > 0) {
-            runCatching { branchesManager?.setActiveBranch(option.id) }
+            runCatching {
+                val bm = branchesManager ?: return@runCatching
+                val singleArgMethod = bm.javaClass.methods.firstOrNull {
+                    it.name == "setActiveBranch" && it.parameterTypes.size == 1 &&
+                        (it.parameterTypes[0] == Int::class.javaPrimitiveType || it.parameterTypes[0] == Integer::class.java)
+                }
+                singleArgMethod?.invoke(bm, option.id)
+            }
         }
         fetchInventoryDashboardData()
     }
@@ -478,16 +485,8 @@ class MiraInventoryDashboardFragment : Fragment() {
         }
     }
 
-    private fun firstPositiveDouble(vararg sources: JSONObject?, keys: List<String> = emptyList()): Double {
-        return firstPositiveDoubleInternal(sources.toList(), keys)
-    }
-
     private fun firstPositiveDouble(primary: JSONObject?, secondary: JSONObject?, vararg keys: String): Double {
-        return firstPositiveDoubleInternal(listOf(primary, secondary), keys.toList())
-    }
-
-    private fun firstPositiveDoubleInternal(sources: List<JSONObject?>, keys: List<String>): Double {
-        for (obj in sources) {
+        for (obj in listOf(primary, secondary)) {
             if (obj == null) continue
             for (k in keys) {
                 if (obj.has(k) && !obj.isNull(k)) {
