@@ -49,18 +49,21 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.uhf.MiraRfid.MiraIRFIDReader
 import com.example.uhf.MiraRfid.MiraReaderSettings
+import com.example.uhf.MiraRfid.MiraRfidService
 import com.example.uhf.MiraRfid.RFIDManager
 import com.example.uhf.R
 import com.example.uhf.activity.BaseTabFragmentActivity
@@ -82,8 +85,6 @@ import com.example.uhf.utils.ScaleSimulationHelper
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -93,7 +94,8 @@ import java.util.regex.Pattern
 import kotlin.math.abs
 
 /**
- * MiraPosFragment (Jetpack Compose Edition — Zero-Lag Hardware Trigger & Instant UHF Scan)
+ * MiraPosFragment (Jetpack Compose Edition)
+ * يحافظ على كامل التوافق مع UHFMainActivity، قارئ RFID، الميزان الذكي، الدفع، الاسترجاع، والمزامنة بدون إنترنت.
  */
 class MiraPosFragment : MiraBaseFragment() {
 
@@ -115,9 +117,7 @@ class MiraPosFragment : MiraBaseFragment() {
         private const val AUTO_ADD_MIN_LEN = 6
         private const val PARTIAL_SERIAL_MIN_LEN = 3
         private const val PARTIAL_SERIAL_MAX_LEN = 8
-        private const val QUICK_TAP_THRESHOLD_MS = 380L
-        private const val QUICK_TAP_GRACE_MS = 2500L
-        private const val HOLD_RELEASE_TAIL_MS = 300L
+        private const val TRIGGER_GRACE_MS = 2000L
 
         private val SERIAL_PREFIXES = arrayOf(
             "MIRA-SN-", "MIRA-SN", "MIRASN-", "MIRASN",
@@ -128,7 +128,7 @@ class MiraPosFragment : MiraBaseFragment() {
     private enum class ScanMode { NONE, RFID, MANUAL, GS1 }
 
     private enum class HeroVisualState {
-        IDLE, GS1_SCANNING, RFID_WARMING_UP, RFID_LISTENING, MANUAL_ENTRY, ITEM_ADDED, ERROR
+        IDLE, GS1_SCANNING, RFID_LISTENING, MANUAL_ENTRY, ITEM_ADDED, ERROR
     }
 
     private data class ScanFeedbackBanner(
@@ -148,14 +148,8 @@ class MiraPosFragment : MiraBaseFragment() {
     private var stopAfterFirstRead = false
     private val oneShotConsumed = AtomicBoolean(false)
 
-    @Volatile
-    private var triggerDownAtMs = 0L
-
     private val sdkExecutor = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "POS-SDK").apply {
-            priority = Thread.MAX_PRIORITY - 1
-            isDaemon = true
-        }
+        Thread(r, "POS-SDK").apply { isDaemon = true }
     }
 
     private var sessionManager: SessionManager? = null
@@ -223,7 +217,7 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private var heroState by mutableStateOf(HeroVisualState.IDLE)
     private var rfidReadCountState by mutableIntStateOf(0)
-    private var isRfidConnectedState by mutableStateOf(false)
+    private var isRfidConnectedState by mutableStateOf(true)
     private var hasRfidHardwareState by mutableStateOf(true)
 
     private var isManualInputVisibleState by mutableStateOf(false)
@@ -234,10 +228,12 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private var statusMessageState by mutableStateOf("")
     private var pendingSalesCountState by mutableIntStateOf(0)
+
     private var activeBranchNameState by mutableStateOf("")
 
     private var canUsePosState by mutableStateOf(true)
     private var canPerformRefundState by mutableStateOf(false)
+
     private var isButtonsBusyState by mutableStateOf(false)
 
     private var scanFeedbackState by mutableStateOf<ScanFeedbackBanner?>(null)
@@ -252,11 +248,17 @@ class MiraPosFragment : MiraBaseFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        val arabic = isArabic
+        val composeDir = if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+
         return ComposeView(requireContext()).apply {
+            layoutDirection = if (arabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                MiraJewelryTheme {
-                    MiraPosScreen()
+                CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+                    MiraJewelryTheme {
+                        MiraPosScreen()
+                    }
                 }
             }
         }
@@ -298,7 +300,6 @@ class MiraPosFragment : MiraBaseFragment() {
 
             rfidManager = RFIDManager.getInstance(ctx)
             rfidManager?.let { manager ->
-                isRfidConnectedState = manager.isReady
                 val listener = object : MiraIRFIDReader.OnTagReadListener {
                     override fun onTagRead(epc: String, rssi: Int) {
                         if (currentScanMode == ScanMode.RFID) {
@@ -306,16 +307,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         }
                     }
 
-                    override fun onScanStarted() {
-                        safeRun {
-                            if (currentScanMode == ScanMode.RFID &&
-                                heroState != HeroVisualState.RFID_LISTENING
-                            ) {
-                                heroState = HeroVisualState.RFID_LISTENING
-                            }
-                        }
-                    }
-
+                    override fun onScanStarted() {}
                     override fun onScanStopped() {}
 
                     override fun onConnectionChanged(connected: Boolean) {
@@ -364,16 +356,18 @@ class MiraPosFragment : MiraBaseFragment() {
             }
 
             isCheckoutDialogShowing = false
-            currentScanMode = ScanMode.NONE
+            if (parentFragmentManager.findFragmentByTag("barcode_scanner") == null) {
+                currentScanMode = ScanMode.NONE
+                heroState = HeroVisualState.IDLE
+            }
             stopAfterFirstRead = false
             oneShotConsumed.set(false)
             cancelPendingStopIfAny()
 
             applyPermissions()
-            scaleManager?.connect()
 
-            // تسخين القارئ مسبقاً وتطبيق طاقة نقطة البيع قبل ضغط الزناد
-            warmUpRfidReaderAndApplyPosPower()
+            scaleManager?.connect()
+            applyLowPowerForPos()
 
             cartManager?.let { syncCartState(it.snapshot()) }
             activeBranchNameState = branchesManager?.activeBranchDisplayName ?: ""
@@ -393,12 +387,11 @@ class MiraPosFragment : MiraBaseFragment() {
             cancelPendingStopIfAny()
             stopCooldownCleanup()
 
-            if (currentScanMode != ScanMode.NONE) {
+            if (currentScanMode == ScanMode.RFID || currentScanMode == ScanMode.MANUAL) {
                 switchScanMode(ScanMode.NONE)
             }
 
             isCheckoutDialogShowing = false
-            heroState = HeroVisualState.IDLE
 
             (activity as? UHFMainActivity)?.let { act ->
                 act.setActivePOSFragment(null)
@@ -420,6 +413,10 @@ class MiraPosFragment : MiraBaseFragment() {
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
         if (!hidden) {
+            if (currentScanMode == ScanMode.GS1) {
+                currentScanMode = ScanMode.NONE
+                heroState = HeroVisualState.IDLE
+            }
             processPendingBarcodeIfAny()
             if (isRefundDialogHiddenForScan) {
                 isRefundDialogHiddenForScan = false
@@ -639,7 +636,7 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Cooldown & Power Management + Reader Pre-Warming
+    //  Cooldown & Power Management
     // ═══════════════════════════════════════════════════════════════════
 
     private fun startCooldownCleanup() {
@@ -659,47 +656,27 @@ class MiraPosFragment : MiraBaseFragment() {
         cooldownCleanupRunnable = null
     }
 
-    /**
-     * تسخين القارئ اليدوي فور دخول شاشة البيع وضبط طاقة POS بدون تضارب
-     */
-    private fun warmUpRfidReaderAndApplyPosPower() {
-        if (!hasRfidHardwareState) return
-        val manager = rfidManager ?: return
-        val appCtx = getSafeAppContext() ?: return
-
-        try {
-            val settings = MiraReaderSettings.getInstance(appCtx)
-            if (savedPowerBeforePos <= 0) {
+    private fun applyLowPowerForPos() {
+        if (sdkExecutor.isShutdown) return
+        sdkExecutor.execute {
+            try {
+                val appCtx = getSafeAppContext() ?: return@execute
+                val settings = MiraReaderSettings.getInstance(appCtx)
                 savedPowerBeforePos = settings.powerDbm
-            }
-            val posPower = settings.posPowerDbm
-            settings.powerDbm = posPower
+                val posPower = settings.posPowerDbm
+                if (savedPowerBeforePos == posPower) return@execute
 
-            // إذا كان القارئ عالقاً في وضع مسح من شاشة سابقة نوقفه فوراً
-            if (manager.isScanning && currentScanMode == ScanMode.NONE) {
-                sdkExecutor.execute {
-                    runCatching { manager.stopScan() }
-                }
-            }
-
-            manager.ensureReady(object : RFIDManager.ReadyCallback {
-                override fun onReady(reader: MiraIRFIDReader) {
-                    safeRun { isRfidConnectedState = true }
-                    sdkExecutor.execute {
-                        runCatching {
-                            manager.setPower(posPower)
-                            BaseTabFragmentActivity.getSharedReader()?.setPower(posPower)
-                        }
+                settings.powerDbm = posPower
+                BaseTabFragmentActivity.getSharedReader()?.let { reader ->
+                    try {
+                        reader.setPower(posPower)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "setPower failed", e)
                     }
                 }
-
-                override fun onError(reason: String) {
-                    Log.w(TAG, "warmUpRfidReader warning: $reason")
-                    safeRun { isRfidConnectedState = false }
-                }
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "warmUpRfidReaderAndApplyPosPower error", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "applyLowPowerForPos error", e)
+            }
         }
     }
 
@@ -707,7 +684,6 @@ class MiraPosFragment : MiraBaseFragment() {
         if (sdkExecutor.isShutdown) return
         sdkExecutor.execute {
             try {
-                rfidManager?.setPower(newPowerDbm)
                 BaseTabFragmentActivity.getSharedReader()?.setPower(newPowerDbm)
             } catch (e: Exception) {
                 Log.w(TAG, "applyPosPowerImmediate failed", e)
@@ -725,7 +701,6 @@ class MiraPosFragment : MiraBaseFragment() {
                 val appCtx = getSafeAppContext() ?: return@execute
                 val settings = MiraReaderSettings.getInstance(appCtx)
                 settings.powerDbm = target
-                rfidManager?.setPower(target)
                 BaseTabFragmentActivity.getSharedReader()?.setPower(target)
             } catch (e: Exception) {
                 Log.e(TAG, "restoreOriginalPower error", e)
@@ -736,8 +711,8 @@ class MiraPosFragment : MiraBaseFragment() {
     private fun openPosPowerSettings() {
         if (!isFragmentAlive()) return
         try {
-            val ctx = getSafeAppContext() ?: return
-            PosPowerSettingsDialog.show(ctx, isArabic) { newPowerDbm ->
+            val dialogCtx = activity ?: context ?: return
+            PosPowerSettingsDialog.show(dialogCtx, isArabic) { newPowerDbm ->
                 applyPosPowerImmediate(newPowerDbm)
                 showToast(
                     if (isArabic) "✅ تم تحديث قوة القراءة إلى $newPowerDbm dBm"
@@ -750,7 +725,7 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Scan Mode & Hardware Trigger (Zero-Lag & Self-Healing)
+    //  Scan Mode & Hardware Trigger
     // ═══════════════════════════════════════════════════════════════════
 
     override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
@@ -762,7 +737,6 @@ class MiraPosFragment : MiraBaseFragment() {
 
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             cancelPendingStopIfAny()
-            triggerDownAtMs = System.currentTimeMillis()
 
             if (isCheckoutDialogShowing) return true
 
@@ -773,35 +747,18 @@ class MiraPosFragment : MiraBaseFragment() {
 
             if (!hasRfidHardwareState) return true
 
-            // أثناء الضغط على الزناد: مسح مستمر حتى إفلات الزناد أو إتمام الضغطة
-            oneShotConsumed.set(false)
-            stopAfterFirstRead = false
-
             if (currentScanMode != ScanMode.RFID) {
                 switchScanMode(ScanMode.RFID)
-            } else if (rfidManager?.isScanning != true) {
-                // إذا كانت الواجهة في وضع RFID لكن العتاد توقف، أعد تشغيل البث فوراً
-                startRFIDScan(retryCount = 0)
+            } else {
+                oneShotConsumed.set(false)
+                stopAfterFirstRead = true
             }
             return true
         }
 
         if (event.action == KeyEvent.ACTION_UP) {
             if (currentScanMode == ScanMode.RFID) {
-                val heldDuration = if (triggerDownAtMs > 0L) {
-                    System.currentTimeMillis() - triggerDownAtMs
-                } else 0L
-                triggerDownAtMs = 0L
-
-                if (heldDuration >= QUICK_TAP_THRESHOLD_MS) {
-                    // ضغطة مطولة: أوقف المسح فور إفلات الزناد (بعد 300ms لالتقاط آخر نبضة)
-                    stopAfterFirstRead = false
-                    scheduleDelayedStop(HOLD_RELEASE_TAIL_MS)
-                } else {
-                    // ضغطة سريعة (نقر): أبقِ الاستماع لـ 2.5 ثانية لالتقاط قطعة واحدة
-                    stopAfterFirstRead = true
-                    scheduleDelayedStop(QUICK_TAP_GRACE_MS)
-                }
+                scheduleDelayedStopIfNeeded()
             }
             return true
         }
@@ -809,15 +766,15 @@ class MiraPosFragment : MiraBaseFragment() {
         return false
     }
 
-    private fun scheduleDelayedStop(delayMs: Long) {
+    private fun scheduleDelayedStopIfNeeded() {
         cancelPendingStopIfAny()
         pendingStopRfid = Runnable {
             pendingStopRfid = null
-            if (currentScanMode == ScanMode.RFID) {
+            if (currentScanMode == ScanMode.RFID && stopAfterFirstRead) {
                 switchScanMode(ScanMode.NONE)
             }
         }
-        mainHandler.postDelayed(pendingStopRfid!!, delayMs)
+        mainHandler.postDelayed(pendingStopRfid!!, TRIGGER_GRACE_MS)
     }
 
     private fun cancelPendingStopIfAny() {
@@ -827,7 +784,7 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private fun switchScanMode(target: ScanMode) {
         if (!isFragmentAlive()) return
-        if (currentScanMode == target) return
+        if (currentScanMode == target && target != ScanMode.GS1) return
 
         when (currentScanMode) {
             ScanMode.RFID -> {
@@ -850,13 +807,8 @@ class MiraPosFragment : MiraBaseFragment() {
             }
             ScanMode.RFID -> {
                 rfidReadCountState = 0
-                val readyNow = rfidManager?.isReady == true
-                heroState = if (readyNow) {
-                    HeroVisualState.RFID_LISTENING
-                } else {
-                    HeroVisualState.RFID_WARMING_UP
-                }
-                startRFIDScan(retryCount = 0)
+                heroState = HeroVisualState.RFID_LISTENING
+                startRFIDScan()
             }
             ScanMode.MANUAL -> {
                 heroState = HeroVisualState.MANUAL_ENTRY
@@ -868,54 +820,22 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun startRFIDScan(retryCount: Int = 0) {
+    private fun startRFIDScan() {
         val manager = rfidManager ?: return
         if (sdkExecutor.isShutdown) return
 
+        oneShotConsumed.set(false)
+        stopAfterFirstRead = true
+
         sdkExecutor.execute {
             try {
-                // إصلاح ذاتي: إذا كانت حالة RFIDManager عالقة على SCANNING من عملية سابقة
-                if (manager.isScanning) {
-                    Log.w(TAG, "RFIDManager stuck in SCANNING — resetting before start")
-                    manager.stopScan()
-                    Thread.sleep(70)
-                }
-
-                if (currentScanMode != ScanMode.RFID) return@execute
-
                 manager.startScan(object : RFIDManager.ReadyCallback {
-                    override fun onReady(reader: MiraIRFIDReader) {
-                        safeRun {
-                            if (!isFragmentAlive() || currentScanMode != ScanMode.RFID) {
-                                stopRFIDScan()
-                                return@safeRun
-                            }
-                            isRfidConnectedState = true
-                            heroState = HeroVisualState.RFID_LISTENING
-                            // صوت تأكيد فوري لحظة بدء البث الفعلي للهوائي
-                            playAlertSound(1)
-                        }
-                    }
-
+                    override fun onReady(reader: MiraIRFIDReader) {}
                     override fun onError(reason: String) {
-                        Log.w(TAG, "startRFIDScan onError (attempt=$retryCount): $reason")
-                        if (retryCount < 1 && currentScanMode == ScanMode.RFID) {
-                            sdkExecutor.execute {
-                                runCatching { manager.stopScan() }
-                                Thread.sleep(100)
-                                startRFIDScan(retryCount + 1)
-                            }
-                            return
-                        }
-
                         safeRun {
                             if (!isFragmentAlive()) return@safeRun
                             currentScanMode = ScanMode.NONE
                             heroState = HeroVisualState.IDLE
-                            showToast(
-                                if (isArabic) "⚠️ تعذر بدء القارئ: $reason"
-                                else "⚠️ Reader start failed: $reason"
-                            )
                         }
                     }
                 })
@@ -928,7 +848,10 @@ class MiraPosFragment : MiraBaseFragment() {
     private fun stopRFIDScan() {
         val manager = rfidManager ?: return
         if (sdkExecutor.isShutdown) {
-            runCatching { manager.stopScan() }
+            try {
+                manager.stopScan()
+            } catch (_: Exception) {
+            }
             return
         }
         sdkExecutor.execute {
@@ -1012,16 +935,61 @@ class MiraPosFragment : MiraBaseFragment() {
                 switchScanMode(ScanMode.NONE)
             }
 
+            val isValidEpc = cleanEpc.matches(Regex("^E2[0-9A-F]{22}$"))
+            if (!isValidEpc) {
+                readTidAndProcess(cleanEpc, "rfid")
+                return
+            }
+
             if (cartManager?.isIdScanned(cleanEpc) == true) {
                 showToast(getString(R.string.pos_msg_already_in_cart))
                 playAlertSound(2)
                 return
             }
 
-            // البحث المباشر بالـ EPC/TID/Serial دون إيقاف القارئ لطلب TID إضافي
             processRingEpc(cleanEpc, "rfid")
         } catch (e: Exception) {
             Log.e(TAG, "onRingScanned error", e)
+        }
+    }
+
+    private fun readTidAndProcess(originalEpc: String, source: String) {
+        if (!hasPosPermission()) return
+        if (sdkExecutor.isShutdown) {
+            processRingEpc(originalEpc, source)
+            return
+        }
+
+        safeRun {
+            statusMessageState = getString(R.string.pos_msg_searching)
+        }
+
+        sdkExecutor.execute {
+            var tidRead: String? = null
+            try {
+                val ctx = getSafeAppContext()
+                if (ctx != null) {
+                    tidRead = MiraRfidService.getInstance(ctx).readTid(null)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "readTid error", e)
+            }
+
+            val cleanTid = if (!tidRead.isNullOrBlank()) tidRead.trim().uppercase(Locale.US) else null
+
+            safeRun {
+                if (!isFragmentAlive()) return@safeRun
+                if (cleanTid == null) {
+                    processRingEpc(originalEpc, source)
+                    return@safeRun
+                }
+                if (cartManager?.isIdScanned(cleanTid) == true) {
+                    showToast(getString(R.string.pos_msg_already_in_cart))
+                    playAlertSound(2)
+                    return@safeRun
+                }
+                processRingEpc(cleanTid, source)
+            }
         }
     }
 
@@ -1077,9 +1045,7 @@ class MiraPosFragment : MiraBaseFragment() {
 
         val cleanCode = code.trim()
         val candidates = buildSearchCandidates(cleanCode)
-        if (source != "rfid") {
-            playAlertSound(1)
-        }
+        playAlertSound(1)
 
         safeRun {
             statusMessageState = getString(R.string.pos_msg_searching)
@@ -1101,10 +1067,8 @@ class MiraPosFragment : MiraBaseFragment() {
                 if (!isFragmentAlive()) return@safeRun
                 showToast(getString(R.string.pos_msg_not_found))
                 playAlertSound(2)
-                if (currentScanMode != ScanMode.RFID) {
-                    heroState = HeroVisualState.ERROR
-                    resetHeroAfterDelay()
-                }
+                heroState = HeroVisualState.ERROR
+                resetHeroAfterDelay()
                 showScanBanner(
                     title = if (isArabic) "❌ لم يتم العثور" else "❌ Not Found",
                     details = originalCode,
@@ -1174,10 +1138,8 @@ class MiraPosFragment : MiraBaseFragment() {
             if (item == null) {
                 showToast(getString(R.string.pos_msg_not_found))
                 playAlertSound(2)
-                if (currentScanMode != ScanMode.RFID) {
-                    heroState = HeroVisualState.ERROR
-                    resetHeroAfterDelay()
-                }
+                heroState = HeroVisualState.ERROR
+                resetHeroAfterDelay()
                 return
             }
 
@@ -1189,10 +1151,8 @@ class MiraPosFragment : MiraBaseFragment() {
                     if (cachedStatus == "sold" || cachedStatus == "exited") {
                         showToast(getString(R.string.pos_msg_already_sold))
                         playAlertSound(2)
-                        if (currentScanMode != ScanMode.RFID) {
-                            heroState = HeroVisualState.ERROR
-                            resetHeroAfterDelay()
-                        }
+                        heroState = HeroVisualState.ERROR
+                        resetHeroAfterDelay()
                         showScanBanner(
                             title = if (isArabic) "❌ القطعة مباعة" else "❌ Already Sold",
                             details = extractString(item, "title", "item_title"),
@@ -1210,10 +1170,8 @@ class MiraPosFragment : MiraBaseFragment() {
             if (vaultStatus == "sold" || vaultStatus == "exited") {
                 showToast(getString(R.string.pos_msg_already_sold))
                 playAlertSound(2)
-                if (currentScanMode != ScanMode.RFID) {
-                    heroState = HeroVisualState.ERROR
-                    resetHeroAfterDelay()
-                }
+                heroState = HeroVisualState.ERROR
+                resetHeroAfterDelay()
                 showScanBanner(
                     title = if (isArabic) "❌ القطعة مباعة" else "❌ Already Sold",
                     details = extractString(item, "title", "item_title"),
@@ -1306,13 +1264,11 @@ class MiraPosFragment : MiraBaseFragment() {
                 accentColor = Color(0xFF10B981)
             )
 
+            heroState = HeroVisualState.ITEM_ADDED
             if (source == "rfid") {
                 rfidReadCountState += 1
             }
-            if (currentScanMode != ScanMode.RFID) {
-                heroState = HeroVisualState.ITEM_ADDED
-                resetHeroAfterDelay()
-            }
+            resetHeroAfterDelay()
         } catch (e: Exception) {
             Log.e(TAG, "parseItemResponse error", e)
             safeRun {
@@ -1327,11 +1283,7 @@ class MiraPosFragment : MiraBaseFragment() {
         mainHandler.postDelayed({
             if (!isFragmentAlive()) return@postDelayed
             if (heroState == HeroVisualState.ITEM_ADDED || heroState == HeroVisualState.ERROR) {
-                heroState = if (currentScanMode == ScanMode.RFID) {
-                    HeroVisualState.RFID_LISTENING
-                } else {
-                    HeroVisualState.IDLE
-                }
+                heroState = HeroVisualState.IDLE
             }
         }, ITEM_ADDED_DISPLAY_MS)
     }
@@ -1356,7 +1308,7 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Barcode Scanner
+    //  Barcode Scanner (Immediate Callback + Safe Backstack Dismissal)
     // ═══════════════════════════════════════════════════════════════════
 
     private fun openBarcodeScanner() {
@@ -1376,10 +1328,40 @@ class MiraPosFragment : MiraBaseFragment() {
                 return
             }
 
+            fm.findFragmentByTag("barcode_scanner")?.let { existing ->
+                fm.beginTransaction().remove(existing).commitNowAllowingStateLoss()
+            }
+
+            pendingBarcodeFromScanner = null
+            val handled = AtomicBoolean(false)
+
             val scannerFragment = MiraBarcodeScannerFragment()
             scannerFragment.setOnBarcodeScannedListener { data, _ ->
-                if (!data.isNullOrEmpty()) {
-                    pendingBarcodeFromScanner = data
+                if (data.isNullOrBlank()) return@setOnBarcodeScannedListener
+                if (!handled.compareAndSet(false, true)) return@setOnBarcodeScannedListener
+
+                pendingBarcodeFromScanner = data
+
+                mainHandler.post {
+                    try {
+                        val hostFm = if (isAdded) parentFragmentManager else null
+                        if (hostFm != null && !hostFm.isStateSaved) {
+                            if (hostFm.findFragmentByTag("barcode_scanner") != null) {
+                                hostFm.popBackStack()
+                            }
+                            if (isHidden) {
+                                hostFm.beginTransaction()
+                                    .show(this@MiraPosFragment)
+                                    .commitAllowingStateLoss()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Dismiss barcode_scanner warning: ${e.message}")
+                    }
+
+                    currentScanMode = ScanMode.NONE
+                    heroState = HeroVisualState.IDLE
+                    processPendingBarcodeIfAny()
                 }
             }
 
@@ -1416,7 +1398,7 @@ class MiraPosFragment : MiraBaseFragment() {
             if (!isFragmentAlive()) return@postDelayed
             val parsed = parseGs1OrQr(code)
             onBarcodeScanned(parsed[0])
-        }, 150)
+        }, 120)
     }
 
     private fun parseGs1OrQr(raw: String?): Array<String> {
@@ -1484,9 +1466,6 @@ class MiraPosFragment : MiraBaseFragment() {
             }
             if (isCheckoutDialogShowing || !isFragmentAlive()) return
 
-            if (currentScanMode != ScanMode.NONE) {
-                switchScanMode(ScanMode.NONE)
-            }
             UIHelper.hideKeyboard(activity)
 
             val itemIds = manager.items.mapNotNull { item ->
@@ -2464,14 +2443,10 @@ class MiraPosFragment : MiraBaseFragment() {
                             enabled = canUsePosState && !isButtonsBusyState,
                             onGs1Click = { switchScanMode(ScanMode.GS1) },
                             onRfidClick = {
-                                if (currentScanMode == ScanMode.RFID) {
-                                    switchScanMode(ScanMode.NONE)
-                                } else {
-                                    stopAfterFirstRead = true
-                                    oneShotConsumed.set(false)
-                                    switchScanMode(ScanMode.RFID)
-                                    scheduleDelayedStop(QUICK_TAP_GRACE_MS)
-                                }
+                                showToast(
+                                    if (isAr) "🎯 استخدم زر الزناد في القارئ للمسح"
+                                    else "🎯 Use the physical trigger to scan"
+                                )
                             },
                             onRfidLongClick = { openPosPowerSettings() },
                             onManualClick = {
@@ -2508,14 +2483,10 @@ class MiraPosFragment : MiraBaseFragment() {
                                 enabled = canUsePosState && !isButtonsBusyState,
                                 onGs1Click = { switchScanMode(ScanMode.GS1) },
                                 onRfidClick = {
-                                    if (currentScanMode == ScanMode.RFID) {
-                                        switchScanMode(ScanMode.NONE)
-                                    } else {
-                                        stopAfterFirstRead = true
-                                        oneShotConsumed.set(false)
-                                        switchScanMode(ScanMode.RFID)
-                                        scheduleDelayedStop(QUICK_TAP_GRACE_MS)
-                                    }
+                                    showToast(
+                                        if (isAr) "🎯 استخدم زر الزناد في القارئ للمسح"
+                                        else "🎯 Use the physical trigger to scan"
+                                    )
                                 },
                                 onRfidLongClick = { openPosPowerSettings() },
                                 onManualClick = {
@@ -2945,7 +2916,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isRfidListening) (if (isArabic) "جاري المسح..." else "Scanning...") else "RFID",
+                            text = "RFID",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = rfidColor,
@@ -3112,7 +3083,6 @@ class MiraPosFragment : MiraBaseFragment() {
         )
 
         val ringColor = when (state) {
-            HeroVisualState.RFID_WARMING_UP -> Color(0xFFF59E0B)
             HeroVisualState.RFID_LISTENING -> Color(0xFF10B981)
             HeroVisualState.GS1_SCANNING -> Color(0xFF06B6D4)
             HeroVisualState.ITEM_ADDED -> Color(0xFF22C55E)
@@ -3122,7 +3092,6 @@ class MiraPosFragment : MiraBaseFragment() {
         }
 
         val heroIcon = when (state) {
-            HeroVisualState.RFID_WARMING_UP -> Icons.Rounded.Sync
             HeroVisualState.RFID_LISTENING -> Icons.Rounded.Contactless
             HeroVisualState.GS1_SCANNING -> Icons.Rounded.QrCodeScanner
             HeroVisualState.ITEM_ADDED -> Icons.Rounded.CheckCircle
@@ -3132,7 +3101,6 @@ class MiraPosFragment : MiraBaseFragment() {
         }
 
         val heroTitle = when (state) {
-            HeroVisualState.RFID_WARMING_UP -> if (isArabic) "جاري تهيئة قارئ RFID..." else "Warming Up RFID Reader..."
             HeroVisualState.RFID_LISTENING -> if (isArabic) "جاري الاستماع لبطاقات RFID..." else "Listening for RFID Tags..."
             HeroVisualState.GS1_SCANNING -> if (isArabic) "ماسح الباركود نشط" else "Barcode Scanner Active"
             HeroVisualState.ITEM_ADDED -> if (isArabic) "تمت إضافة القطعة للسلة" else "Item Added to Cart"
@@ -3142,8 +3110,7 @@ class MiraPosFragment : MiraBaseFragment() {
         }
 
         val heroSubtitle = when (state) {
-            HeroVisualState.RFID_WARMING_UP -> if (isArabic) "ثوانٍ معدودة لتنشيط هوائي القراءة" else "Activating UHF antenna..."
-            HeroVisualState.RFID_LISTENING -> if (isArabic) "قرّب بطاقة المجوهرات من القارئ الآن" else "Bring jewelry tag near reader now"
+            HeroVisualState.RFID_LISTENING -> if (isArabic) "قرّب بطاقة المجوهرات من القارئ" else "Bring jewelry tag near reader"
             HeroVisualState.MANUAL_ENTRY -> if (isArabic) "اكتب الرقم التسلسلي أعلاه للإضافة الفورية" else "Type serial number above to add"
             else -> if (isArabic) "امسح بطاقة القطعة بالزناد أو الباركود أو أدخل الرقم يدوياً" else "Scan via RFID trigger, barcode, or manual entry"
         }
