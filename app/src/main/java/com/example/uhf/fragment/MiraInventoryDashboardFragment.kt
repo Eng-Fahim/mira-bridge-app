@@ -25,57 +25,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AddCircleOutline
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Diamond
-import androidx.compose.material.icons.rounded.FactCheck
-import androidx.compose.material.icons.rounded.Inventory
-import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.PendingActions
-import androidx.compose.material.icons.rounded.PieChart
-import androidx.compose.material.icons.rounded.QrCodeScanner
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Scale
-import androidx.compose.material.icons.rounded.Store
-import androidx.compose.material.icons.rounded.WarningAmber
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,12 +46,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -105,10 +61,8 @@ import com.example.uhf.manager.PermissionManager
 import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
-import org.json.JSONObject
 import java.util.Locale
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 
 class MiraInventoryDashboardFragment : Fragment() {
 
@@ -121,20 +75,6 @@ class MiraInventoryDashboardFragment : Fragment() {
         val name: String
     )
 
-    private data class DashboardSnapshot(
-        val totalValueUsd: Double = 0.0,
-        val totalItems: Int = 0,
-        val totalWeightGrams: Double = 0.0,
-        val matchedItems: Int = 0,
-        val missingItems: Int = 0,
-        val extraItems: Int = 0,
-        val pendingSessions: Int = 0,
-        val hasRecordedAudit: Boolean = false,
-        val lastAuditCode: String = "",
-        val lastAuditDate: String = "",
-        val matchRatePercent: Float? = null
-    )
-
     private var apiClient: MiraApiClient? = null
     private var sessionManager: SessionManager? = null
     private var permissionManager: PermissionManager? = null
@@ -142,7 +82,6 @@ class MiraInventoryDashboardFragment : Fragment() {
     private var priceManager: MiraPriceManager? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val fetchGeneration = AtomicInteger(0)
     private val networkExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "InvDashboard-Net").apply { isDaemon = true }
     }
@@ -150,6 +89,7 @@ class MiraInventoryDashboardFragment : Fragment() {
     private var isReceiverRegistered = false
     private var refreshReceiver: BroadcastReceiver? = null
     private var isArabic: Boolean = true
+    private var lastFetchTimeMs: Long = 0L
 
     // ═══════════════════════════════════════════════════════════════════
     //  Jetpack Compose Reactive States
@@ -171,19 +111,10 @@ class MiraInventoryDashboardFragment : Fragment() {
     private var missingItemsState by mutableIntStateOf(0)
     private var extraItemsState by mutableIntStateOf(0)
     private var pendingSessionsState by mutableIntStateOf(0)
-
-    private var hasRecordedAuditState by mutableStateOf(false)
-    private var lastAuditCodeState by mutableStateOf("")
-    private var lastAuditDateState by mutableStateOf("")
-    private var matchRatePercentState by mutableStateOf<Float?>(null)
+    private var lastAuditLabelState by mutableStateOf("")
 
     private fun checkIsArabic(): Boolean {
-        val appTags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-        if (appTags.isNotEmpty()) {
-            return appTags.contains("ar", ignoreCase = true)
-        }
-        val sysLang = Locale.getDefault().language
-        return sysLang.equals("ar", ignoreCase = true) ||
+        return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
             resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
     }
 
@@ -196,18 +127,11 @@ class MiraInventoryDashboardFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val arabic = checkIsArabic()
-        isArabic = arabic
-        val composeLayoutDirection = if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr
-
         return ComposeView(requireContext()).apply {
-            layoutDirection = if (arabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                CompositionLocalProvider(LocalLayoutDirection provides composeLayoutDirection) {
-                    MiraJewelryTheme {
-                        InventoryDashboardScreen()
-                    }
+                MiraJewelryTheme {
+                    InventoryDashboardScreen()
                 }
             }
         }
@@ -233,6 +157,10 @@ class MiraInventoryDashboardFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         registerRefreshReceiver()
+        // تحديث تلقائي عند العودة من شاشة الجرد أو أي شاشة أخرى
+        if (System.currentTimeMillis() - lastFetchTimeMs > 1200L) {
+            fetchInventoryDashboardData()
+        }
     }
 
     override fun onPause() {
@@ -266,7 +194,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         "com.example.uhf.REFRESH_DASHBOARD" == action
                     ) {
                         mainHandler.post {
-                            if (isAdded && isResumed && !isDetached) {
+                            if (isAdded) {
                                 fetchInventoryDashboardData()
                             }
                         }
@@ -332,26 +260,10 @@ class MiraInventoryDashboardFragment : Fragment() {
         }
     }
 
-    private fun onBranchSelected(option: BranchOption) {
-        selectedBranchIdState = option.id
-        selectedBranchNameState = option.name
-        if (option.id > 0) {
-            runCatching {
-                val bm = branchesManager ?: return@runCatching
-                val singleArgMethod = bm.javaClass.methods.firstOrNull {
-                    it.name == "setActiveBranch" && it.parameterTypes.size == 1 &&
-                        (it.parameterTypes[0] == Int::class.javaPrimitiveType || it.parameterTypes[0] == Integer::class.java)
-                }
-                singleArgMethod?.invoke(bm, option.id)
-            }
-        }
-        fetchInventoryDashboardData()
-    }
-
     private fun fetchInventoryDashboardData() {
-        if (!isAdded || isDetached || networkExecutor.isShutdown) return
+        if (!isAdded || networkExecutor.isShutdown) return
 
-        val requestId = fetchGeneration.incrementAndGet()
+        lastFetchTimeMs = System.currentTimeMillis()
         val branchId = selectedBranchIdState
         isLoadingState = true
         errorMessageState = null
@@ -360,209 +272,81 @@ class MiraInventoryDashboardFragment : Fragment() {
             try {
                 val client = apiClient ?: context?.let { MiraApiClient.getInstance(it) }
                 if (client == null) {
-                    postErrorIfCurrent(
-                        requestId = requestId,
-                        message = if (isArabic) "خطأ في تهيئة الاتصال" else "Client initialization error"
-                    )
+                    mainHandler.post {
+                        if (!isAdded) return@post
+                        isLoadingState = false
+                        errorMessageState = if (isArabic) "خطأ في تهيئة الاتصال" else "Client initialization error"
+                    }
                     return@execute
                 }
 
                 val response = client.getBranchInventoryStats(branchId)
 
-                if (response == null || !response.isSuccess || response.data == null) {
+                if (response != null && response.isSuccess && response.data != null) {
+                    val data = response.data!!.optJSONObject("data") ?: response.data!!
+
+                    val totalValue = data.optDouble("total_value", data.optDouble("total_value_usd", 0.0))
+                    val totalItems = data.optInt("total_items", data.optInt("items_count", 0))
+                    val totalWeight = data.optDouble("total_weight", data.optDouble("total_net_weight", 0.0))
+
+                    val hasAuditData = data.has("matched_items") || data.has("missing_items") || data.has("last_session_id")
+                    val missing = data.optInt("missing_items", 0)
+                    val matched = if (hasAuditData) data.optInt("matched_items", 0) else 0
+                    val extra = data.optInt("extra_items", 0)
+                    val pending = data.optInt("pending_sessions", 0)
+                    val lastSessionId = data.optInt("last_session_id", 0)
+                    val lastAuditAt = data.optString("last_audit_at", "")
+
+                    val auditLabel = if (lastSessionId > 0) {
+                        if (isArabic) "آخر جرد معتمد: #$lastSessionId" + (if (lastAuditAt.isNotBlank()) " • $lastAuditAt" else "")
+                        else "Last audit: #$lastSessionId" + (if (lastAuditAt.isNotBlank()) " • $lastAuditAt" else "")
+                    } else ""
+
+                    mainHandler.post {
+                        if (!isAdded) return@post
+                        isLoadingState = false
+                        errorMessageState = null
+
+                        totalValueUsdState = totalValue
+                        totalItemsState = totalItems
+                        totalWeightState = totalWeight
+
+                        matchedItemsState = matched
+                        missingItemsState = missing
+                        extraItemsState = extra
+                        pendingSessionsState = pending
+                        lastAuditLabelState = auditLabel
+                    }
+                } else {
                     Log.e(TAG, "Failed to fetch inventory stats: ${response?.message}")
-                    postErrorIfCurrent(
-                        requestId = requestId,
-                        message = response?.message?.takeIf { it.isNotBlank() }
+                    mainHandler.post {
+                        if (!isAdded) return@post
+                        isLoadingState = false
+                        errorMessageState = response?.message?.takeIf { it.isNotBlank() }
                             ?: (if (isArabic) "تعذر جلب إحصائيات الجرد من السيرفر" else "Failed to load inventory stats")
-                    )
-                    return@execute
-                }
-
-                val root = response.data!!
-                val data = root.optJSONObject("data") ?: root
-
-                val totalValue = firstPositiveDouble(
-                    data, null,
-                    "total_value", "total_value_usd", "inventory_value", "estimated_value"
-                )
-                val totalItems = firstNonNegativeInt(
-                    data,
-                    "total_items", "items_count", "catalog_count", "expected_count"
-                )
-                val totalWeight = firstPositiveDouble(
-                    data, null,
-                    "total_weight", "total_net_weight", "total_weight_grams", "net_weight"
-                )
-
-                val lastAuditObj = data.optJSONObject("last_audit")
-                    ?: data.optJSONObject("latest_session")
-                    ?: root.optJSONObject("last_audit")
-
-                val rawMissing = firstNullableInt(
-                    lastAuditObj, data,
-                    listOf("missing_items", "missing_count")
-                )
-                val rawMatched = firstNullableInt(
-                    lastAuditObj, data,
-                    listOf("matched_items", "matched_count", "found_count")
-                )
-                val rawExtra = firstNullableInt(
-                    lastAuditObj, data,
-                    listOf("extra_items", "uncatalogued_count", "extra_count")
-                )
-                val pending = firstNonNegativeInt(
-                    data,
-                    "pending_sessions", "open_sessions", "draft_sessions"
-                )
-
-                val auditCode = firstNonBlank(
-                    lastAuditObj, data,
-                    listOf("session_code", "audit_code", "report_number", "session_id")
-                )
-                val auditDate = firstNonBlank(
-                    lastAuditObj, data,
-                    listOf("audited_at", "completed_at", "last_audit_date", "created_at", "date")
-                )
-
-                val hasExplicitAudit = lastAuditObj != null ||
-                    rawMatched != null ||
-                    rawMissing != null ||
-                    rawExtra != null ||
-                    auditCode.isNotBlank() ||
-                    auditDate.isNotBlank()
-
-                val matched = rawMatched ?: 0
-                val missing = rawMissing ?: 0
-                val extra = rawExtra ?: 0
-
-                val serverRate = firstPositiveDouble(
-                    lastAuditObj, data,
-                    "match_rate", "match_rate_percent", "accuracy_percent"
-                )
-
-                val computedRate: Float? = when {
-                    serverRate > 0.0 -> serverRate.toFloat().coerceIn(0f, 100f)
-                    hasExplicitAudit && (matched + missing) > 0 ->
-                        ((matched.toFloat() / (matched + missing).toFloat()) * 100f).coerceIn(0f, 100f)
-                    hasExplicitAudit && matched > 0 && missing == 0 -> 100f
-                    else -> null
-                }
-
-                val snapshot = DashboardSnapshot(
-                    totalValueUsd = totalValue,
-                    totalItems = totalItems,
-                    totalWeightGrams = totalWeight,
-                    matchedItems = matched,
-                    missingItems = missing,
-                    extraItems = extra,
-                    pendingSessions = pending,
-                    hasRecordedAudit = hasExplicitAudit,
-                    lastAuditCode = auditCode,
-                    lastAuditDate = auditDate,
-                    matchRatePercent = computedRate
-                )
-
-                mainHandler.post {
-                    if (!isAdded || isDetached || requestId != fetchGeneration.get()) return@post
-                    isLoadingState = false
-                    errorMessageState = null
-
-                    totalValueUsdState = snapshot.totalValueUsd
-                    totalItemsState = snapshot.totalItems
-                    totalWeightState = snapshot.totalWeightGrams
-
-                    matchedItemsState = snapshot.matchedItems
-                    missingItemsState = snapshot.missingItems
-                    extraItemsState = snapshot.extraItems
-                    pendingSessionsState = snapshot.pendingSessions
-
-                    hasRecordedAuditState = snapshot.hasRecordedAudit
-                    lastAuditCodeState = snapshot.lastAuditCode
-                    lastAuditDateState = snapshot.lastAuditDate
-                    matchRatePercentState = snapshot.matchRatePercent
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching inventory data", e)
-                postErrorIfCurrent(
-                    requestId = requestId,
-                    message = if (isArabic) "خطأ في الاتصال بالشبكة" else "Network error"
-                )
-            }
-        }
-    }
-
-    private fun postErrorIfCurrent(requestId: Int, message: String) {
-        mainHandler.post {
-            if (!isAdded || isDetached || requestId != fetchGeneration.get()) return@post
-            isLoadingState = false
-            errorMessageState = message
-        }
-    }
-
-    private fun firstPositiveDouble(primary: JSONObject?, secondary: JSONObject?, vararg keys: String): Double {
-        for (obj in listOf(primary, secondary)) {
-            if (obj == null) continue
-            for (k in keys) {
-                if (obj.has(k) && !obj.isNull(k)) {
-                    val v = obj.optDouble(k, 0.0)
-                    if (!v.isNaN() && !v.isInfinite() && v > 0.0) return v
+                mainHandler.post {
+                    if (!isAdded) return@post
+                    isLoadingState = false
+                    errorMessageState = if (isArabic) "خطأ في الاتصال بالشبكة" else "Network error"
                 }
             }
         }
-        return 0.0
-    }
-
-    private fun firstNonNegativeInt(obj: JSONObject?, vararg keys: String): Int {
-        if (obj == null) return 0
-        for (k in keys) {
-            if (obj.has(k) && !obj.isNull(k)) {
-                val v = obj.optInt(k, -1)
-                if (v >= 0) return v
-            }
-        }
-        return 0
-    }
-
-    private fun firstNullableInt(primary: JSONObject?, secondary: JSONObject?, keys: List<String>): Int? {
-        for (obj in listOf(primary, secondary)) {
-            if (obj == null) continue
-            for (k in keys) {
-                if (obj.has(k) && !obj.isNull(k)) {
-                    val v = obj.optInt(k, -1)
-                    if (v >= 0) return v
-                }
-            }
-        }
-        return null
-    }
-
-    private fun firstNonBlank(primary: JSONObject?, secondary: JSONObject?, keys: List<String>): String {
-        for (obj in listOf(primary, secondary)) {
-            if (obj == null) continue
-            for (k in keys) {
-                if (obj.has(k) && !obj.isNull(k)) {
-                    val v = obj.optString(k, "").trim()
-                    if (v.isNotEmpty() && !v.equals("null", ignoreCase = true)) {
-                        return v
-                    }
-                }
-            }
-        }
-        return ""
     }
 
     private fun startNewInventorySession() {
-        if (!isAdded || isDetached) return
         try {
             val act = activity
             if (act is UHFMainActivity) {
                 act.loadFragment(MiraInventoryProFragment(), "Inventory")
-            } else {
+            } else if (isAdded) {
                 parentFragmentManager.beginTransaction()
                     .replace(android.R.id.content, MiraInventoryProFragment(), "Inventory")
                     .addToBackStack("Inventory")
-                    .commitAllowingStateLoss()
+                    .commit()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening MiraInventoryProFragment", e)
@@ -689,6 +473,13 @@ class MiraInventoryDashboardFragment : Fragment() {
                                         color = colors.goldPrimary
                                     )
                                 }
+                                if (lastAuditLabelState.isNotEmpty()) {
+                                    Text(
+                                        text = lastAuditLabelState,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = colors.textSecondary
+                                    )
+                                }
                             }
                         }
 
@@ -749,7 +540,9 @@ class MiraInventoryDashboardFragment : Fragment() {
                                                 },
                                                 onClick = {
                                                     branchMenuExpanded = false
-                                                    onBranchSelected(branch)
+                                                    selectedBranchIdState = branch.id
+                                                    selectedBranchNameState = branch.name
+                                                    fetchInventoryDashboardData()
                                                 }
                                             )
                                         }
@@ -792,6 +585,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         }
                     }
 
+                    // تنبيه خطأ إن وجد
                     errorMessageState?.let { err ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -821,7 +615,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         }
                     }
 
-                    // 2. البطاقة الرئيسية لمخزون الفرع المسجّل
+                    // 2. البطاقة الرئيسية لقيمة وأوزان المخزون
                     InventoryHeroValueCard(
                         isArabic = isAr,
                         primaryValue = primaryValueStr,
@@ -831,17 +625,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         isLoading = isLoadingState
                     )
 
-                    // 3. بطاقة ملخص آخر جلسة جرد معتمدة
-                    LastAuditSummaryBanner(
-                        isArabic = isAr,
-                        hasRecordedAudit = hasRecordedAuditState,
-                        auditCode = lastAuditCodeState,
-                        auditDate = lastAuditDateState,
-                        missingCount = missingItemsState,
-                        pendingCount = pendingSessionsState
-                    )
-
-                    // 4. شبكة مؤشرات المطابقة
+                    // 3. شبكة مؤشرات المطابقة (2x2 Grid)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -868,7 +652,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                     ) {
                         AuditStatTile(
                             modifier = Modifier.weight(1f),
-                            title = if (isAr) "قطع زائدة / مخالفة" else "Extra / Uncatalogued",
+                            title = if (isAr) "قطع زائدة" else "Extra Items",
                             count = extraItemsState,
                             accentColor = Color(0xFF3B82F6),
                             icon = Icons.Rounded.AddCircleOutline
@@ -882,14 +666,12 @@ class MiraInventoryDashboardFragment : Fragment() {
                         )
                     }
 
-                    // 5. الرسم البياني الدائري
+                    // 4. الرسم البياني الدائري لتوزيع حالة الجرد
                     InventoryAuditDonutCard(
                         isArabic = isAr,
-                        hasRecordedAudit = hasRecordedAuditState,
                         matched = matchedItemsState,
                         missing = missingItemsState,
-                        extra = extraItemsState,
-                        matchRatePercent = matchRatePercentState
+                        extra = extraItemsState
                     )
                 }
             }
@@ -935,7 +717,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isArabic) "القيمة التقديرية لمخزون الفرع" else "Estimated Branch Stock Value",
+                                text = if (isArabic) "القيمة التقديرية للمخزون" else "Estimated Stock Value",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = colors.textSecondary
                             )
@@ -972,7 +754,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         }
                     }
 
-                    HorizontalDivider(color = colors.textSecondary.copy(alpha = 0.15f))
+                    Divider(color = colors.textSecondary.copy(alpha = 0.15f))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -989,7 +771,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = if (isArabic) "القطع المسجلة بالمخزون" else "Cataloged Pieces",
+                                    text = if (isArabic) "إجمالي القطع" else "Total Pieces",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.textSecondary
                                 )
@@ -1032,91 +814,6 @@ class MiraInventoryDashboardFragment : Fragment() {
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun LastAuditSummaryBanner(
-        isArabic: Boolean,
-        hasRecordedAudit: Boolean,
-        auditCode: String,
-        auditDate: String,
-        missingCount: Int,
-        pendingCount: Int
-    ) {
-        val colors = MiraTheme.colors
-        val alertColor = when {
-            missingCount > 0 -> Color(0xFFEF4444)
-            pendingCount > 0 -> Color(0xFFF59E0B)
-            hasRecordedAudit -> Color(0xFF10B981)
-            else -> colors.goldPrimary
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = alertColor.copy(alpha = 0.11f)),
-            border = BorderStroke(1.dp, alertColor.copy(alpha = 0.35f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(
-                    imageVector = if (missingCount > 0) Icons.Rounded.WarningAmber else Icons.Rounded.FactCheck,
-                    contentDescription = null,
-                    tint = alertColor,
-                    modifier = Modifier.size(22.dp)
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    val headerText = if (hasRecordedAudit) {
-                        val codePart = if (auditCode.isNotBlank()) " • #$auditCode" else ""
-                        val datePart = if (auditDate.isNotBlank()) " ($auditDate)" else ""
-                        if (isArabic) "نتائج آخر جلسة جرد$codePart$datePart"
-                        else "Latest Audit Session$codePart$datePart"
-                    } else {
-                        if (isArabic) "حالة الجرد: لا توجد جلسة جرد معتمدة بعد"
-                        else "Audit Status: No committed audit session yet"
-                    }
-
-                    Text(
-                        text = headerText,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    val detailText = when {
-                        missingCount > 0 -> if (isArabic)
-                            "تنبيه: يوجد $missingCount قطعة مفقودة تتطلب مراجعة أو تتبعاً بالرادار"
-                        else
-                            "Alert: $missingCount missing item(s) require review or radar lookup"
-                        pendingCount > 0 -> if (isArabic)
-                            "يوجد $pendingCount جلسة جرد معلقة بانتظار الإكمال أو الاعتماد"
-                        else
-                            "$pendingCount pending audit session(s) awaiting completion"
-                        hasRecordedAudit -> if (isArabic)
-                            "جميع القطع المشمولة في آخر جرد مطابقة دون نقص"
-                        else
-                            "All items in the latest audit match with zero missing pieces"
-                        else -> if (isArabic)
-                            "ابدأ جلسة جرد RFID لتسجيل المطابقة والمفقودات والوزن الفعلي"
-                        else
-                            "Start an RFID audit session to record matches, missing items, and weight"
-                    }
-
-                    Text(
-                        text = detailText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.textSecondary
-                    )
                 }
             }
         }
@@ -1183,14 +880,13 @@ class MiraInventoryDashboardFragment : Fragment() {
     @Composable
     private fun InventoryAuditDonutCard(
         isArabic: Boolean,
-        hasRecordedAudit: Boolean,
         matched: Int,
         missing: Int,
-        extra: Int,
-        matchRatePercent: Float?
+        extra: Int
     ) {
         val colors = MiraTheme.colors
-        val total = (matched + missing + extra).coerceAtLeast(0)
+        val total = matched + missing + extra
+        val matchPercent = if (total > 0) (matched * 100f) / total else 0f
 
         val animProgress by animateFloatAsState(
             targetValue = 1f,
@@ -1225,14 +921,14 @@ class MiraInventoryDashboardFragment : Fragment() {
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = if (isArabic) "تحليل حالة مطابقة آخر جرد" else "Latest Audit Status Breakdown",
+                        text = if (isArabic) "تحليل حالة مطابقة الجرد" else "Inventory Audit Status Breakdown",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary
                     )
                 }
 
-                if (!hasRecordedAudit && total <= 0) {
+                if (total <= 0) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1240,20 +936,13 @@ class MiraInventoryDashboardFragment : Fragment() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isArabic)
-                                "📭 لا توجد بيانات جرد مسجلة بعد — ابدأ جلسة جرد جديدة لتوليد التحليل"
-                            else
-                                "📭 No recorded audit data yet — start a new audit session to view breakdown",
+                            text = if (isArabic) "📭 لا توجد بيانات جرد مسجلة بعد" else "📭 No previous audit data available",
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.textSecondary,
                             textAlign = TextAlign.Center
                         )
                     }
                 } else {
-                    val rateText = matchRatePercent?.let {
-                        String.format(Locale.US, "%.1f%%", it)
-                    } ?: "—"
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1272,53 +961,41 @@ class MiraInventoryDashboardFragment : Fragment() {
                                 )
                                 val arcSize = Size(diameter, diameter)
 
-                                if (total <= 0) {
-                                    drawArc(
-                                        color = colors.textSecondary.copy(alpha = 0.18f),
-                                        startAngle = 0f,
-                                        sweepAngle = 360f,
-                                        useCenter = false,
-                                        topLeft = topLeft,
-                                        size = arcSize,
-                                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-                                    )
-                                } else {
-                                    val segments = listOf(
-                                        matched to matchedColor,
-                                        missing to missingColor,
-                                        extra to extraColor
-                                    ).filter { it.first > 0 }
+                                val segments = listOf(
+                                    matched to matchedColor,
+                                    missing to missingColor,
+                                    extra to extraColor
+                                ).filter { it.first > 0 }
 
-                                    var startAngle = -90f
-                                    val gap = if (segments.size > 1) 3f else 0f
+                                var startAngle = -90f
+                                val gap = if (segments.size > 1) 3f else 0f
 
-                                    segments.forEach { (value, segColor) ->
-                                        val sweep = ((value.toFloat() / total.toFloat()) * 360f * animProgress) - gap
-                                        if (sweep > 0f) {
-                                            drawArc(
-                                                color = segColor,
-                                                startAngle = startAngle + (gap / 2f),
-                                                sweepAngle = sweep,
-                                                useCenter = false,
-                                                topLeft = topLeft,
-                                                size = arcSize,
-                                                style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-                                            )
-                                        }
-                                        startAngle += (value.toFloat() / total.toFloat()) * 360f * animProgress
+                                segments.forEach { (value, segColor) ->
+                                    val sweep = ((value.toFloat() / total.toFloat()) * 360f * animProgress) - gap
+                                    if (sweep > 0f) {
+                                        drawArc(
+                                            color = segColor,
+                                            startAngle = startAngle + (gap / 2f),
+                                            sweepAngle = sweep,
+                                            useCenter = false,
+                                            topLeft = topLeft,
+                                            size = arcSize,
+                                            style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                                        )
                                     }
+                                    startAngle += (value.toFloat() / total.toFloat()) * 360f * animProgress
                                 }
                             }
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = rateText,
+                                    text = String.format(Locale.US, "%.0f%%", matchPercent),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (missing > 0) Color(0xFFF59E0B) else matchedColor
+                                    color = matchedColor
                                 )
                                 Text(
-                                    text = if (isArabic) "نسبة المطابقة" else "Match Rate",
+                                    text = if (isArabic) "نسبة المطابقة" else "Matched",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.textSecondary
                                 )
@@ -1342,7 +1019,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                                 color = missingColor
                             )
                             LegendItemRow(
-                                label = if (isArabic) "زائد / مخالف" else "Extra",
+                                label = if (isArabic) "زائد" else "Extra",
                                 count = extra,
                                 total = total,
                                 color = extraColor
