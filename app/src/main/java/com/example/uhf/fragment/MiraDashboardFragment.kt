@@ -1,6 +1,9 @@
 package com.example.uhf.fragment
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.example.uhf.R
 import com.example.uhf.activity.UHFMainActivity
@@ -87,6 +91,9 @@ class MiraDashboardFragment : Fragment() {
     private var isArabic = true
     private var currentBranchId = 1
     private var currentUserId = 0
+    private var lastFullRefreshMs = 0L
+    private var isReceiverRegistered = false
+    private var dashboardBroadcastReceiver: BroadcastReceiver? = null
 
     private var apiClient: MiraApiClient? = null
     private var sessionManager: SecureSessionManager? = null
@@ -181,6 +188,7 @@ class MiraDashboardFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        registerDashboardReceiver()
         (activity as? UHFMainActivity)?.setBottomNavVisible(true)
         activity?.findViewById<View>(R.id.appBarLayout)?.visibility = View.VISIBLE
 
@@ -193,16 +201,23 @@ class MiraDashboardFragment : Fragment() {
         if (latestBranch != currentBranchId || latestUser != currentUserId) {
             initSessionAndBranchState()
             recentActivitiesState = emptyList()
+            operationsBreakdownState = emptyList()
             loadOfflineData()
             refreshAllDashboardData(forceNetwork = true)
-        } else {
-            fetchRecentActivity()
-            fetchDashboardCharts(selectedChartDaysState)
+        } else if (System.currentTimeMillis() - lastFullRefreshMs > 1500L) {
+            // تحديث كامل للخزينة والتنبيهات والمبيعات والرسوم عند العودة من الجرد أو نقطة البيع
+            refreshAllDashboardData(forceNetwork = true)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterDashboardReceiver()
     }
 
     override fun onDestroyView() {
         isDestroyed = true
+        unregisterDashboardReceiver()
         mainHandler.removeCallbacksAndMessages(null)
         localExecutor?.let { exec ->
             if (!exec.isShutdown) {
@@ -211,6 +226,57 @@ class MiraDashboardFragment : Fragment() {
         }
         localExecutor = null
         super.onDestroyView()
+    }
+
+    private fun registerDashboardReceiver() {
+        try {
+            val ctx = context ?: return
+            if (isReceiverRegistered) return
+
+            dashboardBroadcastReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    if (intent == null || isDestroyed || !isAdded) return
+                    val action = intent.action
+                    if (action == "com.example.uhf.REFRESH_DASHBOARD" ||
+                        action == "com.example.uhf.REFRESH_INVENTORY" ||
+                        action == "com.example.uhf.REFRESH_SALES"
+                    ) {
+                        mainHandler.post {
+                            if (!isDestroyed && isAdded) {
+                                refreshAllDashboardData(forceNetwork = true)
+                            }
+                        }
+                    }
+                }
+            }
+
+            val filter = IntentFilter().apply {
+                addAction("com.example.uhf.REFRESH_DASHBOARD")
+                addAction("com.example.uhf.REFRESH_INVENTORY")
+                addAction("com.example.uhf.REFRESH_SALES")
+            }
+
+            ContextCompat.registerReceiver(
+                ctx,
+                dashboardBroadcastReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            isReceiverRegistered = true
+        } catch (e: Exception) {
+            Log.e(TAG, "registerDashboardReceiver error: ${e.message}")
+        }
+    }
+
+    private fun unregisterDashboardReceiver() {
+        try {
+            val ctx = context
+            if (ctx != null && isReceiverRegistered && dashboardBroadcastReceiver != null) {
+                ctx.unregisterReceiver(dashboardBroadcastReceiver)
+                isReceiverRegistered = false
+            }
+        } catch (_: Exception) {
+        }
     }
 
     private fun ensureExecutor(): Boolean {
@@ -238,7 +304,9 @@ class MiraDashboardFragment : Fragment() {
         currentUserId = readIntProp(sm, "userId", "id")
         userNameState = readStringProp(sm, "username", "fullName", "name")
         userRoleState = readStringProp(sm, "role", "userRole", "position").lowercase(Locale.ROOT)
-        isManagerState = resolveIsManagerOrAdmin(sm, userRoleState) || (permissionManager?.isManager == true)
+        isManagerState = resolveIsManagerOrAdmin(sm, userRoleState) ||
+            (permissionManager?.isManager == true) ||
+            (permissionManager?.canViewAllBranches() == true)
 
         val orgName = readStringProp(sm, "orgName", "organizationName", "companyName")
             .ifBlank { if (isArabic) "ميرا للمجوهرات" else "MIRA JEWELRY" }
@@ -340,7 +408,7 @@ class MiraDashboardFragment : Fragment() {
         currentBranchId = branchId
         selectedBranchIdState = branchId
         try {
-            val setter = branchesManager?.javaClass?.methods?.firstOrNull {
+            val setter = branchesManager?.javaClass.methods.firstOrNull {
                 it.name in setOf("setActiveBranchId", "selectBranch") && it.parameterCount == 1
             }
             setter?.invoke(branchesManager, branchId)
@@ -348,6 +416,7 @@ class MiraDashboardFragment : Fragment() {
         }
 
         recentActivitiesState = emptyList()
+        operationsBreakdownState = emptyList()
         loadOfflineData()
         refreshAllDashboardData(forceNetwork = true)
     }
@@ -397,6 +466,7 @@ class MiraDashboardFragment : Fragment() {
         if (!ensureExecutor() || !isSessionValid()) return
         if (!isSyncingAll.compareAndSet(false, true)) return
 
+        lastFullRefreshMs = System.currentTimeMillis()
         isRefreshingState = true
         val branchSnapshot = currentBranchId
         val managerSnapshot = isManagerState
@@ -655,7 +725,7 @@ class MiraDashboardFragment : Fragment() {
                 isSaleOperation(op) -> salesCnt++
                 type.contains("scrap") -> scrapCnt++
                 type.contains("transfer") -> transferCnt++
-                type.contains("inv") || type.contains("scan") -> invCnt++
+                type.contains("inv") || type.contains("scan") || type.contains("audit") || type.contains("stock") -> invCnt++
             }
 
             val k = op.optString("karat", op.optString("gold_karat", "")).uppercase(Locale.US)
@@ -727,7 +797,7 @@ class MiraDashboardFragment : Fragment() {
                     KaratDistributionItem("18K", karatWeights["18K"] ?: 0.0, 0.0, Color(0xFF06B6D4))
                 ).filter { it.weightGrams > 0.0 }
             }
-            if (operationsBreakdownState.isEmpty()) {
+            if (ops.isNotEmpty() || operationsBreakdownState.isEmpty()) {
                 operationsBreakdownState = listOf(
                     OperationSummaryMetric("المبيعات (POS)", "POS Sales", salesCnt.coerceAtLeast(todayInvoicesCountState), Color(0xFF10B981)),
                     OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", scrapCnt, Color(0xFFF59E0B)),
@@ -1062,7 +1132,9 @@ class MiraDashboardFragment : Fragment() {
             .takeIf { it > 0.0 } ?: parseFlexibleDouble(vaultObj, "gross_weight")
         val pure24 = parseFlexibleDouble(vaultObj, "pure_24k_weight")
             .takeIf { it > 0.0 } ?: parseFlexibleDouble(vaultObj, "equivalent_24k")
-        if (pieces > 0) totalVaultPiecesState = pieces
+        if (pieces >= 0 && (vaultObj.has("total_pieces") || vaultObj.has("in_stock_count") || vaultObj.has("items_count"))) {
+            totalVaultPiecesState = pieces
+        }
         if (weight > 0.0) totalVaultWeightState = weight
         if (pure24 > 0.0) pure24kWeightState = pure24
 
@@ -1455,7 +1527,8 @@ class MiraDashboardFragment : Fragment() {
             val listener = PermissionManager.OnPermissionsChangedListener {
                 mainHandler.post {
                     isManagerState = resolveIsManagerOrAdmin(sessionManager, userRoleState) ||
-                        (permissionManager?.isManager == true)
+                        (permissionManager?.isManager == true) ||
+                        (permissionManager?.canViewAllBranches() == true)
                     permTick++
                 }
             }
