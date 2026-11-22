@@ -12,6 +12,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.example.uhf.manager.MiraBranchesManager
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -19,8 +20,86 @@ import java.util.Locale
 
 object InventoryReportExporter {
 
-    // الاحتفاظ بمرجع مؤقت لمنع جامع القمامة من حذف WebView قبل اكتمال التحميل للطباعة
     private var activePrintWebView: WebView? = null
+
+    /**
+     * استخراج اسم الجهة/المنشأة والفرع من جلسة التطبيق النشطة
+     */
+    private fun resolveEntityHeader(context: Context, fallbackBranch: String, isArabic: Boolean): Pair<String, String> {
+        var entityName = if (isArabic) "ميرا تكنولوجي للحلول الذكية • MIRA ID™" else "MIRA TECHNOLOGY™ • Smart Jewelry ERP"
+        var branchLabel = fallbackBranch
+
+        runCatching {
+            val bm = MiraBranchesManager.getInstance(context)
+            val methodNames = listOf("getEntityName", "getOrganizationName", "getCompanyName", "getTenantName")
+            for (name in methodNames) {
+                val m = bm.javaClass.methods.firstOrNull { it.name == name && it.parameterTypes.isEmpty() }
+                val res = m?.invoke(bm)?.toString()?.trim()
+                if (!res.isNullOrEmpty() && !res.equals("null", ignoreCase = true)) {
+                    entityName = res
+                    break
+                }
+            }
+
+            if (branchLabel.isBlank() || branchLabel.startsWith("الفرع الحالي") || branchLabel.startsWith("Current Branch")) {
+                val bMethod = bm.javaClass.methods.firstOrNull {
+                    (it.name == "getActiveBranchName" || it.name == "getBranchName") && it.parameterTypes.isEmpty()
+                }
+                val bRes = bMethod?.invoke(bm)?.toString()?.trim()
+                if (!bRes.isNullOrEmpty() && !bRes.equals("null", ignoreCase = true)) {
+                    branchLabel = bRes
+                }
+            }
+        }
+
+        if (entityName.contains("MIRA", ignoreCase = true) || entityName.contains("ميرا")) {
+            val prefs = context.getSharedPreferences("mira_prefs", Context.MODE_PRIVATE)
+            val savedEntity = prefs.getString("entity_name", null)
+                ?: prefs.getString("organization_name", null)
+                ?: prefs.getString("company_name", null)
+            if (!savedEntity.isNullOrBlank()) {
+                entityName = savedEntity.trim()
+            }
+        }
+
+        return entityName to branchLabel
+    }
+
+    /**
+     * تجميع ملخص العيارات تلقائياً من قائمة القطع:
+     * karat -> (matchedCount, expectedCount, scannedWeightGrams, scannedValueUsd)
+     */
+    private data class KaratAgg(
+        var matched: Int = 0,
+        var expected: Int = 0,
+        var weight: Double = 0.0,
+        var value: Double = 0.0
+    )
+
+    private fun aggregateByKarat(items: List<ArchiveReportItemDetail>): Map<String, KaratAgg> {
+        val map = linkedMapOf<String, KaratAgg>()
+        items.forEach { item ->
+            val k = item.karat.ifBlank { "-" }
+            val agg = map.getOrPut(k) { KaratAgg() }
+            when (item.status) {
+                ArchiveItemStatus.MATCHED -> {
+                    agg.matched += 1
+                    agg.expected += 1
+                    agg.weight += item.weightGrams
+                    agg.value += item.estimatedValue
+                }
+                ArchiveItemStatus.MISSING -> {
+                    agg.expected += 1
+                }
+                ArchiveItemStatus.UNCATALOGUED -> {
+                    agg.matched += 1
+                    agg.weight += item.weightGrams
+                    agg.value += item.estimatedValue
+                }
+            }
+        }
+        return map
+    }
 
     /**
      * طباعة التقرير أو حفظه كملف PDF عبر مربع الطباعة الرسمي في أندرويد
@@ -32,7 +111,48 @@ object InventoryReportExporter {
     ) {
         val dir = if (isArabic) "rtl" else "ltr"
         val align = if (isArabic) "right" else "left"
-        val title = if (isArabic) "تقرير مطابقة الجرد الذكي - MIRA ID™" else "Smart Inventory Audit Report - MIRA ID™"
+        val (entityName, resolvedBranch) = resolveEntityHeader(context, details.branchName, isArabic)
+        val title = if (isArabic) "تقرير مطابقة الجرد الذكي" else "Smart Inventory Audit Report"
+
+        val karatStats = aggregateByKarat(details.items)
+
+        val karatRowsHtml = if (karatStats.isNotEmpty()) {
+            buildString {
+                append(
+                    """
+                    <h3 style="margin:14px 0 6px 0;font-size:13px;color:#0B132B;">
+                        ${if (isArabic) "ملخص الجرد حسب العيار" else "Summary by Karat"}
+                    </h3>
+                    <table style="margin-top:4px;margin-bottom:14px;">
+                        <thead>
+                            <tr>
+                                <th>${if (isArabic) "العيار" else "Karat"}</th>
+                                <th>${if (isArabic) "المطابق / المتوقع" else "Matched / Expected"}</th>
+                                <th>${if (isArabic) "نسبة المطابقة" else "Match %"}</th>
+                                <th>${if (isArabic) "الوزن المقروء" else "Scanned Weight"}</th>
+                                <th>${if (isArabic) "القيمة التقديرية" else "Est. Value"}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """.trimIndent()
+                )
+                karatStats.forEach { (karat, agg) ->
+                    val pct = if (agg.expected > 0) (agg.matched * 100.0) / agg.expected else 100.0
+                    append(
+                        """
+                        <tr>
+                            <td style="font-weight:bold;color:#B45309;">${escapeHtml(karat)}</td>
+                            <td>${agg.matched} / ${agg.expected}</td>
+                            <td>${String.format(Locale.US, "%.1f%%", pct)}</td>
+                            <td>${String.format(Locale.US, "%.2f g", agg.weight)}</td>
+                            <td>${String.format(Locale.US, "$%,.2f", agg.value)}</td>
+                        </tr>
+                        """.trimIndent()
+                    )
+                }
+                append("</tbody></table>")
+            }
+        } else ""
 
         val rowsHtml = buildString {
             details.items.forEachIndexed { index, item ->
@@ -54,6 +174,7 @@ object InventoryReportExporter {
                         <td>${escapeHtml(item.karat.ifBlank { "-" })}</td>
                         <td style="font-family:monospace;font-size:11px;">${escapeHtml(item.epc)}</td>
                         <td>${String.format(Locale.US, "%.2f", item.weightGrams)} g</td>
+                        <td>${String.format(Locale.US, "$%.2f", item.estimatedValue)}</td>
                         <td style="color:$statusColor;font-weight:bold;">$statusLabel</td>
                     </tr>
                     """.trimIndent()
@@ -69,26 +190,28 @@ object InventoryReportExporter {
                 <style>
                     body { font-family: sans-serif; color: #0F172A; margin: 18px; direction: $dir; }
                     .header { background: #0B132B; color: #F8FAFC; padding: 16px; border-radius: 8px; border-bottom: 4px solid #D4AF37; }
-                    .header h1 { margin: 0 0 6px 0; font-size: 18px; color: #D4AF37; }
+                    .entity { font-size: 15px; font-weight: bold; color: #FFFFFF; margin-bottom: 4px; }
+                    .header h1 { margin: 0 0 6px 0; font-size: 17px; color: #D4AF37; }
                     .meta { font-size: 12px; color: #CBD5E1; line-height: 1.6; }
                     .kpis { display: flex; justify-content: space-between; gap: 8px; margin: 14px 0; }
                     .kpi { flex: 1; border: 1px solid #CBD5E1; border-radius: 6px; padding: 10px; text-align: center; background: #F8FAFC; }
-                    .kpi-val { font-size: 16px; font-weight: bold; color: #0B132B; }
+                    .kpi-val { font-size: 15px; font-weight: bold; color: #0B132B; }
                     .kpi-lbl { font-size: 11px; color: #475569; margin-top: 3px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
                     th { background: #1E293B; color: #D4AF37; padding: 8px; text-align: $align; }
                     td { border-bottom: 1px solid #E2E8F0; padding: 7px 8px; text-align: $align; }
                     tr:nth-child(even) { background: #F8FAFC; }
-                    .footer { margin-top: 18px; font-size: 11px; color: #64748B; text-align: center; }
+                    .footer { margin-top: 18px; font-size: 11px; color: #64748B; text-align: center; border-top: 1px solid #E2E8F0; padding-top: 8px; }
                 </style>
             </head>
             <body>
                 <div class="header">
+                    <div class="entity">${escapeHtml(entityName)}</div>
                     <h1>$title</h1>
                     <div class="meta">
                         ${if (isArabic) "رقم التقرير:" else "Report ID:"} <b>#${escapeHtml(details.reportCode)}</b> |
                         ${if (isArabic) "التاريخ:" else "Date:"} <b>${escapeHtml(details.createdAt)}</b><br/>
-                        ${if (isArabic) "الفرع:" else "Branch:"} <b>${escapeHtml(details.branchName)}</b> |
+                        ${if (isArabic) "الفرع:" else "Branch:"} <b>${escapeHtml(resolvedBranch)}</b> |
                         ${if (isArabic) "الموظف:" else "Auditor:"} <b>${escapeHtml(details.auditorName)}</b>
                     </div>
                 </div>
@@ -110,8 +233,17 @@ object InventoryReportExporter {
                         <div class="kpi-val">${String.format(Locale.US, "%.2f g", details.scannedWeightGrams)}</div>
                         <div class="kpi-lbl">${if (isArabic) "الوزن المقروء" else "Scanned Weight"}</div>
                     </div>
+                    <div class="kpi">
+                        <div class="kpi-val" style="color:#059669;">${String.format(Locale.US, "$%,.0f", details.estimatedValueUsd)}</div>
+                        <div class="kpi-lbl">${if (isArabic) "القيمة التقديرية" else "Est. Value"}</div>
+                    </div>
                 </div>
 
+                $karatRowsHtml
+
+                <h3 style="margin:10px 0 6px 0;font-size:13px;color:#0B132B;">
+                    ${if (isArabic) "التفصيل الكامل للقطع المشمولة بالجرد" else "Detailed Audited Items"}
+                </h3>
                 <table>
                     <thead>
                         <tr>
@@ -120,6 +252,7 @@ object InventoryReportExporter {
                             <th>${if (isArabic) "العيار" else "Karat"}</th>
                             <th>EPC</th>
                             <th>${if (isArabic) "الوزن" else "Weight"}</th>
+                            <th>${if (isArabic) "القيمة" else "Value"}</th>
                             <th>${if (isArabic) "الحالة" else "Status"}</th>
                         </tr>
                     </thead>
@@ -129,7 +262,7 @@ object InventoryReportExporter {
                 </table>
 
                 <div class="footer">
-                    MIRA ID™ Smart Jewelry ERP • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())}
+                    ${escapeHtml(entityName)} • MIRA ID™ Smart Jewelry ERP • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())}
                 </div>
             </body>
             </html>
@@ -160,27 +293,53 @@ object InventoryReportExporter {
         isArabic: Boolean
     ) {
         try {
+            val (entityName, resolvedBranch) = resolveEntityHeader(context, details.branchName, isArabic)
+            val karatStats = aggregateByKarat(details.items)
+
             val csv = buildString {
                 // UTF-8 BOM لضمان ظهور الأحرف العربية بشكل سليم في Microsoft Excel
                 append('\uFEFF')
                 if (isArabic) {
-                    appendLine("رقم التقرير,التاريخ,الفرع,الموظف,المطابق,المتوقع,المفقود,غير مسجل,الوزن المقروء (جم)")
+                    appendLine("الجهة / المنشأة,رقم التقرير,التاريخ,الفرع,الموظف,المطابق,المتوقع,المفقود,غير مسجل,الوزن المقروء (جم),القيمة التقديرية ($)")
                 } else {
-                    appendLine("Report ID,Date,Branch,Auditor,Matched,Expected,Missing,Uncatalogued,Scanned Weight (g)")
+                    appendLine("Entity / Organization,Report ID,Date,Branch,Auditor,Matched,Expected,Missing,Uncatalogued,Scanned Weight (g),Est. Value ($)")
                 }
                 appendLine(
                     listOf(
+                        csvCell(entityName),
                         csvCell(details.reportCode),
                         csvCell(details.createdAt),
-                        csvCell(details.branchName),
+                        csvCell(resolvedBranch),
                         csvCell(details.auditorName),
                         details.matchedCount.toString(),
                         details.expectedCount.toString(),
                         details.missingCount.toString(),
                         details.uncataloguedCount.toString(),
-                        String.format(Locale.US, "%.2f", details.scannedWeightGrams)
+                        String.format(Locale.US, "%.2f", details.scannedWeightGrams),
+                        String.format(Locale.US, "%.2f", details.estimatedValueUsd)
                     ).joinToString(",")
                 )
+
+                if (karatStats.isNotEmpty()) {
+                    appendLine()
+                    if (isArabic) {
+                        appendLine("العيار,المطابق,المتوقع,الوزن المقروء (جم),القيمة التقديرية ($)")
+                    } else {
+                        appendLine("Karat,Matched,Expected,Scanned Weight (g),Est. Value ($)")
+                    }
+                    karatStats.forEach { (karat, agg) ->
+                        appendLine(
+                            listOf(
+                                csvCell(karat),
+                                agg.matched.toString(),
+                                agg.expected.toString(),
+                                String.format(Locale.US, "%.2f", agg.weight),
+                                String.format(Locale.US, "%.2f", agg.value)
+                            ).joinToString(",")
+                        )
+                    }
+                }
+
                 appendLine()
                 if (isArabic) {
                     appendLine("#,اسم القطعة,العيار,رمز EPC,الوزن (جم),القيمة ($),الحالة")
@@ -231,7 +390,6 @@ object InventoryReportExporter {
                     )
                 )
             } else {
-                // مسار احتياطي: الحفظ مباشرة في مجلد التنزيلات Downloads
                 saveToDownloadsFallback(context, fileName, csv, isArabic)
             }
         } catch (e: Exception) {
