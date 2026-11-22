@@ -210,14 +210,24 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     // ═══════════════════════════════════════════════════════════════════
 
     private val sdkExecutor = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "INV-SDK").apply {
-            priority = Thread.MAX_PRIORITY - 1
-            isDaemon = true
-        }
+    Thread(r, "INV-SDK").apply {
+        priority = Thread.MAX_PRIORITY - 1
+        isDaemon = true
     }
+}
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+/**
+ * خيط مخصص لعمليات القرص (حفظ لقطات الشاشة، توليد PDF/CSV، قراءة الكتالوج المحلي).
+ * منفصل عن sdkExecutor لتفادي حجب قراءة الـ UHF، ومتسلسل لتفادي التزامن على I/O.
+ */
+private val diskExecutor = Executors.newSingleThreadExecutor { r ->
+    Thread(r, "INV-DISK").apply {
+        priority = Thread.NORM_PRIORITY - 1
+        isDaemon = true
+    }
+}
 
+private val mainHandler = Handler(Looper.getMainLooper())
     private var sessionManager: SessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
     private var priceManager: MiraPriceManager? = null
@@ -411,11 +421,14 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        if (!sdkExecutor.isShutdown) {
-            sdkExecutor.shutdownNow()
-        }
+    super.onDestroy()
+    if (!sdkExecutor.isShutdown) {
+        sdkExecutor.shutdownNow()
     }
+    if (!diskExecutor.isShutdown) {
+        diskExecutor.shutdownNow()
+    }
+}
 
     // ═══════════════════════════════════════════════════════════════════
     //  RFID Reader Setup & Hardware Trigger
@@ -633,69 +646,69 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     }
 
     private fun loadCatalogFromLocalCache() {
-        val appCtx = getSafeAppContext() ?: return
-        val targetBranchId = getActiveBranchId()
+    val appCtx = getSafeAppContext() ?: return
+    val targetBranchId = getActiveBranchId()
 
-        miraExecutor?.diskExecutor?.execute {
-            try {
-                val cache = MiraLocalItemCache.getInstance(appCtx) ?: return@execute
-                val itemsList = extractBranchItemsFromCache(cache, targetBranchId)
-                if (itemsList.isNotEmpty()) {
-                    applyCatalogItems(itemsList)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "loadCatalogFromLocalCache error", e)
+    diskExecutor.execute {
+        try {
+            val cache = MiraLocalItemCache.getInstance(appCtx) ?: return@execute
+            val itemsList = extractBranchItemsFromCache(cache, targetBranchId)
+            if (itemsList.isNotEmpty()) {
+                applyCatalogItems(itemsList)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "loadCatalogFromLocalCache error", e)
         }
     }
+}
 
     /**
-     * مزامنة كتالوج الفرع مع السيرفر لضمان تطابق عدد القطع المتوقعة (21 مقابل 21)
-     */
-    private fun syncBranchCatalogWithServer(silent: Boolean) {
-        val appCtx = getSafeAppContext() ?: return
-        val targetBranchId = getActiveBranchId()
-        if (isSyncingCatalogState) return
+ * مزامنة كتالوج الفرع مع السيرفر — يجب أن تجري على networkExecutor،
+ * ثم قراءة القرص تُغلق بـ diskExecutor داخل مسار الاعتماد فقط.
+ */
+private fun syncBranchCatalogWithServer(silent: Boolean) {
+    val appCtx = getSafeAppContext() ?: return
+    val targetBranchId = getActiveBranchId()
+    if (isSyncingCatalogState) return
 
-        safeRun { isSyncingCatalogState = true }
+    safeRun { isSyncingCatalogState = true }
 
-        miraExecutor?.networkExecutor?.execute {
-            try {
-                val syncManager = MiraItemSyncManager.getInstance(appCtx)
-                // استدعاء مزامنة العناصر للفرع
-                invokeSyncManagerRefresh(syncManager, targetBranchId)
+    miraExecutor?.networkExecutor?.execute {
+        try {
+            val syncManager = MiraItemSyncManager.getInstance(appCtx)
+            invokeSyncManagerRefresh(syncManager, targetBranchId)
 
-                val cache = MiraLocalItemCache.getInstance(appCtx)
-                if (cache != null) {
-                    val refreshed = extractBranchItemsFromCache(cache, targetBranchId)
-                    if (refreshed.isNotEmpty()) {
-                        applyCatalogItems(refreshed)
-                    }
+            val cache = MiraLocalItemCache.getInstance(appCtx)
+            if (cache != null) {
+                val refreshed = extractBranchItemsFromCache(cache, targetBranchId)
+                if (refreshed.isNotEmpty()) {
+                    applyCatalogItems(refreshed)
                 }
+            }
 
-                safeRun {
-                    isSyncingCatalogState = false
-                    if (!silent) {
-                        showToast(
-                            if (isArabic) "✅ تم تحديث كتالوج الفرع (${allCatalogItems.size} قطعة)"
-                            else "✅ Branch catalog synced (${allCatalogItems.size} items)"
-                        )
-                    }
+            safeRun {
+                isSyncingCatalogState = false
+                if (!silent) {
+                    showToast(
+                        if (isArabic) "✅ تم تحديث كتالوج الفرع (${allCatalogItems.size} قطعة)"
+                        else "✅ Branch catalog synced (${allCatalogItems.size} items)"
+                    )
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "syncBranchCatalogWithServer error", e)
-                safeRun {
-                    isSyncingCatalogState = false
-                    if (!silent) {
-                        showToast(
-                            if (isArabic) "⚠️ تعذرت المزامنة مع السيرفر، يتم العمل على البيانات المحلية"
-                            else "⚠️ Server sync failed, using local cache"
-                        )
-                    }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "syncBranchCatalogWithServer error", e)
+            safeRun {
+                isSyncingCatalogState = false
+                if (!silent) {
+                    showToast(
+                        if (isArabic) "⚠️ تعذرت المزامنة مع السيرفر، يتم العمل على البيانات المحلية"
+                        else "⚠️ Server sync failed, using local cache"
+                    )
                 }
             }
         }
     }
+}
 
     private fun applyCatalogItems(items: List<CatalogJewelryItem>) {
         catalogByEpc.clear()
@@ -965,48 +978,52 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         }
     }
 
-    private fun encodeAndSaveScreenshot(
-        rawBitmap: Bitmap,
-        onCaptured: (base64: String?, savedFile: File?) -> Unit
-    ) {
-        miraExecutor?.diskExecutor?.execute {
-            try {
-                // تصغير متناسب لضمان سرعة الرفع مع الحفاظ على وضوح النصوص والأرقام
-                val maxWidth = 720
-                val scaledBitmap = if (rawBitmap.width > maxWidth) {
-                    val ratio = maxWidth.toFloat() / rawBitmap.width.toFloat()
-                    val targetHeight = (rawBitmap.height * ratio).roundToInt()
-                    Bitmap.createScaledBitmap(rawBitmap, maxWidth, targetHeight, true)
-                } else {
-                    rawBitmap
-                }
-
-                val baos = ByteArrayOutputStream()
-                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, baos)
-                val bytes = baos.toByteArray()
-                val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-
-                val appCtx = getSafeAppContext()
-                var savedFile: File? = null
-                if (appCtx != null) {
-                    val dir = File(appCtx.cacheDir, "audit_screenshots").apply { mkdirs() }
-                    val file = File(dir, "audit_${System.currentTimeMillis()}.jpg")
-                    FileOutputStream(file).use { out -> out.write(bytes) }
-                    savedFile = file
-                }
-
-                if (scaledBitmap !== rawBitmap) {
-                    scaledBitmap.recycle()
-                }
-                rawBitmap.recycle()
-
-                safeRun { onCaptured(base64Str, savedFile) }
-            } catch (e: Exception) {
-                Log.e(TAG, "encodeAndSaveScreenshot error", e)
-                safeRun { onCaptured(null, null) }
+    /**
+ * يرمّز Bitmap إلى Base64 ويحفظ نسخة على القرص. يعمل على diskExecutor
+ * حتى لا يحجب sdkExecutor (قراءة الـ UHF) ولا networkExecutor.
+ */
+private fun encodeAndSaveScreenshot(
+    rawBitmap: Bitmap,
+    onCaptured: (base64: String?, savedFile: File?) -> Unit
+) {
+    diskExecutor.execute {
+        try {
+            // تصغير متناسب لضمان سرعة الرفع مع الحفاظ على وضوح النصوص والأرقام
+            val maxWidth = 720
+            val scaledBitmap = if (rawBitmap.width > maxWidth) {
+                val ratio = maxWidth.toFloat() / rawBitmap.width.toFloat()
+                val targetHeight = (rawBitmap.height * ratio).roundToInt()
+                Bitmap.createScaledBitmap(rawBitmap, maxWidth, targetHeight, true)
+            } else {
+                rawBitmap
             }
+
+            val baos = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, baos)
+            val bytes = baos.toByteArray()
+            val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+            val appCtx = getSafeAppContext()
+            var savedFile: File? = null
+            if (appCtx != null) {
+                val dir = File(appCtx.cacheDir, "audit_screenshots").apply { mkdirs() }
+                val file = File(dir, "audit_${System.currentTimeMillis()}.jpg")
+                FileOutputStream(file).use { out -> out.write(bytes) }
+                savedFile = file
+            }
+
+            if (scaledBitmap !== rawBitmap) {
+                scaledBitmap.recycle()
+            }
+            rawBitmap.recycle()
+
+            safeRun { onCaptured(base64Str, savedFile) }
+        } catch (e: Exception) {
+            Log.e(TAG, "encodeAndSaveScreenshot error", e)
+            safeRun { onCaptured(null, null) }
         }
     }
+}
 
     /**
      * بناء التقرير التفصيلي وحفظ الجلسة + جميع العناصر + لقطة الشاشة في السيرفر
@@ -1336,9 +1353,9 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private fun exportAndSharePdfReport(report: ReconciledAuditReport) {
         val ctx = context ?: return
-        miraExecutor?.diskExecutor?.execute {
-            try {
-                val pdfFile = generateDetailedPdfFile(ctx, report)
+        diskExecutor.execute {
+    try {
+        val pdfFile = generateDetailedPdfFile(ctx, report)
                 safeRun {
                     shareGeneratedFile(
                         ctx = ctx,
@@ -1361,9 +1378,9 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private fun exportAndShareCsvReport(report: ReconciledAuditReport) {
         val ctx = context ?: return
-        miraExecutor?.diskExecutor?.execute {
-            try {
-                val csvFile = generateDetailedCsvFile(ctx, report)
+        diskExecutor.execute {
+    try {
+        val csvFile = generateDetailedCsvFile(ctx, report)
                 safeRun {
                     shareGeneratedFile(
                         ctx = ctx,
