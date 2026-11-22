@@ -22,6 +22,7 @@ import android.graphics.YuvImage
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CaptureRequest
 import android.media.AudioManager
+import android.media.Image
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
@@ -83,21 +84,14 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  MiraBarcodeScannerFragment v7.0 — Kotlin Ultra-Micro & Harsh Conditions
+ *  MiraBarcodeScannerFragment v7.1 — Kotlin Ultra-Micro & Harsh Conditions
  * ═══════════════════════════════════════════════════════════════════════════
- *
- * هندسة احترافية لقراءة الأكواد المجهرية (≤ 5mm × 5mm) وباركود المجوهرات والمنتجات:
- *   1. True Pixel-Level ROI Cropping (44%) + 2.2x Upscaling
- *   2. Integral-Image Adaptive Thresholding للطباعة الباهتة أو غير المتجانسة
- *   3. 4-Stage Pipeline: ML Kit + ZXing TRY_HARDER + Adaptive Binarized + Inverted
- *   4. Anti-Glare Exposure Control لمنع انعكاس الذهب والبطاقات اللامعة
- *   5. Hardware 2D Scanner Broadcast + HID Keyboard Wedge Support
- *   6. Continuous Batch Mode للمسح المتتالي السريع
  */
 class MiraBarcodeScannerFragment : Fragment() {
 
@@ -126,7 +120,7 @@ class MiraBarcodeScannerFragment : Fragment() {
 
     @Volatile
     private var isFlashOn = false
-    private var exposureLevelStep = 1 // 0 = عادي، 1 = ضد الوهج (-1 EV)، 2 = إزالة انعكاس الذهب (-2 EV)
+    private var exposureLevelStep = 0 // 0 = قياسي، 1 = ضد الوهج (-1 EV)، 2 = إزالة انعكاس الذهب (-2 EV)
     private var cameraExecutor: ExecutorService? = null
 
     // ==================== Dual Scanner Engines ====================
@@ -332,15 +326,15 @@ class MiraBarcodeScannerFragment : Fragment() {
             val hintLabel = TextView(ctx).apply {
                 text = if (isArabic) {
                     if (continuousBatchMode) {
-                        "مسح متتالي للأكواد المجهرية (≤5مم) • امسح القطع تباعاً"
+                        "مسح متتالي للأكواد • امسح القطع تباعاً"
                     } else {
-                        "عدسة الأكواد المجهرية (≤5مم) • اختر مستوى التقريب أو المس للتركيز"
+                        "ضع الباركود أو QR داخل الإطار • اختر التكبير للأكواد المجهرية"
                     }
                 } else {
                     if (continuousBatchMode) {
-                        "Batch Micro-Code Scan (≤5mm) • Scan items continuously"
+                        "Batch Scan • Scan items continuously"
                     } else {
-                        "Extreme Micro Lens (≤5mm) • Select Zoom or Tap to Focus"
+                        "Align Barcode/QR in frame • Select zoom for micro-codes"
                     }
                 }
                 setTextColor(Color.parseColor("#E2E8F0"))
@@ -399,7 +393,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                 container.addView(barWrapper)
             }
 
-            updateZoomChipsSelection(DEFAULT_MICRO_ZOOM)
+            updateZoomChipsSelection(DEFAULT_INITIAL_ZOOM)
         } catch (e: Exception) {
             Log.w(TAG, "injectMicroControlOverlay error: ${e.message}")
         }
@@ -410,7 +404,7 @@ class MiraBarcodeScannerFragment : Fragment() {
         chip.text = when (exposureLevelStep) {
             1 -> if (isArabic) "🌗 مضاد وهج البطاقات (نشط)" else "🌗 Anti-Glare Mode (Active)"
             2 -> if (isArabic) "🌑 إزالة انعكاس الذهب والليزر" else "🌑 Gold/Laser Glare Shield"
-            else -> if (isArabic) "☀️ إضاءة قياسية (للظلام)" else "☀️ Standard Exposure (Low Light)"
+            else -> if (isArabic) "☀️ إضاءة قياسية" else "☀️ Standard Exposure"
         }
     }
 
@@ -421,7 +415,7 @@ class MiraBarcodeScannerFragment : Fragment() {
             val expState = cam.cameraInfo.exposureState
             if (!expState.isExposureCompensationSupported) return
 
-            val range = expState.getExposureCompensationRange()
+            val range = expState.exposureCompensationRange
             val target = when (exposureLevelStep) {
                 0 -> 0
                 1 -> max(range.lower, -1)
@@ -438,7 +432,7 @@ class MiraBarcodeScannerFragment : Fragment() {
             for (i in 0 until count) {
                 val chip = zoomChipViews[i]
                 val preset = ZOOM_PRESETS[i]
-                val isSelected = kotlin.math.abs(activeZoom - preset) < 0.55f
+                val isSelected = abs(activeZoom - preset) < 0.55f
 
                 chip.background = GradientDrawable().apply {
                     cornerRadius = dp(20).toFloat()
@@ -627,9 +621,9 @@ class MiraBarcodeScannerFragment : Fragment() {
             }
             tvScanStatus?.apply {
                 text = if (isArabic) {
-                    "🎯 ضع الكود المجهري (≤5×5 مم) داخل المربع"
+                    "🎯 وجّه الكاميرا نحو الباركود أو رمز QR"
                 } else {
-                    "🎯 Center micro-code (≤5×5 mm) in box"
+                    "🎯 Point camera at Barcode or QR"
                 }
                 setTextColor(COLOR_READY)
             }
@@ -643,15 +637,7 @@ class MiraBarcodeScannerFragment : Fragment() {
     private fun initDualBarcodeEngines(): Boolean {
         return try {
             val options = BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(
-                    Barcode.FORMAT_QR_CODE,
-                    Barcode.FORMAT_DATA_MATRIX,
-                    Barcode.FORMAT_CODE_128,
-                    Barcode.FORMAT_EAN_13,
-                    Barcode.FORMAT_EAN_8,
-                    Barcode.FORMAT_CODE_39,
-                    Barcode.FORMAT_AZTEC
-                )
+                .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
                 .enableAllPotentialBarcodes()
                 .build()
             barcodeScanner = BarcodeScanning.getClient(options)
@@ -664,6 +650,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                     BarcodeFormat.QR_CODE,
                     BarcodeFormat.CODE_128,
                     BarcodeFormat.EAN_13,
+                    BarcodeFormat.EAN_8,
                     BarcodeFormat.CODE_39,
                     BarcodeFormat.AZTEC
                 )
@@ -739,10 +726,6 @@ class MiraBarcodeScannerFragment : Fragment() {
                             CaptureRequest.EDGE_MODE_HIGH_QUALITY
                         )
                         ext.setCaptureRequestOption(
-                            CaptureRequest.NOISE_REDUCTION_MODE,
-                            CaptureRequest.NOISE_REDUCTION_MODE_MINIMAL
-                        )
-                        ext.setCaptureRequestOption(
                             CaptureRequest.CONTROL_SCENE_MODE,
                             CaptureRequest.CONTROL_SCENE_MODE_BARCODE
                         )
@@ -781,7 +764,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                     isScanning = true
 
                     setupFocusAndZoom()
-                    applyZoomRatio(DEFAULT_MICRO_ZOOM, false)
+                    applyZoomRatio(DEFAULT_INITIAL_ZOOM, false)
 
                     mainHandler.removeCallbacks(periodicFocusRunnable)
                     mainHandler.postDelayed(periodicFocusRunnable, 1000L)
@@ -828,7 +811,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                         ).setAutoCancelDuration(3, TimeUnit.SECONDS).build()
                         ctrl.startFocusAndMetering(focus)
                         showHintSafe(
-                            if (isArabic) "🎯 تم قفل البؤرة المجهرية" else "🎯 Micro Focus Locked",
+                            if (isArabic) "🎯 تم قفل البؤرة" else "🎯 Focus Locked",
                             COLOR_READY
                         )
                     } catch (_: Exception) {
@@ -869,7 +852,7 @@ class MiraBarcodeScannerFragment : Fragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  4-Stage Extreme Micro Image Pipeline
+    //  4-Stage Image Pipeline (Full-Frame First + Stride-Safe ROI)
     // ═══════════════════════════════════════════════════════════════════
 
     @Suppress("UnsafeOptInUsageError")
@@ -892,7 +875,20 @@ class MiraBarcodeScannerFragment : Fragment() {
             val rotation = imageProxy.imageInfo.rotationDegrees
             val currentFrame = ++frameCounter
 
-            val roiBitmap = extractCenterMicroBitmap(imageProxy, rotation)
+            // 1. المسح المباشر للإطار الكامل أولاً (سريع جداً ولا يستهلك المخازن قبل القراءة)
+            val fullImage = InputImage.fromMediaImage(mediaImage, rotation)
+            val fullResults = Tasks.await(scanner.process(fullImage))
+            for (b in fullResults) {
+                val raw = b.rawValue
+                if (!raw.isNullOrEmpty()) {
+                    closeOnce()
+                    onBarcodeDetected(raw, b.format, true)
+                    return
+                }
+            }
+
+            // 2. قصّ المنطقة المركزية (ROI) مع احترام RowStride/PixelStride للأكواد المجهرية
+            val roiBitmap = extractCenterMicroBitmap(mediaImage, rotation)
             if (roiBitmap != null) {
                 try {
                     val enhancedBitmap = enhanceMicroContrast(roiBitmap)
@@ -918,6 +914,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                             return
                         }
 
+                        // 3. الثنائية التكيفية (Adaptive Binarization) للأكواد الباهتة/المحفورة بالليزر
                         if (currentFrame % 2 == 0L) {
                             val binarizedBitmap = applyAdaptiveBinarization(roiBitmap)
                             try {
@@ -946,6 +943,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                             }
                         }
 
+                        // 4. عكس الألوان للأكواد السلبية (أبيض على خلفية داكنة)
                         if (currentFrame % 3 == 0L) {
                             val invertedBitmap = invertBitmapColors(enhancedBitmap)
                             try {
@@ -971,19 +969,6 @@ class MiraBarcodeScannerFragment : Fragment() {
                     if (!roiBitmap.isRecycled) roiBitmap.recycle()
                 }
             }
-
-            if (currentFrame % 2 == 1L) {
-                val fullImage = InputImage.fromMediaImage(mediaImage, rotation)
-                val fullResults = Tasks.await(scanner.process(fullImage))
-                for (b in fullResults) {
-                    val raw = b.rawValue
-                    if (!raw.isNullOrEmpty()) {
-                        closeOnce()
-                        onBarcodeDetected(raw, b.format, false)
-                        return
-                    }
-                }
-            }
         } catch (e: Exception) {
             Log.d(TAG, "Frame analyze pass: ${e.message}")
         } finally {
@@ -991,36 +976,21 @@ class MiraBarcodeScannerFragment : Fragment() {
         }
     }
 
-    @Suppress("UnsafeOptInUsageError")
-    private fun extractCenterMicroBitmap(imageProxy: ImageProxy, rotationDegrees: Int): Bitmap? {
+    private fun extractCenterMicroBitmap(image: Image, rotationDegrees: Int): Bitmap? {
         return try {
-            val image = imageProxy.image ?: return null
-            val planes = image.planes
-            val yBuffer = planes[0].buffer
-            val uBuffer = planes[1].buffer
-            val vBuffer = planes[2].buffer
-
-            val ySize = yBuffer.remaining()
-            val uSize = uBuffer.remaining()
-            val vSize = vBuffer.remaining()
-
-            val nv21 = ByteArray(ySize + uSize + vSize)
-            yBuffer.get(nv21, 0, ySize)
-            vBuffer.get(nv21, ySize, vSize)
-            uBuffer.get(nv21, ySize + vSize, uSize)
-
+            val nv21 = yuv420888ToNv21(image) ?: return null
             val width = image.width
             val height = image.height
 
-            val cropW = (width * 0.44f).toInt()
-            val cropH = (height * 0.44f).toInt()
+            val cropW = (width * 0.50f).toInt()
+            val cropH = (height * 0.50f).toInt()
             val left = (width - cropW) / 2
             val top = (height - cropH) / 2
             val cropRect = Rect(left, top, left + cropW, top + cropH)
 
             val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
             val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(cropRect, 98, out)
+            yuvImage.compressToJpeg(cropRect, 96, out)
             val jpegBytes = out.toByteArray()
 
             val cropped = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size) ?: return null
@@ -1029,7 +999,7 @@ class MiraBarcodeScannerFragment : Fragment() {
                 if (rotationDegrees != 0) {
                     postRotate(rotationDegrees.toFloat())
                 }
-                postScale(2.2f, 2.2f)
+                postScale(2.0f, 2.0f)
             }
 
             val upscaled = Bitmap.createBitmap(
@@ -1039,6 +1009,63 @@ class MiraBarcodeScannerFragment : Fragment() {
                 cropped.recycle()
             }
             upscaled
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun yuv420888ToNv21(image: Image): ByteArray? {
+        return try {
+            val width = image.width
+            val height = image.height
+            val ySize = width * height
+            val uvSize = width * height / 2
+            val nv21 = ByteArray(ySize + uvSize)
+
+            val yPlane = image.planes[0]
+            val uPlane = image.planes[1]
+            val vPlane = image.planes[2]
+
+            val yBuffer = yPlane.buffer.duplicate().apply { rewind() }
+            val uBuffer = uPlane.buffer.duplicate().apply { rewind() }
+            val vBuffer = vPlane.buffer.duplicate().apply { rewind() }
+
+            val yRowStride = yPlane.rowStride
+            val yPixelStride = yPlane.pixelStride
+
+            var pos = 0
+            if (yRowStride == width && yPixelStride == 1) {
+                yBuffer.get(nv21, 0, ySize)
+                pos = ySize
+            } else {
+                for (row in 0 until height) {
+                    val rowStart = row * yRowStride
+                    for (col in 0 until width) {
+                        nv21[pos++] = yBuffer.get(rowStart + col * yPixelStride)
+                    }
+                }
+            }
+
+            val uvHeight = height / 2
+            val uvWidth = width / 2
+            val vRowStride = vPlane.rowStride
+            val vPixelStride = vPlane.pixelStride
+            val uRowStride = uPlane.rowStride
+            val uPixelStride = uPlane.pixelStride
+
+            for (row in 0 until uvHeight) {
+                val vRowStart = row * vRowStride
+                val uRowStart = row * uRowStride
+                for (col in 0 until uvWidth) {
+                    val vIndex = vRowStart + col * vPixelStride
+                    val uIndex = uRowStart + col * uPixelStride
+                    if (vIndex < vBuffer.limit() && uIndex < uBuffer.limit() && pos + 1 < nv21.size) {
+                        nv21[pos++] = vBuffer.get(vIndex)
+                        nv21[pos++] = uBuffer.get(uIndex)
+                    }
+                }
+            }
+            nv21
         } catch (_: Exception) {
             null
         }
@@ -1101,7 +1128,7 @@ class MiraBarcodeScannerFragment : Fragment() {
     private fun enhanceMicroContrast(src: Bitmap): Bitmap {
         val dest = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(dest)
-        val contrast = 1.75f
+        val contrast = 1.65f
         val translate = (-0.5f * contrast + 0.5f) * 255f
         val cm = ColorMatrix(
             floatArrayOf(
@@ -1187,9 +1214,9 @@ class MiraBarcodeScannerFragment : Fragment() {
                 if (showHudHint && isScanning) {
                     tvScanStatus?.apply {
                         text = if (isArabic) {
-                            String.format(Locale.US, "🔍 تكبير %.1fx — وضع العدسة المجهرية", finalZoom)
+                            String.format(Locale.US, "🔍 تكبير %.1fx", finalZoom)
                         } else {
-                            String.format(Locale.US, "🔍 Zoom %.1fx — Extreme Micro Lens", finalZoom)
+                            String.format(Locale.US, "🔍 Zoom %.1fx", finalZoom)
                         }
                         setTextColor(COLOR_READY)
                     }
@@ -1242,55 +1269,53 @@ class MiraBarcodeScannerFragment : Fragment() {
             batchScannedCount++
         }
 
-        Log.i(TAG, "✅ KOTLIN ULTRA-MICRO CONFIRMED ($format): $cleanData")
+        Log.i(TAG, "✅ BARCODE CONFIRMED ($format): $cleanData")
 
         playBeepSafe()
         val formatName = getBarcodeFormatName(format)
         val currentBatchCount = batchScannedCount
 
-        safeRun {
-            try {
-                tvScanStatus?.apply {
-                    text = if (continuousBatchMode) {
-                        if (isArabic) {
-                            "✅ تم مسح ($currentBatchCount) — جاهز للقطعة التالية"
+        mainHandler.post {
+            if (!isViewDestroyed) {
+                try {
+                    tvScanStatus?.apply {
+                        text = if (continuousBatchMode) {
+                            if (isArabic) {
+                                "✅ تم مسح ($currentBatchCount) — جاهز للقطعة التالية"
+                            } else {
+                                "✅ Scanned ($currentBatchCount) — Ready for next"
+                            }
                         } else {
-                            "✅ Scanned ($currentBatchCount) — Ready for next"
+                            if (isArabic) "✅ تم التقاط الكود بنجاح" else "✅ Code Captured"
                         }
-                    } else {
-                        if (isArabic) "✅ تم التقاط الكود المجهري بنجاح" else "✅ Micro-Code Captured"
+                        setTextColor(COLOR_SUCCESS)
                     }
-                    setTextColor(COLOR_SUCCESS)
+                    tvScannedData?.apply {
+                        text = cleanData
+                        visibility = View.VISIBLE
+                    }
+                } catch (_: Exception) {
                 }
-                tvScannedData?.apply {
-                    text = cleanData
-                    visibility = View.VISIBLE
-                }
-            } catch (_: Exception) {
             }
-        }
 
-        var delivered = false
-        val listener = barcodeListener
-        if (listener != null) {
-            try {
-                listener.onBarcodeScanned(cleanData, formatName)
-                delivered = true
-            } catch (e: Exception) {
-                Log.e(TAG, "barcodeListener error: ${e.message}")
-            }
-        }
-
-        if (!delivered && !continuousBatchMode) {
-            forwardToPOS(cleanData)
-        }
-
-        if (!continuousBatchMode) {
-            mainHandler.postDelayed({
-                if (isAdded && !isViewDestroyed) {
-                    closeScanner()
+            var delivered = false
+            val listener = barcodeListener
+            if (listener != null) {
+                try {
+                    listener.onBarcodeScanned(cleanData, formatName)
+                    delivered = true
+                } catch (e: Exception) {
+                    Log.e(TAG, "barcodeListener error: ${e.message}")
                 }
-            }, 420L)
+            }
+
+            if (!delivered && !continuousBatchMode) {
+                forwardToPOS(cleanData)
+            }
+
+            if (!continuousBatchMode && isAdded && !isViewDestroyed) {
+                closeScanner()
+            }
         }
     }
 
@@ -1620,7 +1645,7 @@ class MiraBarcodeScannerFragment : Fragment() {
         private val COLOR_GOLD = Color.parseColor("#D4AF37")
 
         private const val MIN_ZOOM = 1.0f
-        private const val DEFAULT_MICRO_ZOOM = 2.3f
+        private const val DEFAULT_INITIAL_ZOOM = 1.0f
         private const val MAX_ZOOM_FALLBACK = 6.5f
 
         private val ZOOM_PRESETS = floatArrayOf(1.0f, 2.3f, 3.6f, 5.2f)
