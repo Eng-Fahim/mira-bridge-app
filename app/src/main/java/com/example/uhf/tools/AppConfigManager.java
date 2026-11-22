@@ -30,7 +30,7 @@ public class AppConfigManager {
     // جلب اسم المنشأة الديناميكي بحسب لغة الواجهة الحالية
     public String getLocalizedOrgName(boolean isArabic) {
         if (isArabic) {
-            return prefs.getString("org_name_ar", "ميرا للتكنولوجيا");
+            return prefs.getString("org_name_ar", "منظومة الذهب الدولية");
         } else {
             return prefs.getString("org_name_en", "Mira Technology");
         }
