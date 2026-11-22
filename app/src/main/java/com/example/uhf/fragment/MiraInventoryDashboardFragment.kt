@@ -69,6 +69,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,10 +88,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -175,7 +178,12 @@ class MiraInventoryDashboardFragment : Fragment() {
     private var matchRatePercentState by mutableStateOf<Float?>(null)
 
     private fun checkIsArabic(): Boolean {
-        return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+        val appTags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+        if (appTags.isNotEmpty()) {
+            return appTags.contains("ar", ignoreCase = true)
+        }
+        val sysLang = Locale.getDefault().language
+        return sysLang.equals("ar", ignoreCase = true) ||
             resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
     }
 
@@ -188,11 +196,18 @@ class MiraInventoryDashboardFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        val arabic = checkIsArabic()
+        isArabic = arabic
+        val composeLayoutDirection = if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+
         return ComposeView(requireContext()).apply {
+            layoutDirection = if (arabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                MiraJewelryTheme {
-                    InventoryDashboardScreen()
+                CompositionLocalProvider(LocalLayoutDirection provides composeLayoutDirection) {
+                    MiraJewelryTheme {
+                        InventoryDashboardScreen()
+                    }
                 }
             }
         }
@@ -635,7 +650,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 1. الشريط العلوي (Header + Branch Selector + Refresh)
+                    // 1. الشريط العلوي
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -777,7 +792,6 @@ class MiraInventoryDashboardFragment : Fragment() {
                         }
                     }
 
-                    // تنبيه خطأ الشبكة إن وجد
                     errorMessageState?.let { err ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -807,7 +821,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         }
                     }
 
-                    // 2. البطاقة الرئيسية لمخزون الفرع المسجّل (قيمة + عدد + وزن)
+                    // 2. البطاقة الرئيسية لمخزون الفرع المسجّل
                     InventoryHeroValueCard(
                         isArabic = isAr,
                         primaryValue = primaryValueStr,
@@ -817,7 +831,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         isLoading = isLoadingState
                     )
 
-                    // 3. بطاقة ملخص آخر جلسة جرد معتمدة + تنبيه المفقودات
+                    // 3. بطاقة ملخص آخر جلسة جرد معتمدة
                     LastAuditSummaryBanner(
                         isArabic = isAr,
                         hasRecordedAudit = hasRecordedAuditState,
@@ -827,7 +841,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         pendingCount = pendingSessionsState
                     )
 
-                    // 4. شبكة مؤشرات المطابقة (2x2 Grid)
+                    // 4. شبكة مؤشرات المطابقة
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -868,7 +882,7 @@ class MiraInventoryDashboardFragment : Fragment() {
                         )
                     }
 
-                    // 5. الرسم البياني الدائري لتوزيع حالة آخر جرد
+                    // 5. الرسم البياني الدائري
                     InventoryAuditDonutCard(
                         isArabic = isAr,
                         hasRecordedAudit = hasRecordedAuditState,
