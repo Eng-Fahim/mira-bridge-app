@@ -180,14 +180,21 @@ class MiraGoldCurrencyFragment : Fragment() {
         btnSaveCurrencySettings?.isEnabled = canEdit
     }
 
-    private fun normalizeArabicNumbers(input: String?): String {
-        if (input.isNullOrEmpty()) return ""
-        return input
-            .replace('٠', '0').replace('١', '1').replace('٢', '2').replace('٣', '3')
-            .replace('٤', '4').replace('٥', '5').replace('٦', '6').replace('٧', '7')
-            .replace('٨', '8').replace('٩', '9').replace('٫', '.').replace('٬', '')
-            .replace(",", "")
-    }
+    
+private fun normalizeArabicNumbers(input: String?): String {
+    if (input.isNullOrEmpty()) return ""
+
+    return input
+        .replace('٠', '0').replace('١', '1')
+        .replace('٢', '2').replace('٣', '3')
+        .replace('٤', '4').replace('٥', '5')
+        .replace('٦', '6').replace('٧', '7')
+        .replace('٨', '8').replace('٩', '9')
+        .replace('٫', '.')
+        .replace("٬", "")
+        .replace(",", "")
+}
+
 
     private fun getDouble(et: EditText?): Double {
         return try {
