@@ -1,6 +1,5 @@
 package com.example.uhf.fragment
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -14,9 +13,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.text.Layout
-import android.text.StaticLayout
-import android.text.TextPaint
 import android.util.Base64
 import android.util.Log
 import android.view.KeyEvent
@@ -25,17 +21,10 @@ import android.view.PixelCopy
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,17 +39,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -80,13 +68,16 @@ import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import com.example.uhf.utils.MiraExecutorService
-import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -102,7 +93,7 @@ import kotlin.math.roundToInt
  * - مطابقة فورية Set-Based Reconciliation
  * - مزامنة الكتالوج قبل الجرد لتوحيد عدد القطع المتوقعة مع السيرفر
  * - التقاط لقطة شاشة توثيقية (PixelCopy) قبل الاعتماد
- * - حفظ الجلسة كاملة في inventory_sessions وتفاصيل جميع القطع في inventory_audit_items
+ * - مزامنة الجلسة + المسح الجماعي bulk-scan + إغلاق الجلسة مع السيرفر
  * - توليد تقارير PDF و CSV تفصيلية شاملة للعيارات والمفقودات والمطابق والزائد
  */
 class MiraInventoryProFragment : MiraBaseFragment() {
@@ -205,29 +196,32 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         val unregisteredItems: List<AuditDisplayItem>
     )
 
+    private data class ServerSyncOutcome(
+        val success: Boolean,
+        val sessionId: Long,
+        val riskCode: String?,
+        val errorMessage: String?
+    )
+
     // ═══════════════════════════════════════════════════════════════════
     //  Core Managers & Executors
     // ═══════════════════════════════════════════════════════════════════
 
     private val sdkExecutor = Executors.newSingleThreadExecutor { r ->
-    Thread(r, "INV-SDK").apply {
-        priority = Thread.MAX_PRIORITY - 1
-        isDaemon = true
+        Thread(r, "INV-SDK").apply {
+            priority = Thread.MAX_PRIORITY - 1
+            isDaemon = true
+        }
     }
-}
 
-/**
- * خيط مخصص لعمليات القرص (حفظ لقطات الشاشة، توليد PDF/CSV، قراءة الكتالوج المحلي).
- * منفصل عن sdkExecutor لتفادي حجب قراءة الـ UHF، ومتسلسل لتفادي التزامن على I/O.
- */
-private val diskExecutor = Executors.newSingleThreadExecutor { r ->
-    Thread(r, "INV-DISK").apply {
-        priority = Thread.NORM_PRIORITY - 1
-        isDaemon = true
+    private val diskExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "INV-DISK").apply {
+            priority = Thread.NORM_PRIORITY - 1
+            isDaemon = true
+        }
     }
-}
 
-private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var sessionManager: SessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
     private var priceManager: MiraPriceManager? = null
@@ -315,11 +309,17 @@ private val mainHandler = Handler(Looper.getMainLooper())
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        val arabic = isArabic
+        val composeDir = if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr
+
         return ComposeView(requireContext()).apply {
+            layoutDirection = if (arabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                MiraJewelryTheme {
-                    MiraInventoryScreen()
+                CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+                    MiraJewelryTheme {
+                        MiraInventoryScreen()
+                    }
                 }
             }
         }
@@ -348,7 +348,6 @@ private val mainHandler = Handler(Looper.getMainLooper())
         setupRfidManager(ctx)
         setupBackHandler()
 
-        // تحميل الكتالوج المحلي فوراً ثم مزامنته مع السيرفر لضمان تطابق عدد المتوقع
         loadCatalogFromLocalCache()
         syncBranchCatalogWithServer(silent = true)
     }
@@ -421,14 +420,14 @@ private val mainHandler = Handler(Looper.getMainLooper())
     }
 
     override fun onDestroy() {
-    super.onDestroy()
-    if (!sdkExecutor.isShutdown) {
-        sdkExecutor.shutdownNow()
+        super.onDestroy()
+        if (!sdkExecutor.isShutdown) {
+            sdkExecutor.shutdownNow()
+        }
+        if (!diskExecutor.isShutdown) {
+            diskExecutor.shutdownNow()
+        }
     }
-    if (!diskExecutor.isShutdown) {
-        diskExecutor.shutdownNow()
-    }
-}
 
     // ═══════════════════════════════════════════════════════════════════
     //  RFID Reader Setup & Hardware Trigger
@@ -626,7 +625,6 @@ private val mainHandler = Handler(Looper.getMainLooper())
                 existing.rssi = rssi
             }
             existing.lastSeenMs = now
-            // تحديث دوري خفيف للواجهة دون إبطاء قراءة الـ UHF
             if (existing.readCount % 5 == 0) {
                 recomputeReconciliationState()
             }
@@ -646,69 +644,65 @@ private val mainHandler = Handler(Looper.getMainLooper())
     }
 
     private fun loadCatalogFromLocalCache() {
-    val appCtx = getSafeAppContext() ?: return
-    val targetBranchId = getActiveBranchId()
+        val appCtx = getSafeAppContext() ?: return
+        val targetBranchId = getActiveBranchId()
 
-    diskExecutor.execute {
-        try {
-            val cache = MiraLocalItemCache.getInstance(appCtx) ?: return@execute
-            val itemsList = extractBranchItemsFromCache(cache, targetBranchId)
-            if (itemsList.isNotEmpty()) {
-                applyCatalogItems(itemsList)
+        diskExecutor.execute {
+            try {
+                val cache = MiraLocalItemCache.getInstance(appCtx) ?: return@execute
+                val itemsList = extractBranchItemsFromCache(cache, targetBranchId)
+                if (itemsList.isNotEmpty()) {
+                    applyCatalogItems(itemsList)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "loadCatalogFromLocalCache error", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "loadCatalogFromLocalCache error", e)
         }
     }
-}
 
-    /**
- * مزامنة كتالوج الفرع مع السيرفر — يجب أن تجري على networkExecutor،
- * ثم قراءة القرص تُغلق بـ diskExecutor داخل مسار الاعتماد فقط.
- */
-private fun syncBranchCatalogWithServer(silent: Boolean) {
-    val appCtx = getSafeAppContext() ?: return
-    val targetBranchId = getActiveBranchId()
-    if (isSyncingCatalogState) return
+    private fun syncBranchCatalogWithServer(silent: Boolean) {
+        val appCtx = getSafeAppContext() ?: return
+        val targetBranchId = getActiveBranchId()
+        if (isSyncingCatalogState) return
 
-    safeRun { isSyncingCatalogState = true }
+        safeRun { isSyncingCatalogState = true }
 
-    miraExecutor?.networkExecutor?.execute {
-        try {
-            val syncManager = MiraItemSyncManager.getInstance(appCtx)
-            invokeSyncManagerRefresh(syncManager, targetBranchId)
+        miraExecutor?.networkExecutor?.execute {
+            try {
+                val syncManager = MiraItemSyncManager.getInstance(appCtx)
+                invokeSyncManagerRefresh(syncManager, targetBranchId)
 
-            val cache = MiraLocalItemCache.getInstance(appCtx)
-            if (cache != null) {
-                val refreshed = extractBranchItemsFromCache(cache, targetBranchId)
-                if (refreshed.isNotEmpty()) {
-                    applyCatalogItems(refreshed)
+                val cache = MiraLocalItemCache.getInstance(appCtx)
+                if (cache != null) {
+                    val refreshed = extractBranchItemsFromCache(cache, targetBranchId)
+                    if (refreshed.isNotEmpty()) {
+                        applyCatalogItems(refreshed)
+                    }
                 }
-            }
 
-            safeRun {
-                isSyncingCatalogState = false
-                if (!silent) {
-                    showToast(
-                        if (isArabic) "✅ تم تحديث كتالوج الفرع (${allCatalogItems.size} قطعة)"
-                        else "✅ Branch catalog synced (${allCatalogItems.size} items)"
-                    )
+                safeRun {
+                    isSyncingCatalogState = false
+                    if (!silent) {
+                        showToast(
+                            if (isArabic) "✅ تم تحديث كتالوج الفرع (${allCatalogItems.size} قطعة)"
+                            else "✅ Branch catalog synced (${allCatalogItems.size} items)"
+                        )
+                    }
                 }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "syncBranchCatalogWithServer error", e)
-            safeRun {
-                isSyncingCatalogState = false
-                if (!silent) {
-                    showToast(
-                        if (isArabic) "⚠️ تعذرت المزامنة مع السيرفر، يتم العمل على البيانات المحلية"
-                        else "⚠️ Server sync failed, using local cache"
-                    )
+            } catch (e: Exception) {
+                Log.e(TAG, "syncBranchCatalogWithServer error", e)
+                safeRun {
+                    isSyncingCatalogState = false
+                    if (!silent) {
+                        showToast(
+                            if (isArabic) "⚠️ تعذرت المزامنة مع السيرفر، يتم العمل على البيانات المحلية"
+                            else "⚠️ Server sync failed, using local cache"
+                        )
+                    }
                 }
             }
         }
     }
-}
 
     private fun applyCatalogItems(items: List<CatalogJewelryItem>) {
         catalogByEpc.clear()
@@ -898,7 +892,7 @@ private fun syncBranchCatalogWithServer(silent: Boolean) {
     )
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Approval Flow: Screenshot Capture + Full DB Persistence
+    //  Approval Flow: Screenshot Capture + Full Server & DB Persistence
     // ═══════════════════════════════════════════════════════════════════
 
     private fun initiateAuditApproval() {
@@ -909,14 +903,12 @@ private fun syncBranchCatalogWithServer(silent: Boolean) {
             return
         }
 
-        // إيقاف المسح الحي قبل التقاط لقطة الشاشة واعتماد الجلسة
         if (isScanningState) {
             stopInventoryScan()
         }
 
         isFinalizingState = true
 
-        // مهلة قصيرة (120ms) لتحديث الواجهة بحالة التوقف قبل التقاط لقطة الشاشة
         mainHandler.postDelayed({
             captureAuditScreenshot { screenshotBase64, screenshotFile ->
                 finalizeAndSaveAuditSession(screenshotBase64, screenshotFile)
@@ -924,9 +916,6 @@ private fun syncBranchCatalogWithServer(silent: Boolean) {
         }, 120L)
     }
 
-    /**
-     * التقاط لقطة شاشة موثقة لشاشة الجرد عبر PixelCopy مع بديل Canvas
-     */
     private fun captureAuditScreenshot(onCaptured: (base64: String?, savedFile: File?) -> Unit) {
         val act = activity
         val rootView = view
@@ -957,7 +946,6 @@ private fun syncBranchCatalogWithServer(silent: Boolean) {
                         if (copyResult == PixelCopy.SUCCESS) {
                             encodeAndSaveScreenshot(bitmap, onCaptured)
                         } else {
-                            // بديل Canvas إذا تعذر PixelCopy
                             runCatching {
                                 val canvas = Canvas(bitmap)
                                 rootView.draw(canvas)
@@ -978,56 +966,48 @@ private fun syncBranchCatalogWithServer(silent: Boolean) {
         }
     }
 
-    /**
- * يرمّز Bitmap إلى Base64 ويحفظ نسخة على القرص. يعمل على diskExecutor
- * حتى لا يحجب sdkExecutor (قراءة الـ UHF) ولا networkExecutor.
- */
-private fun encodeAndSaveScreenshot(
-    rawBitmap: Bitmap,
-    onCaptured: (base64: String?, savedFile: File?) -> Unit
-) {
-    diskExecutor.execute {
-        try {
-            // تصغير متناسب لضمان سرعة الرفع مع الحفاظ على وضوح النصوص والأرقام
-            val maxWidth = 720
-            val scaledBitmap = if (rawBitmap.width > maxWidth) {
-                val ratio = maxWidth.toFloat() / rawBitmap.width.toFloat()
-                val targetHeight = (rawBitmap.height * ratio).roundToInt()
-                Bitmap.createScaledBitmap(rawBitmap, maxWidth, targetHeight, true)
-            } else {
-                rawBitmap
+    private fun encodeAndSaveScreenshot(
+        rawBitmap: Bitmap,
+        onCaptured: (base64: String?, savedFile: File?) -> Unit
+    ) {
+        diskExecutor.execute {
+            try {
+                val maxWidth = 720
+                val scaledBitmap = if (rawBitmap.width > maxWidth) {
+                    val ratio = maxWidth.toFloat() / rawBitmap.width.toFloat()
+                    val targetHeight = (rawBitmap.height * ratio).roundToInt()
+                    Bitmap.createScaledBitmap(rawBitmap, maxWidth, targetHeight, true)
+                } else {
+                    rawBitmap
+                }
+
+                val baos = ByteArrayOutputStream()
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, baos)
+                val bytes = baos.toByteArray()
+                val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+
+                val appCtx = getSafeAppContext()
+                var savedFile: File? = null
+                if (appCtx != null) {
+                    val dir = File(appCtx.cacheDir, "audit_screenshots").apply { mkdirs() }
+                    val file = File(dir, "audit_${System.currentTimeMillis()}.jpg")
+                    FileOutputStream(file).use { out -> out.write(bytes) }
+                    savedFile = file
+                }
+
+                if (scaledBitmap !== rawBitmap) {
+                    scaledBitmap.recycle()
+                }
+                rawBitmap.recycle()
+
+                safeRun { onCaptured(base64Str, savedFile) }
+            } catch (e: Exception) {
+                Log.e(TAG, "encodeAndSaveScreenshot error", e)
+                safeRun { onCaptured(null, null) }
             }
-
-            val baos = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, baos)
-            val bytes = baos.toByteArray()
-            val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-
-            val appCtx = getSafeAppContext()
-            var savedFile: File? = null
-            if (appCtx != null) {
-                val dir = File(appCtx.cacheDir, "audit_screenshots").apply { mkdirs() }
-                val file = File(dir, "audit_${System.currentTimeMillis()}.jpg")
-                FileOutputStream(file).use { out -> out.write(bytes) }
-                savedFile = file
-            }
-
-            if (scaledBitmap !== rawBitmap) {
-                scaledBitmap.recycle()
-            }
-            rawBitmap.recycle()
-
-            safeRun { onCaptured(base64Str, savedFile) }
-        } catch (e: Exception) {
-            Log.e(TAG, "encodeAndSaveScreenshot error", e)
-            safeRun { onCaptured(null, null) }
         }
     }
-}
 
-    /**
-     * بناء التقرير التفصيلي وحفظ الجلسة + جميع العناصر + لقطة الشاشة في السيرفر
-     */
     private fun finalizeAndSaveAuditSession(screenshotBase64: String?, screenshotFile: File?) {
         val approvedAtMs = System.currentTimeMillis()
         val durationSec = getCurrentElapsedSeconds()
@@ -1077,36 +1057,19 @@ private fun encodeAndSaveScreenshot(
         )
 
         miraExecutor?.networkExecutor?.execute {
-            var serverSessionId = activeServerSessionId
-            var savedOnServer = false
-            var finalRiskCode = riskInfo.first
+            val outcome = syncAuditSessionWithServer(payload)
 
-            try {
-                val client = apiClient
-                if (client != null) {
-                    val responseObj = dispatchFinalizePayloadToApiClient(client, payload)
-                    if (responseObj != null && responseObj.optBoolean("success", false)) {
-                        savedOnServer = true
-                        val dataObj = responseObj.optJSONObject("data") ?: responseObj
-                        val returnedId = dataObj.optLong(
-                            "session_id",
-                            dataObj.optLong("id", serverSessionId)
-                        )
-                        if (returnedId > 0L) {
-                            serverSessionId = returnedId
-                            activeServerSessionId = returnedId
-                        }
-                        val serverRisk = dataObj.optString("risk_status", "")
-                        if (serverRisk.isNotEmpty() && serverRisk != "null") {
-                            finalRiskCode = serverRisk
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "finalizeAndSaveAuditSession network error", e)
+            val serverSessionId = if (outcome.sessionId > 0L) {
+                activeServerSessionId = outcome.sessionId
+                outcome.sessionId
+            } else {
+                activeServerSessionId
             }
 
-            if (!savedOnServer) {
+            val finalRiskCode = outcome.riskCode?.takeIf { it.isNotBlank() && it != "null" }
+                ?: riskInfo.first
+
+            if (!outcome.success) {
                 savePendingAuditOffline(payload)
             }
 
@@ -1137,7 +1100,7 @@ private fun encodeAndSaveScreenshot(
                 riskTitleAr = translatedRisk.first,
                 riskTitleEn = translatedRisk.second,
                 isHighRisk = translatedRisk.third,
-                savedOnServer = savedOnServer,
+                savedOnServer = outcome.success,
                 screenshotFilePath = screenshotFile?.absolutePath,
                 karatSummaries = karatSummariesState,
                 matchedItems = matchedList,
@@ -1149,15 +1112,29 @@ private fun encodeAndSaveScreenshot(
                 isFinalizingState = false
                 approvedReportDialogState = report
                 playAlertSound(1)
-                if (savedOnServer) {
+
+                // تحديث لوحة تحكم الجرد الإحصائية بالخلفية فور الاعتماد
+                getSafeAppContext()?.sendBroadcast(
+                    Intent("com.example.uhf.REFRESH_INVENTORY").apply {
+                        setPackage(requireContext().packageName)
+                    }
+                )
+
+                if (outcome.success) {
                     showToast(
-                        if (isArabic) "✅ تم اعتماد الجلسة وحفظ جميع التفاصيل ولقطة الشاشة"
-                        else "✅ Session approved & saved with screenshot"
+                        if (isArabic) "✅ تم اعتماد الجلسة ورفعها للسيرفر بنجاح"
+                        else "✅ Session approved & synced with server"
                     )
                 } else {
+                    val reason = outcome.errorMessage?.takeIf { it.isNotBlank() }
                     showToast(
-                        if (isArabic) "📥 تم الاعتماد محلياً وسيُرفع للسيرفر عند توفر الاتصال"
-                        else "📥 Approved locally; will sync when online"
+                        if (reason != null) {
+                            if (isArabic) "⚠️ حُفظ محلياً — رد السيرفر: $reason"
+                            else "⚠️ Saved locally — Server: $reason"
+                        } else {
+                            if (isArabic) "📥 تم الاعتماد محلياً وسيُرفع للسيرفر عند توفر الاتصال"
+                            else "📥 Approved locally; will sync when online"
+                        }
                     )
                 }
             }
@@ -1198,7 +1175,6 @@ private fun encodeAndSaveScreenshot(
             put("approved_at", isoFormat.format(Date(approvedAtMs)))
             put("duration_seconds", durationSec)
 
-            // إحصائيات جدول inventory_sessions
             put("expected_count", expectedCount)
             put("matched_count", matchedCount)
             put("missing_count", missingCount)
@@ -1218,7 +1194,6 @@ private fun encodeAndSaveScreenshot(
                 put("screenshot_base64", screenshotBase64)
             }
 
-            // ملخص العيارات
             val karatArray = JSONArray()
             for (k in karatSummaries) {
                 karatArray.put(JSONObject().apply {
@@ -1234,7 +1209,6 @@ private fun encodeAndSaveScreenshot(
             }
             put("karat_breakdown", karatArray)
 
-            // جميع القطع لحفظها في جدول inventory_audit_items
             val itemsArray = JSONArray()
             for (item in allItems) {
                 val statusStr = when (item.auditStatus) {
@@ -1259,7 +1233,7 @@ private fun encodeAndSaveScreenshot(
                 })
             }
             put("items", itemsArray)
-            // توافق مع أي Endpoint يتوقع مفتاح scanned_items
+
             val scannedOnlyArray = JSONArray()
             for (item in allItems) {
                 if (item.auditStatus != ItemAuditStatus.MISSING) {
@@ -1279,9 +1253,125 @@ private fun encodeAndSaveScreenshot(
     }
 
     /**
-     * استدعاء مرن لـ MiraApiClient لضمان التوافق التام مع دوال السيرفر
+     * مزامنة الجلسة الكاملة مع السيرفر عبر:
+     * 1) دوال MiraApiClient إن وُجدت
+     * 2) أو مسارات Laravel V1 مباشرة:
+     *    - POST /api/v1/inventory/sessions/start (أو /api/v1/inventory/sessions)
+     *    - POST /api/v1/inventory/sessions/{sessionId}/bulk-scan
+     *    - POST /api/v1/inventory/sessions/{sessionId}/close (أو /finalize)
      */
-    private fun dispatchFinalizePayloadToApiClient(
+    private fun syncAuditSessionWithServer(payload: JSONObject): ServerSyncOutcome {
+        val client = apiClient
+        var sessionId = activeServerSessionId
+        var lastError: String? = null
+
+        // المحاولة 1: استدعاء مباشر لدوال MiraApiClient إن كانت متوفرة
+        if (client != null) {
+            val directRes = invokeAnyClientFinalizeMethod(client, payload)
+            if (directRes != null && directRes.optBoolean("success", false)) {
+                val dataObj = directRes.optJSONObject("data") ?: directRes
+                val returnedId = dataObj.optLong("session_id", dataObj.optLong("id", sessionId))
+                val risk = dataObj.optString("risk_status", "")
+                return ServerSyncOutcome(true, returnedId, risk, null)
+            }
+        }
+
+        // المحاولة 2: الاتصال المباشر بمسارات Laravel API V1 باستخدام بيانات الجلسة
+        val baseUrl = resolveServerBaseUrl(client)
+        val authToken = resolveAuthToken(client)
+
+        if (baseUrl.isBlank()) {
+            return ServerSyncOutcome(false, sessionId, null, "Base URL missing")
+        }
+
+        val cleanBase = baseUrl.trimEnd('/')
+
+        // الخطوة أ: فتح جلسة جرد نشطة على السيرفر إذا لم تُفتح بعد
+        if (sessionId <= 0L) {
+            val startBody = JSONObject().apply {
+                put("branch_id", branchIdState)
+                put("audit_type", "full")
+                put("local_uuid", currentSessionUuid)
+                put("expected_count", payload.optInt("expected_count", 0))
+            }
+            val startPaths = listOf(
+                "$cleanBase/api/v1/inventory/sessions/start",
+                "$cleanBase/api/v1/inventory/sessions"
+            )
+            for (url in startPaths) {
+                val resp = executeAuthenticatedPost(url, authToken, startBody)
+                if (resp.first in 200..299 && resp.second != null) {
+                    val root = resp.second!!
+                    val data = root.optJSONObject("data") ?: root
+                    val newId = data.optLong("session_id", data.optLong("id", 0L))
+                    if (newId > 0L) {
+                        sessionId = newId
+                        activeServerSessionId = newId
+                        payload.put("session_id", newId)
+                        break
+                    }
+                } else if (resp.first > 0) {
+                    lastError = extractServerErrorMessage(resp.first, resp.second)
+                }
+            }
+        }
+
+        // الخطوة ب: إرسال كافة البطاقات الممسوحة عبر InventoryScanController::bulkScan
+        val scannedItems = payload.optJSONArray("scanned_items")
+        if (sessionId > 0L && scannedItems != null && scannedItems.length() > 0) {
+            val tagsArray = JSONArray()
+            for (i in 0 until scannedItems.length()) {
+                val itObj = scannedItems.optJSONObject(i) ?: continue
+                val code = itObj.optString("epc", itObj.optString("serial_no", "")).trim()
+                if (code.isNotEmpty()) {
+                    tagsArray.put(JSONObject().apply {
+                        put("code", code)
+                        put("rssi", itObj.optInt("rssi", -55).toString())
+                    })
+                }
+            }
+            if (tagsArray.length() > 0) {
+                val bulkBody = JSONObject().apply { put("tags", tagsArray) }
+                val bulkUrl = "$cleanBase/api/v1/inventory/sessions/$sessionId/bulk-scan"
+                val bulkResp = executeAuthenticatedPost(bulkUrl, authToken, bulkBody)
+                if (bulkResp.first !in 200..299 && bulkResp.first > 0) {
+                    lastError = extractServerErrorMessage(bulkResp.first, bulkResp.second)
+                }
+            }
+        }
+
+        // الخطوة ج: إغلاق واعتماد الجلسة مع إرسال الملخص التفصيلي ولقطة الشاشة
+        val closeUrls = if (sessionId > 0L) {
+            listOf(
+                "$cleanBase/api/v1/inventory/sessions/$sessionId/close",
+                "$cleanBase/api/v1/inventory/sessions/$sessionId/finalize",
+                "$cleanBase/api/v1/inventory/sessions/$sessionId/complete",
+                "$cleanBase/api/v1/inventory/audit"
+            )
+        } else {
+            listOf(
+                "$cleanBase/api/v1/inventory/audit",
+                "$cleanBase/api/v1/inventory/sessions/close"
+            )
+        }
+
+        for (url in closeUrls) {
+            val resp = executeAuthenticatedPost(url, authToken, payload)
+            if (resp.first in 200..299 && resp.second != null) {
+                val root = resp.second!!
+                val data = root.optJSONObject("data") ?: root
+                val returnedId = data.optLong("session_id", data.optLong("id", sessionId))
+                val risk = data.optString("risk_status", "")
+                return ServerSyncOutcome(true, returnedId, risk, null)
+            } else if (resp.first > 0 && resp.first != 404) {
+                lastError = extractServerErrorMessage(resp.first, resp.second)
+            }
+        }
+
+        return ServerSyncOutcome(false, sessionId, null, lastError)
+    }
+
+    private fun invokeAnyClientFinalizeMethod(
         client: MiraApiClient,
         payload: JSONObject
     ): JSONObject? {
@@ -1289,6 +1379,7 @@ private fun encodeAndSaveScreenshot(
             "finalizeInventorySession",
             "closeInventorySession",
             "submitInventoryAudit",
+            "submitInventoryAuditReport",
             "approveInventorySession"
         )
         for (name in methodNames) {
@@ -1300,7 +1391,6 @@ private fun encodeAndSaveScreenshot(
                 if (method != null) {
                     val res = method.invoke(client, payload) ?: continue
                     if (res is JSONObject) return res
-                    // استخراج isSuccess و data من كائن ApiResponse
                     val isSuccessField = res.javaClass.fields.firstOrNull { it.name == "isSuccess" }
                     val dataField = res.javaClass.fields.firstOrNull { it.name == "data" }
                     val ok = (isSuccessField?.get(res) as? Boolean) ?: false
@@ -1315,6 +1405,109 @@ private fun encodeAndSaveScreenshot(
             }
         }
         return null
+    }
+
+    private fun resolveServerBaseUrl(client: MiraApiClient?): String {
+        try {
+            if (client != null) {
+                val m = client.javaClass.methods.firstOrNull {
+                    (it.name == "getBaseUrl" || it.name == "getServerUrl") && it.parameterTypes.isEmpty()
+                }
+                val fromMethod = m?.invoke(client) as? String
+                if (!fromMethod.isNullOrBlank()) return fromMethod
+
+                val f = client.javaClass.declaredFields.firstOrNull {
+                    it.name.equals("baseUrl", true) || it.name.equals("BASE_URL", true)
+                }
+                if (f != null) {
+                    f.isAccessible = true
+                    val v = f.get(client) as? String
+                    if (!v.isNullOrBlank()) return v
+                }
+            }
+        } catch (_: Exception) {
+        }
+        return try {
+            val sm = sessionManager ?: return ""
+            val m = sm.javaClass.methods.firstOrNull {
+                (it.name == "getBaseUrl" || it.name == "getServerUrl" || it.name == "getApiUrl") &&
+                        it.parameterTypes.isEmpty()
+            }
+            (m?.invoke(sm) as? String) ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun resolveAuthToken(client: MiraApiClient?): String {
+        try {
+            val sm = sessionManager
+            if (sm != null) {
+                val m = sm.javaClass.methods.firstOrNull {
+                    (it.name == "getToken" || it.name == "getAuthToken" || it.name == "getAccessToken") &&
+                            it.parameterTypes.isEmpty()
+                }
+                val t = m?.invoke(sm) as? String
+                if (!t.isNullOrBlank()) return t
+            }
+            if (client != null) {
+                val m = client.javaClass.methods.firstOrNull {
+                    (it.name == "getToken" || it.name == "getAuthToken") && it.parameterTypes.isEmpty()
+                }
+                val t = m?.invoke(client) as? String
+                if (!t.isNullOrBlank()) return t
+            }
+        } catch (_: Exception) {
+        }
+        return ""
+    }
+
+    private fun executeAuthenticatedPost(
+        urlStr: String,
+        token: String,
+        body: JSONObject
+    ): Pair<Int, JSONObject?> {
+        var conn: HttpURLConnection? = null
+        return try {
+            val url = URL(urlStr)
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 15000
+                readTimeout = 25000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                setRequestProperty("Accept", "application/json")
+                if (token.isNotBlank()) {
+                    val bearer = if (token.startsWith("Bearer ", true)) token else "Bearer $token"
+                    setRequestProperty("Authorization", bearer)
+                }
+            }
+
+            OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { writer ->
+                writer.write(body.toString())
+                writer.flush()
+            }
+
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val rawText = if (stream != null) {
+                BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
+            } else {
+                ""
+            }
+            val json = runCatching { JSONObject(rawText) }.getOrNull()
+            code to json
+        } catch (e: Exception) {
+            Log.w(TAG, "POST $urlStr failed: ${e.message}")
+            -1 to null
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    private fun extractServerErrorMessage(httpCode: Int, json: JSONObject?): String {
+        val msg = json?.optString("message", "")?.takeIf { it.isNotBlank() && it != "null" }
+        return if (msg != null) "HTTP $httpCode: $msg" else "HTTP $httpCode"
     }
 
     private fun savePendingAuditOffline(payload: JSONObject) {
@@ -1354,8 +1547,8 @@ private fun encodeAndSaveScreenshot(
     private fun exportAndSharePdfReport(report: ReconciledAuditReport) {
         val ctx = context ?: return
         diskExecutor.execute {
-    try {
-        val pdfFile = generateDetailedPdfFile(ctx, report)
+            try {
+                val pdfFile = generateDetailedPdfFile(ctx, report)
                 safeRun {
                     shareGeneratedFile(
                         ctx = ctx,
@@ -1379,8 +1572,8 @@ private fun encodeAndSaveScreenshot(
     private fun exportAndShareCsvReport(report: ReconciledAuditReport) {
         val ctx = context ?: return
         diskExecutor.execute {
-    try {
-        val csvFile = generateDetailedCsvFile(ctx, report)
+            try {
+                val csvFile = generateDetailedCsvFile(ctx, report)
                 safeRun {
                     shareGeneratedFile(
                         ctx = ctx,
@@ -1403,10 +1596,9 @@ private fun encodeAndSaveScreenshot(
 
     private fun generateDetailedPdfFile(context: Context, report: ReconciledAuditReport): File {
         val doc = PdfDocument()
-        val pageWidth = 595   // A4 width at 72 DPI
-        val pageHeight = 842  // A4 height at 72 DPI
+        val pageWidth = 595
+        val pageHeight = 842
         val margin = 32f
-        val contentWidth = pageWidth - (margin * 2)
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
 
@@ -1472,7 +1664,6 @@ private fun encodeAndSaveScreenshot(
             }
         }
 
-        // 1. الترويسة الرسمية
         canvas.drawRoundRect(margin, y, pageWidth - margin, y + 66f, 8f, 8f, headerBgPaint)
         canvas.drawText("ميرا تكنولوجي للحلول الذكية — تقرير جرد المجوهرات المعتمد", pageWidth - margin - 12f, y + 24f, titlePaint)
         canvas.drawText(
@@ -1489,7 +1680,6 @@ private fun encodeAndSaveScreenshot(
         )
         y += 80f
 
-        // 2. ملخص المطابقة والأوزان والقيم المالية
         canvas.drawText("أولاً: ملخص نتائج الجرد والتقييم الأمني", pageWidth - margin, y, sectionPaint)
         y += 16f
         canvas.drawText(
@@ -1529,7 +1719,6 @@ private fun encodeAndSaveScreenshot(
         canvas.drawLine(margin, y, pageWidth - margin, y, linePaint)
         y += 18f
 
-        // 3. جدول التوزيع حسب العيار
         if (report.karatSummaries.isNotEmpty()) {
             ensureSpace(60f)
             canvas.drawText("ثانياً: تحليل الجرد حسب العيار", pageWidth - margin, y, sectionPaint)
@@ -1557,7 +1746,6 @@ private fun encodeAndSaveScreenshot(
             y += 16f
         }
 
-        // 4. جدول القطع المفقودة (العجز)
         if (report.missingItems.isNotEmpty()) {
             ensureSpace(50f)
             canvas.drawText("ثالثاً: كشف القطع المفقودة / غير المقروءة (${report.missingItems.size} قطعة)", pageWidth - margin, y, sectionPaint)
@@ -1586,7 +1774,6 @@ private fun encodeAndSaveScreenshot(
             y += 16f
         }
 
-        // 5. جدول القطع المطابقة
         if (report.matchedItems.isNotEmpty()) {
             ensureSpace(50f)
             canvas.drawText("رابعاً: كشف القطع المطابقة المقروءة (${report.matchedItems.size} قطعة)", pageWidth - margin, y, sectionPaint)
@@ -1615,7 +1802,6 @@ private fun encodeAndSaveScreenshot(
             y += 16f
         }
 
-        // 6. جدول البطاقات غير المسجلة إن وجدت
         if (report.unregisteredItems.isNotEmpty()) {
             ensureSpace(45f)
             canvas.drawText("خامساً: بطاقات غير مسجلة في الفرع (${report.unregisteredItems.size})", pageWidth - margin, y, sectionPaint)
@@ -1642,7 +1828,6 @@ private fun encodeAndSaveScreenshot(
         val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
 
         FileOutputStream(outFile).use { fos ->
-            // كتابة UTF-8 BOM لضمان عرض النصوص العربية بوضوح في Excel
             fos.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
             OutputStreamWriter(fos, StandardCharsets.UTF_8).use { writer ->
                 writer.appendLine("MIRA TECHNOLOGY - INVENTORY AUDIT REPORT")
@@ -1821,7 +2006,6 @@ private fun encodeAndSaveScreenshot(
                     .statusBarsPadding()
                     .navigationBarsPadding()
             ) {
-                // Top Header
                 InventoryTopHeader(
                     isArabic = isAr,
                     branchId = branchIdState,
@@ -1832,7 +2016,6 @@ private fun encodeAndSaveScreenshot(
                     onBackClick = { handleBackNavigation() }
                 )
 
-                // Summary KPI Card
                 InventorySummaryDashboardCard(
                     isArabic = isAr,
                     expectedCount = expectedCountState,
@@ -1852,7 +2035,6 @@ private fun encodeAndSaveScreenshot(
                     }
                 )
 
-                // Filter Tabs
                 InventoryFilterTabsRow(
                     isArabic = isAr,
                     selectedTab = selectedFilterTabState,
@@ -1863,7 +2045,6 @@ private fun encodeAndSaveScreenshot(
                     onSelectTab = { selectedFilterTabState = it }
                 )
 
-                // Search Bar
                 OutlinedTextField(
                     value = searchQueryState,
                     onValueChange = { searchQueryState = it },
@@ -1892,7 +2073,6 @@ private fun encodeAndSaveScreenshot(
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 )
 
-                // Audited Items List
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
@@ -1909,7 +2089,6 @@ private fun encodeAndSaveScreenshot(
                     }
                 }
 
-                // Bottom Control Bar
                 InventoryBottomControlBar(
                     isArabic = isAr,
                     isScanning = isScanningState,
@@ -1920,8 +2099,9 @@ private fun encodeAndSaveScreenshot(
                         if (isScanningState) stopInventoryScan() else startInventoryScan()
                     },
                     onPowerSettingsClick = {
-                        getSafeAppContext()?.let { appCtx ->
-                            PosPowerSettingsDialog.show(appCtx, isAr) { newPower ->
+                        val dialogCtx = activity ?: context
+                        if (dialogCtx != null) {
+                            PosPowerSettingsDialog.show(dialogCtx, isAr) { newPower ->
                                 sdkExecutor.execute {
                                     runCatching {
                                         rfidManager?.setPower(newPower)
@@ -1935,7 +2115,6 @@ private fun encodeAndSaveScreenshot(
             }
         }
 
-        // نافذة اعتماد الجرد التفصيلية
         approvedReportDialogState?.let { report ->
             AuditApprovalResultDialog(
                 isArabic = isAr,
@@ -2125,7 +2304,6 @@ private fun encodeAndSaveScreenshot(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // حلقة نسبة المطابقة
                     Box(
                         modifier = Modifier.size(86.dp),
                         contentAlignment = Alignment.Center
@@ -2165,7 +2343,6 @@ private fun encodeAndSaveScreenshot(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // شبكة الأرقام الأربعة
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -2203,7 +2380,6 @@ private fun encodeAndSaveScreenshot(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // شريط الوقت والقيمة والوزن
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2254,7 +2430,6 @@ private fun encodeAndSaveScreenshot(
                     }
                 }
 
-                // شرائح العيارات
                 if (karatSummaries.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -2539,7 +2714,6 @@ private fun encodeAndSaveScreenshot(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // تصفير
                 OutlinedButton(
                     onClick = onResetClick,
                     shape = RoundedCornerShape(14.dp),
@@ -2548,7 +2722,6 @@ private fun encodeAndSaveScreenshot(
                     Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
 
-                // زر اعتماد الجرد وحفظ الجلسة + لقطة الشاشة
                 Button(
                     onClick = onApproveClick,
                     enabled = !isFinalizing,
@@ -2571,12 +2744,13 @@ private fun encodeAndSaveScreenshot(
                         Text(
                             text = if (isArabic) "اعتماد" else "Approve",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
 
-                // زر بدء / إيقاف المسح
                 Button(
                     onClick = onToggleScanClick,
                     modifier = Modifier.weight(1f),
@@ -2600,11 +2774,12 @@ private fun encodeAndSaveScreenshot(
                             if (isArabic) "بدء" else "Start"
                         },
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
-                // إعدادات الطاقة
                 OutlinedButton(
                     onClick = onPowerSettingsClick,
                     shape = RoundedCornerShape(14.dp),
@@ -2616,12 +2791,6 @@ private fun encodeAndSaveScreenshot(
         }
     }
 
-    /**
-     * نافذة اعتماد تقرير الجرد المصححة بالكامل:
-     * - تعرض الأرقام الحقيقية المتطابقة مع الجرد الفعلي
-     * - تترجم التقييم الأمني للعربية
-     * - تصدر تقرير PDF و CSV تفصيلي كامل
-     */
     @Composable
     private fun AuditApprovalResultDialog(
         isArabic: Boolean,
@@ -2723,7 +2892,6 @@ private fun encodeAndSaveScreenshot(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // شارة التقييم الأمني المترجمة
                     val riskBg = if (report.isHighRisk) Color(0xFFEF4444).copy(alpha = 0.14f)
                     else Color(0xFF10B981).copy(alpha = 0.14f)
                     val riskFg = if (report.isHighRisk) Color(0xFFEF4444) else Color(0xFF10B981)
@@ -2756,7 +2924,6 @@ private fun encodeAndSaveScreenshot(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // صندوق تصدير وطباعة التقرير التفصيلي
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -2794,6 +2961,7 @@ private fun encodeAndSaveScreenshot(
                                         .weight(1f)
                                         .height(46.dp),
                                     shape = RoundedCornerShape(50),
+                                    contentPadding = PaddingValues(horizontal = 10.dp),
                                     border = BorderStroke(1.dp, colors.goldPrimary)
                                 ) {
                                     Icon(
@@ -2806,6 +2974,9 @@ private fun encodeAndSaveScreenshot(
                                     Text(
                                         text = "CSV",
                                         fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        softWrap = false,
                                         color = colors.goldPrimary
                                     )
                                 }
@@ -2816,6 +2987,7 @@ private fun encodeAndSaveScreenshot(
                                         .weight(1f)
                                         .height(46.dp),
                                     shape = RoundedCornerShape(50),
+                                    contentPadding = PaddingValues(horizontal = 10.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = colors.goldPrimary,
                                         contentColor = Color(0xFF0A0F1D)
@@ -2829,7 +3001,10 @@ private fun encodeAndSaveScreenshot(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = if (isArabic) "PDF / طباعة" else "PDF / Print",
-                                        fontWeight = FontWeight.ExtraBold
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -2852,7 +3027,9 @@ private fun encodeAndSaveScreenshot(
                         Text(
                             text = if (isArabic) "تم" else "Done",
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -2904,7 +3081,6 @@ private fun encodeAndSaveScreenshot(
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun extractBranchItemsFromCache(
         cache: MiraLocalItemCache,
         branchId: Int
@@ -3078,99 +3254,94 @@ private fun encodeAndSaveScreenshot(
         } catch (_: Exception) {
         }
     }
+
     // ═══════════════════════════════════════════════════════════════════
-//  Public API — تُستدعى من UHFMainActivity
-// ═══════════════════════════════════════════════════════════════════
+    //  Public API — تُستدعى من UHFMainActivity
+    // ═══════════════════════════════════════════════════════════════════
 
-/** هل المسح يعمل الآن؟ (UHFMainActivity:1694) */
-fun isCurrentlyScanning(): Boolean = isScanningState
+    fun isCurrentlyScanning(): Boolean = isScanningState
 
-/** اسم بديل مستخدم في UHFMainActivity:2286 */
-fun isScanning(): Boolean = isScanningState
+    fun isScanning(): Boolean = isScanningState
 
-/** إيقاف المسح من خارج الـ fragment (UHFMainActivity:2318) */
-fun stopScanning() {
-    stopInventoryScan()
-}
-
-/** عدد الوسوم الفريدة التي قُرئت في الجلسة (UHFMainActivity:1693) */
-fun getScannedCount(): Int = scannedMetricsByEpc.size
-
-/** فتح أرشيف تقارير PDF/CSV (UHFMainActivity:1726, 1733, 1741) */
-fun showArchiveReportsPublic() {
-    try {
-        val appCtx = getSafeAppContext() ?: return
-        val dir = File(appCtx.cacheDir, "audit_reports")
-        val files = dir.listFiles()
-            ?.filter { it.isFile && (it.extension == "pdf" || it.extension == "csv") }
-            ?.sortedByDescending { it.lastModified() }
-            ?: emptyList()
-
-        if (files.isEmpty()) {
-            showToast(if (isArabic) "📂 لا توجد تقارير محفوظة بعد" else "📂 No archived reports yet")
-            return
-        }
-
-        val latest = files.first()
-        val mime = if (latest.extension == "pdf") "application/pdf" else "text/csv"
-        shareGeneratedFile(
-            ctx = appCtx,
-            file = latest,
-            mimeType = mime,
-            chooserTitle = if (isArabic)
-                "مشاركة آخر تقرير (${files.size} إجمالي)"
-            else
-                "Share latest report (${files.size} total)"
-        )
-    } catch (e: Exception) {
-        Log.e(TAG, "showArchiveReportsPublic error", e)
-        showToast(if (isArabic) "⚠️ تعذر فتح الأرشيف" else "⚠️ Failed to open archive")
+    fun stopScanning() {
+        stopInventoryScan()
     }
-}
 
-/** إعدادات الماسح — تفتح حوار القدرة (UHFMainActivity:674, 679) */
-fun showInventoryScannerSettings() {
-    val appCtx = getSafeAppContext() ?: return
-    PosPowerSettingsDialog.show(appCtx, isArabic) { newPower ->
-        MiraReaderSettings.getInstance(appCtx).inventoryPowerDbm = newPower
-        sdkExecutor.execute {
-            runCatching {
-                rfidManager?.setPower(newPower)
-                BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+    fun getScannedCount(): Int = scannedMetricsByEpc.size
+
+    fun showArchiveReportsPublic() {
+        try {
+            val appCtx = getSafeAppContext() ?: return
+            val dir = File(appCtx.cacheDir, "audit_reports")
+            val files = dir.listFiles()
+                ?.filter { it.isFile && (it.extension == "pdf" || it.extension == "csv") }
+                ?.sortedByDescending { it.lastModified() }
+                ?: emptyList()
+
+            if (files.isEmpty()) {
+                showToast(if (isArabic) "📂 لا توجد تقارير محفوظة بعد" else "📂 No archived reports yet")
+                return
+            }
+
+            val latest = files.first()
+            val mime = if (latest.extension == "pdf") "application/pdf" else "text/csv"
+            shareGeneratedFile(
+                ctx = appCtx,
+                file = latest,
+                mimeType = mime,
+                chooserTitle = if (isArabic)
+                    "مشاركة آخر تقرير (${files.size} إجمالي)"
+                else
+                    "Share latest report (${files.size} total)"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "showArchiveReportsPublic error", e)
+            showToast(if (isArabic) "⚠️ تعذر فتح الأرشيف" else "⚠️ Failed to open archive")
+        }
+    }
+
+    fun showInventoryScannerSettings() {
+        val dialogCtx = activity ?: context ?: return
+        val appCtx = getSafeAppContext() ?: dialogCtx.applicationContext
+        PosPowerSettingsDialog.show(dialogCtx, isArabic) { newPower ->
+            MiraReaderSettings.getInstance(appCtx).inventoryPowerDbm = newPower
+            sdkExecutor.execute {
+                runCatching {
+                    rfidManager?.setPower(newPower)
+                    BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+                }
             }
         }
     }
-}
 
-/** إعدادات جلسة المسح — تُظهر ملخصاً (UHFMainActivity:691, 696) */
-fun showInventorySessionSettings() {
-    try {
-        val appCtx = getSafeAppContext() ?: return
-        val s = MiraReaderSettings.getInstance(appCtx)
-        val rfLinkLabel = MiraReaderSettings.RFLINK_LABELS.getOrNull(s.rfLink) ?: "?"
-        val summary = if (isArabic) {
-            buildString {
-                appendLine("📊 إعدادات جلسة المسح الحالية:")
-                appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
-                appendLine("• Q: ${s.qValue} (${if (s.qMode == 0) "ثابت" else "ديناميكي"})")
-                appendLine("• Miller: ${s.miller}   |   LinkFreq: ${s.linkFreq}")
-                appendLine("• RFLink: $rfLinkLabel")
-                append("• القدرة: ${s.inventoryPowerDbm} dBm")
+    fun showInventorySessionSettings() {
+        try {
+            val appCtx = getSafeAppContext() ?: return
+            val s = MiraReaderSettings.getInstance(appCtx)
+            val rfLinkLabel = MiraReaderSettings.RFLINK_LABELS.getOrNull(s.rfLink) ?: "?"
+            val summary = if (isArabic) {
+                buildString {
+                    appendLine("📊 إعدادات جلسة المسح الحالية:")
+                    appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
+                    appendLine("• Q: ${s.qValue} (${if (s.qMode == 0) "ثابت" else "ديناميكي"})")
+                    appendLine("• Miller: ${s.miller}   |   LinkFreq: ${s.linkFreq}")
+                    appendLine("• RFLink: $rfLinkLabel")
+                    append("• القدرة: ${s.inventoryPowerDbm} dBm")
+                }
+            } else {
+                buildString {
+                    appendLine("📊 Session Settings:")
+                    appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
+                    appendLine("• Q: ${s.qValue} (${if (s.qMode == 0) "fixed" else "dynamic"})")
+                    appendLine("• Miller: ${s.miller}   |   LinkFreq: ${s.linkFreq}")
+                    appendLine("• RFLink: $rfLinkLabel")
+                    append("• Power: ${s.inventoryPowerDbm} dBm")
+                }
             }
-        } else {
-            buildString {
-                appendLine("📊 Session Settings:")
-                appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
-                appendLine("• Q: ${s.qValue} (${if (s.qMode == 0) "fixed" else "dynamic"})")
-                appendLine("• Miller: ${s.miller}   |   LinkFreq: ${s.linkFreq}")
-                appendLine("• RFLink: $rfLinkLabel")
-                append("• Power: ${s.inventoryPowerDbm} dBm")
-            }
+            showToast(summary)
+        } catch (e: Exception) {
+            Log.e(TAG, "showInventorySessionSettings error", e)
+            showToast(if (isArabic) "⚠️ تعذر عرض إعدادات الجلسة" else "⚠️ Failed to show session settings")
         }
-        showToast(summary)
-    } catch (e: Exception) {
-        Log.e(TAG, "showInventorySessionSettings error", e)
-        showToast(if (isArabic) "⚠️ تعذر عرض إعدادات الجلسة" else "⚠️ Failed to show session settings")
     }
-}
 }
