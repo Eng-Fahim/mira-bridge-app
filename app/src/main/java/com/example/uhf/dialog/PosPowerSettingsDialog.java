@@ -4,27 +4,22 @@ import android.content.Context;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.Window;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.view.ContextThemeWrapper;
 
-import com.example.uhf.R;
 import com.example.uhf.MiraRfid.MiraReaderSettings;
-import com.google.android.material.button.MaterialButton;
+import com.example.uhf.R;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  PosPowerSettingsDialog — إعداد قوة قراءة POS
+ *  PosPowerSettingsDialog — إعداد قوة قراءة POS / UHF
  * ═══════════════════════════════════════════════════════════════════════════
- *
- * المستخدم يختار:
- *   - قوة الإرسال (5-30 dBm)
- *   - يرى المدى التقريبي مباشرة
- *
- * يُحفظ في MiraReaderSettings.setPosPowerDbm()
  */
 public final class PosPowerSettingsDialog {
 
@@ -36,93 +31,89 @@ public final class PosPowerSettingsDialog {
 
     private PosPowerSettingsDialog() {}
 
-    /**
-     * ✅ فتح نافذة الإعداد
-     *
-     * @param ctx        السياق
-     * @param isArabic   للترجمة
-     * @param onChanged  callback ليعيد تطبيق القوة على القارئ
-     */
     public static void show(@NonNull Context ctx,
                             boolean isArabic,
                             @NonNull OnPowerChangedListener onChanged) {
 
         MiraReaderSettings settings = MiraReaderSettings.getInstance(ctx);
-        final int savedValue = settings.getPosPowerDbm();
+        int min = MiraReaderSettings.MIN_POS_POWER_DBM;
+        int max = Math.max(min + 1, MiraReaderSettings.MAX_POS_POWER_DBM);
+        final int savedValue = Math.max(min, Math.min(max, settings.getPosPowerDbm()));
 
-        // ═══════════════════════════════════════════════════════
-        //  بناء الواجهة برمجياً
-        // ═══════════════════════════════════════════════════════
-        View view = LayoutInflater.from(ctx)
+        // تغليف السياق بثيم MaterialComponents لمنع InflateException مع MaterialButton و MaterialAlertDialogBuilder
+        Context themedCtx = new ContextThemeWrapper(
+                ctx,
+                com.google.android.material.R.style.Theme_MaterialComponents_DayNight_Dialog_Alert
+        );
+
+        View view = LayoutInflater.from(themedCtx)
                 .inflate(R.layout.dialog_pos_power_settings, null);
+        view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
 
-        TextView tvValue      = view.findViewById(R.id.tvPowerValue);
-        TextView tvRange      = view.findViewById(R.id.tvPowerRange);
-        TextView tvHint       = view.findViewById(R.id.tvPowerHint);
-        SeekBar  seekBar      = view.findViewById(R.id.seekPower);
-        MaterialButton btnReset = view.findViewById(R.id.btnPowerReset);
+        TextView tvValue   = view.findViewById(R.id.tvPowerValue);
+        TextView tvRange   = view.findViewById(R.id.tvPowerRange);
+        TextView tvHint    = view.findViewById(R.id.tvPowerHint);
+        SeekBar  seekBar   = view.findViewById(R.id.seekPower);
+        View     btnReset  = view.findViewById(R.id.btnPowerReset);
 
         final int[] currentValue = { savedValue };
 
-        // ═══════════════════════════════════════════════════════
-        //  القيم الابتدائية
-        // ═══════════════════════════════════════════════════════
-        int min = MiraReaderSettings.MIN_POS_POWER_DBM;
-        int max = MiraReaderSettings.MAX_POS_POWER_DBM;
+        if (seekBar != null) {
+            seekBar.setMax(max - min);
+            seekBar.setProgress(savedValue - min);
 
-        seekBar.setMax(max - min);
-        seekBar.setProgress(savedValue - min);
+            seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                    int value = min + progress;
+                    currentValue[0] = value;
+                    updateLabels(tvValue, tvRange, tvHint, value, isArabic);
+                }
+                @Override public void onStartTrackingTouch(SeekBar sb) {}
+                @Override public void onStopTrackingTouch(SeekBar sb) {}
+            });
+        }
 
-        // ═══════════════════════════════════════════════════════
-        //  ربط الأحداث
-        // ═══════════════════════════════════════════════════════
         updateLabels(tvValue, tvRange, tvHint, savedValue, isArabic);
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
-                int value = min + progress;
-                currentValue[0] = value;
-                updateLabels(tvValue, tvRange, tvHint, value, isArabic);
-            }
-            @Override public void onStartTrackingTouch(SeekBar sb) {}
-            @Override public void onStopTrackingTouch(SeekBar sb) {}
-        });
+        if (btnReset != null) {
+            btnReset.setOnClickListener(v -> {
+                int def = Math.max(min, Math.min(max, MiraReaderSettings.DEF_POS_POWER_DBM));
+                if (seekBar != null) {
+                    seekBar.setProgress(def - min);
+                }
+                currentValue[0] = def;
+                updateLabels(tvValue, tvRange, tvHint, def, isArabic);
+            });
+        }
 
-        btnReset.setOnClickListener(v -> {
-            int def = MiraReaderSettings.DEF_POS_POWER_DBM;
-            seekBar.setProgress(def - min);
-            currentValue[0] = def;
-            updateLabels(tvValue, tvRange, tvHint, def, isArabic);
-        });
-
-        // ═══════════════════════════════════════════════════════
-        //  عرض AlertDialog
-        // ═══════════════════════════════════════════════════════
-        new MaterialAlertDialogBuilder(ctx)
-                .setTitle(isArabic
-                        ? "⚡ قوة قراءة POS"
-                        : "⚡ POS Reading Power")
+        AlertDialog dialog = new MaterialAlertDialogBuilder(themedCtx)
+                .setTitle(isArabic ? "⚡ إعدادات طاقة القارئ" : "⚡ Reader Power Settings")
                 .setView(view)
                 .setPositiveButton(isArabic ? "حفظ" : "Save", (d, w) -> {
                     int finalValue = currentValue[0];
                     settings.setPosPowerDbm(finalValue);
-                    Log.i(TAG, "✅ POS power changed → " + finalValue + " dBm");
+                    Log.i(TAG, "✅ Reader power changed → " + finalValue + " dBm");
                     onChanged.onPowerChanged(finalValue);
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                .setNeutralButton(isArabic ? "الافتراضي" : "Default",
-                        (d, w) -> {
-                            int def = MiraReaderSettings.DEF_POS_POWER_DBM;
-                            settings.setPosPowerDbm(def);
-                            onChanged.onPowerChanged(def);
-                        })
-                .show();
+                .setNeutralButton(isArabic ? "الافتراضي" : "Default", (d, w) -> {
+                    int def = Math.max(min, Math.min(max, MiraReaderSettings.DEF_POS_POWER_DBM));
+                    settings.setPosPowerDbm(def);
+                    onChanged.onPowerChanged(def);
+                })
+                .create();
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.getDecorView().setLayoutDirection(
+                    isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
+            );
+        }
+
+        dialog.show();
     }
 
-    /**
-     * ✅ تحديث النصوص المعروضة
-     */
     private static void updateLabels(TextView tvValue, TextView tvRange,
                                      TextView tvHint, int dbm, boolean isArabic) {
         try {
@@ -140,18 +131,18 @@ public final class PosPowerSettingsDialog {
                     hint = isArabic
                             ? "🛡️ آمن جداً — الشريحة على بُعد سنتيمترات فقط"
                             : "🛡️ Very safe — tag must be centimeters away";
-                } else if (dbm <= 10) {
+                } else if (dbm <= 12) {
                     hint = isArabic
                             ? "⚖️ توازن — مدى قصير وموثوق"
                             : "⚖️ Balanced — short range, reliable";
-                } else if (dbm <= 18) {
+                } else if (dbm <= 20) {
                     hint = isArabic
-                            ? "⚠️ قد يقرأ قطعاً مجاورة"
-                            : "⚠️ May read adjacent items";
+                            ? "⚠️ مدى متوسط — مناسب للأدراج والواجهات"
+                            : "⚠️ Medium range — suitable for trays and displays";
                 } else {
                     hint = isArabic
-                            ? "❌ خطر — قراءة قطع غير مرغوبة"
-                            : "❌ Risk — unwanted tag reads";
+                            ? "📡 مدى بعيد — مناسب للجرد الشامل السريع"
+                            : "📡 Long range — suitable for fast full inventory";
                 }
                 tvHint.setText(hint);
             }
