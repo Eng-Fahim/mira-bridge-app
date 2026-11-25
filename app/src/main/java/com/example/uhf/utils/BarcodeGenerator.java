@@ -25,51 +25,69 @@ public class BarcodeGenerator {
     private static final int COLOR_NAVY_DOT = 0xFF0F172A;
     private static final int COLOR_MIRA_GOLD = 0xFFD4AF37;
 
+    /**
+     * توليد GS1 DataMatrix متوافق قياسياً مع FNC1 وبمضاعف بكسل صحيح للطباعة المجهرية
+     */
     public static Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
-        if (gs1Data == null || gs1Data.trim().isEmpty()) return null;
+        if (gs1Data == null || gs1Data.trim().isEmpty() || width <= 0 || height <= 0) return null;
         try {
+            String cleanData = gs1Data.trim();
+            // إزالة FNC1 البادئة إن وجدت لأن تفعيل GS1_FORMAT يضيفها تلقائياً وفق المعيار
+            if (cleanData.startsWith("\u001D")) {
+                cleanData = cleanData.substring(1);
+            }
+
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
             hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_SQUARE);
-            hints.put(EncodeHintType.MARGIN, 0);
+            hints.put(EncodeHintType.GS1_FORMAT, Boolean.TRUE);
+            hints.put(EncodeHintType.MARGIN, 1);
 
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                    gs1Data,
+            // طلب المصفوفة بأقل أبعاد للحصول على عدد الخانات الفعلي ثم تكبيرها بمضاعف صحيح
+            BitMatrix rawMatrix = new MultiFormatWriter().encode(
+                    cleanData,
                     BarcodeFormat.DATA_MATRIX,
-                    width,
-                    height,
+                    1,
+                    1,
                     hints
             );
 
-            int w = bitMatrix.getWidth();
-            int h = bitMatrix.getHeight();
-            int[] pixels = new int[w * h];
-            for (int y = 0; y < h; y++) {
-                int offset = y * w;
-                for (int x = 0; x < w; x++) {
-                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
+            int mw = rawMatrix.getWidth();
+            int mh = rawMatrix.getHeight();
+            int targetSize = Math.min(width, height);
+            int scale = Math.max(1, targetSize / Math.max(mw, mh));
+
+            int exactW = mw * scale;
+            int exactH = mh * scale;
+            int offsetX = (width - exactW) / 2;
+            int offsetY = (height - exactH) / 2;
+
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            canvas.drawColor(Color.WHITE);
+
+            Paint paint = new Paint();
+            paint.setColor(Color.BLACK);
+            paint.setAntiAlias(false);
+
+            for (int y = 0; y < mh; y++) {
+                for (int x = 0; x < mw; x++) {
+                    if (rawMatrix.get(x, y)) {
+                        float left = offsetX + (x * scale);
+                        float top = offsetY + (y * scale);
+                        canvas.drawRect(left, top, left + scale, top + scale, paint);
+                    }
                 }
             }
-            Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            bitmap.setPixels(pixels, 0, w, 0, 0, w, h);
             return bitmap;
         } catch (Exception e) {
             return null;
         }
     }
 
-    /**
-     * الوضع الافتراضي للعرض الرقمي في التطبيق (تصميم حديث كامل مع الشارة الذهبية وشعار MIRA)
-     */
     public static Bitmap generateMicroQRCode(String qrContent, int width, int height) {
         return generateMicroQRCode(qrContent, width, height, false);
     }
 
-    /**
-     * @param monochromePrint عند تمرير true (للطباعة الحرارية المجهرية):
-     *                        - يعتمد تصحيح أخطاء M لتكبير حجم النقاط لأقصى حد
-     *                        - يرسم بحواف حادة 1-bit بدون Anti-Aliasing لمنع تلاصق الحبر
-     *                        - يستبعد الشعار الأوسط لضمان قراءة فورية بكاميرا الهاتف
-     */
     public static Bitmap generateMicroQRCode(
             String qrContent,
             int width,
@@ -84,7 +102,6 @@ public class BarcodeGenerator {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
             hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
 
-            // في الطباعة المجهرية نستخدم M لتقليل عدد الخانات وتكبير النقطة الواحدة
             ErrorCorrectionLevel ecLevel = monochromePrint
                     ? ErrorCorrectionLevel.M
                     : ErrorCorrectionLevel.H;
@@ -94,13 +111,11 @@ public class BarcodeGenerator {
             if (matrix == null) return null;
 
             int matrixSize = matrix.getWidth();
-            int quietZone = 1;
-            int totalModules = matrixSize + (quietZone * 2);
 
             if (monochromePrint) {
-                return renderMicroscopicPrintQr(matrix, matrixSize, quietZone, totalModules, width, height);
+                return renderPixelExactPrintQr(matrix, matrixSize, width, height);
             } else {
-                return renderLuxuryScreenQr(matrix, matrixSize, quietZone, totalModules, width, height);
+                return renderLuxuryScreenQr(matrix, matrixSize, 1, matrixSize + 2, width, height);
             }
         } catch (Exception e) {
             return null;
@@ -108,34 +123,38 @@ public class BarcodeGenerator {
     }
 
     /**
-     * محرك الطباعة المجهرية (203 DPI): نقاط عريضة حادة + زوايا حديثة بدون ضبابية
+     * رسم QR بمضاعف بكسل صحيح 1:1 بدون أي تحجيم كسري لضمان حدة 100% على الطابعة الحرارية
      */
-    private static Bitmap renderMicroscopicPrintQr(
+    private static Bitmap renderPixelExactPrintQr(
             ByteMatrix matrix,
             int matrixSize,
-            int quietZone,
-            int totalModules,
             int targetWidth,
             int targetHeight
     ) {
         int targetSize = Math.min(targetWidth, targetHeight);
-        // مضاعف صحيح لكل خانة لضمان تطابق البكسلات مع رأس الطابعة الحرارية 1:1
-        int modulePx = Math.max(3, (int) Math.ceil((double) targetSize / (double) totalModules));
-        int exactCanvasSize = modulePx * totalModules;
+        // ترك هامش أمان 2 خانة على الأقل من كل جانب لسرعة التقاط الكاميرا
+        int minQuietModules = 2;
+        int totalModules = matrixSize + (minQuietModules * 2);
 
-        Bitmap crispBitmap = Bitmap.createBitmap(exactCanvasSize, exactCanvasSize, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(crispBitmap);
+        // حساب أكبر مضاعف صحيح للبكسل الواحد (مثلاً 3px لكل نقطة بدون أي كسور)
+        int modulePx = Math.max(2, targetSize / totalModules);
+        int exactQrPx = modulePx * matrixSize;
+
+        int offsetX = (targetWidth - exactQrPx) / 2;
+        int offsetY = (targetHeight - exactQrPx) / 2;
+
+        Bitmap bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
         canvas.drawColor(Color.WHITE);
 
-        // إيقاف Anti-Aliasing تماماً لمنع البكسلات الرمادية عند الطباعة الحرارية
         Paint dotPaint = new Paint();
         dotPaint.setColor(Color.BLACK);
         dotPaint.setStyle(Paint.Style.FILL);
         dotPaint.setAntiAlias(false);
 
-        // نقطة دائرية/منحنية عريضة تغطي 90% من الخانة لضمان وضوحها للكاميرا
-        float inset = modulePx * 0.06f;
-        float dotCorner = modulePx * 0.42f;
+        // نقطة مستديرة الزوايا عريضة (94% من الخانة) تمنع تلاصق الحبر وتعطي مظهراً حديثاً
+        float inset = modulePx * 0.03f;
+        float corner = modulePx * 0.38f;
         RectF cellRect = new RectF();
 
         for (int y = 0; y < matrixSize; y++) {
@@ -143,36 +162,23 @@ public class BarcodeGenerator {
                 if (matrix.get(x, y) != 1) continue;
                 if (isFinderPatternCell(x, y, matrixSize)) continue;
 
-                float left = (x + quietZone) * modulePx + inset;
-                float top = (y + quietZone) * modulePx + inset;
-                float right = (x + quietZone + 1) * modulePx - inset;
-                float bottom = (y + quietZone + 1) * modulePx - inset;
+                float left = offsetX + (x * modulePx) + inset;
+                float top = offsetY + (y * modulePx) + inset;
+                float right = offsetX + ((x + 1) * modulePx) - inset;
+                float bottom = offsetY + ((y + 1) * modulePx) - inset;
 
                 cellRect.set(left, top, right, bottom);
-                canvas.drawRoundRect(cellRect, dotCorner, dotCorner, dotPaint);
+                canvas.drawRoundRect(cellRect, corner, corner, dotPaint);
             }
         }
 
-        // رسم زوايا التحديد الثلاث بتصميم حديث وحواف حادة
-        drawModernFinderEye(canvas, quietZone, quietZone, modulePx, Color.BLACK, false);
-        drawModernFinderEye(canvas, quietZone + matrixSize - 7, quietZone, modulePx, Color.BLACK, false);
-        drawModernFinderEye(canvas, quietZone, quietZone + matrixSize - 7, modulePx, Color.BLACK, false);
+        drawModernFinderEyePx(canvas, offsetX, offsetY, modulePx, Color.BLACK, false);
+        drawModernFinderEyePx(canvas, offsetX + (matrixSize - 7) * modulePx, offsetY, modulePx, Color.BLACK, false);
+        drawModernFinderEyePx(canvas, offsetX, offsetY + (matrixSize - 7) * modulePx, modulePx, Color.BLACK, false);
 
-        if (exactCanvasSize == targetWidth && exactCanvasSize == targetHeight) {
-            return crispBitmap;
-        }
-
-        // filter = false للحفاظ على حدة البكسل 100% دون تنعيم
-        Bitmap finalBitmap = Bitmap.createScaledBitmap(crispBitmap, targetWidth, targetHeight, false);
-        if (crispBitmap != finalBitmap) {
-            crispBitmap.recycle();
-        }
-        return finalBitmap;
+        return bitmap;
     }
 
-    /**
-     * محرك العرض الرقمي الفاخر للشاشات (نقاط دائرية + إطار ذهبي وشعار MIRA)
-     */
     private static Bitmap renderLuxuryScreenQr(
             ByteMatrix matrix,
             int matrixSize,
@@ -214,9 +220,10 @@ public class BarcodeGenerator {
             }
         }
 
-        drawModernFinderEye(canvas, quietZone, quietZone, cellSize, COLOR_NAVY_DOT, true);
-        drawModernFinderEye(canvas, quietZone + matrixSize - 7, quietZone, cellSize, COLOR_NAVY_DOT, true);
-        drawModernFinderEye(canvas, quietZone, quietZone + matrixSize - 7, cellSize, COLOR_NAVY_DOT, true);
+        float qOffset = quietZone * cellSize;
+        drawModernFinderEyePx(canvas, qOffset, qOffset, cellSize, COLOR_NAVY_DOT, true);
+        drawModernFinderEyePx(canvas, qOffset + (matrixSize - 7) * cellSize, qOffset, cellSize, COLOR_NAVY_DOT, true);
+        drawModernFinderEyePx(canvas, qOffset, qOffset + (matrixSize - 7) * cellSize, cellSize, COLOR_NAVY_DOT, true);
 
         drawCenterBrandBadge(
                 canvas,
@@ -246,16 +253,14 @@ public class BarcodeGenerator {
         return inTopLeft || inTopRight || inBottomLeft;
     }
 
-    private static void drawModernFinderEye(
+    private static void drawModernFinderEyePx(
             Canvas canvas,
-            int startModuleX,
-            int startModuleY,
+            float left,
+            float top,
             float cellSize,
             int color,
             boolean antiAlias
     ) {
-        float left = startModuleX * cellSize;
-        float top = startModuleY * cellSize;
         float eyeSize = 7f * cellSize;
         float halfStroke = cellSize * 0.5f;
 
