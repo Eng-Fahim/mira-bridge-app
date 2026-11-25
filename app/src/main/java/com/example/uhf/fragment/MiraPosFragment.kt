@@ -244,6 +244,7 @@ class MiraPosFragment : MiraBaseFragment() {
     // خريطة حدود التفاوض السعري لكل قطعة في السلة
         // خريطة حدود التفاوض السعري لكل قطعة في السلة
     private var itemBoundsState by mutableStateOf>(emptyMap())
+
     private val negotiatedItemKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var negotiatingItemState by mutableStateOf<NegotiateItemTarget?>(null)
 
@@ -591,62 +592,63 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
         private fun resolveItemPriceBoundsFromJson(
-        itemJson: JSONObject,
-        karatNum: Int,
-        weightGrams: Double
-    ): ItemPriceBoundInfo {
-        val boundsObj = itemJson.optJSONObject("price_bounds")
-        val enforced = when {
-            boundsObj != null && boundsObj.has("enforced") -> boundsObj.optBoolean("enforced", true)
-            itemJson.has("enforce_price_bounds") -> itemJson.optBoolean("enforce_price_bounds", true)
-            else -> true
-        }
-
-        val rawSource1 = boundsObj?.optString("source", "") ?: ""
-        val rawSource2 = itemJson.optString("price_bounds_source", "")
-        val source = when {
-            rawSource1.isNotBlank() && rawSource1 != "null" -> rawSource1
-            rawSource2.isNotBlank() && rawSource2 != "null" -> rawSource2
-            else -> "karat"
-        }
-
-        var minUsd = when {
-            boundsObj != null && boundsObj.optDouble("min_price_usd", 0.0) > 0.0 ->
-                boundsObj.optDouble("min_price_usd", 0.0)
-            itemJson.optDouble("min_price_usd", 0.0) > 0.0 ->
-                itemJson.optDouble("min_price_usd", 0.0)
-            else -> 0.0
-        }
-
-        val rawMax = when {
-            boundsObj != null && !boundsObj.isNull("max_price_usd") ->
-                boundsObj.optDouble("max_price_usd", 0.0)
-            !itemJson.isNull("max_price_usd") ->
-                itemJson.optDouble("max_price_usd", 0.0)
-            else -> 0.0
-        }
-        val maxUsd = if (rawMax > 0.0) rawMax else null
-
-        var goldFloor = boundsObj?.optDouble("gold_floor_usd", 0.0) ?: 0.0
-        if (goldFloor <= 0.0 && weightGrams > 0.0) {
-            val gramPriceUsd = itemJson.optDouble("gram_price_usd", 0.0)
-            if (gramPriceUsd > 0.0) {
-                goldFloor = gramPriceUsd * weightGrams
-            }
-        }
-
-        if (minUsd <= 0.0 && goldFloor > 0.0) {
-            minUsd = goldFloor
-        }
-
-        return ItemPriceBoundInfo(
-            minPriceUsd = minUsd,
-            maxPriceUsd = maxUsd,
-            goldFloorUsd = goldFloor,
-            enforceBounds = enforced,
-            source = source
-        )
+    itemJson: JSONObject,
+    karatNum: Int,
+    weightGrams: Double
+): ItemPriceBoundInfo {
+    val boundsObj = itemJson.optJSONObject("price_bounds")
+    val enforced = when {
+        boundsObj != null && boundsObj.has("enforced") -> boundsObj.optBoolean("enforced", true)
+        itemJson.has("enforce_price_bounds") -> itemJson.optBoolean("enforce_price_bounds", true)
+        else -> true
     }
+
+    val rawSource1 = boundsObj?.optString("source", "") ?: ""
+    val rawSource2 = itemJson.optString("price_bounds_source", "")
+    val source = when {
+        rawSource1.isNotBlank() && rawSource1 != "null" -> rawSource1
+        rawSource2.isNotBlank() && rawSource2 != "null" -> rawSource2
+        else -> "karat"
+    }
+
+    var minUsd = when {
+        boundsObj != null && boundsObj.optDouble("min_price_usd", 0.0) > 0.0 ->
+            boundsObj.optDouble("min_price_usd", 0.0)
+        itemJson.optDouble("min_price_usd", 0.0) > 0.0 ->
+            itemJson.optDouble("min_price_usd", 0.0)
+        else -> 0.0
+    }
+
+    val rawMax = when {
+        boundsObj != null && !boundsObj.isNull("max_price_usd") ->
+            boundsObj.optDouble("max_price_usd", 0.0)
+        !itemJson.isNull("max_price_usd") ->
+            itemJson.optDouble("max_price_usd", 0.0)
+        else -> 0.0
+    }
+    val maxUsd = if (rawMax > 0.0) rawMax else null
+
+    var goldFloor = boundsObj?.optDouble("gold_floor_usd", 0.0) ?: 0.0
+    if (goldFloor <= 0.0 && weightGrams > 0.0) {
+        val gramPriceUsd = itemJson.optDouble("gram_price_usd", 0.0)
+        if (gramPriceUsd > 0.0) {
+            goldFloor = gramPriceUsd * weightGrams
+        }
+    }
+
+    if (minUsd <= 0.0 && goldFloor > 0.0) {
+        minUsd = goldFloor
+    }
+
+    return ItemPriceBoundInfo(
+        minPriceUsd = minUsd,
+        maxPriceUsd = maxUsd,
+        goldFloorUsd = goldFloor,
+        enforceBounds = enforced,
+        source = source
+    )
+}
+
 
     private fun updateCartItemNegotiatedPrice(index: Int, newPriceUsd: Double) {
         val manager = cartManager ?: return
