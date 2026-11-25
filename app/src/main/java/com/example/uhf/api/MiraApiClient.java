@@ -1443,7 +1443,7 @@ public class MiraApiClient {
     /**
      * جلب ملخص الداشبورد وبيانات الخزينة/المخزون من المسارات الفعلية للسيرفر
      */
-    public ApiResponse getDashboardSummarySmart(int branchId) {
+        public ApiResponse getDashboardSummarySmart(int branchId) {
         try {
             JSONObject combined = new JSONObject();
 
@@ -1453,7 +1453,7 @@ public class MiraApiClient {
                 mergeJsonInto(combined, appResp.data);
             }
 
-            // 2) المسار التكميلي (/dashboard/summary) إذا نقصت بيانات المبيعات أو الخزينة
+            // 2) المسار التكميلي (/dashboard/summary)
             if (!combined.has("vault") && !combined.has("inventory") && !combined.has("today_sales")) {
                 String sumEp = branchId > 0 ? ("/dashboard/summary?branch_id=" + branchId) : "/dashboard/summary";
                 ApiResponse sumResp = getWithAuth(sumEp);
@@ -1462,7 +1462,7 @@ public class MiraApiClient {
                 }
             }
 
-            // 3) إحصائيات مخزون الفرع (/branches/{branchId}/inventory/stats)
+            // 3) إحصائيات مخزون الفرع مباشرة من السيرفر (/branches/{branchId}/inventory/stats)
             JSONObject existingVault = combined.optJSONObject("vault");
             int pieces = existingVault != null
                     ? existingVault.optInt("total_pieces", existingVault.optInt("in_stock_count", 0))
@@ -1483,57 +1483,12 @@ public class MiraApiClient {
                     double stPure = statsObj.optDouble("pure_24k_weight",
                             statsObj.optDouble("equivalent_24k", statsObj.optDouble("pure_weight", 0.0)));
 
-                    if (stPieces > 0 || stWeight > 0.0) {
+                    if (stPieces > 0 || stWeight > 0.0 || stPure > 0.0) {
                         JSONObject vault = new JSONObject();
                         vault.put("total_pieces", stPieces);
                         vault.put("total_weight", stWeight);
                         vault.put("pure_24k_weight", stPure);
                         combined.put("vault", vault);
-                        pieces = stPieces;
-                    }
-                }
-            }
-
-            // 4) احتياط أخير: حساب القطع والأوزان من قائمة أصناف الفرع مباشرة
-            if (pieces <= 0 && branchId > 0) {
-                ApiResponse itemsResp = getBranchItemsList(branchId);
-                if (itemsResp != null && itemsResp.isSuccess && itemsResp.data != null) {
-                    JSONArray itemsArr = extractArrayFromPayload(itemsResp.data, "items");
-                    if (itemsArr != null && itemsArr.length() > 0) {
-                        int count = 0;
-                        double totalWeight = 0.0;
-                        double pure24k = 0.0;
-
-                        for (int i = 0; i < itemsArr.length(); i++) {
-                            JSONObject it = itemsArr.optJSONObject(i);
-                            if (it == null) continue;
-                            String st = it.optString("status", "in_stock").toLowerCase(Locale.ROOT);
-                            if (st.equals("sold") || st.equals("returned") || st.equals("deleted")) continue;
-
-                            count++;
-                            double w = it.optDouble("gross_weight_grams",
-                                    it.optDouble("gross_weight", it.optDouble("weight", 0.0)));
-                            totalWeight += w;
-
-                            String kStr = it.optString("karat",
-                                    it.optString("purity_code", it.optString("gold_karat", "21")))
-                                    .replaceAll("[^0-9.]", "");
-                            double karatVal = 21.0;
-                            try {
-                                if (!kStr.isEmpty()) karatVal = Double.parseDouble(kStr);
-                            } catch (Exception ignored) {}
-                            if (karatVal > 0 && w > 0) {
-                                pure24k += w * (karatVal / 24.0);
-                            }
-                        }
-
-                        if (count > 0) {
-                            JSONObject vault = new JSONObject();
-                            vault.put("total_pieces", count);
-                            vault.put("total_weight", totalWeight);
-                            vault.put("pure_24k_weight", pure24k);
-                            combined.put("vault", vault);
-                        }
                     }
                 }
             }
@@ -1544,6 +1499,139 @@ public class MiraApiClient {
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
+
+    /**
+     * جلب أسعار الذهب وسعر الصرف مباشرة من السيرفر بدون أي اشتقاقات محلية
+     */
+    public ApiResponse getGoldPricesSmart(int branchId) {
+        try {
+            String branchQuery = branchId > 0 ? ("?branch_id=" + branchId) : "";
+            ApiResponse[] attempts = new ApiResponse[]{
+                    getWithAuth("/gold-currency/settings" + (branchId > 0 ? ("?branch_id=" + branchId) : "")),
+                    getWithAuth("/dashboard/gold-prices" + branchQuery),
+                    getWithAuth("/gold-rates" + branchQuery),
+                    getWithAuth("/gold-currency/live-prices" + branchQuery),
+                    getWithAuth("/gold/price" + branchQuery)
+            };
+
+            for (ApiResponse r : attempts) {
+                if (r != null && r.isSuccess && r.data != null) {
+                    JSONObject parsed = normalizeGoldPricesPayload(r.data);
+                    if (parsed != null && (parsed.optDouble("karat_24", 0.0) > 0.0
+                            || parsed.optDouble("karat_22", 0.0) > 0.0
+                            || parsed.optDouble("karat_21", 0.0) > 0.0
+                            || parsed.optDouble("karat_18", 0.0) > 0.0
+                            || parsed.optDouble("karat_14", 0.0) > 0.0
+                            || parsed.optDouble("karat_24_usd", 0.0) > 0.0)) {
+                        return new ApiResponse(200, parsed, null);
+                    }
+                }
+            }
+            return new ApiResponse(404, null, "Gold prices not available");
+        } catch (Exception e) {
+            Log.e(TAG, "getGoldPricesSmart error: " + e.getMessage());
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        }
+    }
+
+    private JSONObject normalizeGoldPricesPayload(JSONObject root) {
+        try {
+            JSONObject data = root.optJSONObject("data") != null ? root.optJSONObject("data") : root;
+            JSONObject goldObj = data.optJSONObject("gold");
+            JSONObject currObj = data.optJSONObject("currency");
+
+            JSONObject prices = data.optJSONObject("gold_prices") != null
+                    ? data.optJSONObject("gold_prices")
+                    : (data.optJSONObject("prices") != null
+                        ? data.optJSONObject("prices")
+                        : (data.optJSONObject("rates") != null
+                            ? data.optJSONObject("rates")
+                            : (goldObj != null ? goldObj : data)));
+
+            boolean useMarket = (currObj != null && currObj.optBoolean("use_market_rate", false))
+                    || data.optBoolean("use_market_rate", false);
+
+            String currency = "";
+            if (currObj != null) {
+                currency = currObj.optString("global_default_currency", currObj.optString("currency", ""));
+            }
+            if (currency.isEmpty()) {
+                currency = prices.optString("currency",
+                        data.optString("currency", data.optString("local_currency", "")));
+            }
+            currency = currency.trim().toUpperCase(Locale.US);
+
+            double rate = firstPositiveDouble(prices, data,
+                    "exchange_rate", "usd_rate", "dollar_rate", "rate", "selling_rate");
+            if (rate <= 0.0 && currObj != null && !currency.isEmpty() && !"USD".equals(currency)) {
+                String k1 = (useMarket ? "exchange_market_" : "exchange_official_") + currency;
+                String k2 = (useMarket ? "exchange_official_" : "exchange_market_") + currency;
+                rate = firstPositiveDouble(currObj, data, k1, k2);
+            }
+
+            double p24 = firstPositiveDouble(prices, data,
+                    "karat_24", "price_24k", "gold_price_24k", "24k", "gold_24", "sell_24", "price_24", "k24");
+            double p22 = firstPositiveDouble(prices, data,
+                    "karat_22", "price_22k", "gold_price_22k", "22k", "gold_22", "sell_22", "price_22", "k22");
+            double p21 = firstPositiveDouble(prices, data,
+                    "karat_21", "price_21k", "gold_price_21k", "21k", "gold_21", "sell_21", "price_21", "k21");
+            double p18 = firstPositiveDouble(prices, data,
+                    "karat_18", "price_18k", "gold_price_18k", "18k", "gold_18", "sell_18", "price_18", "k18");
+            double p14 = firstPositiveDouble(prices, data,
+                    "karat_14", "price_14k", "gold_price_14k", "14k", "gold_14", "sell_14", "price_14", "k14");
+
+            double p24Usd = firstPositiveDouble(prices, data,
+                    "karat_24_usd", "price_24k_usd", "24k_usd", "usd_24k", "gold_24_usd", "gram_24k_usd");
+
+            JSONArray arr = prices.optJSONArray("rates");
+            if (arr == null) arr = prices.optJSONArray("gold_prices");
+            if (arr == null) arr = data.optJSONArray("gold_rates");
+            if (arr == null) arr = data.optJSONArray("data");
+            if (arr != null) {
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject row = arr.optJSONObject(i);
+                    if (row == null) continue;
+                    int k = row.optInt("karat", row.optInt("purity", 0));
+                    double val = firstPositiveDouble(row, row,
+                            "sell_price", "price", "price_local", "amount", "rate");
+                    double valUsd = firstPositiveDouble(row, row,
+                            "sell_price_usd", "price_usd", "usd_price");
+                    if (k == 24) {
+                        if (val > 0) p24 = val;
+                        if (valUsd > 0) p24Usd = valUsd;
+                    } else if (k == 22 && val > 0) {
+                        p22 = val;
+                    } else if (k == 21 && val > 0) {
+                        p21 = val;
+                    } else if (k == 18 && val > 0) {
+                        p18 = val;
+                    } else if (k == 14 && val > 0) {
+                        p14 = val;
+                    }
+                }
+            }
+
+            String pricingVersion = root.optString("pricing_version",
+                    data.optString("pricing_version", ""));
+
+            JSONObject out = new JSONObject();
+            out.put("karat_24", p24);
+            out.put("karat_22", p22);
+            out.put("karat_21", p21);
+            out.put("karat_18", p18);
+            out.put("karat_14", p14);
+            out.put("karat_24_usd", p24Usd);
+            out.put("exchange_rate", rate);
+            out.put("currency", currency);
+            if (!pricingVersion.isEmpty()) {
+                out.put("pricing_version", pricingVersion);
+            }
+            return out;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 
     /**
      * جلب أسعار الذهب اليوم (24K / 21K / 18K) وسعر الصرف من المسارات المعتمدة
@@ -3402,9 +3490,9 @@ public class MiraApiClient {
     /**
  * جلب تنبيهات الفرع (المعلّقة والمحلولة)
  */
-    public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
-        String endpoint = "alerts?branch_id=" + branchId + "&include_resolved=" + (includeResolved ? 1 : 0);
-        return executeAlertsHttp("GET", endpoint, null);
+        public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
+        String endpoint = "/alerts?branch_id=" + branchId + "&include_resolved=" + (includeResolved ? 1 : 0);
+        return getWithAuth(endpoint);
     }
 
     public ApiResponse resolveAlert(int branchId, String alertId, String note, boolean resolveAll) {
@@ -3414,11 +3502,12 @@ public class MiraApiClient {
             payload.put("alert_id", alertId != null ? alertId : "");
             payload.put("resolution_note", note != null ? note : "");
             payload.put("resolve_all", resolveAll);
-            return executeAlertsHttp("POST", "alerts/resolve", payload);
+            return postWithAuth("/alerts/resolve", payload);
         } catch (Exception e) {
-            return new ApiResponse(0, null, e.getMessage() != null ? e.getMessage() : "Payload error");
+            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
+
 
     private ApiResponse executeAlertsHttp(String method, String endpoint, JSONObject body) {
         java.net.HttpURLConnection conn = null;
