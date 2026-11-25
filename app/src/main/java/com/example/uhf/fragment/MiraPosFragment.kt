@@ -243,7 +243,9 @@ class MiraPosFragment : MiraBaseFragment() {
 
     // خريطة حدود التفاوض السعري لكل قطعة في السلة
         // خريطة حدود التفاوض السعري لكل قطعة في السلة
-    private var itemBoundsState by mutableStateOf>(emptyMap())
+        
+    private var itemBoundsState by mutableStateOf<Map<String, ItemPriceBoundInfo>>(emptyMap())
+
 
     private val negotiatedItemKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var negotiatingItemState by mutableStateOf<NegotiateItemTarget?>(null)
