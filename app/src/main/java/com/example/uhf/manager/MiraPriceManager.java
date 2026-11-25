@@ -1,11 +1,13 @@
 package com.example.uhf.manager;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.example.uhf.api.MiraApiClient;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.DecimalFormat;
@@ -15,29 +17,28 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * MiraPriceManager v2.1 — الحصين ضد Thread-Leak + إصلاح formatPrice
+ * MiraPriceManager v3.0 — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
  *
- * ✅ الإصلاحات:
- *  1. hasLoadedFromServer flag — يمنع تحميل مكرر
- *  2. loadFromServer مع Daemon Thread
- *  3. logging للأداء
- *  4. Null-safety في كل مكان
- *  5. ✅ [v2.1] formatPrice لا تُعيد "—" — تُعيد "0 YER" للقيم <= 0
+ * ✅ لا قرارات أو هوامش أو أسعار صرف افتراضية محلية
+ * ✅ مزامنة مستمرة ولحظية مع السيرفر دون حجب بقفل التحميل لمرة واحدة
+ * ✅ إشعار فوري عبر MIRA_PRICES_UPDATED عند أي تحديث
+ * ✅ لا يُعيد "—" في التنسيق — يُعيد 0 مع رمز العملة
  */
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
     private static final String PREFS_NAME = "MIRA_GOLD_SETTINGS";
+    private static final String ACTION_PRICES_UPDATED = "MIRA_PRICES_UPDATED";
+    private static final long MIN_SYNC_INTERVAL_MS = 10_000L; // 10 ثوانٍ كحد أدنى بين المزامنات التلقائية
 
     private static volatile MiraPriceManager instance;
     private static Context appContext;
 
-    private static volatile boolean hasLoadedFromServer = false;
     private static volatile boolean isLoading = false;
+    private static volatile long lastSyncTimeMs = 0L;
 
     private final SharedPreferences prefs;
 
-    // ✅ Formatters — تُهيَّأ مرة واحدة مع Locale.US
     private final DecimalFormat decimalFormat;
     private final DecimalFormat largeFormat;
 
@@ -54,52 +55,56 @@ public class MiraPriceManager {
     public static final int KARAT_14 = 14;
     public static final int KARAT_12 = 12;
 
-    // ==================== Singleton ====================
-
     private MiraPriceManager(Context context) {
         appContext = context.getApplicationContext();
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        // ✅ تهيئة الـ Formatters مع Locale.US — إجبار الأرقام اللاتينية
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
         decimalFormat = new DecimalFormat("#,##0.00", symbols);
         largeFormat = new DecimalFormat("#,##0", symbols);
 
-        // ✅ حمّل من السيرفر مرة واحدة فقط
-        if (!hasLoadedFromServer && !isLoading) {
-            hasLoadedFromServer = true;
-            loadFromServer();
-        }
+        loadFromServer(true);
     }
 
     public static synchronized MiraPriceManager getInstance(Context context) {
         if (instance == null) {
             instance = new MiraPriceManager(context);
+        } else {
+            instance.ensureFreshRates();
         }
         return instance;
     }
 
     /**
-     * ✅ إعادة تحميل يدوية (من Settings مثلاً)
+     * مزامنة لحظية فورية من السيرفر (تُستخدم عند فتح الشاشات أو المسح أو بعد التعديل)
      */
     public void refreshNow() {
-        if (isLoading) {
-            Log.d(TAG, "refreshNow: already loading, skip");
-            return;
-        }
-        loadFromServer();
+        loadFromServer(true);
     }
 
     /**
-     * ✅ [إصلاح v2.0] آمن — لا يُكرَّر
+     * يضمن تحديث البيانات من السيرفر إذا مرّ وقت كافٍ منذ آخر مزامنة
      */
-    private void loadFromServer() {
+    public void ensureFreshRates() {
+        long now = System.currentTimeMillis();
+        if (!isLoading && (now - lastSyncTimeMs >= MIN_SYNC_INTERVAL_MS)) {
+            loadFromServer(false);
+        }
+    }
+
+    private void loadFromServer(boolean force) {
         if (isLoading) {
             Log.d(TAG, "loadFromServer: already in progress");
             return;
         }
 
+        long now = System.currentTimeMillis();
+        if (!force && (now - lastSyncTimeMs < MIN_SYNC_INTERVAL_MS)) {
+            return;
+        }
+
         isLoading = true;
+        lastSyncTimeMs = now;
 
         Thread loaderThread = new Thread(() -> {
             long startTime = System.currentTimeMillis();
@@ -113,8 +118,11 @@ public class MiraPriceManager {
                         + (response != null && response.isSuccess));
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject data = response.data.optJSONObject("data");
-                    if (data == null) data = response.data;
+                    JSONObject root = response.data;
+                    JSONObject data = root.optJSONObject("data");
+                    if (data == null) {
+                        data = root;
+                    }
 
                     JSONObject goldData = data.optJSONObject("gold");
                     JSONObject currencyData = data.optJSONObject("currency");
@@ -122,22 +130,24 @@ public class MiraPriceManager {
                     SharedPreferences.Editor editor = prefs.edit();
 
                     if (goldData != null) {
+                        editor.putString("gold_settings", goldData.toString());
                         String[] goldKeys = {
                                 "gold_price_24k", "gold_price_22k", "gold_price_21k",
-                                "gold_price_18k", "gold_price_14k",
+                                "gold_price_18k", "gold_price_14k", "gold_price_12k",
                                 "margin_24k", "margin_22k", "margin_21k",
                                 "margin_18k", "margin_14k", "margin_12k",
                                 "making_24k", "making_22k", "making_21k",
                                 "making_18k", "making_14k", "making_12k"
                         };
                         for (String key : goldKeys) {
-                            if (goldData.has(key)) {
+                            if (goldData.has(key) && !goldData.isNull(key)) {
                                 editor.putString(key, goldData.optString(key, "0"));
                             }
                         }
                     }
 
                     if (currencyData != null) {
+                        editor.putString("currency_settings", currencyData.toString());
                         String[] currencyKeys = {
                                 "global_default_currency", "chart_currency",
                                 "exchange_official_YER", "exchange_official_EGP",
@@ -147,7 +157,7 @@ public class MiraPriceManager {
                                 "use_market_rate"
                         };
                         for (String key : currencyKeys) {
-                            if (currencyData.has(key)) {
+                            if (currencyData.has(key) && !currencyData.isNull(key)) {
                                 editor.putString(key, currencyData.optString(key, ""));
                             }
                         }
@@ -158,10 +168,34 @@ public class MiraPriceManager {
                         }
                     }
 
+                    // دعم مصفوفة exchange_rates إن عادت من السيرفر
+                    JSONArray ratesArr = data.optJSONArray("exchange_rates");
+                    if (ratesArr == null) {
+                        ratesArr = root.optJSONArray("exchange_rates");
+                    }
+                    if (ratesArr != null) {
+                        for (int i = 0; i < ratesArr.length(); i++) {
+                            JSONObject rObj = ratesArr.optJSONObject(i);
+                            if (rObj == null) continue;
+                            String from = rObj.optString("from_currency", "").trim().toUpperCase(Locale.US);
+                            String to = rObj.optString("to_currency", "").trim().toUpperCase(Locale.US);
+                            double rate = rObj.optDouble("rate", 0);
+                            if (CURRENCY_USD.equals(from) && !to.isEmpty() && rate > 0) {
+                                editor.putString("exchange_official_" + to, String.valueOf(rate));
+                                editor.putString("exchange_market_" + to, String.valueOf(rate));
+                            }
+                        }
+                    }
+
+                    String version = data.optString("pricing_version", root.optString("pricing_version", ""));
+                    if (!version.isEmpty()) {
+                        editor.putString("pricing_version", version);
+                    }
+
                     editor.apply();
                     notifyPriceUpdated();
 
-                    Log.d(TAG, "✅ loadFromServer: prices updated");
+                    Log.d(TAG, "✅ loadFromServer: synced from server (source of truth)");
                 } else {
                     Log.w(TAG, "⚠️ loadFromServer: no valid response");
                 }
@@ -178,9 +212,10 @@ public class MiraPriceManager {
     }
 
     private void notifyPriceUpdated() {
+        if (appContext == null) return;
         try {
-            android.content.Intent intent =
-                    new android.content.Intent("MIRA_PRICES_UPDATED");
+            Intent intent = new Intent(ACTION_PRICES_UPDATED);
+            intent.setPackage(appContext.getPackageName());
             appContext.sendBroadcast(intent);
         } catch (Exception e) {
             Log.e(TAG, "notifyPriceUpdated error: " + e.getMessage());
@@ -188,27 +223,30 @@ public class MiraPriceManager {
     }
 
     // ============================================
-    // 💰 دوال أسعار الذهب
+    // 💰 دوال أسعار الذهب (مباشرة من بيانات السيرفر)
     // ============================================
 
     public double getGoldPricePerGram(int karat) {
+        ensureFreshRates();
         String key = "gold_price_" + karat + "k";
-        return getDoubleFromPrefs(key, 0);
+        return getDoubleFromPrefs(key, 0.0);
     }
 
     public double getMargin(int karat) {
+        ensureFreshRates();
         String key = "margin_" + karat + "k";
-        return getDoubleFromPrefs(key, getDefaultMargin(karat));
+        return getDoubleFromPrefs(key, 0.0);
     }
 
     public double getMakingCharge(int karat) {
+        ensureFreshRates();
         String key = "making_" + karat + "k";
-        return getDoubleFromPrefs(key, getDefaultMaking(karat));
+        return getDoubleFromPrefs(key, 0.0);
     }
 
     public double getFinalPricePerGram(int karat) {
         double basePrice = getGoldPricePerGram(karat);
-        if (basePrice <= 0) return 0;
+        if (basePrice <= 0) return 0.0;
 
         double margin = getMargin(karat);
         double making = getMakingCharge(karat);
@@ -223,8 +261,8 @@ public class MiraPriceManager {
         double makingCharge = getMakingCharge(karat);
         double margin = getMargin(karat);
 
-        if (basePrice <= 0) {
-            return new PricingDetails(0, 0, 0, 0, 0);
+        if (basePrice <= 0 || weightGrams <= 0) {
+            return new PricingDetails(0, 0, 0, 0, basePrice);
         }
 
         double baseGoldCost = weightGrams * basePrice;
@@ -260,8 +298,7 @@ public class MiraPriceManager {
     }
 
     public double calculateGoldPrice(int karat, double weightGrams) {
-        PricingDetails details = calculatePricingDetails(karat, weightGrams);
-        return details.finalPrice;
+        return calculatePricingDetails(karat, weightGrams).finalPrice;
     }
 
     public double getProfitMargin(int karat) {
@@ -269,28 +306,25 @@ public class MiraPriceManager {
     }
 
     public double getProfitAmount(int karat, double weightGrams) {
-        PricingDetails details = calculatePricingDetails(karat, weightGrams);
-        return details.profitAmount;
+        return calculatePricingDetails(karat, weightGrams).profitAmount;
     }
 
     public double getBaseGoldCost(int karat, double weightGrams) {
-        PricingDetails details = calculatePricingDetails(karat, weightGrams);
-        return details.baseGoldCost;
+        return calculatePricingDetails(karat, weightGrams).baseGoldCost;
     }
 
     public double getTotalMakingCost(int karat, double weightGrams) {
-        PricingDetails details = calculatePricingDetails(karat, weightGrams);
-        return details.totalMakingCost;
+        return calculatePricingDetails(karat, weightGrams).totalMakingCost;
     }
 
     public double calculateGoldPriceInCurrency(int karat, double weightGrams, String currency) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
-        if (priceUSD <= 0) return 0;
+        if (priceUSD <= 0) return 0.0;
         return convertFromUSD(priceUSD, currency);
     }
 
     // ============================================
-    // 💱 دوال العملات
+    // 💱 دوال العملات (من إعدادات السيرفر فقط)
     // ============================================
 
     public String getDefaultCurrency() {
@@ -306,63 +340,63 @@ public class MiraPriceManager {
         } catch (Exception e) {
             Log.e(TAG, "Error getting default currency: " + e.getMessage());
         }
-        return CURRENCY_YER;
+        return CURRENCY_USD;
     }
 
     public double getExchangeRate(String currency) {
-        if (CURRENCY_USD.equals(currency)) return 1.0;
+        if (currency == null || currency.trim().isEmpty() || CURRENCY_USD.equalsIgnoreCase(currency.trim())) {
+            return 1.0;
+        }
+
+        ensureFreshRates();
+        String code = currency.trim().toUpperCase(Locale.US);
 
         try {
             boolean useMarketRate = prefs.getBoolean("use_market_rate", false);
             String source = useMarketRate ? "market" : "official";
-            String key = "exchange_" + source + "_" + currency;
+            String key = "exchange_" + source + "_" + code;
+
             String directValue = prefs.getString(key, "");
-            if (directValue != null && !directValue.isEmpty()) {
-                try {
-                    double rate = Double.parseDouble(directValue);
-                    if (rate > 0) return rate;
-                } catch (NumberFormatException ignored) {}
+            if (!directValue.isEmpty()) {
+                double rate = Double.parseDouble(directValue);
+                if (rate > 0) return rate;
+            }
+
+            // بديل من النوع الآخر إذا لم يُسجل النوع المختار بعد
+            String altKey = "exchange_" + (useMarketRate ? "official" : "market") + "_" + code;
+            String altValue = prefs.getString(altKey, "");
+            if (!altValue.isEmpty()) {
+                double rate = Double.parseDouble(altValue);
+                if (rate > 0) return rate;
             }
 
             String currencySettingsJson = prefs.getString("currency_settings", "");
-            if (currencySettingsJson != null && !currencySettingsJson.isEmpty()) {
+            if (!currencySettingsJson.isEmpty()) {
                 JSONObject currencySettings = new JSONObject(currencySettingsJson);
-
-                if (currencySettings.has("use_market_rate")) {
-                    Object obj = currencySettings.get("use_market_rate");
-                    if (obj instanceof Boolean) {
-                        useMarketRate = (Boolean) obj;
-                    } else {
-                        String str = obj.toString();
-                        useMarketRate = str.equals("true") || str.equals("1");
-                    }
-                }
-
-                source = useMarketRate ? "market" : "official";
-                key = "exchange_" + source + "_" + currency;
-                double rate = currencySettings.optDouble(key, 0);
+                double rate = currencySettings.optDouble(key, 0.0);
                 if (rate > 0) return rate;
+                double altRate = currencySettings.optDouble(altKey, 0.0);
+                if (altRate > 0) return altRate;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error reading exchange rate: " + e.getMessage());
+            Log.e(TAG, "Error reading exchange rate for " + code + ": " + e.getMessage());
         }
 
-        switch (currency) {
-            case CURRENCY_YER: return 530;
-            case CURRENCY_EGP: return 47.5;
-            case CURRENCY_SAR: return 3.75;
-            case CURRENCY_AED: return 3.67;
-            default: return 1.0;
-        }
+        return 0.0;
     }
 
     public double convertFromUSD(double amountUSD, String toCurrency) {
-        return amountUSD * getExchangeRate(toCurrency);
+        if (amountUSD <= 0) return 0.0;
+        if (CURRENCY_USD.equalsIgnoreCase(String.valueOf(toCurrency).trim())) return amountUSD;
+        double rate = getExchangeRate(toCurrency);
+        return rate > 0 ? (amountUSD * rate) : 0.0;
     }
 
     public double convertToUSD(double amount, String fromCurrency) {
+        if (amount <= 0) return 0.0;
+        if (CURRENCY_USD.equalsIgnoreCase(String.valueOf(fromCurrency).trim())) return amount;
         double rate = getExchangeRate(fromCurrency);
-        return rate > 0 ? amount / rate : amount;
+        return rate > 0 ? (amount / rate) : 0.0;
     }
 
     public double convertCurrency(double amount, String fromCurrency, String toCurrency) {
@@ -370,18 +404,16 @@ public class MiraPriceManager {
         return convertFromUSD(amountUSD, toCurrency);
     }
 
-    /**
-     * ✅ [v2.1] formatPrice — لا تُعيد "—" — تُعيد 0 مع العملة للقيم <= 0
-     * السبب: "—" على خلفية ذهبية يصبح غير مرئي، ويُظهر كأن المبلغ فارغ
-     */
     public String formatPrice(double priceUSD, String currency) {
-        // ✅ إذا القيمة سلبية → صفّرها. لا نُعيد "—" أبداً
-        if (priceUSD < 0) priceUSD = 0;
+        if (priceUSD < 0) priceUSD = 0.0;
+        String safeCurrency = (currency == null || currency.trim().isEmpty())
+                ? getDefaultCurrency()
+                : currency.trim().toUpperCase(Locale.US);
 
-        double convertedPrice = convertFromUSD(priceUSD, currency);
-        String symbol = getCurrencySymbol(currency);
+        double convertedPrice = convertFromUSD(priceUSD, safeCurrency);
+        String symbol = getCurrencySymbol(safeCurrency);
 
-        if (CURRENCY_YER.equals(currency) || CURRENCY_EGP.equals(currency)) {
+        if (CURRENCY_YER.equals(safeCurrency) || CURRENCY_EGP.equals(safeCurrency)) {
             return largeFormat.format(convertedPrice) + " " + symbol;
         }
         return symbol + " " + decimalFormat.format(convertedPrice);
@@ -392,18 +424,20 @@ public class MiraPriceManager {
     }
 
     public String getCurrencySymbol(String currency) {
-        switch (currency) {
+        if (currency == null) return "";
+        switch (currency.trim().toUpperCase(Locale.US)) {
             case CURRENCY_USD: return "$";
             case CURRENCY_YER: return "YER";
             case CURRENCY_EGP: return "EGP";
             case CURRENCY_SAR: return "SAR";
             case CURRENCY_AED: return "AED";
-            default: return currency;
+            default: return currency.trim().toUpperCase(Locale.US);
         }
     }
 
     public String getCurrencyNameArabic(String currency) {
-        switch (currency) {
+        if (currency == null) return "";
+        switch (currency.trim().toUpperCase(Locale.US)) {
             case CURRENCY_USD: return "دولار أمريكي";
             case CURRENCY_YER: return "ريال يمني";
             case CURRENCY_EGP: return "جنيه مصري";
@@ -415,14 +449,12 @@ public class MiraPriceManager {
 
     public String getGoldItemPriceSummary(int karat, double weightGrams) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
-        if (priceUSD <= 0) return "—";
-
         String defaultCurrency = getDefaultCurrency();
         double priceInCurrency = convertFromUSD(priceUSD, defaultCurrency);
         return String.format(Locale.US, "%s %s ($%s)",
                 decimalFormat.format(priceInCurrency),
                 getCurrencySymbol(defaultCurrency),
-                decimalFormat.format(priceUSD));
+                decimalFormat.format(Math.max(0.0, priceUSD)));
     }
 
     public Map<String, Double> getAllGoldPrices() {
@@ -452,7 +484,7 @@ public class MiraPriceManager {
 
         String[] goldKeys = {
                 "gold_price_24k", "gold_price_22k", "gold_price_21k",
-                "gold_price_18k", "gold_price_14k",
+                "gold_price_18k", "gold_price_14k", "gold_price_12k",
                 "margin_24k", "margin_22k", "margin_21k",
                 "margin_18k", "margin_14k", "margin_12k",
                 "making_24k", "making_22k", "making_21k",
@@ -466,6 +498,7 @@ public class MiraPriceManager {
         }
 
         editor.apply();
+        notifyPriceUpdated();
     }
 
     public void saveCurrencySettings(JSONObject currencySettings) {
@@ -474,8 +507,10 @@ public class MiraPriceManager {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("currency_settings", currencySettings.toString());
 
-        boolean useMarketRate = currencySettings.optBoolean("use_market_rate", false);
-        editor.putBoolean("use_market_rate", useMarketRate);
+        if (currencySettings.has("use_market_rate")) {
+            boolean useMarketRate = currencySettings.optBoolean("use_market_rate", false);
+            editor.putBoolean("use_market_rate", useMarketRate);
+        }
 
         String[] currencies = {CURRENCY_YER, CURRENCY_EGP, CURRENCY_SAR, CURRENCY_AED};
         for (String currency : currencies) {
@@ -491,55 +526,32 @@ public class MiraPriceManager {
         }
 
         editor.apply();
-    }
-
-    private double getDefaultMargin(int karat) {
-        switch (karat) {
-            case 24: return 95.0;
-            case 22: return 88.0;
-            case 21: return 90.0;
-            case 18: return 100.8;
-            case 14: return 105.8;
-            case 12: return 110.0;
-            default: return 90.0;
-        }
-    }
-
-    private double getDefaultMaking(int karat) {
-        switch (karat) {
-            case 24: return 5.0;
-            case 22: return 8.0;
-            case 21: return 10.0;
-            case 18: return 12.0;
-            case 14: return 15.0;
-            case 12: return 18.0;
-            default: return 10.0;
-        }
+        notifyPriceUpdated();
     }
 
     private double getDoubleFromPrefs(String key, double defaultValue) {
         try {
             String goldSettingsJson = prefs.getString("gold_settings", "");
-            if (goldSettingsJson != null && !goldSettingsJson.isEmpty()) {
+            if (!goldSettingsJson.isEmpty()) {
                 JSONObject goldSettings = new JSONObject(goldSettingsJson);
-                if (goldSettings.has(key)) {
-                    return goldSettings.optDouble(key, defaultValue);
+                if (goldSettings.has(key) && !goldSettings.isNull(key)) {
+                    double val = goldSettings.optDouble(key, Double.NaN);
+                    if (!Double.isNaN(val)) return val;
                 }
             }
 
             String currencySettingsJson = prefs.getString("currency_settings", "");
-            if (currencySettingsJson != null && !currencySettingsJson.isEmpty()) {
+            if (!currencySettingsJson.isEmpty()) {
                 JSONObject currencySettings = new JSONObject(currencySettingsJson);
-                if (currencySettings.has(key)) {
-                    return currencySettings.optDouble(key, defaultValue);
+                if (currencySettings.has(key) && !currencySettings.isNull(key)) {
+                    double val = currencySettings.optDouble(key, Double.NaN);
+                    if (!Double.isNaN(val)) return val;
                 }
             }
 
             String value = prefs.getString(key, "");
-            if (value != null && !value.isEmpty()) {
-                try {
-                    return Double.parseDouble(value);
-                } catch (NumberFormatException ignored) {}
+            if (!value.isEmpty()) {
+                return Double.parseDouble(value);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing " + key + ": " + e.getMessage());
@@ -551,11 +563,8 @@ public class MiraPriceManager {
         return getGoldPricePerGram(KARAT_24) > 0;
     }
 
-    /**
-     * ✅ [إصلاح v2.0] إعادة تعيين حالة التحميل (للاستخدام بعد logout)
-     */
     public static void resetLoadState() {
-        hasLoadedFromServer = false;
         isLoading = false;
+        lastSyncTimeMs = 0L;
     }
 }
