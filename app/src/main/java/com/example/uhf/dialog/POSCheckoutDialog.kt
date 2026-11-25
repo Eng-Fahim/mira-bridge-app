@@ -36,14 +36,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Dialog as ComposeDialog
 import androidx.fragment.app.DialogFragment
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.api.dto.PaymentMethodDto
@@ -56,6 +58,7 @@ import org.json.JSONObject
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 class POSCheckoutDialog : DialogFragment() {
 
@@ -65,6 +68,7 @@ class POSCheckoutDialog : DialogFragment() {
         private const val ARG_ITEM_COUNT = "item_count"
         private const val ARG_RATES_JSON = "rates_json"
         private const val ARG_SCRAP_DETAILS_JSON = "scrap_details_json"
+        private const val MATCH_TOLERANCE_YER = 5.0
 
         @JvmStatic
         fun newInstance(
@@ -247,11 +251,15 @@ class POSCheckoutDialog : DialogFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        val composeDir = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
         return ComposeView(requireContext()).apply {
+            layoutDirection = if (isArabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                MiraJewelryTheme {
-                    CheckoutDialogContent()
+                CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+                    MiraJewelryTheme {
+                        CheckoutDialogContent()
+                    }
                 }
             }
         }
@@ -410,7 +418,7 @@ class POSCheckoutDialog : DialogFragment() {
             if (currencyRate > 0) return currencyRate
         }
 
-        return 1.0
+        return if (curr == "USD") 530.0 else 1.0
     }
 
     private fun parseDouble(s: String?): Double {
@@ -431,9 +439,8 @@ class POSCheckoutDialog : DialogFragment() {
         return total
     }
 
-    private fun formatFinalTotalDisplay(): String {
-        return priceManager?.formatPriceDefault(totalAmount)
-            ?: String.format(Locale.US, "%,.2f YER", totalAmount)
+    private fun formatFinalTotalUsdDisplay(): String {
+        return String.format(Locale.US, "$%,.2f", currentTotalWithDiscountUsd)
     }
 
     private fun formatItemCount(count: Int): String {
@@ -460,7 +467,42 @@ class POSCheckoutDialog : DialogFragment() {
         tradeDialog.show(parentFragmentManager, "TradeInDialog")
     }
 
+    private fun validateBeforeSubmit(): String? {
+        val requiredYer = currentTotalWithDiscountUsd * getRateToYER("USD")
+        val paidYer = getTotalPaidYER()
+        val totalSettledYer = paidYer + tradeInTotalState
+        val diffYer = totalSettledYer - requiredYer
+
+        if (totalSettledYer <= 0.01) {
+            return if (isArabic) "⚠️ يرجى إدخال مبلغ الدفع أو إضافة ذهب كسر"
+            else "⚠️ Please enter a payment amount or add gold trade-in"
+        }
+
+        if (diffYer < -MATCH_TOLERANCE_YER) {
+            val remFormatted = String.format(Locale.US, "%,.0f YER", abs(diffYer))
+            return if (isArabic) "⚠️ المبلغ المدفوع غير مكتمل — المتبقي: $remFormatted"
+            else "⚠️ Payment incomplete — Remaining: $remFormatted"
+        }
+
+        if (diffYer > MATCH_TOLERANCE_YER && customerPhoneState.trim().isEmpty()) {
+            return if (isArabic) "⚠️ يرجى إدخال رقم هاتف العميل لتسجيل الرصيد الدائن"
+            else "⚠️ Customer phone is required to record customer credit"
+        }
+
+        if (diffYer > 50_000.0 && customerNationalIdState.trim().isEmpty()) {
+            return if (isArabic) "⚠️ الرصيد الدائن يتجاوز 50,000 YER — يرجى إدخال رقم الهوية الوطنية"
+            else "⚠️ Credit exceeds 50,000 YER — National ID is required"
+        }
+
+        return null
+    }
+
     private fun submitToServer() {
+        val validationError = validateBeforeSubmit()
+        if (validationError != null) {
+            inlineErrorState = validationError
+            return
+        }
         dispatchCheckout(buildData())
     }
 
@@ -491,6 +533,9 @@ class POSCheckoutDialog : DialogFragment() {
                     put("exchange_rate", rate)
                     put("base_amount", amt * rate)
                     put("method", methodCode)
+                    if (!row.method.accountCode.isNullOrEmpty()) {
+                        put("account_code", row.method.accountCode)
+                    }
                 }
                 paymentsArray.put(pObj)
             } catch (_: Exception) {
@@ -501,6 +546,10 @@ class POSCheckoutDialog : DialogFragment() {
         if (paymentsArray.length() > 0) {
             try {
                 data.paymentMethod = paymentsArray.getJSONObject(0).optString("method", "CASH")
+                val firstAcc = paymentsArray.getJSONObject(0).optString("account_code", "")
+                if (firstAcc.isNotEmpty()) {
+                    data.accountCode = firstAcc
+                }
             } catch (_: Exception) {
             }
         }
@@ -624,7 +673,7 @@ class POSCheckoutDialog : DialogFragment() {
                 ) {
                     TotalAndReconciliationCard(
                         isArabic = isAr,
-                        finalTotalFormatted = formatFinalTotalDisplay(),
+                        finalTotalUsdFormatted = formatFinalTotalUsdDisplay(),
                         requiredYer = requiredTotalYer,
                         diffYer = diffYer,
                         tradeInTotal = tradeInTotalState
@@ -759,7 +808,11 @@ class POSCheckoutDialog : DialogFragment() {
                                 val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
                                 if (remYer > 0.01) {
                                     val rate = getRateToYER(row.currency)
-                                    val formatted = String.format(Locale.US, "%.2f", remYer / rate)
+                                    val formatted = if (row.currency.equals("YER", ignoreCase = true)) {
+                                        remYer.roundToLong().toString()
+                                    } else {
+                                        String.format(Locale.US, "%.2f", remYer / rate)
+                                    }
                                     paymentRowsState[index] = row.copy(amountText = formatted)
                                     inlineErrorState = null
                                 }
@@ -861,7 +914,7 @@ class POSCheckoutDialog : DialogFragment() {
     @Composable
     private fun TotalAndReconciliationCard(
         isArabic: Boolean,
-        finalTotalFormatted: String,
+        finalTotalUsdFormatted: String,
         requiredYer: Double,
         diffYer: Double,
         tradeInTotal: Double
@@ -869,7 +922,7 @@ class POSCheckoutDialog : DialogFragment() {
         val colors = MiraTheme.colors
 
         val (statusColor, statusIcon, statusLabel, statusAmountText) = when {
-            abs(diffYer) < 1.0 -> Quadruple(
+            abs(diffYer) <= MATCH_TOLERANCE_YER -> Quadruple(
                 Color(0xFF10B981),
                 Icons.Rounded.CheckCircle,
                 if (isArabic) "متطابق" else "Matched",
@@ -911,13 +964,14 @@ class POSCheckoutDialog : DialogFragment() {
                             color = colors.textSecondary
                         )
                         Text(
-                            text = String.format(Locale.US, "≈ %,.0f YER", requiredYer),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary.copy(alpha = 0.8f)
+                            text = finalTotalUsdFormatted,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textSecondary
                         )
                     }
                     Text(
-                        text = finalTotalFormatted,
+                        text = String.format(Locale.US, "%,.0f YER", requiredYer),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.goldPrimary
@@ -1029,6 +1083,7 @@ class POSCheckoutDialog : DialogFragment() {
                     leadingIcon = {
                         Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f)
                 )
@@ -1047,7 +1102,10 @@ class POSCheckoutDialog : DialogFragment() {
                     leadingIcon = {
                         Icon(Icons.Rounded.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = if (showNationalId) ImeAction.Next else ImeAction.Done
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f)
                 )
@@ -1068,7 +1126,10 @@ class POSCheckoutDialog : DialogFragment() {
                     leadingIcon = {
                         Icon(Icons.Rounded.Badge, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1299,7 +1360,7 @@ class POSCheckoutDialog : DialogFragment() {
             }
         }
 
-        Dialog(onDismissRequest = onDismiss) {
+        ComposeDialog(onDismissRequest = onDismiss) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
