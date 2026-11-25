@@ -1900,7 +1900,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         }
 
                         var gs1Code = "(21)$shortBarcode"
-                        var qrUrl = "https://sa.mirabarcode.com/$shortBarcode"
+                        var qrUrl = "https://id.ibreg.org/$shortBarcode"
 
                         responseDataObj?.optJSONObject("gs1")?.let { gs1Obj ->
                             val sGs1 = gs1Obj.optString("raw_fnc1", "")
