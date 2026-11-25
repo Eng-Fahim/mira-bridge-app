@@ -58,14 +58,17 @@ public class BarcodeGenerator {
     }
 
     /**
-     * الدالة الافتراضية المعتمدة في التطبيق: تُولّد تصميم MIRA الحديث (نقاط دائرية + إطار ذهبي وشعار MIRA)
+     * الوضع الافتراضي للعرض الرقمي في التطبيق (تصميم حديث كامل مع الشارة الذهبية وشعار MIRA)
      */
     public static Bitmap generateMicroQRCode(String qrContent, int width, int height) {
         return generateMicroQRCode(qrContent, width, height, false);
     }
 
     /**
-     * نسخة تدعم التحويل للأسود الصافي عند الطباعة الحرارية (monochromePrint = true)
+     * @param monochromePrint عند تمرير true (للطباعة الحرارية المجهرية):
+     *                        - يعتمد تصحيح أخطاء M لتكبير حجم النقاط لأقصى حد
+     *                        - يرسم بحواف حادة 1-bit بدون Anti-Aliasing لمنع تلاصق الحبر
+     *                        - يستبعد الشعار الأوسط لضمان قراءة فورية بكاميرا الهاتف
      */
     public static Bitmap generateMicroQRCode(
             String qrContent,
@@ -81,8 +84,12 @@ public class BarcodeGenerator {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
             hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
 
-            // تصحيح أخطاء High (30%) لحماية البيانات مع وجود الشارة المركزية
-            QRCode qrCode = Encoder.encode(qrContent.trim(), ErrorCorrectionLevel.H, hints);
+            // في الطباعة المجهرية نستخدم M لتقليل عدد الخانات وتكبير النقطة الواحدة
+            ErrorCorrectionLevel ecLevel = monochromePrint
+                    ? ErrorCorrectionLevel.M
+                    : ErrorCorrectionLevel.H;
+
+            QRCode qrCode = Encoder.encode(qrContent.trim(), ecLevel, hints);
             ByteMatrix matrix = qrCode.getMatrix();
             if (matrix == null) return null;
 
@@ -90,76 +97,146 @@ public class BarcodeGenerator {
             int quietZone = 1;
             int totalModules = matrixSize + (quietZone * 2);
 
-            // الرسم بدقة عالية (600px على الأقل) لضمان نعومة الحواف الدائرية
-            int renderSize = Math.max(Math.max(width, height), 600);
-            float cellSize = (float) renderSize / (float) totalModules;
-
-            Bitmap highResBitmap = Bitmap.createBitmap(renderSize, renderSize, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(highResBitmap);
-
-            // 1. خلفية بيضاء نقية
-            canvas.drawColor(Color.WHITE);
-
-            int primaryColor = monochromePrint ? Color.BLACK : COLOR_NAVY_DOT;
-            int accentRingColor = monochromePrint ? Color.BLACK : COLOR_MIRA_GOLD;
-
-            Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            dotPaint.setColor(primaryColor);
-            dotPaint.setStyle(Paint.Style.FILL);
-
-            float centerX = renderSize / 2f;
-            float centerY = renderSize / 2f;
-            float badgeRadius = renderSize * 0.132f;
-            float exclusionRadius = badgeRadius + (cellSize * 0.55f);
-
-            // 2. رسم نقاط البيانات الدائرية (مع استثناء زوايا التحديد ومنطقة الشعار الأوسط)
-            float dotRadius = cellSize * 0.40f;
-            for (int y = 0; y < matrixSize; y++) {
-                for (int x = 0; x < matrixSize; x++) {
-                    if (matrix.get(x, y) != 1) continue;
-                    if (isFinderPatternCell(x, y, matrixSize)) continue;
-
-                    float cx = (x + quietZone + 0.5f) * cellSize;
-                    float cy = (y + quietZone + 0.5f) * cellSize;
-
-                    if (Math.hypot(cx - centerX, cy - centerY) < exclusionRadius) {
-                        continue;
-                    }
-
-                    canvas.drawCircle(cx, cy, dotRadius, dotPaint);
-                }
+            if (monochromePrint) {
+                return renderMicroscopicPrintQr(matrix, matrixSize, quietZone, totalModules, width, height);
+            } else {
+                return renderLuxuryScreenQr(matrix, matrixSize, quietZone, totalModules, width, height);
             }
-
-            // 3. رسم زوايا التحديد الثلاث (إطار منحني الزوايا + مركز دائري)
-            drawModernFinderEye(canvas, quietZone, quietZone, cellSize, primaryColor);
-            drawModernFinderEye(canvas, quietZone + matrixSize - 7, quietZone, cellSize, primaryColor);
-            drawModernFinderEye(canvas, quietZone, quietZone + matrixSize - 7, cellSize, primaryColor);
-
-            // 4. رسم الشارة الدائرية المركزية بإطار ذهبي وشعار MIRA
-            drawCenterBrandBadge(
-                    canvas,
-                    centerX,
-                    centerY,
-                    badgeRadius,
-                    accentRingColor,
-                    primaryColor,
-                    "MIRA"
-            );
-
-            // تحجيم النتيجة النهائية للأبعاد المطلوبة بدقة
-            if (renderSize == width && renderSize == height) {
-                return highResBitmap;
-            }
-
-            Bitmap finalBitmap = Bitmap.createScaledBitmap(highResBitmap, width, height, true);
-            if (highResBitmap != finalBitmap) {
-                highResBitmap.recycle();
-            }
-            return finalBitmap;
-
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * محرك الطباعة المجهرية (203 DPI): نقاط عريضة حادة + زوايا حديثة بدون ضبابية
+     */
+    private static Bitmap renderMicroscopicPrintQr(
+            ByteMatrix matrix,
+            int matrixSize,
+            int quietZone,
+            int totalModules,
+            int targetWidth,
+            int targetHeight
+    ) {
+        int targetSize = Math.min(targetWidth, targetHeight);
+        // مضاعف صحيح لكل خانة لضمان تطابق البكسلات مع رأس الطابعة الحرارية 1:1
+        int modulePx = Math.max(3, (int) Math.ceil((double) targetSize / (double) totalModules));
+        int exactCanvasSize = modulePx * totalModules;
+
+        Bitmap crispBitmap = Bitmap.createBitmap(exactCanvasSize, exactCanvasSize, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(crispBitmap);
+        canvas.drawColor(Color.WHITE);
+
+        // إيقاف Anti-Aliasing تماماً لمنع البكسلات الرمادية عند الطباعة الحرارية
+        Paint dotPaint = new Paint();
+        dotPaint.setColor(Color.BLACK);
+        dotPaint.setStyle(Paint.Style.FILL);
+        dotPaint.setAntiAlias(false);
+
+        // نقطة دائرية/منحنية عريضة تغطي 90% من الخانة لضمان وضوحها للكاميرا
+        float inset = modulePx * 0.06f;
+        float dotCorner = modulePx * 0.42f;
+        RectF cellRect = new RectF();
+
+        for (int y = 0; y < matrixSize; y++) {
+            for (int x = 0; x < matrixSize; x++) {
+                if (matrix.get(x, y) != 1) continue;
+                if (isFinderPatternCell(x, y, matrixSize)) continue;
+
+                float left = (x + quietZone) * modulePx + inset;
+                float top = (y + quietZone) * modulePx + inset;
+                float right = (x + quietZone + 1) * modulePx - inset;
+                float bottom = (y + quietZone + 1) * modulePx - inset;
+
+                cellRect.set(left, top, right, bottom);
+                canvas.drawRoundRect(cellRect, dotCorner, dotCorner, dotPaint);
+            }
+        }
+
+        // رسم زوايا التحديد الثلاث بتصميم حديث وحواف حادة
+        drawModernFinderEye(canvas, quietZone, quietZone, modulePx, Color.BLACK, false);
+        drawModernFinderEye(canvas, quietZone + matrixSize - 7, quietZone, modulePx, Color.BLACK, false);
+        drawModernFinderEye(canvas, quietZone, quietZone + matrixSize - 7, modulePx, Color.BLACK, false);
+
+        if (exactCanvasSize == targetWidth && exactCanvasSize == targetHeight) {
+            return crispBitmap;
+        }
+
+        // filter = false للحفاظ على حدة البكسل 100% دون تنعيم
+        Bitmap finalBitmap = Bitmap.createScaledBitmap(crispBitmap, targetWidth, targetHeight, false);
+        if (crispBitmap != finalBitmap) {
+            crispBitmap.recycle();
+        }
+        return finalBitmap;
+    }
+
+    /**
+     * محرك العرض الرقمي الفاخر للشاشات (نقاط دائرية + إطار ذهبي وشعار MIRA)
+     */
+    private static Bitmap renderLuxuryScreenQr(
+            ByteMatrix matrix,
+            int matrixSize,
+            int quietZone,
+            int totalModules,
+            int targetWidth,
+            int targetHeight
+    ) {
+        int renderSize = Math.max(Math.max(targetWidth, targetHeight), 600);
+        float cellSize = (float) renderSize / (float) totalModules;
+
+        Bitmap highResBitmap = Bitmap.createBitmap(renderSize, renderSize, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(highResBitmap);
+        canvas.drawColor(Color.WHITE);
+
+        Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        dotPaint.setColor(COLOR_NAVY_DOT);
+        dotPaint.setStyle(Paint.Style.FILL);
+
+        float centerX = renderSize / 2f;
+        float centerY = renderSize / 2f;
+        float badgeRadius = renderSize * 0.132f;
+        float exclusionRadius = badgeRadius + (cellSize * 0.55f);
+
+        float dotRadius = cellSize * 0.40f;
+        for (int y = 0; y < matrixSize; y++) {
+            for (int x = 0; x < matrixSize; x++) {
+                if (matrix.get(x, y) != 1) continue;
+                if (isFinderPatternCell(x, y, matrixSize)) continue;
+
+                float cx = (x + quietZone + 0.5f) * cellSize;
+                float cy = (y + quietZone + 0.5f) * cellSize;
+
+                if (Math.hypot(cx - centerX, cy - centerY) < exclusionRadius) {
+                    continue;
+                }
+
+                canvas.drawCircle(cx, cy, dotRadius, dotPaint);
+            }
+        }
+
+        drawModernFinderEye(canvas, quietZone, quietZone, cellSize, COLOR_NAVY_DOT, true);
+        drawModernFinderEye(canvas, quietZone + matrixSize - 7, quietZone, cellSize, COLOR_NAVY_DOT, true);
+        drawModernFinderEye(canvas, quietZone, quietZone + matrixSize - 7, cellSize, COLOR_NAVY_DOT, true);
+
+        drawCenterBrandBadge(
+                canvas,
+                centerX,
+                centerY,
+                badgeRadius,
+                COLOR_MIRA_GOLD,
+                COLOR_NAVY_DOT,
+                "MIRA"
+        );
+
+        if (renderSize == targetWidth && renderSize == targetHeight) {
+            return highResBitmap;
+        }
+
+        Bitmap finalBitmap = Bitmap.createScaledBitmap(highResBitmap, targetWidth, targetHeight, true);
+        if (highResBitmap != finalBitmap) {
+            highResBitmap.recycle();
+        }
+        return finalBitmap;
     }
 
     private static boolean isFinderPatternCell(int x, int y, int matrixSize) {
@@ -174,14 +251,16 @@ public class BarcodeGenerator {
             int startModuleX,
             int startModuleY,
             float cellSize,
-            int color
+            int color,
+            boolean antiAlias
     ) {
         float left = startModuleX * cellSize;
         float top = startModuleY * cellSize;
         float eyeSize = 7f * cellSize;
         float halfStroke = cellSize * 0.5f;
 
-        Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint ringPaint = new Paint();
+        ringPaint.setAntiAlias(antiAlias);
         ringPaint.setColor(color);
         ringPaint.setStyle(Paint.Style.STROKE);
         ringPaint.setStrokeWidth(cellSize);
@@ -195,7 +274,8 @@ public class BarcodeGenerator {
         float cornerRadius = cellSize * 1.85f;
         canvas.drawRoundRect(outerRect, cornerRadius, cornerRadius, ringPaint);
 
-        Paint corePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Paint corePaint = new Paint();
+        corePaint.setAntiAlias(antiAlias);
         corePaint.setColor(color);
         corePaint.setStyle(Paint.Style.FILL);
 
