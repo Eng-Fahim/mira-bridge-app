@@ -242,7 +242,9 @@ class MiraPosFragment : MiraBaseFragment() {
     private var cartHasUnavailableState by mutableStateOf(false)
 
     // خريطة حدود التفاوض السعري لكل قطعة في السلة
+        // خريطة حدود التفاوض السعري لكل قطعة في السلة
     private var itemBoundsState by mutableStateOf>(emptyMap())
+    private val negotiatedItemKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var negotiatingItemState by mutableStateOf<NegotiateItemTarget?>(null)
 
     private var heroState by mutableStateOf(HeroVisualState.IDLE)
@@ -588,7 +590,7 @@ class MiraPosFragment : MiraBaseFragment() {
         itemBoundsState = updated
     }
 
-    private fun resolveItemPriceBoundsFromJson(
+        private fun resolveItemPriceBoundsFromJson(
         itemJson: JSONObject,
         karatNum: Int,
         weightGrams: Double
@@ -600,8 +602,13 @@ class MiraPosFragment : MiraBaseFragment() {
             else -> true
         }
 
-        val source = boundsObj?.optString("source")?.takeIf { it.isNotBlank() && it != "null" }
-            ?: itemJson.optString("price_bounds_source", "karat").ifBlank { "karat" }
+        val rawSource1 = boundsObj?.optString("source", "") ?: ""
+        val rawSource2 = itemJson.optString("price_bounds_source", "")
+        val source = when {
+            rawSource1.isNotBlank() && rawSource1 != "null" -> rawSource1
+            rawSource2.isNotBlank() && rawSource2 != "null" -> rawSource2
+            else -> "karat"
+        }
 
         var minUsd = when {
             boundsObj != null && boundsObj.optDouble("min_price_usd", 0.0) > 0.0 ->
@@ -622,12 +629,9 @@ class MiraPosFragment : MiraBaseFragment() {
 
         var goldFloor = boundsObj?.optDouble("gold_floor_usd", 0.0) ?: 0.0
         if (goldFloor <= 0.0 && weightGrams > 0.0) {
-            try {
-                val gramUsd = priceManager?.getGoldPriceUsd(karatNum) ?: 0.0
-                if (gramUsd > 0.0) {
-                    goldFloor = gramUsd * weightGrams
-                }
-            } catch (_: Exception) {
+            val gramPriceUsd = itemJson.optDouble("gram_price_usd", 0.0)
+            if (gramPriceUsd > 0.0) {
+                goldFloor = gramPriceUsd * weightGrams
             }
         }
 
