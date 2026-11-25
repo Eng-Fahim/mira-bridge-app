@@ -2733,8 +2733,22 @@ public class MiraApiClient {
     }
 
     public ApiResponse getGoldCurrencySettings() {
-        return getWithAuth("/gold-currency/settings");
+        String v = "";
+        try {
+            if (this.context != null) {
+                android.content.SharedPreferences sp =
+                        this.context.getSharedPreferences("MIRA_GOLD_SETTINGS", Context.MODE_PRIVATE);
+                v = sp.getString("pricing_version", "");
+            }
+        } catch (Exception ignored) {}
+
+        String path = "/gold-currency/settings?t=" + System.currentTimeMillis();
+        if (v != null && !v.isEmpty()) {
+            path += "&v=" + android.net.Uri.encode(v);
+        }
+        return getWithAuth(path);
     }
+
 
     public ApiResponse getGoldSettings() {
         return getWithAuth("/gold/settings");
