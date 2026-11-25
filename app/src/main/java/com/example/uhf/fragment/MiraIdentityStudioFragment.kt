@@ -141,7 +141,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         private val STANDARD_EPC_REGEX = Regex("^E2[0-9A-F]{22}$")
         private val HEX_24_REGEX = Regex("^[0-9A-F]{24}$")
         private val SERIAL_REGEX = Regex("^MIRA-SN-\\d+$")
-        private val GS1_SERIAL_PATTERN = Pattern.compile("(?:^|\\|)21(MIRA-SN-\\d+)")
+       /* private val GS1_SERIAL_PATTERN = Pattern.compile("(?:^|\\|)21(MIRA-SN-\\d+)")*/
+        private val GS1_SERIAL_PATTERN = Pattern.compile("(?:^|\\||01\\d{14})21([A-Za-z0-9\\-_]+)")
     }
 
     private data class ScanFeedbackData(
