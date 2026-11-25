@@ -31,8 +31,11 @@ public class BarcodeGenerator {
     public static Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
         if (gs1Data == null || gs1Data.trim().isEmpty() || width <= 0 || height <= 0) return null;
         try {
-            String cleanData = gs1Data.trim();
-            // إزالة FNC1 البادئة إن وجدت لأن تفعيل GS1_FORMAT يضيفها تلقائياً وفق المعيار
+            String cleanData = gs1Data.trim()
+                    .replace("(", "")
+                    .replace(")", "");
+
+            // إزالة FNC1 البادئة فقط لأن تفعيل GS1_FORMAT يضيفها تلقائياً في بداية الرمز
             if (cleanData.startsWith("\u001D")) {
                 cleanData = cleanData.substring(1);
             }
@@ -42,7 +45,7 @@ public class BarcodeGenerator {
             hints.put(EncodeHintType.GS1_FORMAT, Boolean.TRUE);
             hints.put(EncodeHintType.MARGIN, 1);
 
-            // طلب المصفوفة بأقل أبعاد للحصول على عدد الخانات الفعلي ثم تكبيرها بمضاعف صحيح
+            // استخراج المصفوفة الخام بأبعاد 1:1 ثم تكبيرها بمضاعف صحيح
             BitMatrix rawMatrix = new MultiFormatWriter().encode(
                     cleanData,
                     BarcodeFormat.DATA_MATRIX,
@@ -132,11 +135,9 @@ public class BarcodeGenerator {
             int targetHeight
     ) {
         int targetSize = Math.min(targetWidth, targetHeight);
-        // ترك هامش أمان 2 خانة على الأقل من كل جانب لسرعة التقاط الكاميرا
         int minQuietModules = 2;
         int totalModules = matrixSize + (minQuietModules * 2);
 
-        // حساب أكبر مضاعف صحيح للبكسل الواحد (مثلاً 3px لكل نقطة بدون أي كسور)
         int modulePx = Math.max(2, targetSize / totalModules);
         int exactQrPx = modulePx * matrixSize;
 
@@ -152,8 +153,8 @@ public class BarcodeGenerator {
         dotPaint.setStyle(Paint.Style.FILL);
         dotPaint.setAntiAlias(false);
 
-        // نقطة مستديرة الزوايا عريضة (94% من الخانة) تمنع تلاصق الحبر وتعطي مظهراً حديثاً
-        float inset = modulePx * 0.03f;
+        boolean useRoundedDots = modulePx >= 4;
+        float inset = useRoundedDots ? (modulePx * 0.03f) : 0f;
         float corner = modulePx * 0.38f;
         RectF cellRect = new RectF();
 
@@ -167,8 +168,13 @@ public class BarcodeGenerator {
                 float right = offsetX + ((x + 1) * modulePx) - inset;
                 float bottom = offsetY + ((y + 1) * modulePx) - inset;
 
-                cellRect.set(left, top, right, bottom);
-                canvas.drawRoundRect(cellRect, corner, corner, dotPaint);
+                if (useRoundedDots) {
+                    cellRect.set(left, top, right, bottom);
+                    canvas.drawRoundRect(cellRect, corner, corner, dotPaint);
+                } else {
+                    // الحفاظ على كامل مساحة البكسل 3×3 لضمان أقصى تشبع حبري على طابعات 203 DPI
+                    canvas.drawRect(left, top, right, bottom, dotPaint);
+                }
             }
         }
 
