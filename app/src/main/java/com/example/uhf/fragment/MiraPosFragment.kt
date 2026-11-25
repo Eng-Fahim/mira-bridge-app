@@ -1336,7 +1336,7 @@ class MiraPosFragment : MiraBaseFragment() {
             val handled = AtomicBoolean(false)
 
             val scannerFragment = MiraBarcodeScannerFragment()
-            scannerFragment.setOnBarcodeScannedListener { data, _ ->
+                        scannerFragment.setOnBarcodeScannedListener { data, _ ->
                 if (data.isNullOrBlank()) return@setOnBarcodeScannedListener
                 if (!handled.compareAndSet(false, true)) return@setOnBarcodeScannedListener
 
@@ -1345,18 +1345,13 @@ class MiraPosFragment : MiraBaseFragment() {
                 mainHandler.post {
                     try {
                         val hostFm = if (isAdded) parentFragmentManager else null
-                        if (hostFm != null && !hostFm.isStateSaved) {
-                            if (hostFm.findFragmentByTag("barcode_scanner") != null) {
-                                hostFm.popBackStack()
-                            }
-                            if (isHidden) {
-                                hostFm.beginTransaction()
-                                    .show(this@MiraPosFragment)
-                                    .commitAllowingStateLoss()
-                            }
+                        if (hostFm != null && !hostFm.isStateSaved && isHidden) {
+                            hostFm.beginTransaction()
+                                .show(this@MiraPosFragment)
+                                .commitAllowingStateLoss()
                         }
                     } catch (e: Exception) {
-                        Log.w(TAG, "Dismiss barcode_scanner warning: ${e.message}")
+                        Log.w(TAG, "Show POS fragment warning: ${e.message}")
                     }
 
                     currentScanMode = ScanMode.NONE
