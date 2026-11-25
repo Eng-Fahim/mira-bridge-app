@@ -1077,6 +1077,22 @@ public class MiraApiClient {
             }
         });
     }
+    
+    private void mergeJsonInto(JSONObject target, JSONObject source) {
+        if (target == null || source == null) return;
+        try {
+            JSONObject d = source.optJSONObject("data") != null ? source.optJSONObject("data") : source;
+            java.util.Iterator<String> keys = d.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                Object val = d.opt(k);
+                if (val != null && val != JSONObject.NULL) {
+                    target.put(k, val);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
 
     public void getAllMessages(String userId, MessageCallback callback) {
         executorService.execute(() -> {
@@ -3556,4 +3572,4 @@ public class MiraApiClient {
             return t;
         }
     }
-            }
+        }
