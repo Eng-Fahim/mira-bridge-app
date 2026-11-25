@@ -1396,8 +1396,8 @@ class MiraPosFragment : MiraBaseFragment() {
 
         mainHandler.postDelayed({
             if (!isFragmentAlive()) return@postDelayed
-            val parsed = parseGs1OrQr(code)
-            onBarcodeScanned(parsed[0])
+            // تمرير النص الخام مباشرة لأن onBarcodeScanned تستدعي parseGs1OrQr مرة واحدة
+            onBarcodeScanned(code)
         }, 120)
     }
 
@@ -1405,6 +1405,7 @@ class MiraPosFragment : MiraBaseFragment() {
         if (raw.isNullOrBlank()) return arrayOf("", "empty")
         var data = raw.trim()
 
+        // إزالة ترويسة AIM القياسية إن وجدت (مثل ]d2 لـ GS1 DataMatrix أو ]Q3 لـ QR)
         if (data.startsWith("]d") || data.startsWith("]Q") ||
             data.startsWith("]e") || data.startsWith("]C") ||
             data.startsWith("]D") || data.startsWith("]A")
@@ -1412,6 +1413,7 @@ class MiraPosFragment : MiraBaseFragment() {
             data = data.substring(3).trim()
         }
 
+        // 1) معالجة روابط QR مثل https://id.ibreg.org/p/MIRA-SN-1001
         if (data.startsWith("http://") || data.startsWith("https://")) {
             try {
                 val uri = Uri.parse(data)
@@ -1425,12 +1427,13 @@ class MiraPosFragment : MiraBaseFragment() {
             }
         }
 
+        // 2) معالجة GS1 DataMatrix (يدعم وجود (01)+14 خانة قبل (21) أو غيابها)
         val gs1 = data.replace('\u001D', '|')
             .replace("(#)", "|")
             .replace("(21)", "|21")
             .replace("(01)", "|01")
 
-        val mSerial = Pattern.compile("(?:^|\\|)21([A-Za-z0-9\\-_.]+)").matcher(gs1)
+        val mSerial = Pattern.compile("(?:^|\\||01\\d{14})21([A-Za-z0-9\\-_.]+)").matcher(gs1)
         if (mSerial.find()) {
             val serial = mSerial.group(1)
             if (!serial.isNullOrEmpty()) return arrayOf(serial, "gs1_serial")
@@ -1444,6 +1447,7 @@ class MiraPosFragment : MiraBaseFragment() {
 
         return arrayOf(data, "raw")
     }
+
 
     // ═══════════════════════════════════════════════════════════════════
     //  Checkout Flow (with live price verification & dialog retention)
