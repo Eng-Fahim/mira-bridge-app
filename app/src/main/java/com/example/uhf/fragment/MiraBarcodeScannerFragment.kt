@@ -1319,34 +1319,55 @@ class MiraBarcodeScannerFragment : Fragment() {
         }
     }
 
-    private fun extractCleanCodePayload(raw: String): String {
+        private fun extractCleanCodePayload(raw: String): String {
         return try {
-            if (raw.startsWith("http://") || raw.startsWith("https://")) {
-                val queryIdx = raw.indexOf("code=")
+            var cleaned = raw.trim()
+
+            // إزالة ترويسة AIM القياسية إن وجدت (مثل ]d2 لـ GS1 DataMatrix أو ]Q3 لـ QR)
+            if (cleaned.startsWith("]d") || cleaned.startsWith("]Q") ||
+                cleaned.startsWith("]e") || cleaned.startsWith("]C") ||
+                cleaned.startsWith("]D") || cleaned.startsWith("]A")
+            ) {
+                cleaned = cleaned.substring(3).trim()
+            }
+
+            // 1) روابط QR مثل https://id.ibreg.org/p/MIRA-SN-1001
+            if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
+                val queryIdx = cleaned.indexOf("code=")
                 if (queryIdx != -1) {
-                    val sub = raw.substring(queryIdx + 5)
+                    val sub = cleaned.substring(queryIdx + 5)
                     val amp = sub.indexOf('&')
                     return if (amp != -1) sub.substring(0, amp) else sub
                 }
-                val lastSlash = raw.lastIndexOf('/')
-                if (lastSlash != -1 && lastSlash < raw.length - 1) {
-                    val tail = raw.substring(lastSlash + 1).trim()
+                val lastSlash = cleaned.lastIndexOf('/')
+                if (lastSlash != -1 && lastSlash < cleaned.length - 1) {
+                    val tail = cleaned.substring(lastSlash + 1).trim()
                     if (tail.isNotEmpty() && !tail.equals("verify", ignoreCase = true)) {
                         return tail
                     }
                 }
             }
-            val ai21 = raw.indexOf("(21)")
-            if (ai21 != -1) {
-                val after21 = raw.substring(ai21 + 4)
-                val nextParen = after21.indexOf('(')
-                return if (nextParen != -1) after21.substring(0, nextParen).trim() else after21.trim()
+
+            // 2) GS1 DataMatrix سواء بالأقواس (01)...(21)... أو بالصيغة الخام 01<14رقم>21<SERIAL>
+            val normalizedGs1 = cleaned
+                .replace('\u001D', '|')
+                .replace("(01)", "|01")
+                .replace("(21)", "|21")
+
+            val matcher = java.util.regex.Pattern
+                .compile("(?:^|\\||01\\d{14})21([A-Za-z0-9\\-_.]+)")
+                .matcher(normalizedGs1)
+            if (matcher.find()) {
+                val serial = matcher.group(1)
+                if (!serial.isNullOrEmpty()) return serial.trim()
             }
-            raw
+
+            cleaned
         } catch (_: Exception) {
             raw
         }
     }
+
 
     private fun forwardToPOS(data: String) {
         try {
@@ -1645,7 +1666,7 @@ class MiraBarcodeScannerFragment : Fragment() {
         private val COLOR_GOLD = Color.parseColor("#D4AF37")
 
         private const val MIN_ZOOM = 1.0f
-        private const val DEFAULT_INITIAL_ZOOM = 1.0f
+        private const val DEFAULT_INITIAL_ZOOM = 2.0f
         private const val MAX_ZOOM_FALLBACK = 6.5f
 
         private val ZOOM_PRESETS = floatArrayOf(1.0f, 2.3f, 3.6f, 5.2f)
