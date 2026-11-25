@@ -1499,7 +1499,6 @@ public class MiraApiClient {
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
-
     /**
      * جلب أسعار الذهب وسعر الصرف مباشرة من السيرفر بدون أي اشتقاقات محلية
      */
@@ -1632,130 +1631,6 @@ public class MiraApiClient {
         }
     }
 
-
-    /**
-     * جلب أسعار الذهب اليوم (24K / 21K / 18K) وسعر الصرف من المسارات المعتمدة
-     */
-    public ApiResponse getGoldPricesSmart(int branchId) {
-        try {
-            String branchQuery = branchId > 0 ? ("?branch_id=" + branchId) : "";
-            ApiResponse[] attempts = new ApiResponse[]{
-                    getWithAuth("/dashboard/gold-prices" + branchQuery),
-                    getWithAuth("/gold-rates" + branchQuery),
-                    getWithAuth("/gold-currency/live-prices" + branchQuery),
-                    getWithAuth("/gold/price" + branchQuery)
-            };
-
-            for (ApiResponse r : attempts) {
-                if (r != null && r.isSuccess && r.data != null) {
-                    JSONObject parsed = normalizeGoldPricesPayload(r.data);
-                    if (parsed != null && (parsed.optDouble("karat_24", 0.0) > 0.0
-                            || parsed.optDouble("karat_21", 0.0) > 0.0
-                            || parsed.optDouble("karat_24_usd", 0.0) > 0.0)) {
-                        return new ApiResponse(200, parsed, null);
-                    }
-                }
-            }
-            return new ApiResponse(404, null, "Gold prices not available");
-        } catch (Exception e) {
-            Log.e(TAG, "getGoldPricesSmart error: " + e.getMessage());
-            return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
-        }
-    }
-
-    private void mergeJsonInto(JSONObject target, JSONObject source) {
-        if (target == null || source == null) return;
-        try {
-            JSONObject d = source.optJSONObject("data") != null ? source.optJSONObject("data") : source;
-            Iterator<String> keys = d.keys();
-            while (keys.hasNext()) {
-                String k = keys.next();
-                Object val = d.opt(k);
-                if (val != null && val != JSONObject.NULL) {
-                    target.put(k, val);
-                }
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private JSONObject normalizeGoldPricesPayload(JSONObject root) {
-        try {
-            JSONObject data = root.optJSONObject("data") != null ? root.optJSONObject("data") : root;
-            JSONObject prices = data.optJSONObject("gold_prices") != null
-                    ? data.optJSONObject("gold_prices")
-                    : (data.optJSONObject("prices") != null
-                        ? data.optJSONObject("prices")
-                        : (data.optJSONObject("rates") != null ? data.optJSONObject("rates") : data));
-
-            double rate = firstPositiveDouble(prices, data,
-                    "exchange_rate", "usd_rate", "dollar_rate", "rate", "selling_rate");
-            String currency = prices.optString("currency",
-                    data.optString("currency", data.optString("local_currency", "YER")));
-            if (currency == null || currency.trim().isEmpty()) currency = "YER";
-
-            double p24 = firstPositiveDouble(prices, data,
-                    "karat_24", "price_24k", "24k", "gold_24", "sell_24", "price_24", "k24", "24");
-            double p21 = firstPositiveDouble(prices, data,
-                    "karat_21", "price_21k", "21k", "gold_21", "sell_21", "price_21", "k21", "21");
-            double p18 = firstPositiveDouble(prices, data,
-                    "karat_18", "price_18k", "18k", "gold_18", "sell_18", "price_18", "k18", "18");
-
-            double p24Usd = firstPositiveDouble(prices, data,
-                    "karat_24_usd", "price_24k_usd", "24k_usd", "usd_24k", "gold_24_usd", "gram_24k_usd");
-            double p21Usd = firstPositiveDouble(prices, data,
-                    "karat_21_usd", "price_21k_usd", "21k_usd", "usd_21k", "gram_21k_usd");
-            double p18Usd = firstPositiveDouble(prices, data,
-                    "karat_18_usd", "price_18k_usd", "18k_usd", "usd_18k", "gram_18k_usd");
-
-            JSONArray arr = prices.optJSONArray("rates");
-            if (arr == null) arr = prices.optJSONArray("gold_prices");
-            if (arr == null) arr = data.optJSONArray("gold_rates");
-            if (arr == null) arr = data.optJSONArray("data");
-            if (arr != null) {
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject row = arr.optJSONObject(i);
-                    if (row == null) continue;
-                    int k = row.optInt("karat", row.optInt("purity", 0));
-                    double val = firstPositiveDouble(row, row,
-                            "sell_price", "price", "price_local", "amount", "rate");
-                    double valUsd = firstPositiveDouble(row, row,
-                            "sell_price_usd", "price_usd", "usd_price");
-                    if (k == 24) {
-                        if (val > 0) p24 = val;
-                        if (valUsd > 0) p24Usd = valUsd;
-                    } else if (k == 21) {
-                        if (val > 0) p21 = val;
-                        if (valUsd > 0) p21Usd = valUsd;
-                    } else if (k == 18) {
-                        if (val > 0) p18 = val;
-                        if (valUsd > 0) p18Usd = valUsd;
-                    }
-                }
-            }
-
-            if (p24 <= 0 && p24Usd > 0 && rate > 0) p24 = p24Usd * rate;
-            if (p21 <= 0 && p21Usd > 0 && rate > 0) p21 = p21Usd * rate;
-            if (p18 <= 0 && p18Usd > 0 && rate > 0) p18 = p18Usd * rate;
-
-            if (p24 <= 0 && p21 > 0) p24 = p21 * (24.0 / 21.0);
-            if (p24 <= 0 && p18 > 0) p24 = p18 * (24.0 / 18.0);
-            if (p21 <= 0 && p24 > 0) p21 = p24 * (21.0 / 24.0);
-            if (p18 <= 0 && p24 > 0) p18 = p24 * (18.0 / 24.0);
-
-            if (p24Usd <= 0 && p24 > 0 && rate > 0) p24Usd = p24 / rate;
-
-            JSONObject out = new JSONObject();
-            out.put("karat_24", p24);
-            out.put("karat_21", p21);
-            out.put("karat_18", p18);
-            out.put("karat_24_usd", p24Usd);
-            out.put("exchange_rate", rate);
-            out.put("currency", currency.toUpperCase(Locale.US));
-            return out;
-        } catch (Exception e) {
-            return null;
-        }
-    }
 
     private double firstPositiveDouble(JSONObject primary, JSONObject secondary, String... keys) {
         for (String k : keys) {
@@ -3681,4 +3556,4 @@ public class MiraApiClient {
             return t;
         }
     }
-}
+            }
