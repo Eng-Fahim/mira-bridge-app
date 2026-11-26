@@ -4,6 +4,8 @@ import android.util.Log;
 
 import org.json.JSONObject;
 
+import java.util.Locale;
+
 /**
  * PosPriceResolver — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
  *
@@ -35,7 +37,7 @@ public final class PosPriceResolver {
         }
 
         public boolean isValid() {
-            return priceUsd > 0 && priceUsd < MAX_REASONABLE_PRICE_USD;
+            return isValidUsd(priceUsd);
         }
     }
 
@@ -50,13 +52,14 @@ public final class PosPriceResolver {
 
     public PriceResult resolve(JSONObject item, int karat, double weightGrams) {
         if (item == null) {
-            return new PriceResult(0, PriceSource.INVALID, false);
+            return new PriceResult(0.0, PriceSource.INVALID, false);
         }
 
         // 1. مزامنة سعر الصرف المعتمد من استجابة السيرفر فوراً إن وُجد
+        String currencyCode = extractCurrencyCode(item);
         double serverRate = extractAuthoritativeRate(item);
         if (serverRate > 1.0 && priceManager != null) {
-            priceManager.setAuthoritativeExchangeRate("YER", serverRate);
+            priceManager.setAuthoritativeExchangeRate(currencyCode, serverRate);
         }
 
         // 2. الأولوية الأولى المطلقة: السعر الرسمي المحسوب في السيرفر (retail_price_usd)
@@ -68,15 +71,17 @@ public final class PosPriceResolver {
         JSONObject boundsObj = item.optJSONObject("price_bounds");
         if (boundsObj != null) {
             double recommendedUsd = boundsObj.optDouble("recommended_usd", 0.0);
-            if (isValidUsd(recommendedUsd)) {
+            double maxUsd = boundsObj.optDouble("max_usd", 0.0);
+            boolean withinMax = !(maxUsd > 0.0 && Double.isFinite(maxUsd)) || recommendedUsd <= maxUsd;
+            if (isValidUsd(recommendedUsd) && withinMax) {
                 return new PriceResult(recommendedUsd, PriceSource.RETAIL_PRICE_USD, false);
             }
         }
 
         // 3. الأولوية الثانية: السعر المحلي الرسمي من السيرفر مقسوماً على سعر الصرف المعتمد
         double priceLocal = item.optDouble("retail_price_local", 0.0);
-        if (priceLocal > 0) {
-            double rate = (serverRate > 1.0) ? serverRate : getYerExchangeRate();
+        if (priceLocal > 0.0 && Double.isFinite(priceLocal)) {
+            double rate = (serverRate > 1.0) ? serverRate : getExchangeRateForCurrency(currencyCode);
             if (rate > 1.0) {
                 double convertedUsd = priceLocal / rate;
                 if (isValidUsd(convertedUsd)) {
@@ -98,11 +103,11 @@ public final class PosPriceResolver {
         // 4. احتياطي Offline فقط: إذا لم يرسل السيرفر أي سعر للقطعة، نحسبه لمرة واحدة بدون تكرار المصنعية
         double netWeight = item.optDouble("net_weight_grams",
                 item.optDouble("net_weight", weightGrams));
-        if (netWeight <= 0) {
+        if (netWeight <= 0.0) {
             netWeight = weightGrams;
         }
 
-        if (netWeight > 0 && priceManager != null) {
+        if (netWeight > 0.0 && Double.isFinite(netWeight) && priceManager != null) {
             double makingPerGram = item.optDouble("making_per_gram", 0.0);
             double totalMakingCost = item.optDouble("making_charge", 0.0);
             double stoneValueUsd = Math.max(0.0, item.optDouble("stone_value",
@@ -123,7 +128,22 @@ public final class PosPriceResolver {
         }
 
         Log.e(TAG, "🚨 All price resolution paths failed!");
-        return new PriceResult(0, PriceSource.INVALID, false);
+        return new PriceResult(0.0, PriceSource.INVALID, false);
+    }
+
+    private String extractCurrencyCode(JSONObject item) {
+        String code = item.optString("currency", "");
+        if (code.trim().isEmpty()) {
+            code = item.optString("local_currency", "");
+        }
+        if (code.trim().isEmpty()) {
+            JSONObject bounds = item.optJSONObject("price_bounds");
+            if (bounds != null) {
+                code = bounds.optString("currency", "");
+            }
+        }
+        String normalized = code.trim().toUpperCase(Locale.US);
+        return normalized.isEmpty() ? MiraPriceManager.CURRENCY_YER : normalized;
     }
 
     private double extractAuthoritativeRate(JSONObject item) {
@@ -141,13 +161,19 @@ public final class PosPriceResolver {
         return 0.0;
     }
 
-    private boolean isValidUsd(double price) {
+    private static boolean isValidUsd(double price) {
         return Double.isFinite(price) && price > 0.0 && price < MAX_REASONABLE_PRICE_USD;
     }
 
-    private double getYerExchangeRate() {
+    private double getExchangeRateForCurrency(String currencyCode) {
         if (priceManager == null) return 0.0;
-        double rate = priceManager.getExchangeRate("YER");
+        String target = (currencyCode == null || currencyCode.trim().isEmpty())
+                ? MiraPriceManager.CURRENCY_YER
+                : currencyCode.trim().toUpperCase(Locale.US);
+        if (MiraPriceManager.CURRENCY_USD.equals(target)) {
+            return 1.0;
+        }
+        double rate = priceManager.getExchangeRate(target);
         return (Double.isFinite(rate) && rate > 1.0) ? rate : 0.0;
     }
 }
