@@ -242,7 +242,7 @@ class MiraPosFragment : MiraBaseFragment() {
     private var cartRevisionState by mutableIntStateOf(0)
 
     // سعر الصرف المعتمد من السيرفر (1 USD = X YER) موحّد بين السلة ونافذة الدفع والـ Payload
-    private var activeUsdToYerRateState by mutableDoubleStateOf(530.0)
+    private var activeUsdToYerRateState by mutableDoubleStateOf(0.0)
 
     // خريطة حدود التفاوض السعري لكل قطعة في السلة (مصدرها السيرفر)
     private var itemBoundsState by mutableStateOf(emptyMap<String, ItemPriceBoundInfo>())
@@ -541,7 +541,7 @@ class MiraPosFragment : MiraBaseFragment() {
         if (pmRate > 1.0 && pmRate.isFinite()) {
             activeUsdToYerRateState = pmRate
         } else if (activeUsdToYerRateState <= 1.0) {
-            activeUsdToYerRateState = 530.0
+            activeUsdToYerRateState = 0.0
         }
     }
 
@@ -4462,20 +4462,22 @@ class MiraPosFragment : MiraBaseFragment() {
         }
         return try {
             val r = priceManager?.getExchangeRate("YER") ?: 0.0
-            if (r > 1.0 && r.isFinite()) r else 530.0
+            if (r > 1.0 && r.isFinite()) r else 0.0
         } catch (_: Exception) {
-            530.0
+            0.0
         }
     }
 
-    private fun formatDualUsdYer(usd: Double, rateOverride: Double = getEffectiveYerRate()): String {
+        private fun formatDualUsdYer(usd: Double, rateOverride: Double = getEffectiveYerRate()): String {
         val safeUsd = if (usd.isFinite() && usd > 0.0) usd else 0.0
         val rate = if (rateOverride.isFinite() && rateOverride > 1.0) rateOverride else getEffectiveYerRate()
-        val yer = (safeUsd * rate).roundToLong()
         val usdStr = String.format(Locale.US, "$%,.2f", safeUsd)
+        if (rate <= 1.0) return usdStr
+        val yer = (safeUsd * rate).roundToLong()
         val yerStr = String.format(Locale.US, "%,d", yer)
         return if (isArabic) "$usdStr ($yerStr ر.ي)" else "$usdStr ($yerStr YER)"
     }
+
 
     private fun buildTotalText(
         count: Int,
