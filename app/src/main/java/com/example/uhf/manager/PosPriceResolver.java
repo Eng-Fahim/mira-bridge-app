@@ -5,17 +5,16 @@ import android.util.Log;
 import org.json.JSONObject;
 
 /**
- * PosPriceResolver — محلّل أسعار القطع في شاشة البيع
+ * PosPriceResolver — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
  *
- * ✅ يعطي الأولوية للتسعير اللحظي (سعر الذهب الحي + المصنعية + الأحجار)
- * ✅ يستخدم الوزن الصافي (net_weight_grams) حتى لا تُحسب الأحجار بسعر الذهب
- * ✅ يتراجع تلقائياً للسعر المخزّن إذا كانت القطعة ذات سعر ثابت أو تعذر جلب سعر الذهب
+ * ✅ يعتمد السعر الرسمي القادم من السيرفر (retail_price_usd / price_bounds) أولاً دون إعادة حساب محلي متضارب
+ * ✅ يزامن سعر الصرف القادم من السيرفر فوراً مع MiraPriceManager
+ * ✅ لا يحتوي على أي سعر صرف ثابت (لا 530 ولا غيره)
+ * ✅ في حالة Offline التام فقط، يحسب السعر بدقة دون مضاعفة المصنعية
  */
 public final class PosPriceResolver {
 
     private static final String TAG = "PosPriceResolver";
-
-    // الحد الأقصى المعقول لأي سعر بالدولار (لمنع البيانات الفاسدة)
     private static final double MAX_REASONABLE_PRICE_USD = 10_000_000.0;
 
     private final MiraPriceManager priceManager;
@@ -25,9 +24,9 @@ public final class PosPriceResolver {
     }
 
     public static final class PriceResult {
-        public final double priceUsd;       // السعر النهائي بالدولار
-        public final PriceSource source;    // مصدر السعر
-        public final boolean calculated;    // هل تم حسابه لحظياً من سعر الذهب؟
+        public final double priceUsd;
+        public final PriceSource source;
+        public final boolean calculated;
 
         public PriceResult(double priceUsd, PriceSource source, boolean calculated) {
             this.priceUsd = priceUsd;
@@ -36,74 +35,49 @@ public final class PosPriceResolver {
         }
 
         public boolean isValid() {
-            return priceUsd > 0;
+            return priceUsd > 0 && priceUsd < MAX_REASONABLE_PRICE_USD;
         }
     }
 
     public enum PriceSource {
-        LIVE_GOLD_CALCULATED,   // محسوب لحظياً (ذهب حي + مصنعية + أحجار)
-        RETAIL_PRICE_USD,       // retail_price_usd (سعر ثابت مخزن)
-        RETAIL_PRICE_LOCAL,     // retail_price_local ÷ exchange_rate
+        LIVE_GOLD_CALCULATED,   // احتياطي Offline فقط عند غياب سعر السيرفر
+        RETAIL_PRICE_USD,       // السعر الرسمي المعتمد من السيرفر بالدولار
+        RETAIL_PRICE_LOCAL,     // السعر الرسمي المحلي ÷ سعر الصرف المعتمد من السيرفر
         RETAIL_PRICE,           // retail_price
         GENERIC_PRICE,          // price
         INVALID                 // لا يوجد سعر صالح
     }
 
-    /**
-     * يحلّل السعر من بيانات القطعة مع إعطاء الأولوية للسعر اللحظي للذهب والصرف
-     */
     public PriceResult resolve(JSONObject item, int karat, double weightGrams) {
         if (item == null) {
             return new PriceResult(0, PriceSource.INVALID, false);
         }
 
-        boolean isFixedPrice = item.optBoolean("is_fixed_price", false)
-                || item.optInt("is_fixed_price", 0) == 1;
-
-        // استخراج الوزن الصافي (إن وُجد) وإلا الوزن الإجمالي
-        double netWeight = item.optDouble("net_weight_grams",
-                item.optDouble("net_weight", weightGrams));
-        if (netWeight <= 0) {
-            netWeight = weightGrams;
+        // 1. مزامنة سعر الصرف المعتمد من استجابة السيرفر فوراً إن وُجد
+        double serverRate = extractAuthoritativeRate(item);
+        if (serverRate > 1.0 && priceManager != null) {
+            priceManager.setAuthoritativeExchangeRate("YER", serverRate);
         }
 
-        // استخراج المصنعية للجرام (أو إجمالي المصنعية) وقيمة الأحجار بالدولار
-        double makingPerGram = item.optDouble("making_per_gram", 0.0);
-        double totalMakingCost = item.optDouble("making_charge", 0.0);
-        double stoneValueUsd = item.optDouble("stone_value", 0.0);
-
-        // 1. الأولوية القصوى: التسعير اللحظي الحي (الوزن الصافي × سعر الجرام اليوم + المصنعية + الأحجار)
-        if (!isFixedPrice && netWeight > 0 && priceManager != null) {
-            double liveGoldValueUsd = priceManager.calculateGoldPrice(karat, netWeight);
-            if (liveGoldValueUsd > 0) {
-                double makingUsd = (makingPerGram > 0)
-                        ? (netWeight * makingPerGram)
-                        : totalMakingCost;
-
-                double liveTotalUsd = liveGoldValueUsd + makingUsd + Math.max(0.0, stoneValueUsd);
-
-                if (isValidUsd(liveTotalUsd)) {
-                    Log.d(TAG, "✅ Live price resolved → gold=" + liveGoldValueUsd +
-                            ", making=" + makingUsd + ", stones=" + stoneValueUsd +
-                            ", totalUsd=" + liveTotalUsd);
-                    return new PriceResult(liveTotalUsd, PriceSource.LIVE_GOLD_CALCULATED, true);
-                }
-            }
-        }
-
-        // 2. الاحتياطي: الأسعار المخزنة (للقطع ذات السعر الثابت أو عند عدم توفر سعر الذهب الحي)
-        double priceUsd     = item.optDouble("retail_price_usd", 0.0);
-        double priceLocal   = item.optDouble("retail_price_local", 0.0);
-        double priceMain    = item.optDouble("retail_price", 0.0);
-        double priceGeneric = item.optDouble("price", 0.0);
-
+        // 2. الأولوية الأولى المطلقة: السعر الرسمي المحسوب في السيرفر (retail_price_usd)
+        double priceUsd = item.optDouble("retail_price_usd", 0.0);
         if (isValidUsd(priceUsd)) {
             return new PriceResult(priceUsd, PriceSource.RETAIL_PRICE_USD, false);
         }
 
+        JSONObject boundsObj = item.optJSONObject("price_bounds");
+        if (boundsObj != null) {
+            double recommendedUsd = boundsObj.optDouble("recommended_usd", 0.0);
+            if (isValidUsd(recommendedUsd)) {
+                return new PriceResult(recommendedUsd, PriceSource.RETAIL_PRICE_USD, false);
+            }
+        }
+
+        // 3. الأولوية الثانية: السعر المحلي الرسمي من السيرفر مقسوماً على سعر الصرف المعتمد
+        double priceLocal = item.optDouble("retail_price_local", 0.0);
         if (priceLocal > 0) {
-            double rate = getYerExchangeRate();
-            if (rate > 0) {
+            double rate = (serverRate > 1.0) ? serverRate : getYerExchangeRate();
+            if (rate > 1.0) {
                 double convertedUsd = priceLocal / rate;
                 if (isValidUsd(convertedUsd)) {
                     return new PriceResult(convertedUsd, PriceSource.RETAIL_PRICE_LOCAL, false);
@@ -111,25 +85,69 @@ public final class PosPriceResolver {
             }
         }
 
+        double priceMain = item.optDouble("retail_price", 0.0);
         if (isValidUsd(priceMain)) {
             return new PriceResult(priceMain, PriceSource.RETAIL_PRICE, false);
         }
 
+        double priceGeneric = item.optDouble("price", 0.0);
         if (isValidUsd(priceGeneric)) {
             return new PriceResult(priceGeneric, PriceSource.GENERIC_PRICE, false);
+        }
+
+        // 4. احتياطي Offline فقط: إذا لم يرسل السيرفر أي سعر للقطعة، نحسبه لمرة واحدة بدون تكرار المصنعية
+        double netWeight = item.optDouble("net_weight_grams",
+                item.optDouble("net_weight", weightGrams));
+        if (netWeight <= 0) {
+            netWeight = weightGrams;
+        }
+
+        if (netWeight > 0 && priceManager != null) {
+            double makingPerGram = item.optDouble("making_per_gram", 0.0);
+            double totalMakingCost = item.optDouble("making_charge", 0.0);
+            double stoneValueUsd = Math.max(0.0, item.optDouble("stone_value",
+                    item.optDouble("stone_price_usd", 0.0)));
+
+            double fallbackUsd = priceManager.calculateFallbackPriceUsd(
+                    karat,
+                    netWeight,
+                    makingPerGram,
+                    totalMakingCost,
+                    stoneValueUsd
+            );
+
+            if (isValidUsd(fallbackUsd)) {
+                Log.d(TAG, "⚠️ Offline fallback price calculated: totalUsd=" + fallbackUsd);
+                return new PriceResult(fallbackUsd, PriceSource.LIVE_GOLD_CALCULATED, true);
+            }
         }
 
         Log.e(TAG, "🚨 All price resolution paths failed!");
         return new PriceResult(0, PriceSource.INVALID, false);
     }
 
+    private double extractAuthoritativeRate(JSONObject item) {
+        double rate = item.optDouble("exchange_rate", 0.0);
+        if (rate > 1.0 && Double.isFinite(rate)) {
+            return rate;
+        }
+        JSONObject bounds = item.optJSONObject("price_bounds");
+        if (bounds != null) {
+            double bRate = bounds.optDouble("exchange_rate", 0.0);
+            if (bRate > 1.0 && Double.isFinite(bRate)) {
+                return bRate;
+            }
+        }
+        return 0.0;
+    }
+
     private boolean isValidUsd(double price) {
-        return price > 0 && price < MAX_REASONABLE_PRICE_USD;
+        return Double.isFinite(price) && price > 0.0 && price < MAX_REASONABLE_PRICE_USD;
     }
 
     private double getYerExchangeRate() {
-        if (priceManager == null) return 530.0;
+        if (priceManager == null) return 0.0;
         double rate = priceManager.getExchangeRate("YER");
-        return rate > 0 ? rate : 530.0;
+        return (Double.isFinite(rate) && rate > 1.0) ? rate : 0.0;
     }
 }
