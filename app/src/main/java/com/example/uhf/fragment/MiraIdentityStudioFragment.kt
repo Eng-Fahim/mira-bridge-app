@@ -170,6 +170,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         val stoneCount: Int,
         val stoneValue: Double,
         val netWeight: Double
+        
     )
 
     private data class AlertDialogPayload(
@@ -198,6 +199,13 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     private var rfidTimeoutRunnable: Runnable? = null
     private var scanRetryRunnable: Runnable? = null
     private var pendingHideFeedback: Runnable? = null
+    private val pricesUpdatedReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            safeRun {
+                calculateEstimatedGoldValue()
+            }
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     //  حالة المسح الفيزيائي والـ Trigger والتزامن الآمن
@@ -1416,7 +1424,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         return normalized.toIntOrNull()
     }
 
-    private fun calculateEstimatedGoldValue() {
+        private fun calculateEstimatedGoldValue() {
         try {
             val pm = priceManager ?: return
             val grossWeight = parseLocalizedDouble(grossWeightTextState) ?: 0.0
@@ -1433,16 +1441,18 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                 stoneValue = (parseLocalizedDouble(stoneValueTextState) ?: 0.0).coerceAtLeast(0.0)
             }
 
-            val pricing = PricingCalculator.calculatePricingDetails(
-                grossWeight, stoneWeightCarats, stoneValue, selectedKaratState, pm
-            )
-            val totalPrice = pricing[5]
-            netGoldWeightState = pricing[6]
-            estimatedPriceTextState = pm.formatPriceDefault(totalPrice)
+            val stoneWeightGrams = stoneWeightCarats * 0.2
+            val netWeight = (grossWeight - stoneWeightGrams).coerceAtLeast(0.0)
+            netGoldWeightState = netWeight
+
+            val details = pm.calculatePricingDetails(selectedKaratState, netWeight)
+            val totalUsd = details.finalPrice + stoneValue
+            estimatedPriceTextState = pm.formatPriceDefault(totalUsd)
         } catch (_: Exception) {
             resetCalculatedDisplay()
         }
     }
+
 
     private fun resetCalculatedDisplay() {
         val pm = priceManager
@@ -1745,6 +1755,23 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             isNetworkError = true
                         }
                     }
+                                            // استخراج السعر وسعر الصرف المعتمدين من السيرفر بعد الحفظ
+                        val itemObj = responseDataObj?.optJSONObject("item")
+                            ?: responseDataObj?.optJSONObject("data")
+                            ?: responseDataObj
+
+                        val serverExchangeRate = itemObj?.optDouble("exchange_rate", 0.0) ?: 0.0
+                        if (serverExchangeRate > 1.0 && serverExchangeRate.isFinite()) {
+                            prcMgr.setAuthoritativeExchangeRate("YER", serverExchangeRate)
+                        }
+
+                        val serverRetailUsd = itemObj?.optDouble("retail_price_usd", 0.0) ?: 0.0
+                        val authoritativeFinalPriceUsd = if (serverRetailUsd > 0.0 && serverRetailUsd.isFinite()) {
+                            serverRetailUsd
+                        } else {
+                            finalPriceUSD
+                        }
+
 
                     if (!apiSuccess) {
                         safeRun {
@@ -1933,7 +1960,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             qrUrl = qrUrl,
                             weight = grossWeight.toString(),
                             karat = selectedKarat,
-                            finalPriceUSD = finalPriceUSD,
+                            finalPriceUSD = authoritativeFinalPriceUsd,
                             currency = localCurrency,
                             photos = finalPhotoPaths,
                             stoneType = stoneType,
@@ -2611,6 +2638,16 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         calculateEstimatedGoldValue()
         scheduleAutoSync()
 
+        try {
+            val filter = android.content.IntentFilter("MIRA_PRICES_UPDATED")
+            androidx.core.content.ContextCompat.registerReceiver(
+                requireContext(),
+                pricesUpdatedReceiver,
+                filter,
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        } catch (_: Exception) {}
+
         miraExecutor?.takeIf { it.isHealthy }?.backgroundExecutor?.execute {
             formManager?.cleanupOldDrafts()
             cleanupSafeOrphanFiles(photoManager?.photoPaths)
@@ -2619,6 +2656,10 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     override fun onPause() {
         super.onPause()
+                try {
+            requireContext().unregisterReceiver(pricesUpdatedReceiver)
+        } catch (_: Exception) {}
+
 
         (activity as? UHFMainActivity)?.apply {
             setBottomNavVisible(true)
