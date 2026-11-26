@@ -205,7 +205,6 @@ class POSCheckoutDialog : DialogFragment() {
     private var isArabic: Boolean = true
     private var priceManager: MiraPriceManager? = null
 
-    // قيمة 1 وحدة من العملة مقوّمة بالريال اليمني (YER) كما يحدده السيرفر
     private val ratesToYerMap = HashMap<String, Double>()
     private var serverUsdToYerRate: Double = 0.0
 
@@ -255,6 +254,9 @@ class POSCheckoutDialog : DialogFragment() {
         }
         serverUsdToYerRate = if (pmYerRate > 0.0 && pmYerRate.isFinite()) pmYerRate else 0.0
 
+        val initialCurrencies = LinkedHashSet<String>().apply { add("YER") }
+        ratesToYerMap["YER"] = 1.0
+
         arguments?.let { args ->
             totalAmount = args.getDouble(ARG_TOTAL_AMOUNT, 0.0)
             itemCount = args.getInt(ARG_ITEM_COUNT, 0)
@@ -264,9 +266,13 @@ class POSCheckoutDialog : DialogFragment() {
             val explicitUsdRate = args.getDouble(ARG_USD_TO_YER_RATE, 0.0)
             if (explicitUsdRate > 0.0 && explicitUsdRate.isFinite()) {
                 serverUsdToYerRate = explicitUsdRate
+                ratesToYerMap["USD"] = explicitUsdRate
+                initialCurrencies.add("USD")
                 priceManager?.setAuthoritativeExchangeRate("YER", explicitUsdRate)
             }
 
+            // قراءة exchange_rates القادمة من POST /api/v1/pos/prepare-checkout
+            // الشكل من السيرفر: {"YER": 1.0, "USD": 535.0, "SAR": 142.67, "AED": ..., ...}
             try {
                 val ratesJson = args.getString(ARG_RATES_JSON, "{}") ?: "{}"
                 val ratesObj = JSONObject(ratesJson)
@@ -275,33 +281,41 @@ class POSCheckoutDialog : DialogFragment() {
                 val srvYer = ratesObj.optDouble("YER", 0.0)
                 if (srvUsd > 0.0 && srvUsd.isFinite()) {
                     serverUsdToYerRate = srvUsd
+                    ratesToYerMap["USD"] = srvUsd
+                    initialCurrencies.add("USD")
                     priceManager?.setAuthoritativeExchangeRate("YER", srvUsd)
-                } else if (srvYer > 0.0 && srvYer.isFinite()) {
+                } else if (srvYer > 1.0 && srvYer.isFinite()) {
                     serverUsdToYerRate = srvYer
+                    ratesToYerMap["USD"] = srvYer
+                    initialCurrencies.add("USD")
                     priceManager?.setAuthoritativeExchangeRate("YER", srvYer)
-                }
-
-                ratesToYerMap["YER"] = 1.0
-                if (serverUsdToYerRate > 0.0) {
-                    ratesToYerMap["USD"] = serverUsdToYerRate
                 }
 
                 val keys = ratesObj.keys()
                 while (keys.hasNext()) {
                     val k = keys.next().uppercase(Locale.US).trim()
                     val v = ratesObj.optDouble(k, 0.0)
-                    if (v <= 0.0 || !v.isFinite() || k == "YER" || k == "USD") continue
-                    ratesToYerMap[k] = v
+                    if (v <= 0.0 || !v.isFinite()) continue
+                    if (k == "YER") {
+                        ratesToYerMap["YER"] = 1.0
+                        initialCurrencies.add("YER")
+                    } else {
+                        ratesToYerMap[k] = v
+                        initialCurrencies.add(k)
+                    }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to parse server rates: ${e.message}")
+                Log.w(TAG, "Failed to parse ARG_RATES_JSON: ${e.message}")
             }
         }
 
-        ratesToYerMap["YER"] = 1.0
         if (serverUsdToYerRate > 0.0) {
             ratesToYerMap["USD"] = serverUsdToYerRate
+            initialCurrencies.add("USD")
         }
+
+        currenciesState.clear()
+        currenciesState.addAll(initialCurrencies)
 
         isArabic = try {
             val tags = AppCompatDelegate.getApplicationLocales().toLanguageTags()
@@ -311,19 +325,19 @@ class POSCheckoutDialog : DialogFragment() {
             Locale.getDefault().language == "ar"
         }
 
-        val initialMethod = PaymentMethodDto().apply {
+        val placeholderMethod = PaymentMethodDto().apply {
             code = "CASH"
             nameAr = "نقداً"
             nameEn = "Cash"
             icon = "💵"
         }
         paymentMethodsState.clear()
-        paymentMethodsState.add(initialMethod)
+        paymentMethodsState.add(placeholderMethod)
 
         if (paymentRowsState.isEmpty()) {
             paymentRowsState.add(
                 PaymentRowUiModel(
-                    method = initialMethod,
+                    method = placeholderMethod,
                     currency = "YER",
                     amountText = ""
                 )
@@ -396,123 +410,112 @@ class POSCheckoutDialog : DialogFragment() {
                 for (i in paymentRowsState.indices) {
                     val row = paymentRowsState[i]
                     val matched = result.methods.firstOrNull {
-                        !it.code.isNullOrBlank() && it.code.equals(row.method.code, ignoreCase = true)
+                        it.id > 0 && it.id == row.method.id
+                    } ?: result.methods.firstOrNull {
+                        !it.code.isNullOrBlank() &&
+                            it.code.equals(row.method.code, ignoreCase = true) &&
+                            (it.accountCode ?: "") == (row.method.accountCode ?: "")
                     } ?: defaultMethod
                     paymentRowsState[i] = row.copy(method = matched)
                 }
-            }
-
-            if (result.currencies.isNotEmpty()) {
-                currenciesState.clear()
-                currenciesState.addAll(result.currencies)
-            }
-
-            if (result.usdToYer > 0.0) {
-                serverUsdToYerRate = result.usdToYer
-                ratesToYerMap["USD"] = result.usdToYer
-                priceManager?.setAuthoritativeExchangeRate("YER", result.usdToYer)
+            } else if (!result.methodsError.isNullOrBlank()) {
+                Log.w(TAG, "Server payment-methods issue: ${result.methodsError}")
             }
 
             for ((curr, rateVal) in result.ratesToYer) {
-                if (rateVal > 0.0) {
+                if (rateVal > 0.0 && rateVal.isFinite()) {
                     ratesToYerMap[curr] = rateVal
                 }
             }
+
+            val usdFromServer = result.ratesToYer["USD"] ?: 0.0
+            if (usdFromServer > 0.0) {
+                serverUsdToYerRate = usdFromServer
+                priceManager?.setAuthoritativeExchangeRate("YER", usdFromServer)
+            }
+
+            val mergedCurrencies = LinkedHashSet<String>()
+            mergedCurrencies.add("YER")
+            mergedCurrencies.addAll(currenciesState)
+            for ((curr, rateVal) in ratesToYerMap) {
+                if (rateVal > 0.0 && rateVal.isFinite()) {
+                    mergedCurrencies.add(curr)
+                }
+            }
+            currenciesState.clear()
+            currenciesState.addAll(mergedCurrencies)
         }
     }
 
     private data class ServerConfigResult(
         val methods: List<PaymentMethodDto>,
-        val currencies: List<String>,
-        val usdToYer: Double,
-        val ratesToYer: Map<String, Double>
+        val ratesToYer: Map<String, Double>,
+        val methodsError: String? = null
     )
 
     private fun fetchConfigFromServer(appCtx: android.content.Context): ServerConfigResult {
         val methods = ArrayList<PaymentMethodDto>()
-        val currencies = LinkedHashSet<String>()
-        currencies.add("YER")
         val extractedRates = HashMap<String, Double>()
-        var detectedUsdToYer = serverUsdToYerRate
+        var methodsError: String? = null
 
         try {
             val client = MiraApiClient.getInstance(appCtx)
 
+            // 1. GET /api/v1/payment-methods -> PaymentMethodController@index
+            // الشكل الدقيق من السيرفر: { "success": true, "count": N, "data": [ { "id", "code", "name_ar", "name_en", "icon", "account_id", "account_code", "account_name_ar", "account_name", "requires_account", "sort_order" } ] }
             val methodsResp = client.paymentMethods
             if (methodsResp != null && methodsResp.isSuccess && methodsResp.data != null) {
-                val dataObj = methodsResp.data!!
-                val arr = dataObj.optJSONArray("data")
-                    ?: dataObj.optJSONArray("methods")
-                    ?: dataObj.optJSONArray("payment_methods")
-                    ?: dataObj.optJSONArray("items")
-
-                if (arr != null && arr.length() > 0) {
+                val arr = methodsResp.data.optJSONArray("data")
+                if (arr != null) {
                     val gson = Gson()
                     for (i in 0 until arr.length()) {
                         try {
-                            val m = gson.fromJson(
-                                arr.getJSONObject(i).toString(),
-                                PaymentMethodDto::class.java
-                            )
+                            val obj = arr.getJSONObject(i)
+                            val m = gson.fromJson(obj.toString(), PaymentMethodDto::class.java)
                             if (m != null && !m.code.isNullOrBlank()) {
-                                val codeUpper = m.code.trim().uppercase(Locale.US)
-                                if (codeUpper != "TRADE_IN" && codeUpper != "CUSTOMER_CREDIT") {
-                                    methods.add(m)
-                                }
+                                methods.add(m)
                             }
                         } catch (e: Exception) {
-                            Log.w(TAG, "skip malformed method", e)
+                            Log.w(TAG, "Malformed payment method item at $i", e)
                         }
                     }
+                } else {
+                    methodsError = "Missing 'data' array in /payment-methods response"
                 }
+            } else {
+                methodsError = methodsResp?.error ?: "HTTP ${methodsResp?.statusCode ?: -1}"
             }
 
+            // 2. GET /api/v1/currency/rates -> ExchangeRateController@current
+            // الشكل الدقيق من السيرفر: { "success": true, "data": { "usd_to_yer": 535.0, "sar_to_yer": 142.67, "yer_to_yer": 1.0, ... } }
             val ratesResp = client.exchangeRates
             if (ratesResp != null && ratesResp.isSuccess && ratesResp.data != null) {
-                val dataObj = ratesResp.data!!
-                val arr = dataObj.optJSONArray("data") ?: dataObj.optJSONArray("rates")
-                if (arr != null) {
-                    for (i in 0 until arr.length()) {
-                        val r = arr.getJSONObject(i)
-                        val from = r.optString("from_currency", "").uppercase(Locale.US).trim()
-                        val to = r.optString("to_currency", "YER").uppercase(Locale.US).trim()
-                        val rateVal = r.optDouble("rate", r.optDouble("exchange_rate", 0.0))
-
-                        if (from.isNotEmpty()) {
-                            currencies.add(from)
-                        }
-                        if (rateVal > 0.0 && rateVal.isFinite()) {
-                            if (from == "YER") {
-                                extractedRates["YER"] = 1.0
-                            } else if (from == "USD" && to == "YER") {
-                                detectedUsdToYer = rateVal
-                                extractedRates["USD"] = rateVal
-                            } else if (from == "USD" && to.isEmpty()) {
-                                detectedUsdToYer = rateVal
-                                extractedRates["USD"] = rateVal
-                            } else if (to == "YER" && from.isNotEmpty()) {
-                                extractedRates[from] = rateVal
-                            }
+                val payload = ratesResp.data.optJSONObject("data") ?: ratesResp.data
+                val keys = payload.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next().trim()
+                    val lower = key.lowercase(Locale.US)
+                    if (lower.endsWith("_to_yer")) {
+                        val currCode = lower.removeSuffix("_to_yer").uppercase(Locale.US).trim()
+                        val valRate = payload.optDouble(key, 0.0)
+                        if (currCode.isNotEmpty() && valRate > 0.0 && valRate.isFinite()) {
+                            extractedRates[currCode] = if (currCode == "YER") 1.0 else valRate
                         }
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "fetchConfigFromServer error", e)
+            methodsError = e.message
         }
 
         return ServerConfigResult(
             methods = methods,
-            currencies = ArrayList(currencies),
-            usdToYer = detectedUsdToYer,
-            ratesToYer = extractedRates
+            ratesToYer = extractedRates,
+            methodsError = methodsError
         )
     }
 
-    /**
-     * يُرجع قيمة 1 وحدة من العملة بالريال اليمني (YER) من بيانات السيرفر فقط.
-     * يُرجع 0.0 إذا لم يتوفر سعر صرف معتمد لعملة غير YER.
-     */
     private fun getRateToYER(currency: String?): Double {
         if (currency == null) return 0.0
         val curr = currency.uppercase(Locale.US).trim()
@@ -618,7 +621,7 @@ class POSCheckoutDialog : DialogFragment() {
             }
         }
 
-        val requiredYer = currentTotalWithDiscountUsd * usdRate
+        val requiredYer = (currentTotalWithDiscountUsd * usdRate).roundToLong().toDouble()
         val paidYer = getTotalPaidYER()
         val totalSettledYer = paidYer + tradeInTotalState
         val diffYer = totalSettledYer - requiredYer
@@ -742,7 +745,11 @@ class POSCheckoutDialog : DialogFragment() {
         val isAr = isArabic
 
         val usdRate = getRateToYER("USD")
-        val requiredTotalYer = currentTotalWithDiscountUsd * usdRate
+        val requiredTotalYer = if (usdRate > 0.0) {
+            (currentTotalWithDiscountUsd * usdRate).roundToLong().toDouble()
+        } else {
+            0.0
+        }
         val paidYer = getTotalPaidYER()
         val totalWithGoldYer = paidYer + tradeInTotalState
         val diffYer = totalWithGoldYer - requiredTotalYer
@@ -969,11 +976,7 @@ class POSCheckoutDialog : DialogFragment() {
                                 val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
                                 if (remYer > 0.01) {
                                     val formatted = if (row.currency.equals("YER", ignoreCase = true)) {
-                                        if (abs(remYer - remYer.roundToLong()) < 0.01) {
-                                            remYer.roundToLong().toString()
-                                        } else {
-                                            String.format(Locale.US, "%.2f", remYer)
-                                        }
+                                        remYer.roundToLong().toString()
                                     } else {
                                         String.format(Locale.US, "%.2f", remYer / rowRate)
                                     }
@@ -1332,8 +1335,7 @@ class POSCheckoutDialog : DialogFragment() {
         val methodDisplay = remember(row.method, isArabic) {
             val disp = row.method.getDisplayName(isArabic)
             val acc = row.method.getAccountDisplay(isArabic)
-            val icon = row.method.icon?.takeIf { it.isNotEmpty() } ?: "💳"
-            if (!acc.isNullOrEmpty()) "$icon $disp ($acc)" else "$icon $disp"
+            if (acc.isNotEmpty()) "$disp ($acc)" else disp
         }
 
         val parsedAmount = parseDouble(row.amountText)
@@ -1531,7 +1533,7 @@ class POSCheckoutDialog : DialogFragment() {
             if (q.isEmpty()) methods
             else methods.filter { m ->
                 val name = m.getDisplayName(isArabic).lowercase(Locale.US)
-                val acc = (m.getAccountDisplay(isArabic) ?: "").lowercase(Locale.US)
+                val acc = m.getAccountDisplay(isArabic).lowercase(Locale.US)
                 name.contains(q) || acc.contains(q)
             }
         }
@@ -1586,7 +1588,7 @@ class POSCheckoutDialog : DialogFragment() {
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        items(filtered, key = { it.code ?: UUID.randomUUID().toString() }) { method ->
+                        items(filtered, key = { "${it.id}_${it.code}_${it.accountCode}" }) { method ->
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1601,11 +1603,6 @@ class POSCheckoutDialog : DialogFragment() {
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = method.icon?.takeIf { it.isNotEmpty() } ?: "💳",
-                                        fontSize = 20.sp
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = method.getDisplayName(isArabic),
@@ -1614,7 +1611,7 @@ class POSCheckoutDialog : DialogFragment() {
                                             color = colors.textPrimary
                                         )
                                         val acc = method.getAccountDisplay(isArabic)
-                                        if (!acc.isNullOrEmpty()) {
+                                        if (acc.isNotEmpty()) {
                                             Text(
                                                 text = acc,
                                                 style = MaterialTheme.typography.labelSmall,
