@@ -97,6 +97,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.api.dto.PaymentMethodDto
 import com.example.uhf.manager.MiraPriceManager
+import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import com.google.gson.Gson
@@ -105,6 +106,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
@@ -455,29 +461,32 @@ class POSCheckoutDialog : DialogFragment() {
 
             // 1. GET /api/v1/payment-methods -> PaymentMethodController@index
             val methodsResp = client.paymentMethods
-            if (methodsResp != null && methodsResp.isSuccess) {
-                val rootObj = methodsResp.data ?: methodsResp.body?.trim()?.takeIf { it.startsWith("{") }?.let {
-                    try { JSONObject(it) } catch (_: Exception) { null }
-                }
-                val arr = rootObj?.optJSONArray("data") ?: methodsResp.body?.trim()?.takeIf { it.startsWith("[") }?.let {
-                    try { JSONArray(it) } catch (_: Exception) { null }
-                }
+            var arr: JSONArray? = null
 
-                if (arr != null) {
-                    val gson = Gson()
-                    for (i in 0 until arr.length()) {
-                        try {
-                            val obj = arr.getJSONObject(i)
-                            val m = gson.fromJson(obj.toString(), PaymentMethodDto::class.java)
-                            if (m != null && !m.code.isNullOrBlank()) {
-                                methods.add(m)
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Malformed payment method item at $i", e)
+            if (methodsResp != null && methodsResp.isSuccess) {
+                arr = extractMethodsArrayFromResponse(methodsResp)
+            }
+
+            // مسار احتياطي مباشر إذا لم يحتفظ ApiResponse بالمصفوفة داخل حقوله
+            if (arr == null) {
+                arr = fetchMethodsDirectFallback(appCtx, client)
+            }
+
+            if (arr != null) {
+                val gson = Gson()
+                for (i in 0 until arr.length()) {
+                    try {
+                        val obj = arr.getJSONObject(i)
+                        val dto = parsePaymentMethodDto(gson, obj)
+                        if (dto != null && !dto.code.isNullOrBlank()) {
+                            methods.add(dto)
                         }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Malformed payment method item at $i", e)
                     }
-                } else {
-                    methodsError = "Invalid response format from /payment-methods"
+                }
+                if (methods.isEmpty() && arr.length() == 0) {
+                    methodsError = "0 active payment methods returned"
                 }
             } else {
                 methodsError = methodsResp?.error ?: "HTTP ${methodsResp?.statusCode ?: -1}"
@@ -510,6 +519,124 @@ class POSCheckoutDialog : DialogFragment() {
             ratesToYer = extractedRates,
             methodsError = methodsError
         )
+    }
+
+    private fun extractMethodsArrayFromResponse(resp: MiraApiClient.ApiResponse): JSONArray? {
+        // 1. إذا كان resp.data يحتوي مصفوفة داخلية
+        resp.data?.let { d ->
+            d.optJSONArray("data")?.let { return it }
+            d.optJSONArray("payment_methods")?.let { return it }
+            d.optJSONArray("methods")?.let { return it }
+        }
+
+        // 2. فحص حقول ApiResponse (مثل dataArray أو rawResponse أو body)
+        val allFields = (resp.javaClass.fields.toList() + resp.javaClass.declaredFields.toList())
+            .distinctBy { it.name }
+        for (field in allFields) {
+            try {
+                field.isAccessible = true
+                when (val value = field.get(resp)) {
+                    is JSONArray -> if (value.length() > 0) return value
+                    is JSONObject -> {
+                        value.optJSONArray("data")?.let { return it }
+                    }
+                    is String -> {
+                        val trimmed = value.trim()
+                        if (trimmed.startsWith("{")) {
+                            JSONObject(trimmed).optJSONArray("data")?.let { return it }
+                        } else if (trimmed.startsWith("[")) {
+                            return JSONArray(trimmed)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun fetchMethodsDirectFallback(
+        appCtx: android.content.Context,
+        client: MiraApiClient
+    ): JSONArray? {
+        var conn: HttpURLConnection? = null
+        return try {
+            val session = SessionManager(appCtx)
+            val token = session.token
+            if (token.isNullOrBlank()) return null
+
+            var baseUrl: String? = null
+            val fields = (client.javaClass.fields.toList() + client.javaClass.declaredFields.toList())
+                .distinctBy { it.name }
+            for (f in fields) {
+                if (f.type == String::class.java) {
+                    f.isAccessible = true
+                    val v = f.get(client) as? String
+                    if (!v.isNullOrBlank() && (v.startsWith("http://") || v.startsWith("https://"))) {
+                        baseUrl = v.trimEnd('/')
+                        break
+                    }
+                }
+            }
+            if (baseUrl.isNullOrBlank()) return null
+
+            val endpoint = if (baseUrl.endsWith("/api/v1")) {
+                "$baseUrl/payment-methods"
+            } else {
+                "$baseUrl/api/v1/payment-methods"
+            }
+
+            conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $token")
+            }
+
+            if (conn.responseCode in 200..299) {
+                val body = BufferedReader(InputStreamReader(conn.inputStream, StandardCharsets.UTF_8))
+                    .use { it.readText() }
+                    .trim()
+                if (body.startsWith("{")) {
+                    JSONObject(body).optJSONArray("data")
+                } else if (body.startsWith("[")) {
+                    JSONArray(body)
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchMethodsDirectFallback failed: ${e.message}")
+            null
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    private fun parsePaymentMethodDto(gson: Gson, obj: JSONObject): PaymentMethodDto? {
+        return try {
+            gson.fromJson(obj.toString(), PaymentMethodDto::class.java)
+        } catch (_: Exception) {
+            // معالجة اختلاف requires_account بين 0/1 و false/true
+            try {
+                val normalized = JSONObject(obj.toString())
+                if (normalized.has("requires_account")) {
+                    val rawReq = normalized.opt("requires_account")
+                    if (rawReq is Number) {
+                        normalized.put("requires_account", rawReq.toInt() != 0)
+                    } else if (rawReq is Boolean) {
+                        normalized.put("requires_account", if (rawReq) 1 else 0)
+                    }
+                }
+                gson.fromJson(normalized.toString(), PaymentMethodDto::class.java)
+            } catch (e2: Exception) {
+                Log.w(TAG, "Failed parsing PaymentMethodDto: ${e2.message}")
+                null
+            }
+        }
     }
 
     private fun getRateToYER(currency: String?): Double {
