@@ -499,6 +499,7 @@ class MiraPosFragment : MiraBaseFragment() {
             lastScannedTimes.clear()
             negotiatedItemKeys.clear()
             itemBoundsState = emptyMap()
+
             negotiatingItemState = null
             currentScanMode = ScanMode.NONE
             stopAfterFirstRead = false
@@ -604,18 +605,20 @@ class MiraPosFragment : MiraBaseFragment() {
         return buildItemKeys(item).any { negotiatedItemKeys.contains(it) }
     }
 
-    private fun getBoundsForItem(item: CartItem?): ItemPriceBoundInfo? {
-        if (item == null) return null
-        for (k in buildItemKeys(item)) {
-            itemBoundsState[k]?.let { return it }
+    private fun getBoundsForItem(item: CartItem): ItemPriceBoundInfo? {
+        for (key in buildItemKeys(item)) {
+            val bound = itemBoundsState[key]
+            if (bound != null) return bound
         }
         return null
     }
 
     private fun putBoundsForItem(item: CartItem, bounds: ItemPriceBoundInfo) {
+        val keys = buildItemKeys(item)
+        if (keys.isEmpty()) return
         val updated = itemBoundsState.toMutableMap()
-        for (k in buildItemKeys(item)) {
-            updated[k] = bounds
+        for (key in keys) {
+            updated[key] = bounds
         }
         itemBoundsState = updated
     }
@@ -2860,7 +2863,10 @@ class MiraPosFragment : MiraBaseFragment() {
                                     items = cartItemsState,
                                     key = { index, item -> "${item.epc}_${item.serialNo}_$index" }
                                 ) { index, item ->
-                                    val itemBounds = getBoundsForItem(item)
+                                    val itemBounds = remember(item, itemBoundsState) {
+                                        getBoundsForItem(item)
+                                    }
+
                                     PosCartItemCard(
                                         isArabic = isAr,
                                         item = item,
