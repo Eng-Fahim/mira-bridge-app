@@ -802,14 +802,18 @@ class POSCheckoutDialog : DialogFragment() {
                                 paymentRowsState[index] = row.copy(amountText = newAmt)
                                 inlineErrorState = null
                             },
-                            onFillRemaining = {
+                                                        onFillRemaining = {
                                 val currentRowYer = parseDouble(row.amountText) * getRateToYER(row.currency)
                                 val otherPaidYer = getTotalPaidYER() - currentRowYer
                                 val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
                                 if (remYer > 0.01) {
                                     val rate = getRateToYER(row.currency)
                                     val formatted = if (row.currency.equals("YER", ignoreCase = true)) {
-                                        remYer.roundToLong().toString()
+                                        if (abs(remYer - remYer.roundToLong()) < 0.01) {
+                                            remYer.roundToLong().toString()
+                                        } else {
+                                            String.format(Locale.US, "%.2f", remYer)
+                                        }
                                     } else {
                                         String.format(Locale.US, "%.2f", remYer / rate)
                                     }
@@ -817,6 +821,7 @@ class POSCheckoutDialog : DialogFragment() {
                                     inlineErrorState = null
                                 }
                             },
+
                             onRemoveRow = {
                                 if (paymentRowsState.size > 1) {
                                     paymentRowsState.removeAt(index)
