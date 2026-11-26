@@ -121,6 +121,8 @@ public abstract class BaseActivity extends AppCompatActivity
             }
 
             if (!permissionManager.canAccessFragment(tag)) {
+                Log.w(TAG, "Closing unauthorized fragment on resume: tag=" + tag
+                        + ", class=" + f.getClass().getSimpleName());
                 toRemove.add(f);
             }
         }
