@@ -245,7 +245,11 @@ class MiraPosFragment : MiraBaseFragment() {
     private var activeUsdToYerRateState by mutableDoubleStateOf(530.0)
 
     // خريطة حدود التفاوض السعري لكل قطعة في السلة
-    private var itemBoundsState by mutableStateOf>(emptyMap())
+    private var itemBoundsState by mutableStateOf<kotlin.collections.Map<String, ItemPriceBoundInfo>>(emptyMap())
+
+
+
+
 
     // مفاتيح القطع التي تم تعديل سعرها بالتفاوض لحمايتها من الاستبدال عند التحقق قبل الدفع
     private val negotiatedItemKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
