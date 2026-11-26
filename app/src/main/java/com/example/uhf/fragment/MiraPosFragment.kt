@@ -1699,7 +1699,7 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun refreshPricesBeforeCheckout(itemIds: List<Int>) {
+        private fun refreshPricesBeforeCheckout(itemIds: List<Int>) {
         val loadingDialog = PosUIManager.showLoadingDialog(requireContext(), isArabic)
 
         miraExecutor?.networkExecutor?.execute {
@@ -1720,23 +1720,22 @@ class MiraPosFragment : MiraBaseFragment() {
 
                     try {
                         val manager = cartManager ?: return@safeRun
-                        val freshItems = resp.data?.optJSONArray("items")
-                        val unavailable = resp.data?.optJSONArray("unavailable")
-                        val freshTotalUsd = resp.data?.optDouble("total_usd", 0.0) ?: 0.0
-                        val freshTotalYer = resp.data?.optDouble("total_yer", 0.0) ?: 0.0
+                        val dataObj = resp.data!!
+                        val freshItems = dataObj.optJSONArray("items")
+                        val unavailable = dataObj.optJSONArray("unavailable")
+                        val serverTotalUsd = dataObj.optDouble("total_usd", 0.0)
+                        val serverTotalYer = dataObj.optDouble("total_yer", 0.0)
+                        val serverUsdRate = dataObj.optDouble("exchange_rate", 0.0)
                         val cachedTotalUsd = manager.snapshot().totalUsd
-
-                        val pricesChanged = abs(freshTotalUsd - cachedTotalUsd) > 0.01
 
                         if (freshItems != null) {
                             for (i in 0 until freshItems.length()) {
                                 val it = freshItems.getJSONObject(i)
                                 val id = it.optInt("id", 0)
                                 val newPrice = it.optDouble("retail_price_usd", 0.0)
-                                if (id > 0 && newPrice > 0) {
+                                if (id > 0 && newPrice > 0.0) {
                                     manager.updateItemPrice(id, newPrice)
                                 }
-                                // تحديث حدود التفاوض السعري المرجعة من السيرفر إن وُجدت
                                 if (id > 0) {
                                     val matchingCartItem = manager.items.firstOrNull { c -> c != null && c.itemId == id }
                                     if (matchingCartItem != null) {
@@ -1769,7 +1768,17 @@ class MiraPosFragment : MiraBaseFragment() {
                             )
                         }
 
-                        syncCartState(manager.snapshot())
+                        val updatedSnap = manager.snapshot()
+                        syncCartState(updatedSnap)
+
+                        val finalCheckoutUsd = if (serverTotalUsd > 0.0) {
+                            serverTotalUsd
+                        } else {
+                            updatedSnap.totalUsd
+                        }
+                        cartTotalUsdState = finalCheckoutUsd
+
+                        val pricesChanged = abs(finalCheckoutUsd - cachedTotalUsd) > 0.01
 
                         val postRefreshViolation = findFirstOutOfBoundsItem()
                         if (postRefreshViolation != null) {
@@ -1783,21 +1792,29 @@ class MiraPosFragment : MiraBaseFragment() {
                         }
 
                         if (pricesChanged) {
-                            val msg = if (isArabic) {
-                                "💰 تم تحديث الأسعار. الإجمالي الجديد: ${String.format(Locale.US, "%,.0f", freshTotalYer)} YER"
+                            val displayYer = if (serverTotalYer > 0.0) {
+                                serverTotalYer
                             } else {
-                                "💰 Prices updated. New total: ${String.format(Locale.US, "%,.0f", freshTotalYer)} YER"
+                                finalCheckoutUsd * (if (serverUsdRate > 0.0) serverUsdRate else getEffectiveYerRate())
+                            }
+                            val msg = if (isArabic) {
+                                "💰 تم تحديث الأسعار. الإجمالي الجديد: ${String.format(Locale.US, "%,.0f", displayYer)} YER"
+                            } else {
+                                "💰 Prices updated. New total: ${String.format(Locale.US, "%,.0f", displayYer)} YER"
                             }
                             showToast(msg)
                         }
 
-                        val ratesObj = resp.data?.optJSONObject("exchange_rates")
-                        val ratesJson = ratesObj?.toString() ?: "{}"
+                        val ratesObj = dataObj.optJSONObject("exchange_rates") ?: JSONObject()
+                        if (serverUsdRate > 0.0 && ratesObj.optDouble("USD", 0.0) <= 0.0) {
+                            ratesObj.put("USD", serverUsdRate)
+                        }
+                        val ratesJson = ratesObj.toString()
 
-                        val scrapDetailsObj = resp.data?.optJSONObject("scrap_details")
+                        val scrapDetailsObj = dataObj.optJSONObject("scrap_details")
                         val scrapDetailsJson = scrapDetailsObj?.toString() ?: "{}"
 
-                        openCheckoutDialogWithTotal(freshTotalUsd, ratesJson, scrapDetailsJson)
+                        openCheckoutDialogWithTotal(finalCheckoutUsd, ratesJson, scrapDetailsJson)
                     } catch (e: Exception) {
                         Log.e(TAG, "refreshPrices parse error", e)
                         showToast("⚠️ ${e.message}")
@@ -1824,8 +1841,9 @@ class MiraPosFragment : MiraBaseFragment() {
 
             isCheckoutDialogShowing = true
             val snap = manager.snapshot()
+            val effectiveTotalUsd = if (totalUsd > 0.0) totalUsd else snap.totalUsd
 
-            val dialog = POSCheckoutDialog.newInstance(totalUsd, snap.count, ratesJson, scrapDetailsJson)
+            val dialog = POSCheckoutDialog.newInstance(effectiveTotalUsd, snap.count, ratesJson, scrapDetailsJson)
             activeCheckoutDialog = dialog
 
             dialog.setCheckoutListener(object : POSCheckoutDialog.OnCheckoutListener {
@@ -1854,6 +1872,7 @@ class MiraPosFragment : MiraBaseFragment() {
             Log.e(TAG, "openCheckoutDialogWithTotal error", e)
         }
     }
+
 
     private fun executeCheckoutDirectly(data: POSCheckoutDialog.POSCheckoutData) {
         if (!isFragmentAlive()) return
@@ -3768,129 +3787,146 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    @Composable
-    private fun ItemPriceBoundsBadge(
-        isArabic: Boolean,
-        currentPriceUsd: Double,
-        bounds: ItemPriceBoundInfo,
-        onSnapToBound: (Double) -> Unit
+   @Composable
+private fun ItemPriceBoundsBadge(
+    isArabic: Boolean,
+    currentPriceUsd: Double,
+    bounds: ItemPriceBoundInfo,
+    onSnapToBound: (Double) -> Unit
+) {
+    val colors = MiraTheme.colors
+    val belowMin = bounds.isBelowMin(currentPriceUsd)
+    val aboveMax = bounds.isAboveMax(currentPriceUsd)
+    val outOfBounds = belowMin || aboveMax
+
+    val containerColor = if (outOfBounds) {
+        Color(0xFFEF4444).copy(alpha = 0.12f)
+    } else {
+        colors.backgroundMid.copy(alpha = 0.65f)
+    }
+    val borderColor = if (outOfBounds) {
+        Color(0xFFEF4444).copy(alpha = 0.55f)
+    } else {
+        colors.goldPrimary.copy(alpha = 0.25f)
+    }
+
+    val sourceLabel = when {
+        isArabic && bounds.source == "item" -> "نطاق القطعة"
+        isArabic -> "نطاق العيار"
+        bounds.source == "item" -> "Item Range"
+        else -> "Karat Range"
+    }
+
+    val minFormatted = formatDualUsdYer(bounds.minPriceUsd)
+    val maxFormatted = if (bounds.maxPriceUsd != null && bounds.maxPriceUsd > 0.0) {
+        formatDualUsdYer(bounds.maxPriceUsd)
+    } else {
+        if (isArabic) "مفتوح" else "Open"
+    }
+
+    val valueColor = if (outOfBounds) Color(0xFFFCA5A5) else colors.goldPrimary
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(containerColor)
+            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        val colors = MiraTheme.colors
-        val belowMin = bounds.isBelowMin(currentPriceUsd)
-        val aboveMax = bounds.isAboveMax(currentPriceUsd)
-        val outOfBounds = belowMin || aboveMax
-
-        val containerColor = if (outOfBounds) {
-            Color(0xFFEF4444).copy(alpha = 0.12f)
-        } else {
-            colors.backgroundMid.copy(alpha = 0.65f)
-        }
-        val borderColor = if (outOfBounds) {
-            Color(0xFFEF4444).copy(alpha = 0.55f)
-        } else {
-            colors.goldPrimary.copy(alpha = 0.25f)
-        }
-
-        val sourceLabel = when {
-            isArabic && bounds.source == "item" -> "نطاق القطعة:"
-            isArabic -> "نطاق العيار:"
-            bounds.source == "item" -> "Item Range:"
-            else -> "Karat Range:"
-        }
-
-        val rangeText = buildString {
-            append(formatDualUsdYer(bounds.minPriceUsd))
-            append(" — ")
-            if (bounds.maxPriceUsd != null && bounds.maxPriceUsd > 0.0) {
-                append(formatDualUsdYer(bounds.maxPriceUsd))
-            } else {
-                append(if (isArabic) "مفتوح" else "Open")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = sourceLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textSecondary,
+                maxLines = 1,
+                softWrap = false
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = if (isArabic) "من: $minFormatted" else "Min: $minFormatted",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = valueColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (isArabic) "إلى: $maxFormatted" else "Max: $maxFormatted",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = valueColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(containerColor)
-                .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        if (belowMin) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = sourceLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = rangeText,
+                    text = if (isArabic) "⚠️ أقل من الحد الأدنى المسموح" else "⚠️ Below minimum allowed",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (outOfBounds) Color(0xFFFCA5A5) else colors.goldPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    color = Color(0xFFF87171)
                 )
-            }
-
-            if (belowMin) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                TextButton(
+                    onClick = { onSnapToBound(bounds.minPriceUsd) },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.height(26.dp)
                 ) {
                     Text(
-                        text = if (isArabic) "⚠️ أقل من الحد الأدنى المسموح" else "⚠️ Below minimum allowed",
+                        text = if (isArabic) "ضبط للأدنى" else "Snap Min",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF87171)
+                        color = Color(0xFF10B981)
                     )
-                    TextButton(
-                        onClick = { onSnapToBound(bounds.minPriceUsd) },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier.height(26.dp)
-                    ) {
-                        Text(
-                            text = if (isArabic) "ضبط للأدنى" else "Snap Min",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF10B981)
-                        )
-                    }
                 }
-            } else if (aboveMax && bounds.maxPriceUsd != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            }
+        } else if (aboveMax && bounds.maxPriceUsd != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isArabic) "⚠️ يتجاوز الحد الأعلى المسموح" else "⚠️ Exceeds maximum allowed",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFBBF24)
+                )
+                TextButton(
+                    onClick = { onSnapToBound(bounds.maxPriceUsd) },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.height(26.dp)
                 ) {
                     Text(
-                        text = if (isArabic) "⚠️ يتجاوز الحد الأعلى المسموح" else "⚠️ Exceeds maximum allowed",
+                        text = if (isArabic) "ضبط للأعلى" else "Snap Max",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFBBF24)
+                        color = Color(0xFF10B981)
                     )
-                    TextButton(
-                        onClick = { onSnapToBound(bounds.maxPriceUsd) },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        modifier = Modifier.height(26.dp)
-                    ) {
-                        Text(
-                            text = if (isArabic) "ضبط للأعلى" else "Snap Max",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF10B981)
-                        )
-                    }
                 }
             }
         }
     }
+}
+
 
     @Composable
     private fun NegotiateItemPriceDialog(
@@ -4286,11 +4322,14 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
     private fun formatDualUsdYer(usd: Double): String {
-        val yer = (usd * getEffectiveYerRate()).roundToLong()
-        val usdStr = String.format(Locale.US, "$%,.2f", usd)
-        val yerStr = String.format(Locale.US, "%,d", yer)
-        return if (isArabic) "$usdStr ($yerStr ر.ي)" else "$usdStr ($yerStr YER)"
-    }
+    val safeUsd = if (usd.isFinite() && usd > 0.0) usd else 0.0
+    val rate = getEffectiveYerRate().takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+    val yer = (safeUsd * rate).roundToLong()
+    val usdStr = String.format(Locale.US, "$%,.2f", safeUsd)
+    val yerStr = String.format(Locale.US, "%,d", yer)
+    return if (isArabic) "$usdStr ($yerStr ر.ي)" else "$usdStr ($yerStr YER)"
+}
+
 
     private fun buildTotalText(count: Int, totalUsd: Double): String {
         if (count <= 0) {
