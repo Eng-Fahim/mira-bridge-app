@@ -14,10 +14,11 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v4.4 — Server-Driven & Live Sync
+ *  PermissionManager v4.5 — Server-Driven & Live Sync
  * ═══════════════════════════════════════════════════════════════════
  *  متطابق 100% مع PermissionsNormalizer::MODULES (23 وحدة قياسية)
  */
@@ -255,9 +256,10 @@ public class PermissionManager {
             // المحاسبة والمالية
             {"Accounting", "accounting"}, {"FiscalYears", "accounting"},
             {"OpeningBalances", "accounting"}, {"FinancialReports", "accounting"},
-            {"ProfitReport", "accounting"}, {"AccountingCharts", "accounting"},
-            {"AccountingAuditLog", "accounting"}, {"AccountingSetup", "accounting"},
-            {"CashReconciliation", "accounting"},
+            {"ProfitReport", "accounting"}, {"ProfitAnalysis", "accounting"},
+            {"InventoryRevaluation", "accounting"},
+            {"AccountingCharts", "accounting"}, {"AccountingAuditLog", "accounting"},
+            {"AccountingSetup", "accounting"}, {"CashReconciliation", "accounting"},
             {"Vouchers", "vouchers"},
             {"Cheques", "cheques"},
 
@@ -320,9 +322,17 @@ public class PermissionManager {
             }
         }
 
-        // شاشة استوديو التكويد تعمل بصلاحية rfid أو صلاحية تشغيل/تعديل المخزون inventory
+        // إعادة تقييم المخزون تعمل بصلاحية المحاسبة أو المخزون
+        JSONObject accMod  = modules.optJSONObject("accounting");
         JSONObject rfidMod = modules.optJSONObject("rfid");
         JSONObject invMod  = modules.optJSONObject("inventory");
+
+        if ((accMod != null && accMod.optBoolean("enabled", false))
+                || (invMod != null && invMod.optBoolean("enabled", false))) {
+            try { out.put("InventoryRevaluation", true); } catch (Exception ignored) {}
+        }
+
+        // شاشة استوديو التكويد تعمل بصلاحية rfid أو صلاحية تشغيل/تعديل المخزون inventory
         boolean canIdentity = (rfidMod != null && rfidMod.optBoolean("enabled", false))
                 || (invMod != null && invMod.optBoolean("enabled", false)
                     && ("operate".equals(invMod.optString("scope"))
@@ -704,55 +714,96 @@ public class PermissionManager {
     public boolean canAccessFragment(String fragmentTag) {
         if (fragmentTag == null || fragmentTag.trim().isEmpty()) return false;
         final String tag = fragmentTag.trim();
+        final String normalized = canonicalFragmentKey(tag);
 
-        if ("IdentityStudio".equalsIgnoreCase(tag) || "MiraIdentityStudio".equalsIgnoreCase(tag)) {
+        if ("identitystudio".equals(normalized)) {
             return canViewIdentity();
         }
-        if ("QuickActions".equalsIgnoreCase(tag) || "Receipt".equalsIgnoreCase(tag)) {
+        if ("quickactions".equals(normalized) || "receipt".equals(normalized)) {
             return true;
         }
 
-        if (fragments != null && fragments.has(tag)) {
-            return fragments.optBoolean(tag, false);
+        // 1. فحص خريطة fragments القادمة/المشتقة من السيرفر (بالتطابق المباشر أو المعياري)
+        if (fragments != null) {
+            if (fragments.has(tag)) {
+                return fragments.optBoolean(tag, false);
+            }
+            Iterator<String> keys = fragments.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                if (canonicalFragmentKey(k).equals(normalized)) {
+                    return fragments.optBoolean(k, false);
+                }
+            }
         }
 
-        String mod = moduleForFragment(tag);
+        // 2. الشاشات الأساسية للمستخدم المسجل دخول
+        if ("dashboard".equals(normalized) || "home".equals(normalized)
+                || "profile".equals(normalized) || "soundsettings".equals(normalized)
+                || "notifications".equals(normalized)) {
+            return true;
+        }
+
+        // 3. إعادة تقييم المخزون ترتبط بوحدة المحاسبة أو المخزون في السيرفر
+        if ("inventoryrevaluation".equals(normalized)) {
+            return moduleEnabled("accounting") || moduleEnabled("inventory");
+        }
+
+        // 4. فحص الوحدة المقابلة في capabilities.modules من السيرفر
+        String mod = moduleForFragment(normalized);
         if (mod != null) return moduleEnabled(mod);
 
         Log.w(TAG, "🚫 Unknown fragment denied (server-driven): " + tag);
         return false;
     }
 
-    private String moduleForFragment(String tag) {
-        switch (tag.toLowerCase()) {
-            case "dashboard": case "home": case "homefragment":
+    private String canonicalFragmentKey(String raw) {
+        String s = raw.trim().toLowerCase(Locale.US)
+                .replace("_", "")
+                .replace("-", "");
+        if (s.startsWith("mira") && s.length() > 4) {
+            s = s.substring(4);
+        }
+        if (s.endsWith("fragment") && s.length() > 8) {
+            s = s.substring(0, s.length() - 8);
+        }
+        return s;
+    }
+
+    private String moduleForFragment(String normalizedTag) {
+        switch (normalizedTag) {
+            case "dashboard": case "home":
             case "profile": case "soundsettings": case "notifications":
             case "receipt": case "quickactions":
                 return null;
             case "serverconfig": return "settings";
-            case "accountingsetup": return "accounting";
-            case "cashreconciliation": return "accounting";
+            case "accountingsetup":
+            case "cashreconciliation":
+            case "profitanalysis":
+            case "inventoryrevaluation":
+                return "accounting";
             case "readercontrol": case "readersetup": case "uhfset": return "setup";
-            case "scrapgoldbuy": case "mirascrapgoldbuy":
-            case "scraphistory": case "mirascraphistory":
-            case "scrapbatches": case "mirascrapbatches":
-            case "scrapaging": case "mirascrapaging":
+            case "scrapgoldbuy":
+            case "scraphistory":
+            case "scrapbatches":
+            case "scrapaging":
             case "scrapprofitreport":
                 return "scrap";
-            case "inventory": case "inventorypro": case "mirainventory":
+            case "inventory": case "inventorypro":
             case "scan": case "snapshots": case "goldconversion":
                 return "inventory";
-            case "parties": case "miraparties": return "parties";
+            case "parties": case "partieslist": return "parties";
             case "purchaseinvoice": return "purchases";
-            case "auditlogs": return "audit";
+            case "auditlogs": case "auditlog": return "audit";
             case "vouchers": return "vouchers";
             case "cheques": return "cheques";
-            case "pos": case "posfragment": return "pos";
+            case "pos": return "pos";
             case "transfers": case "transferdetail": return "transfers";
-            case "identitystudio": case "miraidentitystudio":
-            case "rfidwrite": case "rfidbindings": case "rfidsettings":
+            case "identitystudio":
+            case "rfidwrite": case "uhfreadwrite":
+            case "rfidbindings": case "rfidsettings":
                 return "rfid";
-            case "radar": case "locator": return "radar";
+            case "radar": case "locator": case "uhfradarlocation": return "radar";
             case "securegate": case "gatesettings": case "gates": return "gate";
             case "reports": case "reportspro": return "reports";
             case "accounting": case "fiscalyears": case "openingbalances":
@@ -762,7 +813,7 @@ public class PermissionManager {
             case "adminhub": case "quickaccesssettings": case "nxpsecurity":
                 return "admin";
             case "usersmanagement": return "users";
-            case "goldrates": return "gold_rates";
+            case "goldrates": case "goldcurrency": return "gold_rates";
             case "saleshistory": return "sales_history";
             case "branches": case "branchesmanagement": return "branches";
             default:
