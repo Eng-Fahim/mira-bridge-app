@@ -96,9 +96,8 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
- * MiraPosFragment (Jetpack Compose Edition)
- * يحافظ على كامل التوافق مع UHFMainActivity، قارئ RFID، الميزان الذكي، الدفع، الاسترجاع،
- * والمزامنة بدون إنترنت، مع توحيد مصدر الأسعار وسعر الصرف وحدود التفاوض السعري ($ / YER).
+ * MiraPosFragment (Jetpack Compose Edition — Server Single Source of Truth)
+ * السيرفر هو مصدر الحقيقة الوحيد للأسعار، حدود التفاوض السعري، سعر الصرف، وتوافر القطع.
  */
 class MiraPosFragment : MiraBaseFragment() {
 
@@ -233,25 +232,22 @@ class MiraPosFragment : MiraBaseFragment() {
     private var pendingStopRfid: Runnable? = null
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose Reactive States (Single Source of Truth)
+    //  Jetpack Compose Reactive States (Server Single Source of Truth)
     // ═══════════════════════════════════════════════════════════════════
 
-    private var cartItemsState by mutableStateOf<List<CartItem>>(emptyList())
+    private var cartItemsState by mutableStateOf(emptyList<CartItem>())
     private var cartCountState by mutableIntStateOf(0)
     private var cartTotalUsdState by mutableDoubleStateOf(0.0)
     private var cartHasUnavailableState by mutableStateOf(false)
+    private var cartRevisionState by mutableIntStateOf(0)
 
-    // سعر الصرف المعتمد حالياً (1 USD = X YER) موحّد بين السلة ونافذة الدفع والـ Payload
+    // سعر الصرف المعتمد من السيرفر (1 USD = X YER) موحّد بين السلة ونافذة الدفع والـ Payload
     private var activeUsdToYerRateState by mutableDoubleStateOf(530.0)
 
-    // خريطة حدود التفاوض السعري لكل قطعة في السلة
-    private var itemBoundsState by mutableStateOf<kotlin.collections.Map<String, ItemPriceBoundInfo>>(emptyMap())
+    // خريطة حدود التفاوض السعري لكل قطعة في السلة (مصدرها السيرفر)
+    private var itemBoundsState by mutableStateOf(emptyMap<String, ItemPriceBoundInfo>())
 
-
-
-
-
-    // مفاتيح القطع التي تم تعديل سعرها بالتفاوض لحمايتها من الاستبدال عند التحقق قبل الدفع
+    // مفاتيح القطع التي تم تعديل سعرها بالتفاوض ضمن الحدود المعتمدة من السيرفر
     private val negotiatedItemKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var negotiatingItemState by mutableStateOf<NegotiateItemTarget?>(null)
 
@@ -549,6 +545,16 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
+    private fun applyAuthoritativeRateFromServer(rate: Double) {
+        if (rate > 1.0 && rate.isFinite()) {
+            activeUsdToYerRateState = rate
+            try {
+                priceManager?.setExchangeRate("YER", rate)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun setupCartListener() {
         val manager = cartManager ?: return
         val listener = PosCartManager.OnCartChangedListener { snapshot, _, _ ->
@@ -565,6 +571,7 @@ class MiraPosFragment : MiraBaseFragment() {
         cartCountState = snapshot.count
         cartTotalUsdState = snapshot.totalUsd
         cartHasUnavailableState = snapshot.hasUnavailable
+        cartRevisionState += 1
 
         if (items.isEmpty()) {
             itemBoundsState = emptyMap()
@@ -620,11 +627,13 @@ class MiraPosFragment : MiraBaseFragment() {
     private fun putBoundsForItem(item: CartItem, bounds: ItemPriceBoundInfo) {
         val keys = buildItemKeys(item)
         if (keys.isEmpty()) return
-        val updated = itemBoundsState.toMutableMap()
+        val updated = LinkedHashMap<String, ItemPriceBoundInfo>(itemBoundsState.size + keys.size)
+        updated.putAll(itemBoundsState)
         for (key in keys) {
             updated[key] = bounds
         }
         itemBoundsState = updated
+        cartRevisionState += 1
     }
 
     private fun resolveItemPriceBoundsFromJson(
@@ -685,6 +694,27 @@ class MiraPosFragment : MiraBaseFragment() {
         )
     }
 
+    private fun cloneCartItemWithPrice(source: CartItem, newPriceUsd: Double): CartItem {
+        return CartItem(
+            source.epc,
+            source.name,
+            source.karat,
+            source.weight,
+            source.scaleWeight,
+            newPriceUsd,
+            source.isAvailable,
+            source.status
+        ).apply {
+            serialNo = source.serialNo
+            gtin = source.gtin
+            location = source.location
+            itemId = source.itemId
+            tid = source.tid
+            rfidEpc = source.rfidEpc
+            epc = source.epc
+        }
+    }
+
     private fun updateCartItemNegotiatedPrice(index: Int, newPriceUsd: Double) {
         val manager = cartManager ?: return
         val items = manager.items
@@ -713,9 +743,10 @@ class MiraPosFragment : MiraBaseFragment() {
             }
         }
 
-        target.price = newPriceUsd
-        markItemNegotiated(target)
-        manager.updateItemAt(index, target)
+        val updatedItem = cloneCartItemWithPrice(target, newPriceUsd)
+        markItemNegotiated(updatedItem)
+        manager.updateItemAt(index, updatedItem)
+        syncCartState(manager.snapshot())
         negotiatingItemState = null
         playAlertSound(1)
         showToast(
@@ -1366,10 +1397,11 @@ class MiraPosFragment : MiraBaseFragment() {
                 return
             }
 
-            // مزامنة سعر الصرف إذا ورد مع بيانات القطعة
-            val itemUsdRate = item.optDouble("exchange_rate", data.optDouble("exchange_rate", 0.0))
-            if (itemUsdRate > 1.0 && itemUsdRate.isFinite()) {
-                activeUsdToYerRateState = itemUsdRate
+            // السيرفر مصدر الحقيقة الوحيد لسعر الصرف: مزامنة فورية عند المسح
+            val serverRate = extractUsdToYerFromJson(item).takeIf { it > 1.0 }
+                ?: extractUsdToYerFromJson(data)
+            if (serverRate > 1.0) {
+                applyAuthoritativeRateFromServer(serverRate)
             }
 
             try {
@@ -1420,8 +1452,12 @@ class MiraPosFragment : MiraBaseFragment() {
             )
 
             val karatNum = getKaratNumber(karat)
-            val priceResult = priceResolver!!.resolve(item, karatNum, weight)
-            val price = priceResult.priceUsd
+            val serverRetailUsd = item.optDouble("retail_price_usd", 0.0)
+            val price = if (serverRetailUsd > 0.0 && serverRetailUsd.isFinite()) {
+                serverRetailUsd
+            } else {
+                priceResolver!!.resolve(item, karatNum, weight).priceUsd
+            }
             val boundsInfo = resolveItemPriceBoundsFromJson(item, karatNum, weight)
 
             val cartItem = CartItem(
@@ -1683,7 +1719,7 @@ class MiraPosFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Checkout Flow (Unified Rate & Negotiated Prices Protection)
+    //  Checkout Flow (Server Single Source of Truth)
     // ═══════════════════════════════════════════════════════════════════
 
     private fun processCheckoutAndStockUpdate() {
@@ -1739,7 +1775,7 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun extractUsdToYerFromPrepareResponse(dataObj: JSONObject): Double {
+    private fun extractUsdToYerFromJson(dataObj: JSONObject): Double {
         val directRate = dataObj.optDouble("exchange_rate", 0.0)
         if (directRate > 1.0 && directRate.isFinite()) return directRate
 
@@ -1751,7 +1787,12 @@ class MiraPosFragment : MiraBaseFragment() {
             val yerRate = ratesObj.optDouble("YER", 0.0)
             if (yerRate > 1.0 && yerRate.isFinite()) return yerRate
         }
-        return getEffectiveYerRate()
+        return 0.0
+    }
+
+    private fun extractUsdToYerFromPrepareResponse(dataObj: JSONObject): Double {
+        val extracted = extractUsdToYerFromJson(dataObj)
+        return if (extracted > 1.0) extracted else getEffectiveYerRate()
     }
 
     private fun refreshPricesBeforeCheckout(itemIds: List<Int>) {
@@ -1781,9 +1822,9 @@ class MiraPosFragment : MiraBaseFragment() {
                         val serverTotalUsd = dataObj.optDouble("total_usd", 0.0)
                         val cachedTotalUsd = manager.snapshot().totalUsd
 
-                        // توحيد سعر الصرف بين السلة ونافذة الدفع والـ Payload
+                        // السيرفر مصدر الحقيقة الوحيد لسعر الصرف
                         val resolvedUsdToYerRate = extractUsdToYerFromPrepareResponse(dataObj)
-                        activeUsdToYerRateState = resolvedUsdToYerRate
+                        applyAuthoritativeRateFromServer(resolvedUsdToYerRate)
 
                         var hasAnyNegotiatedItem = false
 
@@ -1793,7 +1834,8 @@ class MiraPosFragment : MiraBaseFragment() {
                                 val id = it.optInt("id", 0)
                                 val newPrice = it.optDouble("retail_price_usd", 0.0)
                                 if (id > 0) {
-                                    val matchingCartItem = manager.items.firstOrNull { c -> c != null && c.itemId == id }
+                                    val matchingIndex = manager.items.indexOfFirst { c -> c != null && c.itemId == id }
+                                    val matchingCartItem = if (matchingIndex >= 0) manager.items[matchingIndex] else null
                                     if (matchingCartItem != null) {
                                         val updatedBounds = resolveItemPriceBoundsFromJson(
                                             it,
@@ -1803,10 +1845,19 @@ class MiraPosFragment : MiraBaseFragment() {
                                         putBoundsForItem(matchingCartItem, updatedBounds)
 
                                         if (isItemNegotiated(matchingCartItem)) {
-                                            // نحافظ على السعر المتفاوض عليه طالما هو ضمن الحدود المعتمدة
-                                            hasAnyNegotiatedItem = true
-                                        } else if (newPrice > 0.0) {
-                                            manager.updateItemPrice(id, newPrice)
+                                            // السيرفر يحدد الحدود: السعر المتفاوض عليه يُقبل فقط إذا بقي ضمن حدود السيرفر المحدّثة
+                                            if (updatedBounds.isOutOfBounds(matchingCartItem.price)) {
+                                                unmarkItemNegotiated(matchingCartItem)
+                                                if (newPrice > 0.0) {
+                                                    val resetItem = cloneCartItemWithPrice(matchingCartItem, newPrice)
+                                                    manager.updateItemAt(matchingIndex, resetItem)
+                                                }
+                                            } else {
+                                                hasAnyNegotiatedItem = true
+                                            }
+                                        } else if (newPrice > 0.0 && abs(matchingCartItem.price - newPrice) > 0.005) {
+                                            val updatedItem = cloneCartItemWithPrice(matchingCartItem, newPrice)
+                                            manager.updateItemAt(matchingIndex, updatedItem)
                                         }
                                     } else if (newPrice > 0.0) {
                                         manager.updateItemPrice(id, newPrice)
@@ -1838,6 +1889,10 @@ class MiraPosFragment : MiraBaseFragment() {
                         val updatedSnap = manager.snapshot()
                         syncCartState(updatedSnap)
 
+                        if (updatedSnap.count == 0) {
+                            return@safeRun
+                        }
+
                         val finalCheckoutUsd = when {
                             hasAnyNegotiatedItem -> updatedSnap.totalUsd
                             serverTotalUsd > 0.0 -> serverTotalUsd
@@ -1850,8 +1905,8 @@ class MiraPosFragment : MiraBaseFragment() {
                             val (badItem, _) = postRefreshViolation
                             playAlertSound(2)
                             showToast(
-                                if (isArabic) "⚠️ سعر «${badItem.name}» خارج النطاق المعتمد بعد التحديث"
-                                else "⚠️ Price for «${badItem.name}» is out of bounds after refresh"
+                                if (isArabic) "⚠️ سعر «${badItem.name}» خارج النطاق المعتمد من السيرفر"
+                                else "⚠️ Price for «${badItem.name}» is out of server bounds"
                             )
                             return@safeRun
                         }
@@ -1859,9 +1914,9 @@ class MiraPosFragment : MiraBaseFragment() {
                         val pricesChanged = abs(finalCheckoutUsd - cachedTotalUsd) > 0.01
                         if (pricesChanged) {
                             val msg = if (isArabic) {
-                                "💰 تم تحديث الأسعار. الإجمالي الجديد: ${formatDualUsdYer(finalCheckoutUsd)}"
+                                "💰 تم تحديث الأسعار. الإجمالي الجديد: ${formatDualUsdYer(finalCheckoutUsd, resolvedUsdToYerRate)}"
                             } else {
-                                "💰 Prices updated. New total: ${formatDualUsdYer(finalCheckoutUsd)}"
+                                "💰 Prices updated. New total: ${formatDualUsdYer(finalCheckoutUsd, resolvedUsdToYerRate)}"
                             }
                             showToast(msg)
                         }
@@ -1986,9 +2041,9 @@ class MiraPosFragment : MiraBaseFragment() {
                                 "RATE_MISMATCH", "TRADE_IN_RATE_CHANGED" -> {
                                     currentSaleUuid = null
                                     val msg = if (isArabic) {
-                                        "⚠️ تغيّرت الأسعار — أغلق النافذة وافتحها مجدداً"
+                                        "⚠️ تغيّرت الأسعار في السيرفر — أغلق النافذة وافتحها مجدداً"
                                     } else {
-                                        "⚠️ Rates outdated — close and reopen"
+                                        "⚠️ Server rates updated — close and reopen"
                                     }
                                     if (activeCheckoutDialog?.isAdded == true) {
                                         activeCheckoutDialog?.onCheckoutError(msg)
@@ -2000,9 +2055,9 @@ class MiraPosFragment : MiraBaseFragment() {
                                 "PRICE_OUT_OF_BOUNDS", "BELOW_MIN_PRICE", "ABOVE_MAX_PRICE" -> {
                                     currentSaleUuid = null
                                     val msg = if (isArabic) {
-                                        "⛔ السعر خارج حدود التسعير المعتمدة — راجع أسعار القطع في السلة"
+                                        "⛔ السعر مرفوض من السيرفر (خارج حدود التسعير المعتمدة)"
                                     } else {
-                                        "⛔ Price outside allowed bounds — review cart item prices"
+                                        "⛔ Price rejected by server (outside allowed bounds)"
                                     }
                                     if (activeCheckoutDialog?.isAdded == true) {
                                         activeCheckoutDialog?.onCheckoutError(msg)
@@ -2161,7 +2216,7 @@ class MiraPosFragment : MiraBaseFragment() {
         val discountUsd = data.discountAmount
         val finalUsd = data.finalAmount
 
-        // استخدام نفس سعر الصرف المقفل الذي استُخدم في شاشة POSCheckoutDialog لمنع تضارب الإجماليات
+        // استخدام نفس سعر الصرف المقفل من السيرفر لمنع تضارب الإجماليات
         val yerRate = when {
             data.usdToYerRate > 1.0 -> data.usdToYerRate
             activeUsdToYerRateState > 1.0 -> activeUsdToYerRateState
@@ -2729,8 +2784,9 @@ class MiraPosFragment : MiraBaseFragment() {
         val colors = MiraTheme.colors
         val isAr = isArabic
         val currentYerRate = activeUsdToYerRateState
+        val revision = cartRevisionState
 
-        val hasAnyOutOfBounds = remember(cartItemsState, itemBoundsState) {
+        val hasAnyOutOfBounds = remember(revision, cartItemsState, itemBoundsState) {
             cartItemsState.any { item ->
                 val b = getBoundsForItem(item)
                 b != null && b.isOutOfBounds(item.price)
@@ -2867,7 +2923,7 @@ class MiraPosFragment : MiraBaseFragment() {
                                     items = cartItemsState,
                                     key = { index, item -> "${item.epc}_${item.serialNo}_$index" }
                                 ) { index, item ->
-                                    val itemBounds = remember(item, itemBoundsState) {
+                                    val itemBounds = remember(revision, item, itemBoundsState) {
                                         getBoundsForItem(item)
                                     }
 
@@ -2875,6 +2931,7 @@ class MiraPosFragment : MiraBaseFragment() {
                                         isArabic = isAr,
                                         item = item,
                                         bounds = itemBounds,
+                                        yerRate = currentYerRate,
                                         formattedPrice = formatDualUsdYer(item.price, currentYerRate),
                                         onEditPrice = {
                                             val resolvedBounds = itemBounds ?: resolveItemPriceBoundsFromJson(
@@ -3705,6 +3762,7 @@ class MiraPosFragment : MiraBaseFragment() {
         isArabic: Boolean,
         item: CartItem,
         bounds: ItemPriceBoundInfo?,
+        yerRate: Double,
         formattedPrice: String,
         onEditPrice: () -> Unit,
         onSnapToBound: (Double) -> Unit,
@@ -3870,6 +3928,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         isArabic = isArabic,
                         currentPriceUsd = item.price,
                         bounds = bounds,
+                        yerRate = yerRate,
                         onSnapToBound = onSnapToBound
                     )
                 }
@@ -3882,6 +3941,7 @@ class MiraPosFragment : MiraBaseFragment() {
         isArabic: Boolean,
         currentPriceUsd: Double,
         bounds: ItemPriceBoundInfo,
+        yerRate: Double,
         onSnapToBound: (Double) -> Unit
     ) {
         val colors = MiraTheme.colors
@@ -3907,9 +3967,9 @@ class MiraPosFragment : MiraBaseFragment() {
             else -> "Karat Range"
         }
 
-        val minFormatted = formatDualUsdYer(bounds.minPriceUsd)
+        val minFormatted = formatDualUsdYer(bounds.minPriceUsd, yerRate)
         val maxFormatted = if (bounds.maxPriceUsd != null && bounds.maxPriceUsd > 0.0) {
-            formatDualUsdYer(bounds.maxPriceUsd)
+            formatDualUsdYer(bounds.maxPriceUsd, yerRate)
         } else {
             if (isArabic) "مفتوح" else "Open"
         }
