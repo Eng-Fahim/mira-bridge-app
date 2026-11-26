@@ -545,15 +545,12 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    private fun applyAuthoritativeRateFromServer(rate: Double) {
+        private fun applyAuthoritativeRateFromServer(rate: Double) {
         if (rate > 1.0 && rate.isFinite()) {
             activeUsdToYerRateState = rate
-            try {
-                priceManager?.setExchangeRate("YER", rate)
-            } catch (_: Exception) {
-            }
         }
     }
+
 
     private fun setupCartListener() {
         val manager = cartManager ?: return
