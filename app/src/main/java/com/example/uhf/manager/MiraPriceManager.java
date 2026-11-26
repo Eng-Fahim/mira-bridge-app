@@ -17,19 +17,18 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * MiraPriceManager v3.0 — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
+ * MiraPriceManager v4.0 — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
  *
  * ✅ لا قرارات أو هوامش أو أسعار صرف افتراضية محلية
- * ✅ مزامنة مستمرة ولحظية مع السيرفر دون حجب بقفل التحميل لمرة واحدة
- * ✅ إشعار فوري عبر MIRA_PRICES_UPDATED عند أي تحديث
- * ✅ لا يُعيد "—" في التنسيق — يُعيد 0 مع رمز العملة
+ * ✅ مزامنة لحظية من السيرفر ومن أي استجابة API تحتوي على exchange_rate
+ * ✅ إشعار فوري عبر MIRA_PRICES_UPDATED لتوحيد العملة بين السلة والدفع والإيصال
  */
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
     private static final String PREFS_NAME = "MIRA_GOLD_SETTINGS";
     private static final String ACTION_PRICES_UPDATED = "MIRA_PRICES_UPDATED";
-    private static final long MIN_SYNC_INTERVAL_MS = 10_000L; // 10 ثوانٍ كحد أدنى بين المزامنات التلقائية
+    private static final long MIN_SYNC_INTERVAL_MS = 10_000L;
 
     private static volatile MiraPriceManager instance;
     private static Context appContext;
@@ -75,16 +74,10 @@ public class MiraPriceManager {
         return instance;
     }
 
-    /**
-     * مزامنة لحظية فورية من السيرفر (تُستخدم عند فتح الشاشات أو المسح أو بعد التعديل)
-     */
     public void refreshNow() {
         loadFromServer(true);
     }
 
-    /**
-     * يضمن تحديث البيانات من السيرفر إذا مرّ وقت كافٍ منذ آخر مزامنة
-     */
     public void ensureFreshRates() {
         long now = System.currentTimeMillis();
         if (!isLoading && (now - lastSyncTimeMs >= MIN_SYNC_INTERVAL_MS)) {
@@ -92,9 +85,51 @@ public class MiraPriceManager {
         }
     }
 
+    /**
+     * تحديث فوري لسعر الصرف المعتمد من استجابة السيرفر (findItem / prepareCheckout)
+     * لتوحيد سعر الصرف بين السلة ونافذة الدفع والإيصال فوراً.
+     */
+    public void setAuthoritativeExchangeRate(String currency, double rate) {
+        if (currency == null || currency.trim().isEmpty()) return;
+        if (!Double.isFinite(rate) || rate <= 1.0) return;
+
+        String code = currency.trim().toUpperCase(Locale.US);
+        if (CURRENCY_USD.equals(code)) return;
+
+        double current = getExchangeRate(code);
+        if (Math.abs(current - rate) < 0.0001) {
+            return;
+        }
+
+        SharedPreferences.Editor editor = prefs.edit();
+        String rateStr = String.valueOf(rate);
+        editor.putString("exchange_official_" + code, rateStr);
+        editor.putString("exchange_market_" + code, rateStr);
+        editor.putString("authoritative_rate_" + code, rateStr);
+
+        try {
+            String currencySettingsJson = prefs.getString("currency_settings", "");
+            JSONObject obj = currencySettingsJson.isEmpty()
+                    ? new JSONObject()
+                    : new JSONObject(currencySettingsJson);
+            obj.put("exchange_official_" + code, rate);
+            obj.put("exchange_market_" + code, rate);
+            editor.putString("currency_settings", obj.toString());
+        } catch (Exception e) {
+            Log.w(TAG, "setAuthoritativeExchangeRate json merge warning: " + e.getMessage());
+        }
+
+        editor.apply();
+        notifyPriceUpdated();
+        Log.d(TAG, "✅ Authoritative exchange rate updated: 1 USD = " + rate + " " + code);
+    }
+
+    public void setExchangeRate(String currency, double rate) {
+        setAuthoritativeExchangeRate(currency, rate);
+    }
+
     private void loadFromServer(boolean force) {
         if (isLoading) {
-            Log.d(TAG, "loadFromServer: already in progress");
             return;
         }
 
@@ -107,15 +142,9 @@ public class MiraPriceManager {
         lastSyncTimeMs = now;
 
         Thread loaderThread = new Thread(() -> {
-            long startTime = System.currentTimeMillis();
-
             try {
                 MiraApiClient client = MiraApiClient.getInstance(appContext);
                 MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
-
-                long elapsed = System.currentTimeMillis() - startTime;
-                Log.d(TAG, "📥 loadFromServer took " + elapsed + "ms, success="
-                        + (response != null && response.isSuccess));
 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject root = response.data;
@@ -168,7 +197,13 @@ public class MiraPriceManager {
                         }
                     }
 
-                    // دعم مصفوفة exchange_rates إن عادت من السيرفر
+                    double topExchangeRate = data.optDouble("exchange_rate",
+                            root.optDouble("exchange_rate", 0.0));
+                    if (topExchangeRate > 1.0 && Double.isFinite(topExchangeRate)) {
+                        editor.putString("authoritative_rate_YER", String.valueOf(topExchangeRate));
+                        editor.putString("exchange_official_YER", String.valueOf(topExchangeRate));
+                    }
+
                     JSONArray ratesArr = data.optJSONArray("exchange_rates");
                     if (ratesArr == null) {
                         ratesArr = root.optJSONArray("exchange_rates");
@@ -183,6 +218,7 @@ public class MiraPriceManager {
                             if (CURRENCY_USD.equals(from) && !to.isEmpty() && rate > 0) {
                                 editor.putString("exchange_official_" + to, String.valueOf(rate));
                                 editor.putString("exchange_market_" + to, String.valueOf(rate));
+                                editor.putString("authoritative_rate_" + to, String.valueOf(rate));
                             }
                         }
                     }
@@ -194,12 +230,8 @@ public class MiraPriceManager {
 
                     editor.apply();
                     notifyPriceUpdated();
-
                     Log.d(TAG, "✅ loadFromServer: synced from server (source of truth)");
-                } else {
-                    Log.w(TAG, "⚠️ loadFromServer: no valid response");
                 }
-
             } catch (Exception e) {
                 Log.e(TAG, "❌ loadFromServer error: " + e.getMessage(), e);
             } finally {
@@ -278,6 +310,38 @@ public class MiraPriceManager {
                 finalPrice,
                 basePrice
         );
+    }
+
+    /**
+     * حساب احتياطي لمرة واحدة فقط في حالة Offline التام وعدم وجود retail_price_usd
+     * بدون تكرار جمع المصنعية مرتين.
+     */
+    public double calculateFallbackPriceUsd(
+            int karat,
+            double weightGrams,
+            double itemMakingPerGram,
+            double itemTotalMaking,
+            double stoneValueUsd
+    ) {
+        double basePrice = getGoldPricePerGram(karat);
+        if (basePrice <= 0 || weightGrams <= 0) {
+            return 0.0;
+        }
+
+        double baseGoldCost = weightGrams * basePrice;
+        double totalMakingCost;
+        if (itemMakingPerGram > 0) {
+            totalMakingCost = weightGrams * itemMakingPerGram;
+        } else if (itemTotalMaking > 0) {
+            totalMakingCost = itemTotalMaking;
+        } else {
+            totalMakingCost = weightGrams * getMakingCharge(karat);
+        }
+
+        double margin = getMargin(karat);
+        double subtotal = baseGoldCost + totalMakingCost;
+        double profitAmount = subtotal * (margin / 100.0);
+        return subtotal + profitAmount + Math.max(0.0, stoneValueUsd);
     }
 
     public static class PricingDetails {
@@ -362,11 +426,16 @@ public class MiraPriceManager {
                 if (rate > 0) return rate;
             }
 
-            // بديل من النوع الآخر إذا لم يُسجل النوع المختار بعد
             String altKey = "exchange_" + (useMarketRate ? "official" : "market") + "_" + code;
             String altValue = prefs.getString(altKey, "");
             if (!altValue.isEmpty()) {
                 double rate = Double.parseDouble(altValue);
+                if (rate > 0) return rate;
+            }
+
+            String authValue = prefs.getString("authoritative_rate_" + code, "");
+            if (!authValue.isEmpty()) {
+                double rate = Double.parseDouble(authValue);
                 if (rate > 0) return rate;
             }
 
