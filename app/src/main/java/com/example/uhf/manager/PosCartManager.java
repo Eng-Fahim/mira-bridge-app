@@ -18,26 +18,8 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  PosCartManager v2.0 — Single Source of Truth
+ *  PosCartManager v2.1 — Single Source of Truth
  * ═══════════════════════════════════════════════════════════════════════════
- *
- * التغييرات الجوهرية عن v1.0:
- *
- *   1. ✅ Notification واحدة لكل عملية (ChangeType بدلاً من 4 دوال منفصلة)
- *      → يمنع التنازع بين notifyItemInserted و notifyDataSetChanged.
- *
- *   2. ✅ Thread-safe: كل notifications على main thread.
- *      → يمنع "Cannot call this method while RecyclerView is computing a layout".
- *
- *   3. ✅ getItems() يعيد immutable snapshot.
- *      → CartAdapter لن يقرأ من قائمة تتغيّر تحته.
- *
- *   4. ✅ دعم مستمعين متعددين (addListener / removeListener).
- *      → لا يوجد استيلاء من شاشة على أخرى.
- *
- *   5. ✅ فصل واضح: ChangeType + position + snapshot في notification واحدة.
- *
- *   6. ✅ updateItemAt() جديد — لتحديث عنصر (scaleWeight).
  */
 public final class PosCartManager {
 
@@ -52,7 +34,9 @@ public final class PosCartManager {
     public static PosCartManager getInstance() {
         if (INSTANCE == null) {
             synchronized (PosCartManager.class) {
-                if (INSTANCE == null) INSTANCE = new PosCartManager();
+                if (INSTANCE == null) {
+                    INSTANCE = new PosCartManager();
+                }
             }
         }
         return INSTANCE;
@@ -86,12 +70,7 @@ public final class PosCartManager {
     //  Snapshot — نسخة ثابتة للقراءة
     // ============================================
 
-    /**
-     * نسخة ثابتة من السلة — للاستخدام في الـ UI.
-     * لا تعكس أي تعديل لاحق.
-     */
     public static final class CartSnapshot {
-        /** نسخة immutable من القائمة */
         @NonNull public final List<CartItem> items;
         public final int count;
         public final double totalUsd;
@@ -112,13 +91,6 @@ public final class PosCartManager {
     // ============================================
 
     public interface OnCartChangedListener {
-        /**
-         * يُستدعى مرة واحدة لكل عملية — على main thread.
-         *
-         * @param snapshot صورة ثابتة للحالة الجديدة
-         * @param type     نوع التغيير
-         * @param position فهرس التغيير (أو -1 لـ CART_CLEARED)
-         */
         void onCartChanged(@NonNull CartSnapshot snapshot,
                            @NonNull ChangeType type,
                            int position);
@@ -129,17 +101,9 @@ public final class PosCartManager {
     // ============================================
 
     private final Object lock = new Object();
-
-    /** القائمة الأساسية — لا تُكشف مباشرة */
     private final List<CartItem> cartList = new ArrayList<>();
-
-    /** معرّفات لمنع المسح المكرر */
     private final Set<String> scannedIds = new CopyOnWriteArraySet<>();
-
-    /** مستمعون متعددون */
     private final List<OnCartChangedListener> listeners = new CopyOnWriteArrayList<>();
-
-    /** main thread handler لكل notifications */
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private PosCartManager() {}
@@ -155,24 +119,24 @@ public final class PosCartManager {
     }
 
     public void removeListener(@Nullable OnCartChangedListener listener) {
-        if (listener != null) listeners.remove(listener);
+        if (listener != null) {
+            listeners.remove(listener);
+        }
     }
 
     /** للتوافق العكسي: يستبدل كل المستمعين بمستمع واحد */
     @Deprecated
     public void setListener(@Nullable OnCartChangedListener listener) {
         listeners.clear();
-        if (listener != null) listeners.add(listener);
+        if (listener != null) {
+            listeners.add(listener);
+        }
     }
 
     // ============================================
     //  الاستعلامات — snapshot-based
     // ============================================
 
-    /**
-     * ✅ snapshot immutable — آمن للاستخدام من أي مكان.
-     * لا تعكس التعديلات اللاحقة.
-     */
     @NonNull
     public List<CartItem> getItems() {
         synchronized (lock) {
@@ -180,7 +144,6 @@ public final class PosCartManager {
         }
     }
 
-    /** نسخة كاملة مع الحسابات */
     @NonNull
     public CartSnapshot snapshot() {
         synchronized (lock) {
@@ -190,19 +153,27 @@ public final class PosCartManager {
     }
 
     public int size() {
-        synchronized (lock) { return cartList.size(); }
+        synchronized (lock) {
+            return cartList.size();
+        }
     }
 
     public boolean isEmpty() {
-        synchronized (lock) { return cartList.isEmpty(); }
+        synchronized (lock) {
+            return cartList.isEmpty();
+        }
     }
 
     public double getTotalUsd() {
-        synchronized (lock) { return computeTotal(cartList); }
+        synchronized (lock) {
+            return computeTotal(cartList);
+        }
     }
 
     public boolean hasUnavailableItems() {
-        synchronized (lock) { return computeHasUnavailable(cartList); }
+        synchronized (lock) {
+            return computeHasUnavailable(cartList);
+        }
     }
 
     public boolean containsItem(@Nullable String epc,
@@ -231,16 +202,11 @@ public final class PosCartManager {
     //  العمليات
     // ============================================
 
-    /**
-     * إضافة قطعة إلى السلة — تُطلق notification واحدة (ITEM_ADDED).
-     * @return 0 إذا نجحت، -1 إذا فشلت (مكررة)
-     */
     public int addItem(@NonNull CartItem item) {
         if (item == null) return -1;
 
         int insertPosition;
         synchronized (lock) {
-            // منع التكرار
             if (containsLocked(item.epc, item.serialNo, item.gtin)) {
                 Log.w(TAG, "⚠️ Item already in cart: " + item.epc);
                 return -1;
@@ -256,13 +222,14 @@ public final class PosCartManager {
         return 0;
     }
 
-    /** حذف بموضع */
     public boolean removeItemAt(int position) {
         boolean removed;
         synchronized (lock) {
             if (position < 0 || position >= cartList.size()) return false;
             CartItem removedItem = cartList.remove(position);
-            if (removedItem != null) unregisterIdsLocked(removedItem);
+            if (removedItem != null) {
+                unregisterIdsLocked(removedItem);
+            }
             removed = (removedItem != null);
         }
 
@@ -273,17 +240,14 @@ public final class PosCartManager {
         return true;
     }
 
-    /** حذف بكائن */
     public boolean removeItem(@NonNull CartItem item) {
         int index;
-        synchronized (lock) { index = cartList.indexOf(item); }
+        synchronized (lock) {
+            index = cartList.indexOf(item);
+        }
         return index >= 0 && removeItemAt(index);
     }
 
-    /**
-     * تحديث عنصر موجود (مثل scaleWeight) — دون إعادة ترتيب.
-     * @return true إذا وُجد وتم التحديث
-     */
     public boolean updateItemAt(int position, @NonNull CartItem newItem) {
         if (newItem == null) return false;
 
@@ -300,7 +264,6 @@ public final class PosCartManager {
         return updated;
     }
 
-    /** تفريغ السلة — يُطلق notification واحدة (CART_CLEARED) */
     public void clear() {
         int sizeBefore;
         synchronized (lock) {
@@ -338,7 +301,6 @@ public final class PosCartManager {
     //  دوال داخلية
     // ============================================
 
-    /** ⚠️ يُستدعى داخل synchronized(lock) */
     private boolean containsLocked(String epc, String serialNo, String gtin) {
         for (CartItem item : cartList) {
             if (item == null) continue;
@@ -352,7 +314,6 @@ public final class PosCartManager {
         return false;
     }
 
-    /** ⚠️ يُستدعى داخل synchronized(lock) */
     private void registerIdsLocked(@NonNull CartItem item) {
         if (notEmpty(item.epc)) scannedIds.add(item.epc);
         if (notEmpty(item.serialNo)) scannedIds.add(item.serialNo);
@@ -360,7 +321,6 @@ public final class PosCartManager {
         if (notEmpty(item.rfidEpc)) scannedIds.add(item.rfidEpc);
     }
 
-    /** ⚠️ يُستدعى داخل synchronized(lock) */
     private void unregisterIdsLocked(@NonNull CartItem item) {
         if (notEmpty(item.epc)) scannedIds.remove(item.epc);
         if (notEmpty(item.serialNo)) scannedIds.remove(item.serialNo);
@@ -369,13 +329,19 @@ public final class PosCartManager {
     }
 
     private double computeTotal(List<CartItem> list) {
-        double t = 0;
-        for (CartItem i : list) if (i != null) t += i.price;
+        double t = 0.0;
+        for (CartItem i : list) {
+            if (i != null && Double.isFinite(i.price) && i.price > 0.0) {
+                t += i.price;
+            }
+        }
         return t;
     }
 
     private boolean computeHasUnavailable(List<CartItem> list) {
-        for (CartItem i : list) if (i != null && !i.isAvailable) return true;
+        for (CartItem i : list) {
+            if (i != null && !i.isAvailable) return true;
+        }
         return false;
     }
 
@@ -383,9 +349,6 @@ public final class PosCartManager {
         return s != null && !s.isEmpty();
     }
 
-    /**
-     * ✅ Dispatch واحد لكل عملية — على main thread دائماً.
-     */
     private void dispatch(@NonNull final ChangeType type, final int position) {
         final CartSnapshot snapshot = snapshot();
 
@@ -399,63 +362,64 @@ public final class PosCartManager {
             }
         };
 
-        // ✅ إذا كنا على main thread → نفّذ مباشرة
-        //    وإلا → post إلى main
         if (Looper.myLooper() == Looper.getMainLooper()) {
             notifier.run();
         } else {
             mainHandler.post(notifier);
         }
     }
-    
-/**
- * يحدّث سعر قطعة في السلة (بعد prepare-checkout).
- * ✅ Thread-safe: كل التعديلات داخل lock.
- * ✅ Notification واحدة فقط عند التغيير الفعلي.
- * @return true إذا تغيّر السعر
- */
-public boolean updateItemPrice(int itemId, double newPriceUsd) {
-    int position = -1;
-    double oldPrice = 0;
 
-    synchronized (lock) {
-        for (int i = 0; i < cartList.size(); i++) {
-            CartItem item = cartList.get(i);
-            if (item != null && item.itemId == itemId) {
-                if (Math.abs(item.price - newPriceUsd) <= 0.01) {
-                    return false;  // لا يوجد تغيير
+    /**
+     * يحدّث سعر قطعة في السلة (بعد prepare-checkout).
+     */
+    public boolean updateItemPrice(int itemId, double newPriceUsd) {
+        if (!Double.isFinite(newPriceUsd) || newPriceUsd < 0.0) return false;
+
+        int position = -1;
+        double oldPrice = 0.0;
+
+        synchronized (lock) {
+            for (int i = 0; i < cartList.size(); i++) {
+                CartItem item = cartList.get(i);
+                if (item != null && item.itemId == itemId) {
+                    if (Math.abs(item.price - newPriceUsd) <= 0.01) {
+                        return false;
+                    }
+                    oldPrice = item.price;
+                    item.price = newPriceUsd;
+                    position = i;
+                    break;
                 }
-                oldPrice = item.price;
-                item.price = newPriceUsd;
-                position = i;
-                break;
             }
         }
+
+        if (position >= 0) {
+            Log.d(TAG, "💰 Price updated [itemId=" + itemId + "]: "
+                    + oldPrice + " → " + newPriceUsd);
+            dispatch(ChangeType.ITEM_UPDATED, position);
+            return true;
+        }
+        return false;
     }
 
-    if (position >= 0) {
-        Log.d(TAG, "💰 Price updated [itemId=" + itemId + "]: "
-                + oldPrice + " → " + newPriceUsd);
-        dispatch(ChangeType.ITEM_UPDATED, position);
-        return true;
-    }
-    return false;
-}
-
-/**
- * يزيل قطعة بمعرّف itemId.
- */
-public void removeItemByItemId(int itemId) {
-    try {
-        List<CartItem> items = new ArrayList<>(getItems());
-        for (int i = items.size() - 1; i >= 0; i--) {
-            CartItem item = items.get(i);
-            if (item != null && item.itemId == itemId) {
-                removeItemAt(i);
+    /**
+     * يزيل قطعة أو أكثر بمعرّف itemId مع إطلاق إشعار واحد عند وجود حذف فعلي.
+     */
+    public void removeItemByItemId(int itemId) {
+        int lastRemovedPos = -1;
+        synchronized (lock) {
+            for (int i = cartList.size() - 1; i >= 0; i--) {
+                CartItem item = cartList.get(i);
+                if (item != null && item.itemId == itemId) {
+                    cartList.remove(i);
+                    unregisterIdsLocked(item);
+                    lastRemovedPos = i;
+                }
             }
         }
-    } catch (Exception e) {
-        Log.e("PosCartManager", "removeItemByItemId error", e);
+
+        if (lastRemovedPos >= 0) {
+            dispatch(ChangeType.ITEM_REMOVED, lastRemovedPos);
+        }
     }
-}
 }
