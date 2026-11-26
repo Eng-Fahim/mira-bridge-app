@@ -271,8 +271,6 @@ class POSCheckoutDialog : DialogFragment() {
                 priceManager?.setAuthoritativeExchangeRate("YER", explicitUsdRate)
             }
 
-            // قراءة exchange_rates القادمة من POST /api/v1/pos/prepare-checkout
-            // الشكل من السيرفر: {"YER": 1.0, "USD": 535.0, "SAR": 142.67, "AED": ..., ...}
             try {
                 val ratesJson = args.getString(ARG_RATES_JSON, "{}") ?: "{}"
                 val ratesObj = JSONObject(ratesJson)
@@ -323,25 +321,6 @@ class POSCheckoutDialog : DialogFragment() {
             else Locale.getDefault().language == "ar"
         } catch (_: Exception) {
             Locale.getDefault().language == "ar"
-        }
-
-        val placeholderMethod = PaymentMethodDto().apply {
-            code = "CASH"
-            nameAr = "نقداً"
-            nameEn = "Cash"
-            icon = "💵"
-        }
-        paymentMethodsState.clear()
-        paymentMethodsState.add(placeholderMethod)
-
-        if (paymentRowsState.isEmpty()) {
-            paymentRowsState.add(
-                PaymentRowUiModel(
-                    method = placeholderMethod,
-                    currency = "YER",
-                    amountText = ""
-                )
-            )
         }
     }
 
@@ -407,19 +386,32 @@ class POSCheckoutDialog : DialogFragment() {
                 paymentMethodsState.addAll(result.methods)
 
                 val defaultMethod = result.methods.first()
-                for (i in paymentRowsState.indices) {
-                    val row = paymentRowsState[i]
-                    val matched = result.methods.firstOrNull {
-                        it.id > 0 && it.id == row.method.id
-                    } ?: result.methods.firstOrNull {
-                        !it.code.isNullOrBlank() &&
-                            it.code.equals(row.method.code, ignoreCase = true) &&
-                            (it.accountCode ?: "") == (row.method.accountCode ?: "")
-                    } ?: defaultMethod
-                    paymentRowsState[i] = row.copy(method = matched)
+                if (paymentRowsState.isEmpty()) {
+                    paymentRowsState.add(
+                        PaymentRowUiModel(
+                            method = defaultMethod,
+                            currency = "YER",
+                            amountText = ""
+                        )
+                    )
+                } else {
+                    for (i in paymentRowsState.indices) {
+                        val row = paymentRowsState[i]
+                        val matched = result.methods.firstOrNull {
+                            it.id > 0 && it.id == row.method.id
+                        } ?: result.methods.firstOrNull {
+                            !it.code.isNullOrBlank() &&
+                                it.code.equals(row.method.code, ignoreCase = true)
+                        } ?: defaultMethod
+                        paymentRowsState[i] = row.copy(method = matched)
+                    }
                 }
-            } else if (!result.methodsError.isNullOrBlank()) {
-                Log.w(TAG, "Server payment-methods issue: ${result.methodsError}")
+            } else {
+                inlineErrorState = if (isArabic) {
+                    "⚠️ تعذر تحميل طرق الدفع من السيرفر: ${result.methodsError ?: "لا توجد طرق دفع نشطة"}"
+                } else {
+                    "⚠️ Failed to load payment methods: ${result.methodsError ?: "No active payment methods"}"
+                }
             }
 
             for ((curr, rateVal) in result.ratesToYer) {
@@ -462,10 +454,15 @@ class POSCheckoutDialog : DialogFragment() {
             val client = MiraApiClient.getInstance(appCtx)
 
             // 1. GET /api/v1/payment-methods -> PaymentMethodController@index
-            // الشكل الدقيق من السيرفر: { "success": true, "count": N, "data": [ { "id", "code", "name_ar", "name_en", "icon", "account_id", "account_code", "account_name_ar", "account_name", "requires_account", "sort_order" } ] }
             val methodsResp = client.paymentMethods
-            if (methodsResp != null && methodsResp.isSuccess && methodsResp.data != null) {
-                val arr = methodsResp.data.optJSONArray("data")
+            if (methodsResp != null && methodsResp.isSuccess) {
+                val rootObj = methodsResp.data ?: methodsResp.body?.trim()?.takeIf { it.startsWith("{") }?.let {
+                    try { JSONObject(it) } catch (_: Exception) { null }
+                }
+                val arr = rootObj?.optJSONArray("data") ?: methodsResp.body?.trim()?.takeIf { it.startsWith("[") }?.let {
+                    try { JSONArray(it) } catch (_: Exception) { null }
+                }
+
                 if (arr != null) {
                     val gson = Gson()
                     for (i in 0 until arr.length()) {
@@ -480,14 +477,13 @@ class POSCheckoutDialog : DialogFragment() {
                         }
                     }
                 } else {
-                    methodsError = "Missing 'data' array in /payment-methods response"
+                    methodsError = "Invalid response format from /payment-methods"
                 }
             } else {
                 methodsError = methodsResp?.error ?: "HTTP ${methodsResp?.statusCode ?: -1}"
             }
 
             // 2. GET /api/v1/currency/rates -> ExchangeRateController@current
-            // الشكل الدقيق من السيرفر: { "success": true, "data": { "usd_to_yer": 535.0, "sar_to_yer": 142.67, "yer_to_yer": 1.0, ... } }
             val ratesResp = client.exchangeRates
             if (ratesResp != null && ratesResp.isSuccess && ratesResp.data != null) {
                 val payload = ratesResp.data.optJSONObject("data") ?: ratesResp.data
@@ -601,6 +597,14 @@ class POSCheckoutDialog : DialogFragment() {
     }
 
     private fun validateBeforeSubmit(): String? {
+        if (paymentMethodsState.isEmpty()) {
+            return if (isArabic) {
+                "⚠️ لا تتوفر طرق دفع محملة من السيرفر"
+            } else {
+                "⚠️ No payment methods loaded from server"
+            }
+        }
+
         val usdRate = getRateToYER("USD")
         if (currentTotalWithDiscountUsd > 0.0 && usdRate <= 0.0) {
             return if (isArabic) {
@@ -917,7 +921,7 @@ class POSCheckoutDialog : DialogFragment() {
 
                             OutlinedButton(
                                 onClick = {
-                                    val defaultM = paymentMethodsState.first()
+                                    val defaultM = paymentMethodsState.firstOrNull() ?: return@OutlinedButton
                                     paymentRowsState.add(
                                         PaymentRowUiModel(
                                             method = defaultM,
@@ -927,7 +931,7 @@ class POSCheckoutDialog : DialogFragment() {
                                     )
                                     inlineErrorState = null
                                 },
-                                enabled = !isSubmittingState,
+                                enabled = !isSubmittingState && paymentMethodsState.isNotEmpty(),
                                 shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.55f)),
@@ -1026,7 +1030,7 @@ class POSCheckoutDialog : DialogFragment() {
 
                     Button(
                         onClick = { submitToServer() },
-                        enabled = !isSubmittingState && !isLoadingConfigState,
+                        enabled = !isSubmittingState && !isLoadingConfigState && paymentMethodsState.isNotEmpty(),
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -1528,7 +1532,7 @@ class POSCheckoutDialog : DialogFragment() {
         val colors = MiraTheme.colors
         var searchQuery by remember { mutableStateOf("") }
 
-        val filtered = remember(searchQuery, methods.size) {
+        val filtered = remember(searchQuery, methods.toList()) {
             val q = searchQuery.trim().lowercase(Locale.US)
             if (q.isEmpty()) methods
             else methods.filter { m ->
