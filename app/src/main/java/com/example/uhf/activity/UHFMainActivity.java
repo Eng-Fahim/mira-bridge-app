@@ -136,33 +136,33 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private volatile boolean navigationLocked = false;
     private volatile boolean justUnlockedWithBiometric = false;
     private boolean isArabic = true;
-    private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener =this::updateAppTitle;
+    private final MiraOrgProfileManager.OnProfileChangedListener orgProfileListener = this::updateAppTitle;
     private final PermissionManager.OnPermissionsChangedListener permissionsListener = () -> {
-    mainHandler.post(() -> {
-        if (!isActivityAlive()) return;
+        mainHandler.post(() -> {
+            if (!isActivityAlive()) return;
 
-        // 1. إعادة رسم الشريط السفلي، القائمة العلوية، والتولبار الثانوي فوراً
-        refreshAllPermissionsUI();
+            // 1. إعادة رسم الشريط السفلي، القائمة العلوية، والتولبار الثانوي فوراً
+            refreshAllPermissionsUI();
 
-        // 2. إذا كان الموظف يقف حالياً داخل شاشة تم سحب صلاحيتها -> أخرجه منها فوراً
-        String currentTag = getCurrentFragmentTag();
-        if (permissionManager != null
-                && currentTag != null
-                && !permissionManager.canAccessFragment(currentTag)) {
+            // 2. إذا كان الموظف يقف حالياً داخل شاشة تم سحب صلاحيتها -> أخرجه منها فوراً
+            String currentTag = getCurrentFragmentTag();
+            if (permissionManager != null
+                    && currentTag != null
+                    && !permissionManager.canAccessFragment(currentTag)) {
+                Toast.makeText(this,
+                        isArabic ? "⚠️ تم سحب صلاحية الوصول لهذه الشاشة"
+                                 : "⚠️ Access to this screen has been revoked",
+                        Toast.LENGTH_LONG).show();
+                navigateByRole();
+                return;
+            }
+
             Toast.makeText(this,
-                    isArabic ? "⚠️ تم سحب صلاحية الوصول لهذه الشاشة"
-                             : "⚠️ Access to this screen has been revoked",
-                    Toast.LENGTH_LONG).show();
-            navigateByRole();
-            return;
-        }
-
-        Toast.makeText(this,
-                isArabic ? "🔄 تم تحديث صلاحياتك تلقائياً"
-                         : "🔄 Permissions updated live",
-                Toast.LENGTH_SHORT).show();
-    });
-};
+                    isArabic ? "🔄 تم تحديث صلاحياتك تلقائياً"
+                             : "🔄 Permissions updated live",
+                    Toast.LENGTH_SHORT).show();
+        });
+    };
 
     private MiraPosFragment activePOSFragment = null;
     private MiraIdentityStudioFragment activeEncodingFragment = null;
@@ -172,7 +172,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public int selectIndex = -1;
     public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
     public boolean loopFlag = false;
-    
 
     private boolean lastKeyboardState = false;
 
@@ -376,7 +375,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             permissionManager = PermissionManager.getInstance(getApplicationContext());
             permissionManager.addListener(permissionsListener);
-
 
             navigationManager = new NavigationManager(
                     getSupportFragmentManager(),
@@ -617,8 +615,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     targetFragment = new MiraSecureGateFragment();
                     targetTag = NavigationManager.TAG_GATES;
                 } else if (permissionManager.isFinanceManager() || permissionManager.isAccountant()) {
-                    targetFragment = new MiraAccountingFragment();
-                    targetTag = NavigationManager.TAG_ACCOUNTING;
+                    targetFragment = new MiraDashboardFragment();
+                    targetTag = NavigationManager.TAG_DASHBOARD;
                 } else {
                     targetFragment = new MiraDashboardFragment();
                     targetTag = NavigationManager.TAG_DASHBOARD;
@@ -891,6 +889,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     .show();
         }, 1500);
     }
+
     // ═══════════════════════════════════════════════════════
     //  Keyboard Behavior
     // ═══════════════════════════════════════════════════════
@@ -1047,7 +1046,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         transferCountHandler.removeCallbacks(transferRefreshRunnable);
     }
 
-        private boolean isGateSecurityExempt() {
+    private boolean isGateSecurityExempt() {
         return permissionManager != null
                 && (permissionManager.isGateSecurity() || permissionManager.isSecurity());
     }
@@ -1083,7 +1082,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-
     private void showAutoLockDialog() {
         if (!isActivityAlive() || sessionManager == null) return;
 
@@ -1106,7 +1104,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                             sessionManager.touchActivity();
                         }
                     }
-
 
                     @Override
                     public void onLogoutRequested() {
@@ -1187,7 +1184,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.w(TAG, "Error stopping scan in onPause: " + e.getMessage());
         }
     }
-
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -1525,12 +1521,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         setMenuVisible(menu, R.id.action_locator, pm.canViewRadar());
 
-        setMenuVisible(menu, R.id.action_accounting,       pm.canViewAccounting());
         setMenuVisible(menu, R.id.action_license_status,
                 pm.isAdmin() || pm.isManager());
 
         // [REMOVED-TO-WEB] الإعداد المحاسبي والعمليات الإدارية نُقلت إلى لوحة الويب
         setMenuVisible(menu, R.id.action_accounting_setup, false);
+        setMenuVisible(menu, R.id.action_accounting,       false);
 
         setMenuVisible(menu, R.id.action_export_data, pm.canExportReports());
     }
@@ -1592,7 +1588,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
             return true;
         } else if (id == R.id.action_accounting) {
-            openAccounting();
+            loadFragment(new MiraDashboardFragment(), NavigationManager.TAG_DASHBOARD);
             return true;
         } else if (id == R.id.action_device_status) {
             showHardwareOptionsDialog();
@@ -2497,7 +2493,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 permissionManager.removeListener(permissionsListener);
             }
 
-
             SessionMonitorManager.getInstance(this).stopMonitoring();
 
             clearActiveListeners();
@@ -2522,7 +2517,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         super.onDestroy();
     }
-
 
     // ═══════════════════════════════════════════════════════
     //  التفاعل مع الكيبورد
@@ -2599,30 +2593,29 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             bottomNavManager.updateTransfersBadge(count);
         }
     }
-    
+
     private void syncPermissionsInBackground() {
-    new Thread(() -> {
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
-            // المسار الذي يعيد data.mobile_capabilities و permissions_version
-            MiraApiClient.ApiResponse res = api.getCurrentUser();
-            if (res != null && res.isSuccess && res.data != null && permissionManager != null) {
-                org.json.JSONObject root = res.data;
-                org.json.JSONObject data = root.optJSONObject("data");
-                String serverVer = data != null
-                        ? data.optString("permissions_version", "")
-                        : root.optString("permissions_version", "");
+        new Thread(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(getApplicationContext());
+                // المسار الذي يعيد data.mobile_capabilities و permissions_version
+                MiraApiClient.ApiResponse res = api.getCurrentUser();
+                if (res != null && res.isSuccess && res.data != null && permissionManager != null) {
+                    org.json.JSONObject root = res.data;
+                    org.json.JSONObject data = root.optJSONObject("data");
+                    String serverVer = data != null
+                            ? data.optString("permissions_version", "")
+                            : root.optString("permissions_version", "");
 
-                if (!serverVer.isEmpty() && permissionManager.needsRefresh(serverVer)) {
-                    permissionManager.applyFromServer(root, serverVer);
+                    if (!serverVer.isEmpty() && permissionManager.needsRefresh(serverVer)) {
+                        permissionManager.applyFromServer(root, serverVer);
+                    }
                 }
+            } catch (Exception e) {
+                Log.w(TAG, "syncPermissionsInBackground skipped: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.w(TAG, "syncPermissionsInBackground skipped: " + e.getMessage());
-        }
-    }, "LivePermSync").start();
-}
-
+        }, "LivePermSync").start();
+    }
 
     private void saveTransfersCountLocally(int count) {
         try {
