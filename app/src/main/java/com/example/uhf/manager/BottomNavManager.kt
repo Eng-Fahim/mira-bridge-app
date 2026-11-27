@@ -9,21 +9,15 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,7 +38,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -63,13 +59,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -81,13 +78,10 @@ import com.example.uhf.fragment.MiraProfileFragment
 import com.example.uhf.fragment.MiraReportsProFragment
 import com.example.uhf.navigation.FragmentFactory
 import com.example.uhf.navigation.NavigationManager
+import com.example.uhf.ui.theme.MiraJewelryTheme
+import com.example.uhf.ui.theme.MiraTheme
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
-/**
- * BottomNavManager (Kotlin + Jetpack Compose)
- * شريط تنقّل عائم فاخر بهوية MIRA ID™ (الكحلي الملكي والذهب عيار 24)
- * متوافق 100% مع UHFMainActivity.java دون الحاجة لتعديل ملفات XML.
- */
 class BottomNavManager(
     private val context: Context,
     rootView: View,
@@ -100,16 +94,8 @@ class BottomNavManager(
     companion object {
         private const val TAG = "BottomNavManager"
 
-        // لوحة ألوان هوية MIRA ID™ الملكية
-        private val NavyObsidian = Color(0xFF071224)
-        private val NavyDeep = Color(0xFF0A192F)
-        private val NavyElevated = Color(0xFF132644)
-        private val NavyPillActive = Color(0xFF1E2D4D)
-
-        private val GoldBright = Color(0xFFF7DF8B)
-        private val GoldPrimary = Color(0xFFD4AF37)
-        private val GoldBronze = Color(0xFF9C7621)
-        private val TextMuted = Color(0xFF94A3B8)
+        private val GoldBright = Color(0xFFE8C868)
+        private val GoldDeep = Color(0xFFB8891E)
         private val BadgeCrimson = Color(0xFFDC2626)
 
         private val NAV_CONFIGS = listOf(
@@ -181,7 +167,6 @@ class BottomNavManager(
 
     private var composeView: ComposeView? = null
 
-    // حالات تفاعلية فورية لـ Jetpack Compose
     private val visibleItemsState = mutableStateListOf<NavItemCfg>()
     private var selectedTagState by mutableStateOf(NavigationManager.TAG_DASHBOARD)
     private var isArabicState by mutableStateOf(isArabic)
@@ -196,14 +181,15 @@ class BottomNavManager(
         bottomNavContainer?.post { applyPermissions() }
     }
 
-    /** تهيئة الشريط الفاخر وحقن ComposeView داخل bottomNavContainer */
     fun setup() {
         try {
-            // إخفاء العناصر التقليدية القديمة مع الإبقاء على مراجعها آمنة
-            legacyBottomNav?.visibility = View.GONE
-            legacyFabCenter?.visibility = View.GONE
-            legacyFabReports?.visibility = View.GONE
-            legacyFabProfile?.visibility = View.GONE
+            // إزالة الأزرار التقليدية تماماً من الحاوية لمنع أي تراكب بالارتفاع (Z-Order)
+            listOf(legacyBottomNav, legacyFabCenter, legacyFabReports, legacyFabProfile).forEach { v ->
+                v?.visibility = View.GONE
+                if (v != null && v.parent is ViewGroup) {
+                    (v.parent as ViewGroup).removeView(v)
+                }
+            }
 
             mountComposeDock()
             applyPermissions()
@@ -220,48 +206,51 @@ class BottomNavManager(
 
         val cv = ComposeView(context).apply {
             id = View.generateViewId()
+            elevation = dp(12f)
             setViewCompositionStrategy(
                 ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool
             )
             setContent {
                 val layoutDir = if (isArabicState) LayoutDirection.Rtl else LayoutDirection.Ltr
                 CompositionLocalProvider(LocalLayoutDirection provides layoutDir) {
-                    MiraLuxuryNavigationDock(
-                        items = visibleItemsState,
-                        selectedTag = selectedTagState,
-                        isArabic = isArabicState,
-                        showCenterHub = showCenterHubState,
-                        isPosOperator = isPosOperatorState,
-                        isFabMenuOpen = isFabMenuOpenState,
-                        isEnabled = isEnabledState && !navigationLockedState,
-                        transfersBadgeCount = transfersBadgeCountState,
-                        onSelectTab = { cfg ->
-                            performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                            handleTabSelection(cfg)
-                        },
-                        onCenterHubClick = {
-                            performHaptic(HapticFeedbackConstants.LONG_PRESS)
-                            handleCenterHubClick()
-                        },
-                        onOpenReports = {
-                            performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                            closePosFabMenu()
-                            host.navigateToFragment(
-                                MiraReportsProFragment(),
-                                NavigationManager.TAG_REPORTS,
-                                false
-                            )
-                        },
-                        onOpenProfile = {
-                            performHaptic(HapticFeedbackConstants.CLOCK_TICK)
-                            closePosFabMenu()
-                            host.navigateToFragment(
-                                MiraProfileFragment(),
-                                "Profile",
-                                false
-                            )
-                        }
-                    )
+                    MiraJewelryTheme {
+                        MiraThemeAwareNavigationDock(
+                            items = visibleItemsState,
+                            selectedTag = selectedTagState,
+                            isArabic = isArabicState,
+                            showCenterHub = showCenterHubState,
+                            isPosOperator = isPosOperatorState,
+                            isFabMenuOpen = isFabMenuOpenState,
+                            isEnabled = isEnabledState && !navigationLockedState,
+                            transfersBadgeCount = transfersBadgeCountState,
+                            onSelectTab = { cfg ->
+                                performHaptic(HapticFeedbackConstants.CLOCK_TICK)
+                                handleTabSelection(cfg)
+                            },
+                            onCenterHubClick = {
+                                performHaptic(HapticFeedbackConstants.LONG_PRESS)
+                                handleCenterHubClick()
+                            },
+                            onOpenReports = {
+                                performHaptic(HapticFeedbackConstants.CLOCK_TICK)
+                                closePosFabMenu()
+                                host.navigateToFragment(
+                                    MiraReportsProFragment(),
+                                    NavigationManager.TAG_REPORTS,
+                                    false
+                                )
+                            },
+                            onOpenProfile = {
+                                performHaptic(HapticFeedbackConstants.CLOCK_TICK)
+                                closePosFabMenu()
+                                host.navigateToFragment(
+                                    MiraProfileFragment(),
+                                    "Profile",
+                                    false
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -287,13 +276,11 @@ class BottomNavManager(
         composeView = cv
     }
 
-    /** تنظيف المستمعات عند إغلاق النشاط */
     fun cleanup() {
         permissionManager?.removeListener(permissionsListener)
         composeView = null
     }
 
-    /** إعادة بناء التبويبات والزر الأوسط بناءً على الصلاحيات */
     fun applyPermissions() {
         try {
             val container = bottomNavContainer ?: return
@@ -301,12 +288,11 @@ class BottomNavManager(
 
             val hideFabForSecurity = pm.isGateUser()
             showCenterHubState = !hideFabForSecurity && (
-    pm.isSystemAdmin() ||
-    pm.isOrgAdmin() ||
-    pm.isPosOperator() ||
-    pm.getAllowedQuickActions().isNotEmpty()
-)
-
+                pm.isSystemAdmin() ||
+                    pm.isOrgAdmin() ||
+                    pm.isPosOperator() ||
+                    pm.getAllowedQuickActions().isNotEmpty()
+                )
             isPosOperatorState = pm.isPosOperator()
 
             if (!showCenterHubState && isFabMenuOpenState) {
@@ -323,8 +309,6 @@ class BottomNavManager(
 
             val currentTag = host.getCurrentFragmentTag()
             selectByTag(currentTag)
-
-            Log.d(TAG, "applyPermissions: visibleTabs=${allowed.size}, currentTag=$currentTag")
         } catch (e: Exception) {
             Log.e(TAG, "applyPermissions error: ${e.message}", e)
         }
@@ -454,7 +438,7 @@ class BottomNavManager(
                 val startY = if (container.translationY > 0f) {
                     container.translationY
                 } else {
-                    if (container.height > 0) container.height.toFloat() else dp(110f)
+                    if (container.height > 0) container.height.toFloat() else dp(96f)
                 }
 
                 container.translationY = startY
@@ -463,8 +447,8 @@ class BottomNavManager(
                 container.animate()
                     .translationY(0f)
                     .alpha(1f)
-                    .setDuration(280L)
-                    .setInterpolator(OvershootInterpolator(0.85f))
+                    .setDuration(250L)
+                    .setInterpolator(OvershootInterpolator(0.75f))
                     .withEndAction { setEnabled(true) }
                     .start()
             } else {
@@ -475,12 +459,12 @@ class BottomNavManager(
                 }
 
                 container.animate().cancel()
-                val endY = if (container.height > 0) container.height.toFloat() else dp(110f)
+                val endY = if (container.height > 0) container.height.toFloat() else dp(96f)
 
                 container.animate()
                     .translationY(endY)
                     .alpha(0f)
-                    .setDuration(220L)
+                    .setDuration(200L)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .withEndAction {
                         container.visibility = View.GONE
@@ -490,7 +474,7 @@ class BottomNavManager(
             }
 
             fragmentContainer?.let { fc ->
-                val targetPadding = if (visible) dp(92f).toInt() else 0
+                val targetPadding = if (visible) dp(88f).toInt() else 0
                 if (fc.paddingBottom != targetPadding) {
                     fc.setPadding(
                         fc.paddingLeft,
@@ -527,14 +511,14 @@ class BottomNavManager(
                 if (container.translationY != targetY) {
                     container.animate()
                         .translationY(targetY)
-                        .setDuration(220L)
+                        .setDuration(200L)
                         .setInterpolator(AccelerateDecelerateInterpolator())
                         .start()
                 }
             }
 
             fragmentContainer?.let { fc ->
-                val targetPadding = if (isKeyboardVisible) dp(8f).toInt() else dp(92f).toInt()
+                val targetPadding = if (isKeyboardVisible) dp(8f).toInt() else dp(88f).toInt()
                 if (fc.paddingBottom != targetPadding) {
                     fc.setPadding(
                         fc.paddingLeft,
@@ -554,7 +538,7 @@ class BottomNavManager(
     }
 
     fun anchorFabToContainerCenter() {
-        // الزر المركزي مدمج تلقائياً في قلب الكبسولة العائمة
+        // مدمج تلقائياً في المنتصف
     }
 
     private fun performHaptic(type: Int) {
@@ -568,11 +552,11 @@ class BottomNavManager(
         value * context.resources.displayMetrics.density
 
     // ═══════════════════════════════════════════════════════════════════
-    //  واجهة Jetpack Compose الفاخرة (MIRA ID™ Royal Dock)
+    //  واجهة Jetpack Compose المتناغمة مع الثيم النهاري والليلي
     // ═══════════════════════════════════════════════════════════════════
 
     @Composable
-    private fun MiraLuxuryNavigationDock(
+    private fun MiraThemeAwareNavigationDock(
         items: List<NavItemCfg>,
         selectedTag: String,
         isArabic: Boolean,
@@ -586,136 +570,149 @@ class BottomNavManager(
         onOpenReports: () -> Unit,
         onOpenProfile: () -> Unit
     ) {
+        val colors = MiraTheme.colors
+        val isDark = colors.backgroundTop.luminance() < 0.45f
+
         val dockAlpha by animateFloatAsState(
             targetValue = if (isEnabled) 1f else 0.45f,
-            animationSpec = tween(220),
+            animationSpec = tween(200),
             label = "dockAlpha"
         )
 
-        val navyGradient = remember {
-            Brush.verticalGradient(
-                colors = listOf(NavyElevated, NavyDeep, NavyObsidian)
-            )
+        val dockSurfaceColor = if (isDark) colors.cardSurface else Color(0xFFFFFFFF)
+        val dockBorderColor = if (isDark) {
+            colors.goldPrimary.copy(alpha = 0.45f)
+        } else {
+            colors.goldPrimary.copy(alpha = 0.38f)
         }
-
-        val goldBorderBrush = remember {
-            Brush.linearGradient(
-                colors = listOf(
-                    GoldBright.copy(alpha = 0.75f),
-                    GoldPrimary.copy(alpha = 0.45f),
-                    GoldBronze.copy(alpha = 0.65f)
-                )
-            )
-        }
+        val cutoutRingColor = if (isDark) colors.backgroundTop else colors.backgroundMid
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
                 .alpha(dockAlpha)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // قوس الاختصارات العائمة لموظفي نقاط البيع (POS) عند فتح الجوهرة المركزية
+            // اختصارات موظف نقطة البيع عند فتح الزر الأوسط
             AnimatedVisibility(
                 visible = showCenterHub && isPosOperator && isFabMenuOpen,
-                enter = fadeIn(tween(220)) + scaleIn(
-                    initialScale = 0.82f,
+                enter = fadeIn(tween(200)) + scaleIn(
+                    initialScale = 0.85f,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessMediumLow
                     )
                 ),
-                exit = fadeOut(tween(160)) + scaleOut(targetScale = 0.85f)
+                exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.88f)
             ) {
                 Row(
-                    modifier = Modifier
-                        .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    LuxurySatelliteChip(
+                    ThemeSatelliteChip(
                         iconRes = R.drawable.ic_inventory,
                         label = if (isArabic) "التقارير" else "Reports",
+                        surfaceColor = dockSurfaceColor,
+                        borderColor = dockBorderColor,
+                        textColor = colors.textPrimary,
+                        iconTint = colors.goldPrimary,
                         onClick = onOpenReports
                     )
-                    LuxurySatelliteChip(
+                    ThemeSatelliteChip(
                         iconRes = R.drawable.ic_home,
                         label = if (isArabic) "حسابي" else "Profile",
+                        surfaceColor = dockSurfaceColor,
+                        borderColor = dockBorderColor,
+                        textColor = colors.textPrimary,
+                        iconTint = colors.goldPrimary,
                         onClick = onOpenProfile
                     )
                 }
             }
 
-            // الحاوية الرئيسية للكبسولة + الزر الذهبي المرتفع
+            // الحاوية المتوازنة للشريط + الزر الدائري الذهبي في المنتصف
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(74.dp),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                // الكبسولة الكحلية ذات الإطار الذهبي المتدرج
-                Box(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
-                        .shadow(
-                            elevation = 16.dp,
-                            shape = RoundedCornerShape(32.dp),
-                            ambientColor = NavyObsidian,
-                            spotColor = GoldPrimary.copy(alpha = 0.35f)
-                        )
-                        .clip(RoundedCornerShape(32.dp))
-                        .background(navyGradient)
-                        .border(
-                            width = 1.2.dp,
-                            brush = goldBorderBrush,
-                            shape = RoundedCornerShape(32.dp)
-                        )
-                        .padding(horizontal = 10.dp),
-                    contentAlignment = Alignment.Center
+                        .height(62.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    color = dockSurfaceColor,
+                    border = BorderStroke(1.dp, dockBorderColor),
+                    shadowElevation = if (isDark) 12.dp else 8.dp
                 ) {
                     val splitIndex = (items.size + 1) / 2
                     val leadingItems = if (showCenterHub) items.take(splitIndex) else items
                     val trailingItems = if (showCenterHub) items.drop(splitIndex) else emptyList()
 
                     Row(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        leadingItems.forEach { cfg ->
-                            val badge = if (cfg.itemId == R.id.nav_transfers) transfersBadgeCount else 0
-                            MiraExpandablePillTab(
-                                cfg = cfg,
-                                isSelected = cfg.tag == selectedTag,
-                                isArabic = isArabic,
-                                badgeCount = badge,
-                                onClick = { onSelectTab(cfg) }
-                            )
+                        // النصف الأيمن (في العربية)
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            leadingItems.forEach { cfg ->
+                                val badge = if (cfg.itemId == R.id.nav_transfers) transfersBadgeCount else 0
+                                SymmetricalNavTab(
+                                    cfg = cfg,
+                                    isSelected = cfg.tag == selectedTag,
+                                    isArabic = isArabic,
+                                    isDark = isDark,
+                                    badgeCount = badge,
+                                    onClick = { onSelectTab(cfg) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
 
+                        // مساحة محجوزة ثابتة للزر الذهبي الأوسط تمنع أي تراكب مع النصوص
                         if (showCenterHub) {
                             Spacer(modifier = Modifier.width(66.dp))
                         }
 
-                        trailingItems.forEach { cfg ->
-                            val badge = if (cfg.itemId == R.id.nav_transfers) transfersBadgeCount else 0
-                            MiraExpandablePillTab(
-                                cfg = cfg,
-                                isSelected = cfg.tag == selectedTag,
-                                isArabic = isArabic,
-                                badgeCount = badge,
-                                onClick = { onSelectTab(cfg) }
-                            )
+                        // النصف الأيسر (في العربية)
+                        if (trailingItems.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                trailingItems.forEach { cfg ->
+                                    val badge = if (cfg.itemId == R.id.nav_transfers) transfersBadgeCount else 0
+                                    SymmetricalNavTab(
+                                        cfg = cfg,
+                                        isSelected = cfg.tag == selectedTag,
+                                        isArabic = isArabic,
+                                        isDark = isDark,
+                                        badgeCount = badge,
+                                        onClick = { onSelectTab(cfg) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                // جوهرة التحكم الذهبية المركزية (24K Gold Command Hub)
+                // الزر الدائري الذهبي الأوسط (CircleShape حقيقي)
                 if (showCenterHub) {
-                    MiraGoldCommandOrb(
+                    CenterGoldCircleButton(
                         isOpen = isFabMenuOpen,
+                        ringColor = cutoutRingColor,
                         modifier = Modifier.align(Alignment.TopCenter),
                         onClick = onCenterHubClick
                     )
@@ -725,143 +722,109 @@ class BottomNavManager(
     }
 
     @Composable
-    private fun MiraExpandablePillTab(
+    private fun SymmetricalNavTab(
         cfg: NavItemCfg,
         isSelected: Boolean,
         isArabic: Boolean,
+        isDark: Boolean,
         badgeCount: Int,
-        onClick: () -> Unit
+        onClick: () -> Unit,
+        modifier: Modifier = Modifier
     ) {
+        val colors = MiraTheme.colors
+
+        val activePillColor = if (isDark) {
+            colors.goldPrimary.copy(alpha = 0.18f)
+        } else {
+            colors.goldPrimary.copy(alpha = 0.14f)
+        }
+
+        val activeTextAndIcon = if (isDark) Color(0xFFF7DF8B) else Color(0xFF8C6200)
+        val inactiveTextAndIcon = colors.textSecondary
+
         val pillBg by animateColorAsState(
-            targetValue = if (isSelected) NavyPillActive else Color.Transparent,
-            animationSpec = tween(240),
+            targetValue = if (isSelected) activePillColor else Color.Transparent,
+            animationSpec = tween(200),
             label = "pillBg"
         )
-
-        val borderColor by animateColorAsState(
-            targetValue = if (isSelected) GoldPrimary.copy(alpha = 0.75f) else Color.Transparent,
-            animationSpec = tween(240),
-            label = "pillBorder"
+        val tintColor by animateColorAsState(
+            targetValue = if (isSelected) activeTextAndIcon else inactiveTextAndIcon,
+            animationSpec = tween(200),
+            label = "tintColor"
         )
-
-        val contentColor by animateColorAsState(
-            targetValue = if (isSelected) GoldBright else TextMuted,
-            animationSpec = tween(240),
-            label = "pillContent"
-        )
-
         val iconScale by animateFloatAsState(
-            targetValue = if (isSelected) 1.08f else 0.96f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            ),
+            targetValue = if (isSelected) 1.08f else 1.0f,
+            animationSpec = spring(stiffness = Spring.StiffnessMedium),
             label = "iconScale"
         )
 
         val title = stringResource(id = if (isArabic) cfg.titleArRes else cfg.titleEnRes)
 
-        Box(
-            modifier = Modifier
-                .height(44.dp)
-                .clip(RoundedCornerShape(22.dp))
+        Column(
+            modifier = modifier
+                .padding(horizontal = 3.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(16.dp))
                 .background(pillBg)
-                .border(1.dp, borderColor, RoundedCornerShape(22.dp))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onClick
                 )
-                .padding(horizontal = if (isSelected) 14.dp else 10.dp),
-            contentAlignment = Alignment.Center
+                .padding(vertical = 5.dp, horizontal = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Box(contentAlignment = Alignment.TopEnd) {
-                    Image(
-                        painter = painterResource(id = cfg.iconRes),
-                        contentDescription = title,
-                        colorFilter = ColorFilter.tint(contentColor),
+            Box(contentAlignment = Alignment.TopEnd) {
+                Image(
+                    painter = painterResource(id = cfg.iconRes),
+                    contentDescription = title,
+                    colorFilter = ColorFilter.tint(tintColor),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .scale(iconScale)
+                )
+
+                if (badgeCount > 0) {
+                    Box(
                         modifier = Modifier
-                            .size(21.dp)
-                            .scale(iconScale)
-                    )
-
-                    if (badgeCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = 6.dp, y = (-4).dp)
-                                .clip(CircleShape)
-                                .background(BadgeCrimson)
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            BasicText(
-                                text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                                style = TextStyle(
-                                    color = Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = isSelected,
-                    enter = expandHorizontally(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ) + fadeIn(tween(200)),
-                    exit = shrinkHorizontally(tween(180)) + fadeOut(tween(140))
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spacer(modifier = Modifier.width(7.dp))
-                        BasicText(
-                            text = title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = TextStyle(
-                                color = GoldBright,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(GoldPrimary)
+                            .offset(x = 7.dp, y = (-3).dp)
+                            .clip(CircleShape)
+                            .background(BadgeCrimson)
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                            color = Color.White,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = title,
+                color = tintColor,
+                fontSize = 10.5.sp,
+                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
         }
     }
 
     @Composable
-    private fun MiraGoldCommandOrb(
+    private fun CenterGoldCircleButton(
         isOpen: Boolean,
+        ringColor: Color,
         modifier: Modifier = Modifier,
         onClick: () -> Unit
     ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "goldOrbGlow")
-        val glowScale by infiniteTransition.animateFloat(
-            initialValue = 1.0f,
-            targetValue = 1.06f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "orbPulse"
-        )
-
         val rotation by animateFloatAsState(
             targetValue = if (isOpen) 135f else 0f,
             animationSpec = spring(
@@ -871,34 +834,27 @@ class BottomNavManager(
             label = "orbRotation"
         )
 
-        val goldOrbBrush = remember {
+        val goldBrush = remember {
             Brush.linearGradient(
-                colors = listOf(GoldBright, GoldPrimary, GoldBronze)
+                colors = listOf(GoldBright, Color(0xFFD4AF37), GoldDeep)
             )
         }
 
-        // حلقة عزل كحلية داكنة تفصل الجوهرة الذهبية بأناقة عن الكبسولة
+        // حلقة خارجية بلون خلفية الشاشة تعزل الدائرة الذهبية بنظافة تامة
         Box(
             modifier = modifier
-                .size(62.dp)
+                .size(58.dp)
                 .clip(CircleShape)
-                .background(NavyObsidian)
-                .padding(3.5.dp),
+                .background(ringColor)
+                .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .scale(if (isOpen) 1.04f else glowScale)
-                    .shadow(
-                        elevation = 12.dp,
-                        shape = CircleShape,
-                        ambientColor = GoldPrimary,
-                        spotColor = GoldBright
-                    )
+                    .shadow(6.dp, CircleShape)
                     .clip(CircleShape)
-                    .background(goldOrbBrush)
-                    .border(1.dp, GoldBright.copy(alpha = 0.85f), CircleShape)
+                    .background(goldBrush)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -908,10 +864,10 @@ class BottomNavManager(
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_diamond),
-                    contentDescription = "MIRA Command Hub",
-                    colorFilter = ColorFilter.tint(NavyDeep),
+                    contentDescription = "Quick Actions",
+                    colorFilter = ColorFilter.tint(Color(0xFF1A1405)),
                     modifier = Modifier
-                        .size(25.dp)
+                        .size(23.dp)
                         .rotate(rotation)
                 )
             }
@@ -919,40 +875,42 @@ class BottomNavManager(
     }
 
     @Composable
-    private fun LuxurySatelliteChip(
+    private fun ThemeSatelliteChip(
         iconRes: Int,
         label: String,
+        surfaceColor: Color,
+        borderColor: Color,
+        textColor: Color,
+        iconTint: Color,
         onClick: () -> Unit
     ) {
-        Row(
+        Surface(
             modifier = Modifier
-                .shadow(10.dp, RoundedCornerShape(20.dp))
                 .clip(RoundedCornerShape(20.dp))
-                .background(NavyDeep)
-                .border(1.dp, GoldPrimary.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick
-                )
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(20.dp),
+            color = surfaceColor,
+            border = BorderStroke(1.dp, borderColor),
+            shadowElevation = 6.dp
         ) {
-            Image(
-                painter = painterResource(id = iconRes),
-                contentDescription = label,
-                colorFilter = ColorFilter.tint(GoldPrimary),
-                modifier = Modifier.size(18.dp)
-            )
-            BasicText(
-                text = label,
-                style = TextStyle(
-                    color = GoldBright,
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    colorFilter = ColorFilter.tint(iconTint),
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = label,
+                    color = textColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
-            )
+            }
         }
     }
 }
