@@ -192,6 +192,15 @@ class LoginActivity : AppCompatActivity() {
         apiClient = MiraApiClient.getInstance(applicationContext)
 
         initInitialData()
+        if (sessionManager.hasActivationToken() &&
+        sessionManager.offlineStatus != "BLOCKED" &&
+        sessionManager.isLoggedIn &&
+        sessionManager.hasValidToken()
+    ) {
+        refreshLicenseBlobSilently()
+        navigateToMainDirect()
+        return
+    }
 
         setContent {
             val layoutDirection = if (isArabicState) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -282,56 +291,29 @@ class LoginActivity : AppCompatActivity() {
         applyOrgProfile()
     }
 
+        private fun refreshLicenseBlobSilently() {
+        val appCtx = applicationContext
+        executeSafeBg {
+            try {
+                MiraBlobFetcher.fetchVerifyAndStore(appCtx)
+            } catch (e: Exception) {
+                Log.w(TAG, "Silent blob refresh skipped: ${e.message}")
+            }
+        }
+    }
+
     private fun checkLicenseIntegrityAsync() {
         if (!sessionManager.hasActivationToken()) {
-            Log.d(TAG, "No activation token → skip blob check")
             continueOnCreateAfterLicenseCheck()
             return
         }
 
-        val storedBlob = MiraBlobStorage.load(this)
-        if (storedBlob != null) {
-            val result = MiraBlobVerifier.verify(
-                storedBlob.blobJson, storedBlob.signatureB64, storedBlob.publicKeyB64
-            )
-            if (result.valid) {
-                val fullResult = MiraBlobVerifier.verifyAndValidate(storedBlob, storedBlob)
-                if (fullResult.valid) {
-                    Log.d(TAG, "✅ License blob valid (v${storedBlob.version})")
-                    continueOnCreateAfterLicenseCheck()
-                    return
-                } else {
-                    Log.w(TAG, "⚠️ Stored blob expired: ${fullResult.message} — will try refresh")
-                }
-            } else {
-                Log.w(TAG, "⚠️ Stored blob tampered: ${result.message} — will try refresh")
-            }
-        }
-
-        Log.d(TAG, "📥 Fetching blob from server (optional)")
-        isCheckingLicenseState = true
-
-        executeSafeBg {
-            var fetched = false
-            try {
-                fetched = MiraBlobFetcher.fetchVerifyAndStore(this@LoginActivity)
-            } catch (e: Exception) {
-                Log.w(TAG, "blob fetch exception: ${e.message}")
-            }
-
-            mainHandler.post {
-                if (!isActivityAlive()) return@post
-                isCheckingLicenseState = false
-
-                if (fetched) {
-                    Log.d(TAG, "✅ Blob fetched from server")
-                } else {
-                    Log.w(TAG, "⚠️ Blob fetch failed — but activation token exists, proceeding")
-                }
-                continueOnCreateAfterLicenseCheck()
-            }
-        }
+        // المتابعة فوراً دون انتظار الشبكة وتحديث الـ Blob في الخلفية بصمت
+        isCheckingLicenseState = false
+        refreshLicenseBlobSilently()
+        continueOnCreateAfterLicenseCheck()
     }
+
 
     private fun continueOnCreateAfterLicenseCheck() {
         // [1] فحص activation token
