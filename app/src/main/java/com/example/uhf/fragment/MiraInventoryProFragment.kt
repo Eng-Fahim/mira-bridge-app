@@ -21,6 +21,7 @@ import android.view.PixelCopy
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -57,13 +58,13 @@ import androidx.core.content.FileProvider
 import com.example.uhf.MiraRfid.MiraIRFIDReader
 import com.example.uhf.MiraRfid.MiraReaderSettings
 import com.example.uhf.MiraRfid.RFIDManager
-import com.example.uhf.R
 import com.example.uhf.activity.BaseTabFragmentActivity
 import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.PosPowerSettingsDialog
 import com.example.uhf.manager.*
 import com.example.uhf.tools.DeviceDetector
+import com.example.uhf.tools.MiraLanguageHelper
 import com.example.uhf.tools.SessionManager
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
@@ -85,16 +86,12 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 /**
  * MiraInventoryProFragment
- * منظومة الجرد الذكي المتكاملة لـ MIRA ID™:
- * - مطابقة فورية Set-Based Reconciliation
- * - مزامنة الكتالوج قبل الجرد لتوحيد عدد القطع المتوقعة مع السيرفر
- * - التقاط لقطة شاشة توثيقية (PixelCopy) قبل الاعتماد
- * - مزامنة الجلسة + المسح الجماعي bulk-scan + إغلاق الجلسة مع السيرفر
- * - توليد تقارير PDF و CSV تفصيلية شاملة للعيارات والمفقودات والمطابق والزائد
+ * منظومة الجرد الذكي المتكاملة لـ MIRA ID™ (RTL Native + Throttled Engine)
  */
 class MiraInventoryProFragment : MiraBaseFragment() {
 
@@ -106,6 +103,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         private const val KEYCODE_RFID_TRIGGER_3 = 293
 
         private const val PREFS_PENDING_AUDITS = "mira_pending_inventory_audits"
+        private const val RECONCILE_THROTTLE_MS = 120L
     }
 
     enum class AuditFilterTab { ALL, MATCHED, MISSING, UNREGISTERED }
@@ -222,6 +220,8 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val reconcileScheduled = AtomicBoolean(false)
+
     private var sessionManager: SessionManager? = null
     private var branchesManager: MiraBranchesManager? = null
     private var priceManager: MiraPriceManager? = null
@@ -266,6 +266,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     //  Jetpack Compose Reactive UI State
     // ═══════════════════════════════════════════════════════════════════
 
+    private var isArabicUiState by mutableStateOf(true)
     private var branchNameState by mutableStateOf("")
     private var branchIdState by mutableIntStateOf(1)
     private var isScanningState by mutableStateOf(false)
@@ -300,6 +301,14 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private var tickerRunnable: Runnable? = null
 
+    private fun resolveIsArabic(ctx: Context?): Boolean {
+        val savedLang = ctx?.let { MiraLanguageHelper.getSavedLanguage(it) } ?: ""
+        return isArabic ||
+            savedLang.equals("ar", ignoreCase = true) ||
+            AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+            Locale.getDefault().language == "ar"
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  Lifecycle
     // ═══════════════════════════════════════════════════════════════════
@@ -309,10 +318,12 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val arabic = isArabic
+        val ctx = requireContext()
+        val arabic = resolveIsArabic(ctx)
+        isArabicUiState = arabic
         val composeDir = if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr
 
-        return ComposeView(requireContext()).apply {
+        return ComposeView(ctx).apply {
             layoutDirection = if (arabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
@@ -329,6 +340,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val ctx = requireContext().applicationContext
+        isArabicUiState = resolveIsArabic(ctx)
         sessionManager = SessionManager(ctx)
         branchesManager = MiraBranchesManager.getInstance(ctx)
         priceManager = MiraPriceManager.getInstance(ctx)
@@ -363,10 +375,8 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     override fun onResume() {
         super.onResume()
         try {
-            (activity as? UHFMainActivity)?.let { act ->
-                act.setActiveInventoryFragment(this)
-                act.findViewById<View>(R.id.fabActionCenter)?.visibility = View.GONE
-            }
+            isArabicUiState = resolveIsArabic(context)
+            (activity as? UHFMainActivity)?.setActiveInventoryFragment(this)
             warmUpRfidReaderForInventory()
             startTicker()
         } catch (e: Exception) {
@@ -379,10 +389,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         try {
             stopInventoryScan()
             stopTicker()
-            (activity as? UHFMainActivity)?.let { act ->
-                act.setActiveInventoryFragment(null)
-                act.findViewById<View>(R.id.fabActionCenter)?.visibility = View.VISIBLE
-            }
+            (activity as? UHFMainActivity)?.setActiveInventoryFragment(null)
         } catch (e: Exception) {
             Log.e(TAG, "onPause error", e)
         }
@@ -413,6 +420,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 rfidManager?.removeListener(listener)
             }
             rfidListener = null
+            reconcileScheduled.set(false)
             mainHandler.removeCallbacksAndMessages(null)
         } catch (e: Exception) {
             Log.e(TAG, "onDestroyView error", e)
@@ -481,10 +489,12 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             manager.ensureReady(object : RFIDManager.ReadyCallback {
                 override fun onReady(reader: MiraIRFIDReader) {
                     safeRun { isRfidReadyState = true }
-                    sdkExecutor.execute {
-                        runCatching {
-                            manager.setPower(inventoryPower)
-                            BaseTabFragmentActivity.getSharedReader()?.setPower(inventoryPower)
+                    if (!sdkExecutor.isShutdown) {
+                        sdkExecutor.execute {
+                            runCatching {
+                                manager.setPower(inventoryPower)
+                                BaseTabFragmentActivity.getSharedReader()?.setPower(inventoryPower)
+                            }
                         }
                     }
                 }
@@ -516,8 +526,8 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
         val isTrigger = keyCode == KEYCODE_RFID_TRIGGER_1 ||
-                keyCode == KEYCODE_RFID_TRIGGER_2 ||
-                keyCode == KEYCODE_RFID_TRIGGER_3
+            keyCode == KEYCODE_RFID_TRIGGER_2 ||
+            keyCode == KEYCODE_RFID_TRIGGER_3
 
         if (!isTrigger) return false
 
@@ -535,11 +545,11 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private fun startInventoryScan() {
         if (!hasRfidHardwareState) {
-            showToast(if (isArabic) "الجهاز لا يدعم قارئ UHF RFID" else "UHF RFID not supported")
+            showToast(if (isArabicUiState) "الجهاز لا يدعم قارئ UHF RFID" else "UHF RFID not supported")
             return
         }
         val manager = rfidManager ?: return
-        if (isScanningState) return
+        if (isScanningState || sdkExecutor.isShutdown) return
 
         currentScanSegmentStartMs = System.currentTimeMillis()
         isScanningState = true
@@ -563,7 +573,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                         safeRun {
                             isScanningState = false
                             showToast(
-                                if (isArabic) "⚠️ تعذر بدء المسح: $reason"
+                                if (isArabicUiState) "⚠️ تعذر بدء المسح: $reason"
                                 else "⚠️ Scan failed: $reason"
                             )
                         }
@@ -583,6 +593,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         }
         isScanningState = false
         tagRatePerSecState = 0
+        recomputeReconciliationState()
 
         val manager = rfidManager ?: return
         if (sdkExecutor.isShutdown) {
@@ -595,7 +606,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Tag Ingestion & Set-Based Reconciliation Engine
+    //  Tag Ingestion & Throttled Set-Based Reconciliation Engine
     // ═══════════════════════════════════════════════════════════════════
 
     fun onTagScanned(rawEpc: String?, rssi: Int = -55) {
@@ -605,7 +616,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         readsInLastSecond++
 
         val catalogItem = resolveCatalogItemByCode(cleanEpc)
-        val canonicalEpc = catalogItem?.epc ?: cleanEpc
+        val canonicalEpc = catalogItem?.epc?.ifEmpty { cleanEpc } ?: cleanEpc
 
         val existing = scannedMetricsByEpc[canonicalEpc]
         if (existing == null) {
@@ -618,15 +629,15 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 lastSeenMs = now
             )
             playAlertSound(1)
-            recomputeReconciliationState()
+            scheduleReconciliationUpdate()
         } else {
             existing.readCount += 1
             if (rssi > existing.rssi && rssi < 0) {
                 existing.rssi = rssi
             }
             existing.lastSeenMs = now
-            if (existing.readCount % 5 == 0) {
-                recomputeReconciliationState()
+            if (existing.readCount % 6 == 0) {
+                scheduleReconciliationUpdate()
             }
         }
     }
@@ -634,6 +645,19 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     fun onBarcodeScanned(rawCode: String?) {
         if (rawCode.isNullOrBlank()) return
         onTagScanned(rawCode.trim(), -40)
+    }
+
+    private fun scheduleReconciliationUpdate() {
+        if (reconcileScheduled.compareAndSet(false, true)) {
+            mainHandler.postDelayed({
+                reconcileScheduled.set(false)
+                if (!diskExecutor.isShutdown) {
+                    diskExecutor.execute { recomputeReconciliationState() }
+                } else {
+                    recomputeReconciliationState()
+                }
+            }, RECONCILE_THROTTLE_MS)
+        }
     }
 
     private fun resolveCatalogItemByCode(code: String): CatalogJewelryItem? {
@@ -646,6 +670,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     private fun loadCatalogFromLocalCache() {
         val appCtx = getSafeAppContext() ?: return
         val targetBranchId = getActiveBranchId()
+        if (diskExecutor.isShutdown) return
 
         diskExecutor.execute {
             try {
@@ -669,6 +694,9 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
         miraExecutor?.networkExecutor?.execute {
             try {
+                // إعادة محاولة رفع أي جلسات جرد معلقة عند توفر الاتصال
+                flushPendingAuditsQueue()
+
                 val syncManager = MiraItemSyncManager.getInstance(appCtx)
                 invokeSyncManagerRefresh(syncManager, targetBranchId)
 
@@ -684,7 +712,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                     isSyncingCatalogState = false
                     if (!silent) {
                         showToast(
-                            if (isArabic) "✅ تم تحديث كتالوج الفرع (${allCatalogItems.size} قطعة)"
+                            if (isArabicUiState) "✅ تم تحديث كتالوج الفرع (${allCatalogItems.size} قطعة)"
                             else "✅ Branch catalog synced (${allCatalogItems.size} items)"
                         )
                     }
@@ -695,7 +723,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                     isSyncingCatalogState = false
                     if (!silent) {
                         showToast(
-                            if (isArabic) "⚠️ تعذرت المزامنة مع السيرفر، يتم العمل على البيانات المحلية"
+                            if (isArabicUiState) "⚠️ تعذرت المزامنة مع السيرفر، يتم العمل على البيانات المحلية"
                             else "⚠️ Server sync failed, using local cache"
                         )
                     }
@@ -832,7 +860,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                         epc = epc,
                         tid = "",
                         serialNo = "",
-                        title = if (isArabic) "بطاقة غير مسجلة في الفرع" else "Unregistered Tag",
+                        title = if (isArabicUiState) "بطاقة غير مسجلة في الفرع" else "Unregistered Tag",
                         karat = "—",
                         weight = 0.0,
                         priceUsd = 0.0,
@@ -899,7 +927,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         if (isFinalizingState) return
 
         if (expectedCountState == 0 && matchedCountState == 0 && unregisteredCountState == 0) {
-            showToast(if (isArabic) "لا توجد بيانات جرد لاعتمادها" else "No inventory data to approve")
+            showToast(if (isArabicUiState) "لا توجد بيانات جرد لاعتمادها" else "No inventory data to approve")
             return
         }
 
@@ -970,6 +998,12 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         rawBitmap: Bitmap,
         onCaptured: (base64: String?, savedFile: File?) -> Unit
     ) {
+        if (diskExecutor.isShutdown) {
+            rawBitmap.recycle()
+            onCaptured(null, null)
+            return
+        }
+
         diskExecutor.execute {
             try {
                 val maxWidth = 720
@@ -982,7 +1016,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 }
 
                 val baos = ByteArrayOutputStream()
-                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 78, baos)
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 76, baos)
                 val bytes = baos.toByteArray()
                 val base64Str = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
 
@@ -1081,7 +1115,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 branchId = branchIdState,
                 branchName = branchNameState,
                 auditorName = sessionManager?.username ?: "POS Operator",
-                auditTypeLabel = if (isArabic) "جرد شامل" else "Full Audit",
+                auditTypeLabel = if (isArabicUiState) "جرد شامل" else "Full Audit",
                 startedAtMs = auditStartedAtMs,
                 approvedAtMs = approvedAtMs,
                 durationSeconds = durationSec,
@@ -1113,7 +1147,6 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 approvedReportDialogState = report
                 playAlertSound(1)
 
-                // تحديث لوحة تحكم الجرد الإحصائية بالخلفية فور الاعتماد
                 getSafeAppContext()?.sendBroadcast(
                     Intent("com.example.uhf.REFRESH_INVENTORY").apply {
                         setPackage(requireContext().packageName)
@@ -1122,17 +1155,17 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
                 if (outcome.success) {
                     showToast(
-                        if (isArabic) "✅ تم اعتماد الجلسة ورفعها للسيرفر بنجاح"
+                        if (isArabicUiState) "✅ تم اعتماد الجلسة ورفعها للسيرفر بنجاح"
                         else "✅ Session approved & synced with server"
                     )
                 } else {
                     val reason = outcome.errorMessage?.takeIf { it.isNotBlank() }
                     showToast(
                         if (reason != null) {
-                            if (isArabic) "⚠️ حُفظ محلياً — رد السيرفر: $reason"
+                            if (isArabicUiState) "⚠️ حُفظ محلياً — رد السيرفر: $reason"
                             else "⚠️ Saved locally — Server: $reason"
                         } else {
-                            if (isArabic) "📥 تم الاعتماد محلياً وسيُرفع للسيرفر عند توفر الاتصال"
+                            if (isArabicUiState) "📥 تم الاعتماد محلياً وسيُرفع للسيرفر عند توفر الاتصال"
                             else "📥 Approved locally; will sync when online"
                         }
                     )
@@ -1252,20 +1285,11 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         }
     }
 
-    /**
-     * مزامنة الجلسة الكاملة مع السيرفر عبر:
-     * 1) دوال MiraApiClient إن وُجدت
-     * 2) أو مسارات Laravel V1 مباشرة:
-     *    - POST /api/v1/inventory/sessions/start (أو /api/v1/inventory/sessions)
-     *    - POST /api/v1/inventory/sessions/{sessionId}/bulk-scan
-     *    - POST /api/v1/inventory/sessions/{sessionId}/close (أو /finalize)
-     */
     private fun syncAuditSessionWithServer(payload: JSONObject): ServerSyncOutcome {
         val client = apiClient
         var sessionId = activeServerSessionId
         var lastError: String? = null
 
-        // المحاولة 1: استدعاء مباشر لدوال MiraApiClient إن كانت متوفرة
         if (client != null) {
             val directRes = invokeAnyClientFinalizeMethod(client, payload)
             if (directRes != null && directRes.optBoolean("success", false)) {
@@ -1276,7 +1300,6 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             }
         }
 
-        // المحاولة 2: الاتصال المباشر بمسارات Laravel API V1 باستخدام بيانات الجلسة
         val baseUrl = resolveServerBaseUrl(client)
         val authToken = resolveAuthToken(client)
 
@@ -1286,7 +1309,6 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
         val cleanBase = baseUrl.trimEnd('/')
 
-        // الخطوة أ: فتح جلسة جرد نشطة على السيرفر إذا لم تُفتح بعد
         if (sessionId <= 0L) {
             val startBody = JSONObject().apply {
                 put("branch_id", branchIdState)
@@ -1316,7 +1338,6 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             }
         }
 
-        // الخطوة ب: إرسال كافة البطاقات الممسوحة عبر InventoryScanController::bulkScan
         val scannedItems = payload.optJSONArray("scanned_items")
         if (sessionId > 0L && scannedItems != null && scannedItems.length() > 0) {
             val tagsArray = JSONArray()
@@ -1340,7 +1361,6 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             }
         }
 
-        // الخطوة ج: إغلاق واعتماد الجلسة مع إرسال الملخص التفصيلي ولقطة الشاشة
         val closeUrls = if (sessionId > 0L) {
             listOf(
                 "$cleanBase/api/v1/inventory/sessions/$sessionId/close",
@@ -1386,7 +1406,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             try {
                 val method = client.javaClass.methods.firstOrNull {
                     it.name == name && it.parameterTypes.size == 1 &&
-                            it.parameterTypes[0] == JSONObject::class.java
+                        it.parameterTypes[0] == JSONObject::class.java
                 }
                 if (method != null) {
                     val res = method.invoke(client, payload) ?: continue
@@ -1431,7 +1451,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             val sm = sessionManager ?: return ""
             val m = sm.javaClass.methods.firstOrNull {
                 (it.name == "getBaseUrl" || it.name == "getServerUrl" || it.name == "getApiUrl") &&
-                        it.parameterTypes.isEmpty()
+                    it.parameterTypes.isEmpty()
             }
             (m?.invoke(sm) as? String) ?: ""
         } catch (_: Exception) {
@@ -1445,7 +1465,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             if (sm != null) {
                 val m = sm.javaClass.methods.firstOrNull {
                     (it.name == "getToken" || it.name == "getAuthToken" || it.name == "getAccessToken") &&
-                            it.parameterTypes.isEmpty()
+                        it.parameterTypes.isEmpty()
                 }
                 val t = m?.invoke(sm) as? String
                 if (!t.isNullOrBlank()) return t
@@ -1513,13 +1533,32 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     private fun savePendingAuditOffline(payload: JSONObject) {
         try {
             val ctx = getSafeAppContext() ?: return
-            val prefs = ctx.getSharedPreferences(PREFS_PENDING_AUDITS, Context.MODE_PRIVATE)
-            val existingStr = prefs.getString("queue", "[]") ?: "[]"
-            val arr = JSONArray(existingStr)
-            arr.put(payload)
-            prefs.edit().putString("queue", arr.toString()).apply()
+            val dir = File(ctx.filesDir, "pending_audits").apply { mkdirs() }
+            val file = File(dir, "pending_${System.currentTimeMillis()}.json")
+            file.writeText(payload.toString(), StandardCharsets.UTF_8)
         } catch (e: Exception) {
             Log.e(TAG, "savePendingAuditOffline error", e)
+        }
+    }
+
+    private fun flushPendingAuditsQueue() {
+        try {
+            val ctx = getSafeAppContext() ?: return
+            val dir = File(ctx.filesDir, "pending_audits")
+            val files = dir.listFiles()?.filter { it.isFile && it.extension == "json" } ?: return
+            for (file in files) {
+                val payload = runCatching { JSONObject(file.readText(StandardCharsets.UTF_8)) }.getOrNull()
+                if (payload == null) {
+                    file.delete()
+                    continue
+                }
+                val res = syncAuditSessionWithServer(payload)
+                if (res.success) {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "flushPendingAuditsQueue error: ${e.message}")
         }
     }
 
@@ -1537,7 +1576,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         selectedKaratFilterState = null
         searchQueryState = ""
         recomputeReconciliationState()
-        showToast(if (isArabic) "🔄 تم تصفير الجلسة لبدء جرد جديد" else "🔄 Audit session reset")
+        showToast(if (isArabicUiState) "🔄 تم تصفير الجلسة لبدء جرد جديد" else "🔄 Audit session reset")
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1546,6 +1585,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private fun exportAndSharePdfReport(report: ReconciledAuditReport) {
         val ctx = context ?: return
+        if (diskExecutor.isShutdown) return
         diskExecutor.execute {
             try {
                 val pdfFile = generateDetailedPdfFile(ctx, report)
@@ -1554,14 +1594,14 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                         ctx = ctx,
                         file = pdfFile,
                         mimeType = "application/pdf",
-                        chooserTitle = if (isArabic) "مشاركة أو طباعة تقرير الجرد PDF" else "Share or Print Audit PDF"
+                        chooserTitle = if (isArabicUiState) "مشاركة أو طباعة تقرير الجرد PDF" else "Share or Print Audit PDF"
                     )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "exportAndSharePdfReport error", e)
                 safeRun {
                     showToast(
-                        if (isArabic) "❌ فشل إنشاء تقرير PDF: ${e.message}"
+                        if (isArabicUiState) "❌ فشل إنشاء تقرير PDF: ${e.message}"
                         else "❌ PDF generation failed: ${e.message}"
                     )
                 }
@@ -1571,6 +1611,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private fun exportAndShareCsvReport(report: ReconciledAuditReport) {
         val ctx = context ?: return
+        if (diskExecutor.isShutdown) return
         diskExecutor.execute {
             try {
                 val csvFile = generateDetailedCsvFile(ctx, report)
@@ -1579,14 +1620,14 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                         ctx = ctx,
                         file = csvFile,
                         mimeType = "text/csv",
-                        chooserTitle = if (isArabic) "تصدير تقرير الجرد CSV" else "Export Audit CSV"
+                        chooserTitle = if (isArabicUiState) "تصدير تقرير الجرد CSV" else "Export Audit CSV"
                     )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "exportAndShareCsvReport error", e)
                 safeRun {
                     showToast(
-                        if (isArabic) "❌ فشل تصدير ملف CSV: ${e.message}"
+                        if (isArabicUiState) "❌ فشل تصدير ملف CSV: ${e.message}"
                         else "❌ CSV export failed: ${e.message}"
                     )
                 }
@@ -1850,8 +1891,8 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 for (k in report.karatSummaries) {
                     writer.appendLine(
                         "${k.karat},${k.expectedCount},${k.matchedCount},${k.missingCount}," +
-                                "${String.format(Locale.US, "%.2f", k.scannedWeight)}," +
-                                "${String.format(Locale.US, "%.2f", k.expectedWeight)}"
+                            "${String.format(Locale.US, "%.2f", k.scannedWeight)}," +
+                            "${String.format(Locale.US, "%.2f", k.expectedWeight)}"
                     )
                 }
                 writer.appendLine()
@@ -1868,10 +1909,10 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                     val safeTitle = item.title.replace("\"", "\"\"")
                     writer.appendLine(
                         "\"$statusAr\",\"$safeTitle\",${item.karat}," +
-                                "${String.format(Locale.US, "%.2f", item.weight)}," +
-                                "${String.format(Locale.US, "%.2f", item.priceUsd)}," +
-                                "\"${item.serialNo}\",\"${item.epc}\",\"${item.tid}\"," +
-                                "${item.tidVerified},${item.rssi},${item.readCount}"
+                            "${String.format(Locale.US, "%.2f", item.weight)}," +
+                            "${String.format(Locale.US, "%.2f", item.priceUsd)}," +
+                            "\"${item.serialNo}\",\"${item.epc}\",\"${item.tid}\"," +
+                            "${item.tidVerified},${item.rssi},${item.readCount}"
                     )
                 }
             }
@@ -1892,7 +1933,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         } catch (e: Exception) {
             Log.e(TAG, "shareGeneratedFile error", e)
             showToast(
-                if (isArabic) "تم حفظ الملف في: ${file.name}"
+                if (isArabicUiState) "تم حفظ الملف في: ${file.name}"
                 else "File saved: ${file.name}"
             )
         }
@@ -1964,13 +2005,14 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose Screen & Approval Dialog
+    //  Jetpack Compose Screen & Approval Dialog (Native RTL & LTR)
     // ═══════════════════════════════════════════════════════════════════
 
     @Composable
     private fun MiraInventoryScreen() {
         val colors = MiraTheme.colors
-        val isAr = isArabic
+        val isAr = isArabicUiState
+        val composeDir = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
 
         val filteredItems = remember(
             allDisplayItemsState,
@@ -1986,12 +2028,12 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                     AuditFilterTab.UNREGISTERED -> item.auditStatus == ItemAuditStatus.UNREGISTERED
                 }
                 val matchesKarat = selectedKaratFilterState == null ||
-                        item.karat.equals(selectedKaratFilterState, ignoreCase = true)
+                    item.karat.equals(selectedKaratFilterState, ignoreCase = true)
                 val q = searchQueryState.trim()
                 val matchesQuery = q.isEmpty() ||
-                        item.title.contains(q, ignoreCase = true) ||
-                        item.epc.contains(q, ignoreCase = true) ||
-                        item.serialNo.contains(q, ignoreCase = true)
+                    item.title.contains(q, ignoreCase = true) ||
+                    item.epc.contains(q, ignoreCase = true) ||
+                    item.serialNo.contains(q, ignoreCase = true)
                 matchesTab && matchesKarat && matchesQuery
             }
         }
@@ -2049,16 +2091,19 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                     value = searchQueryState,
                     onValueChange = { searchQueryState = it },
                     singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = colors.textPrimary),
                     placeholder = {
                         Text(
                             text = if (isAr) "بحث بالاسم، EPC، الباركود، أو الرقم التسلسلي..."
                             else "Search by name, EPC, barcode, or serial...",
                             style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
+                            color = colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     leadingIcon = {
-                        Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.textSecondary)
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.goldPrimary)
                     },
                     trailingIcon = {
                         if (searchQueryState.isNotEmpty()) {
@@ -2067,6 +2112,13 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                             }
                         }
                     },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = colors.cardSurface,
+                        unfocusedContainerColor = colors.cardSurface.copy(alpha = 0.7f),
+                        focusedBorderColor = colors.goldPrimary,
+                        unfocusedBorderColor = colors.textSecondary.copy(alpha = 0.25f),
+                        cursorColor = colors.goldPrimary
+                    ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2102,10 +2154,12 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                         val dialogCtx = activity ?: context
                         if (dialogCtx != null) {
                             PosPowerSettingsDialog.show(dialogCtx, isAr) { newPower ->
-                                sdkExecutor.execute {
-                                    runCatching {
-                                        rfidManager?.setPower(newPower)
-                                        BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+                                if (!sdkExecutor.isShutdown) {
+                                    sdkExecutor.execute {
+                                        runCatching {
+                                            rfidManager?.setPower(newPower)
+                                            BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+                                        }
                                     }
                                 }
                             }
@@ -2118,6 +2172,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         approvedReportDialogState?.let { report ->
             AuditApprovalResultDialog(
                 isArabic = isAr,
+                composeDir = composeDir,
                 report = report,
                 onExportCsv = { exportAndShareCsvReport(report) },
                 onExportPdf = { exportAndSharePdfReport(report) },
@@ -2126,77 +2181,81 @@ class MiraInventoryProFragment : MiraBaseFragment() {
         }
 
         if (showResetConfirmDialogState) {
-            AlertDialog(
-                onDismissRequest = { showResetConfirmDialogState = false },
-                containerColor = colors.cardSurface,
-                title = {
-                    Text(
-                        text = if (isAr) "تصفير جلسة الجرد؟" else "Reset Audit Session?",
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
-                    )
-                },
-                text = {
-                    Text(
-                        text = if (isAr) "سيتم مسح القراءات الحالية والبدء من الصفر."
-                        else "Current scanned tags will be cleared.",
-                        color = colors.textSecondary
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showResetConfirmDialogState = false
-                            resetAuditSession()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                    ) {
-                        Text(if (isAr) "تصفير" else "Reset", color = Color.White)
+            CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+                AlertDialog(
+                    onDismissRequest = { showResetConfirmDialogState = false },
+                    containerColor = colors.cardSurface,
+                    title = {
+                        Text(
+                            text = if (isAr) "تصفير جلسة الجرد؟" else "Reset Audit Session?",
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = if (isAr) "سيتم مسح القراءات الحالية والبدء من الصفر."
+                            else "Current scanned tags will be cleared.",
+                            color = colors.textSecondary
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showResetConfirmDialogState = false
+                                resetAuditSession()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                        ) {
+                            Text(if (isAr) "تصفير" else "Reset", color = Color.White)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetConfirmDialogState = false }) {
+                            Text(if (isAr) "إلغاء" else "Cancel", color = colors.textSecondary)
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showResetConfirmDialogState = false }) {
-                        Text(if (isAr) "إلغاء" else "Cancel", color = colors.textSecondary)
-                    }
-                }
-            )
+                )
+            }
         }
 
         if (showExitConfirmDialogState) {
-            AlertDialog(
-                onDismissRequest = { showExitConfirmDialogState = false },
-                containerColor = colors.cardSurface,
-                title = {
-                    Text(
-                        text = if (isAr) "مغادرة الجرد دون اعتماد؟" else "Leave Without Approving?",
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
-                    )
-                },
-                text = {
-                    Text(
-                        text = if (isAr) "تمت قراءة $matchedCountState قطعة. هل تريد المغادرة دون حفظ التقرير؟"
-                        else "$matchedCountState items scanned. Leave without saving?",
-                        color = colors.textSecondary
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showExitConfirmDialogState = false
-                            navigateAway()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.goldPrimary)
-                    ) {
-                        Text(if (isAr) "مغادرة" else "Leave", color = Color(0xFF0A0F1D))
+            CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+                AlertDialog(
+                    onDismissRequest = { showExitConfirmDialogState = false },
+                    containerColor = colors.cardSurface,
+                    title = {
+                        Text(
+                            text = if (isAr) "مغادرة الجرد دون اعتماد؟" else "Leave Without Approving?",
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = if (isAr) "تمت قراءة $matchedCountState قطعة. هل تريد المغادرة دون حفظ التقرير؟"
+                            else "$matchedCountState items scanned. Leave without saving?",
+                            color = colors.textSecondary
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showExitConfirmDialogState = false
+                                navigateAway()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.goldPrimary)
+                        ) {
+                            Text(if (isAr) "مغادرة" else "Leave", color = Color(0xFF0A0F1D))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showExitConfirmDialogState = false }) {
+                            Text(if (isAr) "البقاء" else "Stay", color = colors.textSecondary)
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showExitConfirmDialogState = false }) {
-                        Text(if (isAr) "البقاء" else "Stay", color = colors.textSecondary)
-                    }
-                }
-            )
+                )
+            }
         }
     }
 
@@ -2212,36 +2271,26 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     ) {
         val colors = MiraTheme.colors
 
+        // في RTL: Start = يمين، End = يسار
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(onClick = onSyncClick, enabled = !isSyncing) {
-                    Icon(
-                        imageVector = Icons.Rounded.Sync,
-                        contentDescription = null,
-                        tint = if (isSyncing) colors.goldPrimary else Color(0xFF0EA5E9)
-                    )
-                }
-                IconButton(onClick = onRefreshClick) {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = null,
-                        tint = colors.textPrimary
-                    )
-                }
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = if (isArabic) Icons.Rounded.ArrowForward else Icons.Rounded.ArrowBack,
+                    contentDescription = null,
+                    tint = colors.goldPrimary
+                )
             }
 
             Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.End
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp),
+                horizontalAlignment = Alignment.Start
             ) {
                 Text(
                     text = if (isArabic) "جرد المجوهرات الذكي" else "Smart Jewelry Audit",
@@ -2260,14 +2309,24 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.Rounded.ArrowForward,
-                    contentDescription = null,
-                    tint = colors.goldPrimary
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                IconButton(onClick = onRefreshClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = null,
+                        tint = colors.textPrimary
+                    )
+                }
+                IconButton(onClick = onSyncClick, enabled = !isSyncing) {
+                    Icon(
+                        imageVector = Icons.Rounded.Sync,
+                        contentDescription = null,
+                        tint = if (isSyncing) colors.goldPrimary else Color(0xFF0EA5E9)
+                    )
+                }
             }
         }
     }
@@ -2489,15 +2548,15 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary
+                )
+                Text(
                     text = value,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = valueColor
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary
                 )
             }
         }
@@ -2574,36 +2633,17 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             border = BorderStroke(1.dp, statusColor.copy(alpha = 0.3f))
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
+                // السطر الأول: العيار + اسم القطعة في البداية (يمين في RTL) وشارة الحالة في النهاية (يسار في RTL)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = statusColor.copy(alpha = 0.14f)
-                    ) {
-                        Text(
-                            text = statusText,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor
-                        )
-                    }
-
                     Row(
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = colors.goldPrimary.copy(alpha = 0.18f)
@@ -2617,16 +2657,72 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                                 color = colors.goldPrimary
                             )
                         }
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = statusColor.copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            text = statusText,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // السطر الثاني: الوزن والسعر والرمز في البداية، ومؤشر القراءة في النهاية
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (item.weight > 0.0) {
+                            Text(
+                                text = String.format(Locale.US, "%.2fg", item.weight),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.goldPrimary
+                            )
+                        }
+                        if (item.priceUsd > 0.0) {
+                            Text(
+                                text = String.format(Locale.US, "$%,.0f", item.priceUsd),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF10B981)
+                            )
+                        }
+                        Text(
+                            text = item.epc.ifEmpty { item.serialNo },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     if (item.auditStatus != ItemAuditStatus.MISSING) {
                         Text(
                             text = "${item.rssi}dBm • ${item.readCount}x",
@@ -2640,42 +2736,13 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                             color = Color(0xFFEF4444)
                         )
                     }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (item.priceUsd > 0.0) {
-                            Text(
-                                text = String.format(Locale.US, "$%,.0f", item.priceUsd),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF10B981)
-                            )
-                        }
-                        if (item.weight > 0.0) {
-                            Text(
-                                text = String.format(Locale.US, "%.2fg", item.weight),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.goldPrimary
-                            )
-                        }
-                        Text(
-                            text = item.epc.ifEmpty { item.serialNo },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                 }
 
                 if (item.tidVerified) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -2707,6 +2774,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             color = colors.cardSurface,
             shadowElevation = 10.dp
         ) {
+            // في RTL: الزر الأساسي (بدء/إيقاف) على اليمين في متناول الإبهام الأيمن، يليه اعتماد ثم تصفير ثم إعدادات الطاقة
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2714,12 +2782,33 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = onResetClick,
+                Button(
+                    onClick = onToggleScanClick,
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(14.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isScanning) Color(0xFFDC2626) else colors.goldPrimary,
+                        contentColor = if (isScanning) Color.White else Color(0xFF0A0F1D)
+                    )
                 ) {
-                    Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(
+                        imageVector = if (isScanning) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isScanning) {
+                            if (isArabic) "إيقاف" else "Stop"
+                        } else {
+                            if (isArabic) "بدء" else "Start"
+                        },
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
 
                 Button(
@@ -2751,33 +2840,12 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                     }
                 }
 
-                Button(
-                    onClick = onToggleScanClick,
-                    modifier = Modifier.weight(1f),
+                OutlinedButton(
+                    onClick = onResetClick,
                     shape = RoundedCornerShape(14.dp),
-                    contentPadding = PaddingValues(vertical = 12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isScanning) Color(0xFFDC2626) else colors.goldPrimary,
-                        contentColor = if (isScanning) Color.White else Color(0xFF0A0F1D)
-                    )
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isScanning) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isScanning) {
-                            if (isArabic) "إيقاف" else "Stop"
-                        } else {
-                            if (isArabic) "بدء" else "Start"
-                        },
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        softWrap = false
-                    )
+                    Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
 
                 OutlinedButton(
@@ -2794,6 +2862,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
     @Composable
     private fun AuditApprovalResultDialog(
         isArabic: Boolean,
+        composeDir: LayoutDirection,
         report: ReconciledAuditReport,
         onExportCsv: () -> Unit,
         onExportPdf: () -> Unit,
@@ -2805,232 +2874,234 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             onDismissRequest = onDismiss,
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
-                border = BorderStroke(1.5.dp, colors.goldPrimary.copy(alpha = 0.45f))
-            ) {
-                Column(
+            CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 18.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
+                    border = BorderStroke(1.5.dp, colors.goldPrimary.copy(alpha = 0.45f))
                 ) {
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF059669)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF059669)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        text = if (isArabic) "تم اعتماد تقرير الجرد" else "Inventory Report Approved",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = colors.goldPrimary,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = if (isArabic) "رقم الجلسة: #${report.sessionId}" else "Session ID: #${report.sessionId}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = if (isArabic) "نسبة المطابقة: ${report.accuracyPercent}%"
-                        else "Match Accuracy: ${report.accuracyPercent}%",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF10B981)
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = if (isArabic) {
-                            "المتوقع: ${report.expectedCount}  |  المطابق: ${report.matchedCount}  |  المفقود: ${report.missingCount}"
-                        } else {
-                            "Expected: ${report.expectedCount}  |  Matched: ${report.matchedCount}  |  Missing: ${report.missingCount}"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = String.format(
-                            Locale.US,
-                            if (isArabic) "الوزن المقروء: %.2fg من %.2fg" else "Scanned Weight: %.2fg / %.2fg",
-                            report.scannedWeight,
-                            report.expectedWeight
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    val riskBg = if (report.isHighRisk) Color(0xFFEF4444).copy(alpha = 0.14f)
-                    else Color(0xFF10B981).copy(alpha = 0.14f)
-                    val riskFg = if (report.isHighRisk) Color(0xFFEF4444) else Color(0xFF10B981)
-
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = riskBg,
-                        border = BorderStroke(1.dp, riskFg.copy(alpha = 0.4f))
-                    ) {
                         Text(
-                            text = if (isArabic) report.riskTitleAr else report.riskTitleEn,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = riskFg,
+                            text = if (isArabic) "تم اعتماد تقرير الجرد" else "Inventory Report Approved",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = colors.goldPrimary,
                             textAlign = TextAlign.Center
                         )
-                    }
 
-                    if (report.screenshotFilePath != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = if (isArabic) "رقم الجلسة: #${report.sessionId}" else "Session ID: #${report.sessionId}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = if (isArabic) "نسبة المطابقة: ${report.accuracyPercent}%"
+                            else "Match Accuracy: ${report.accuracyPercent}%",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF10B981)
+                        )
+
                         Spacer(modifier = Modifier.height(6.dp))
+
                         Text(
-                            text = if (isArabic) "📸 تم توثيق الجلسة بلقطة شاشة وحفظ التفاصيل"
-                            else "📸 Session verified with screenshot & full item log",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary,
+                            text = if (isArabic) {
+                                "المتوقع: ${report.expectedCount}  |  المطابق: ${report.matchedCount}  |  المفقود: ${report.missingCount}"
+                            } else {
+                                "Expected: ${report.expectedCount}  |  Matched: ${report.matchedCount}  |  Missing: ${report.missingCount}"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary,
                             textAlign = TextAlign.Center
                         )
-                    }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = colors.backgroundTop.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.2f))
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "#${report.sessionId}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.textSecondary
-                                )
-                                Text(
-                                    text = if (isArabic) "تصدير وطباعة التقرير التفصيلي"
-                                    else "Export & Print Detailed Report",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.goldPrimary
-                                )
-                            }
+                        Text(
+                            text = String.format(
+                                Locale.US,
+                                if (isArabic) "الوزن المقروء: %.2fg من %.2fg" else "Scanned Weight: %.2fg / %.2fg",
+                                report.scannedWeight,
+                                report.expectedWeight
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary
+                        )
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedButton(
-                                    onClick = onExportCsv,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(46.dp),
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding = PaddingValues(horizontal = 10.dp),
-                                    border = BorderStroke(1.dp, colors.goldPrimary)
+                        val riskBg = if (report.isHighRisk) Color(0xFFEF4444).copy(alpha = 0.14f)
+                        else Color(0xFF10B981).copy(alpha = 0.14f)
+                        val riskFg = if (report.isHighRisk) Color(0xFFEF4444) else Color(0xFF10B981)
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = riskBg,
+                            border = BorderStroke(1.dp, riskFg.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = if (isArabic) report.riskTitleAr else report.riskTitleEn,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = riskFg,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        if (report.screenshotFilePath != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (isArabic) "📸 تم توثيق الجلسة بلقطة شاشة وحفظ التفاصيل"
+                                else "📸 Session verified with screenshot & full item log",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            color = colors.backgroundTop.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, colors.textSecondary.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Rounded.Download,
-                                        contentDescription = null,
-                                        tint = colors.goldPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "CSV",
+                                        text = if (isArabic) "تصدير وطباعة التقرير التفصيلي"
+                                        else "Export & Print Detailed Report",
+                                        style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        maxLines = 1,
-                                        softWrap = false,
                                         color = colors.goldPrimary
+                                    )
+                                    Text(
+                                        text = "#${report.sessionId}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = colors.textSecondary
                                     )
                                 }
 
-                                Button(
-                                    onClick = onExportPdf,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(46.dp),
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding = PaddingValues(horizontal = 10.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = colors.goldPrimary,
-                                        contentColor = Color(0xFF0A0F1D)
-                                    )
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Rounded.Print,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (isArabic) "PDF / طباعة" else "PDF / Print",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 13.sp,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
+                                    Button(
+                                        onClick = onExportPdf,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp),
+                                        shape = RoundedCornerShape(50),
+                                        contentPadding = PaddingValues(horizontal = 10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = colors.goldPrimary,
+                                            contentColor = Color(0xFF0A0F1D)
+                                        )
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Print,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isArabic) "PDF / طباعة" else "PDF / Print",
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = onExportCsv,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp),
+                                        shape = RoundedCornerShape(50),
+                                        contentPadding = PaddingValues(horizontal = 10.dp),
+                                        border = BorderStroke(1.dp, colors.goldPrimary)
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Download,
+                                            contentDescription = null,
+                                            tint = colors.goldPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "CSV",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            color = colors.goldPrimary
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .align(Alignment.Start)
-                            .height(42.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.goldPrimary,
-                            contentColor = Color(0xFF0A0F1D)
-                        )
-                    ) {
-                        Text(
-                            text = if (isArabic) "تم" else "Done",
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(50),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.goldPrimary,
+                                contentColor = Color(0xFF0A0F1D)
+                            )
+                        ) {
+                            Text(
+                                text = if (isArabic) "تم" else "Done",
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
             }
@@ -3137,7 +3208,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 val tid = obj.optString("tid", obj.optString("tag_tid", "")).trim()
                 val serial = obj.optString("serial", obj.optString("serial_number", "")).trim()
                 val gtin = obj.optString("gtin", obj.optString("barcode", "")).trim()
-                val title = obj.optString("title", obj.optString("item_title", if (isArabic) "قطعة مجوهرات" else "Jewelry Item"))
+                val title = obj.optString("title", obj.optString("item_title", if (isArabicUiState) "قطعة مجوهرات" else "Jewelry Item"))
                 val karat = obj.optString("karat", obj.optString("gold_karat", "21K"))
                 val weight = obj.optDouble("weight", obj.optDouble("gross_weight", 0.0))
                 var priceUsd = obj.optDouble("retail_price_usd", obj.optDouble("price_usd", 0.0))
@@ -3173,7 +3244,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             val methods = syncManager.javaClass.methods
             val syncMethod = methods.firstOrNull {
                 (it.name == "syncBranchItems" || it.name == "syncItems" || it.name == "syncAll") &&
-                        it.parameterTypes.size <= 1
+                    it.parameterTypes.size <= 1
             }
             if (syncMethod != null) {
                 if (syncMethod.parameterTypes.isEmpty()) {
@@ -3230,7 +3301,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
 
     private fun isFragmentAlive(): Boolean {
         return isAdded && !isRemoving && !isDetached &&
-                activity != null && !requireActivity().isFinishing && !requireActivity().isDestroyed
+            activity != null && !requireActivity().isFinishing && !requireActivity().isDestroyed
     }
 
     private fun safeRun(r: Runnable) {
@@ -3279,7 +3350,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 ?: emptyList()
 
             if (files.isEmpty()) {
-                showToast(if (isArabic) "📂 لا توجد تقارير محفوظة بعد" else "📂 No archived reports yet")
+                showToast(if (isArabicUiState) "📂 لا توجد تقارير محفوظة بعد" else "📂 No archived reports yet")
                 return
             }
 
@@ -3289,26 +3360,28 @@ class MiraInventoryProFragment : MiraBaseFragment() {
                 ctx = appCtx,
                 file = latest,
                 mimeType = mime,
-                chooserTitle = if (isArabic)
+                chooserTitle = if (isArabicUiState)
                     "مشاركة آخر تقرير (${files.size} إجمالي)"
                 else
                     "Share latest report (${files.size} total)"
             )
         } catch (e: Exception) {
             Log.e(TAG, "showArchiveReportsPublic error", e)
-            showToast(if (isArabic) "⚠️ تعذر فتح الأرشيف" else "⚠️ Failed to open archive")
+            showToast(if (isArabicUiState) "⚠️ تعذر فتح الأرشيف" else "⚠️ Failed to open archive")
         }
     }
 
     fun showInventoryScannerSettings() {
         val dialogCtx = activity ?: context ?: return
         val appCtx = getSafeAppContext() ?: dialogCtx.applicationContext
-        PosPowerSettingsDialog.show(dialogCtx, isArabic) { newPower ->
+        PosPowerSettingsDialog.show(dialogCtx, isArabicUiState) { newPower ->
             MiraReaderSettings.getInstance(appCtx).inventoryPowerDbm = newPower
-            sdkExecutor.execute {
-                runCatching {
-                    rfidManager?.setPower(newPower)
-                    BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+            if (!sdkExecutor.isShutdown) {
+                sdkExecutor.execute {
+                    runCatching {
+                        rfidManager?.setPower(newPower)
+                        BaseTabFragmentActivity.getSharedReader()?.setPower(newPower)
+                    }
                 }
             }
         }
@@ -3319,7 +3392,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             val appCtx = getSafeAppContext() ?: return
             val s = MiraReaderSettings.getInstance(appCtx)
             val rfLinkLabel = MiraReaderSettings.RFLINK_LABELS.getOrNull(s.rfLink) ?: "?"
-            val summary = if (isArabic) {
+            val summary = if (isArabicUiState) {
                 buildString {
                     appendLine("📊 إعدادات جلسة المسح الحالية:")
                     appendLine("• Session: S${s.session}   |   Target: ${if (s.target == 0) "A" else "B"}")
@@ -3341,7 +3414,7 @@ class MiraInventoryProFragment : MiraBaseFragment() {
             showToast(summary)
         } catch (e: Exception) {
             Log.e(TAG, "showInventorySessionSettings error", e)
-            showToast(if (isArabic) "⚠️ تعذر عرض إعدادات الجلسة" else "⚠️ Failed to show session settings")
+            showToast(if (isArabicUiState) "⚠️ تعذر عرض إعدادات الجلسة" else "⚠️ Failed to show session settings")
         }
     }
 }
