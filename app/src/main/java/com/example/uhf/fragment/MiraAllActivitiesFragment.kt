@@ -17,7 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,10 +47,10 @@ import com.example.uhf.activity.UHFMainActivity
 import com.example.uhf.api.MiraApiClient
 import com.example.uhf.dialog.ActivityDetailsBottomSheet
 import com.example.uhf.manager.MiraBranchesManager
+import com.example.uhf.tools.SecureSessionManager
 import com.example.uhf.ui.dashboard.UnifiedOperationCard
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
-import com.example.uhf.tools.SecureSessionManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -58,6 +58,7 @@ import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -80,7 +81,7 @@ class MiraAllActivitiesFragment : Fragment() {
     private val filteredActivitiesState = mutableStateListOf<JSONObject>()
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val executor = Executors.newFixedThreadPool(2)
+    private var executor: ExecutorService? = null
     private val isRequestInFlight = AtomicBoolean(false)
 
     private var isArabic = true
@@ -130,6 +131,7 @@ class MiraAllActivitiesFragment : Fragment() {
         apiClient = MiraApiClient.getInstance(requireContext())
         branchesManager = MiraBranchesManager.getInstance(requireContext())
 
+        ensureExecutor()
         loadActivities(reset = true)
     }
 
@@ -147,14 +149,29 @@ class MiraAllActivitiesFragment : Fragment() {
 
     override fun onDestroyView() {
         isDestroyed = true
-        if (!executor.isShutdown) {
-            executor.shutdownNow()
+        executor?.let { exec ->
+            if (!exec.isShutdown) {
+                exec.shutdownNow()
+            }
         }
+        executor = null
         mainHandler.removeCallbacksAndMessages(null)
         super.onDestroyView()
     }
 
-        private fun loadActivities(reset: Boolean) {
+    private fun ensureExecutor(): ExecutorService {
+        val current = executor
+        if (current == null || current.isShutdown || current.isTerminated) {
+            val created = Executors.newFixedThreadPool(2)
+            executor = created
+            return created
+        }
+        return current
+    }
+
+    private fun loadActivities(reset: Boolean) {
+        if (isDestroyed || !isAdded) return
+
         val client = apiClient
         if (client == null) {
             showError(if (isArabic) "العميل غير مهيأ" else "Client not initialized")
@@ -186,7 +203,6 @@ class MiraAllActivitiesFragment : Fragment() {
         val searchSnapshot = currentSearchState.trim()
         val filterSnapshot = currentFilterState
 
-        // قراءة بيانات المستخدم ودوره لضمان تطبيق العزل للموظفين والشمولية للمدراء
         val sm = context?.let { SecureSessionManager.getInstance(it) }
         val userId = readIntPropSafe(sm, "userId", "id")
         val username = readStringPropSafe(sm, "username", "fullName", "name")
@@ -198,7 +214,8 @@ class MiraAllActivitiesFragment : Fragment() {
         )
         val isManager = role.isNotBlank() && managerKeywords.any { role.contains(it) }
 
-        executor.execute {
+        val exec = ensureExecutor()
+        exec.execute {
             try {
                 val branchId = branchesManager?.activeBranchId ?: 0
                 val response = client.getUnifiedOperations(
@@ -259,9 +276,23 @@ class MiraAllActivitiesFragment : Fragment() {
         return 0
     }
 
+    private fun extractActivitiesArray(dataObj: JSONObject): JSONArray {
+        dataObj.optJSONArray("activities")?.let { return it }
+        dataObj.optJSONArray("operations")?.let { return it }
+        dataObj.optJSONArray("items")?.let { return it }
+        dataObj.optJSONArray("data")?.let { return it }
+        val nested = dataObj.optJSONObject("data")
+        if (nested != null) {
+            nested.optJSONArray("activities")?.let { return it }
+            nested.optJSONArray("operations")?.let { return it }
+            nested.optJSONArray("items")?.let { return it }
+            nested.optJSONArray("data")?.let { return it }
+        }
+        return JSONArray()
+    }
 
     private fun handleResponse(response: MiraApiClient.ApiResponse?, reset: Boolean) {
-        if (isDestroyed) return
+        if (isDestroyed || !isAdded) return
         finishLoading()
 
         if (response == null || !response.isSuccess || response.data == null) {
@@ -272,7 +303,7 @@ class MiraAllActivitiesFragment : Fragment() {
         }
 
         val dataObj = response.data!!
-        val activities = dataObj.optJSONArray("activities") ?: JSONArray()
+        val activities = extractActivitiesArray(dataObj)
         errorMessageState = null
 
         if (reset) {
@@ -280,7 +311,9 @@ class MiraAllActivitiesFragment : Fragment() {
         }
 
         for (i in 0 until activities.length()) {
-            activities.optJSONObject(i)?.let { allActivities.add(it) }
+            activities.optJSONObject(i)?.let { rawItem ->
+                allActivities.add(normalizeActivityItem(rawItem))
+            }
         }
 
         totalCountState = allActivities.size
@@ -291,6 +324,78 @@ class MiraAllActivitiesFragment : Fragment() {
         hasMorePages = dataObj.optBoolean("has_more", false)
 
         applyLocalFilters()
+    }
+
+    private fun normalizeActivityItem(item: JSONObject): JSONObject {
+        val copy = JSONObject(item.toString())
+        val rawType = copy.optString("type", copy.optString("operation_type", copy.optString("kind", "")))
+            .trim()
+        val refCode = copy.optString(
+            "sale_number",
+            copy.optString("reference", copy.optString("code", copy.optString("number", "")))
+        ).trim()
+
+        if (rawType.isBlank() && refCode.uppercase(Locale.US).startsWith("SCR")) {
+            copy.put("type", "scrap")
+        } else if (rawType.isNotBlank()) {
+            copy.put("type", rawType)
+        }
+
+        if (copy.optString("sale_number", "").isBlank() && refCode.isNotBlank()) {
+            copy.put("sale_number", refCode)
+        }
+
+        return copy
+    }
+
+    private fun matchesCategoryFilter(act: JSONObject, filterKey: String): Boolean {
+        if (filterKey == "all") return true
+
+        val typeLower = act.optString("type", act.optString("operation_type", ""))
+            .lowercase(Locale.ROOT)
+            .trim()
+        val refUpper = act.optString(
+            "sale_number",
+            act.optString("reference", act.optString("code", ""))
+        ).uppercase(Locale.US).trim()
+
+        return when (filterKey) {
+            "scrap" -> typeLower.contains("scrap") ||
+                typeLower.contains("trade_in") ||
+                typeLower.contains("trade-in") ||
+                typeLower.contains("buy_gold") ||
+                typeLower.contains("gold_buy") ||
+                typeLower.contains("كسر") ||
+                refUpper.startsWith("SCR")
+            "refund" -> typeLower.contains("refund") ||
+                typeLower.contains("return") ||
+                typeLower.contains("مرتجع") ||
+                refUpper.startsWith("REF") ||
+                refUpper.startsWith("RTN")
+            "transfer" -> typeLower.contains("transfer") ||
+                typeLower.contains("تحويل") ||
+                refUpper.startsWith("TRF")
+            "inventory" -> typeLower.contains("inv") ||
+                typeLower.contains("scan") ||
+                typeLower.contains("audit") ||
+                typeLower.contains("stock") ||
+                typeLower.contains("جرد")
+            "sale" -> {
+                val isOther = typeLower.contains("scrap") ||
+                    typeLower.contains("trade_in") ||
+                    typeLower.contains("refund") ||
+                    typeLower.contains("return") ||
+                    typeLower.contains("transfer") ||
+                    typeLower.contains("inv") ||
+                    typeLower.contains("scan") ||
+                    typeLower.contains("audit") ||
+                    refUpper.startsWith("SCR") ||
+                    refUpper.startsWith("REF") ||
+                    refUpper.startsWith("TRF")
+                !isOther && (typeLower.contains("sale") || typeLower.contains("invoice") || typeLower.contains("pos") || refUpper.startsWith("INV"))
+            }
+            else -> typeLower.contains(filterKey.lowercase(Locale.ROOT))
+        }
     }
 
     private fun loadMore() {
@@ -310,6 +415,7 @@ class MiraAllActivitiesFragment : Fragment() {
     private fun selectFilter(filter: String) {
         if (currentFilterState != filter) {
             currentFilterState = filter
+            applyLocalFilters()
             loadActivities(reset = true)
         }
     }
@@ -325,10 +431,7 @@ class MiraAllActivitiesFragment : Fragment() {
 
         val result = ArrayList<JSONObject>()
         for (act in allActivities) {
-            if (filterLower != "all") {
-                val t = act.optString("type", "").lowercase(Locale.ROOT)
-                if (!t.contains(filterLower)) continue
-            }
+            if (!matchesCategoryFilter(act, filterLower)) continue
             if (searchLower.isNotEmpty() && !act.toString().lowercase(Locale.ROOT).contains(searchLower)) {
                 continue
             }
@@ -340,7 +443,7 @@ class MiraAllActivitiesFragment : Fragment() {
     }
 
     private fun showError(message: String?) {
-        if (isDestroyed) return
+        if (isDestroyed || !isAdded) return
         val msg = message?.trim()?.takeIf { it.isNotEmpty() }
             ?: (if (isArabic) "تعذّر تحميل العمليات" else "Failed to load activities")
 
@@ -353,7 +456,7 @@ class MiraAllActivitiesFragment : Fragment() {
 
     private fun showActivityDetails(activity: JSONObject) {
         try {
-            if (!isAdded) return
+            if (!isAdded || parentFragmentManager.isStateSaved) return
             val sheet = ActivityDetailsBottomSheet.newInstance(activity, isArabic)
             sheet.setOnActionClickListener(object : ActivityDetailsBottomSheet.OnActionClickListener {
                 override fun onPrintInvoice(activityData: JSONObject) {
@@ -405,7 +508,7 @@ class MiraAllActivitiesFragment : Fragment() {
         val ctx = appContext ?: return
         isExportingState = true
 
-        executor.execute {
+        ensureExecutor().execute {
             try {
                 val dir = File(ctx.getExternalFilesDir(null), "exports")
                 if (!dir.exists()) dir.mkdirs()
@@ -417,11 +520,19 @@ class MiraAllActivitiesFragment : Fragment() {
                 FileWriter(file).use { writer ->
                     writer.append("Date,Type,Reference,Customer_User,Amount,Currency,Status\n")
                     for (act in snapshot) {
+                        val ref = act.optString(
+                            "sale_number",
+                            act.optString("reference", act.optString("code", act.optString("id", "")))
+                        )
+                        val amt = act.optString(
+                            "final_amount",
+                            act.optString("value_yer", act.optString("scrap_value", act.optString("amount", "")))
+                        )
                         writer.append(escapeCsv(act.optString("created_at", act.optString("timestamp", "")))).append(",")
                         writer.append(escapeCsv(act.optString("type", ""))).append(",")
-                        writer.append(escapeCsv(act.optString("sale_number", act.optString("id", "")))).append(",")
+                        writer.append(escapeCsv(ref)).append(",")
                         writer.append(escapeCsv(act.optString("customer_name", act.optString("user", "")))).append(",")
-                        writer.append(escapeCsv(act.optString("final_amount", act.optString("amount", "")))).append(",")
+                        writer.append(escapeCsv(amt)).append(",")
                         writer.append(escapeCsv(act.optString("currency", "YER"))).append(",")
                         writer.append(escapeCsv(act.optString("refund_status", act.optString("status", "completed")))).append("\n")
                     }
@@ -463,7 +574,7 @@ class MiraAllActivitiesFragment : Fragment() {
 
     private fun postToMain(block: () -> Unit) {
         mainHandler.post {
-            if (isDestroyed) return@post
+            if (isDestroyed || !isAdded) return@post
             try {
                 block()
             } catch (e: Throwable) {
@@ -539,7 +650,9 @@ class MiraAllActivitiesFragment : Fragment() {
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clickable {
-                                        if (isAdded) parentFragmentManager.popBackStack()
+                                        if (isAdded && !parentFragmentManager.isStateSaved) {
+                                            parentFragmentManager.popBackStack()
+                                        }
                                     },
                                 shape = RoundedCornerShape(12.dp),
                                 color = colors.cardSurface,
@@ -713,7 +826,7 @@ class MiraAllActivitiesFragment : Fragment() {
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(categories) { cat ->
+                        items(categories, key = { it.key }) { cat ->
                             val selected = currentFilterState == cat.key
                             val label = if (isAr) cat.labelAr else cat.labelEn
 
@@ -800,17 +913,16 @@ class MiraAllActivitiesFragment : Fragment() {
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    items(
+                                    itemsIndexed(
                                         items = filteredActivitiesState,
-                                        key = { act ->
-                                            val saleNo = act.optString("sale_number", "")
+                                        key = { index, act ->
+                                            val type = act.optString("type", "op")
+                                            val saleNo = act.optString("sale_number", act.optString("reference", ""))
                                             val id = act.optString("id", "")
                                             val ts = act.optString("created_at", act.optString("timestamp", ""))
-                                            if (saleNo.isNotEmpty()) "sale_$saleNo"
-                                            else if (id.isNotEmpty()) "op_${id}_$ts"
-                                            else "row_${ts}_${act.hashCode()}"
+                                            "row_${index}_${type}_${saleNo.ifBlank { id }}_${ts.takeLast(8)}"
                                         }
-                                    ) { activity ->
+                                    ) { _, activity ->
                                         UnifiedOperationCard(
                                             item = activity,
                                             isArabic = isAr,
@@ -820,7 +932,7 @@ class MiraAllActivitiesFragment : Fragment() {
                                     }
 
                                     if (isLoadingMoreState) {
-                                        item {
+                                        item(key = "loading_more_footer") {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
