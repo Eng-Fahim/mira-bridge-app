@@ -2,10 +2,9 @@ package com.example.uhf.fragment
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,9 +12,13 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,8 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -60,18 +65,18 @@ import com.example.uhf.navigation.FragmentFactory
 import com.example.uhf.navigation.NavigationManager
 import com.example.uhf.tools.MiraLanguageHelper
 import com.example.uhf.ui.theme.MiraJewelryTheme
-import com.example.uhf.ui.theme.MiraTheme
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
 
     companion object {
         private const val TAG = "QuickActionsSheet"
-        private const val NAV_DELAY_MS = 160L
         private const val GRID_COLUMNS = 4
+        private const val EXIT_DURATION_MS = 200
 
         // لوحة ألوان هوية MIRA ID™ الملكية الموحدة
         private val NavyObsidian = Color(0xFF071224)
@@ -104,19 +109,21 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
     private var isArabic: Boolean = true
     private var permissionManager: PermissionManager? = null
     private var quickAccessSettings: MiraQuickAccessSettings? = null
-    private val navHandler = Handler(Looper.getMainLooper())
     private var isNavigating: Boolean = false
+
+    // حالات التحكم بالحركة الفاخرة للفتح والإغلاق
+    private var isSheetVisible by mutableStateOf(false)
+    private var isDismissAnimating by mutableStateOf(false)
     private var permissionsRevision by mutableIntStateOf(0)
 
     private val permissionsListener = PermissionManager.OnPermissionsChangedListener {
-        navHandler.post {
+        view?.post {
             if (isAdded) {
                 permissionsRevision++
             }
         }
     }
 
-    // مصدر الحقيقة الموحّد للعمليات الميدانية والإدارية (دون استثناءات تجاوز الصلاحيات)
     private val menuConfigs = listOf(
         // 1. العمليات والحركة
         QuickMenuItemConfig("transfers", NavigationManager.TAG_TRANSFERS, "التحويلات", "Transfers", Icons.Rounded.SwapHoriz, Color(0xFF06B6D4), ActionCategory.OPERATIONS),
@@ -162,6 +169,8 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
         }
         quickAccessSettings = MiraQuickAccessSettings.getInstance(ctx)
         isNavigating = false
+        isSheetVisible = false
+        isDismissAnimating = false
 
         return ComposeView(ctx).apply {
             layoutDirection = if (isArabic) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
@@ -180,7 +189,28 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
     override fun onStart() {
         super.onStart()
         try {
-            dialog?.window?.navigationBarColor = 0xFF071224.toInt()
+            dialog?.window?.let { win ->
+                win.navigationBarColor = 0xFF071224.toInt()
+                // تعطيل حركة نافذة النظام الحادة لإتاحة التحكم الكامل لحركة Compose المخملية
+                win.setWindowAnimations(0)
+            }
+
+            // توجيه النقر خارج القائمة لتنفيذ الإغلاق الانسيابي بدلاً من الإغلاق المفاجئ
+            dialog?.findViewById<View>(com.google.android.material.R.id.touch_outside)
+                ?.setOnClickListener {
+                    triggerAnimatedDismiss()
+                }
+
+            // اعتراض زر الرجوع لتنفيذ الإغلاق الانسيابي
+            dialog?.setOnKeyListener { _, keyCode, event ->
+                if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                    triggerAnimatedDismiss()
+                    true
+                } else {
+                    false
+                }
+            }
+
             val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
             if (bottomSheet != null) {
                 bottomSheet.setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -198,8 +228,13 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
 
     override fun onDestroyView() {
         permissionManager?.removeListener(permissionsListener)
-        navHandler.removeCallbacksAndMessages(null)
         super.onDestroyView()
+    }
+
+    private fun triggerAnimatedDismiss() {
+        if (isDismissAnimating) return
+        isDismissAnimating = true
+        isSheetVisible = false
     }
 
     private fun isItemAllowed(item: QuickMenuItemConfig): Boolean {
@@ -231,11 +266,11 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
     }
 
     private fun navigateToTag(navTag: String, fallback: Fragment? = null) {
-        if (isNavigating) return
+        if (isNavigating || isDismissAnimating) return
         performHaptic()
 
         val mainActivity = activity as? UHFMainActivity ?: run {
-            dismissSafely()
+            triggerAnimatedDismiss()
             return
         }
 
@@ -289,35 +324,45 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
         navTag: String,
         fallback: Fragment?
     ) {
-        val targetFragment = mainActivity.navigationManager?.createFragmentByTag(navTag)
-            ?: FragmentFactory.createFragmentByTag(navTag)
-            ?: fallback
-            ?: run {
-                dismissSafely()
-                return
-            }
+        val targetFragment = try {
+            mainActivity.navigationManager?.createFragmentByTag(navTag)
+                ?: FragmentFactory.createFragmentByTag(navTag)
+                ?: fallback
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error creating fragment for tag=$navTag", e)
+            fallback
+        }
+
+        if (targetFragment == null) {
+            Log.w(TAG, "No fragment resolved for tag=$navTag")
+            Toast.makeText(
+                mainActivity,
+                if (isArabic) "هذه الشاشة غير متاحة حالياً" else "Screen currently unavailable",
+                Toast.LENGTH_SHORT
+            ).show()
+            triggerAnimatedDismiss()
+            return
+        }
 
         isNavigating = true
-        dismissSafely()
-
-        navHandler.postDelayed({
+        try {
             if (!mainActivity.isFinishing && !mainActivity.isDestroyed) {
-                try {
-                    mainActivity.loadFragmentDirectly(targetFragment, navTag)
-                } catch (e: Throwable) {
-                    Log.e(TAG, "loadFragmentDirectly error for $navTag", e)
-                }
+                // تحميل الشاشة فوراً في الخلفية بينما تنزلق القائمة للأسفل بنعومة
+                mainActivity.loadFragmentDirectly(targetFragment, navTag)
             }
-        }, NAV_DELAY_MS)
+        } catch (e: Throwable) {
+            Log.e(TAG, "loadFragmentDirectly error for $navTag", e)
+        }
+        triggerAnimatedDismiss()
     }
 
     private fun openLicenseStatus() {
-        if (isNavigating) return
+        if (isNavigating || isDismissAnimating) return
         isNavigating = true
         performHaptic()
         try {
             startActivity(Intent(requireContext(), LicenseStatusActivity::class.java))
-            dismissSafely()
+            triggerAnimatedDismiss()
         } catch (e: Exception) {
             isNavigating = false
             Log.e(TAG, "Failed to open LicenseStatusActivity", e)
@@ -346,10 +391,49 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
 
     @Composable
     private fun QuickActionsSheetContent() {
-        val colors = MiraTheme.colors
         val rev = permissionsRevision
         var searchQuery by remember { mutableStateOf("") }
         var showSearchBar by remember { mutableStateOf(false) }
+
+        // تشغيل الإقلاع الانسيابي عند فتح النافذة
+        LaunchedEffect(Unit) {
+            isSheetVisible = true
+        }
+
+        // إتمام إغلاق النافذة بعد انتهاء حركة الانزلاق للأسفل
+        LaunchedEffect(isDismissAnimating) {
+            if (isDismissAnimating) {
+                delay(EXIT_DURATION_MS.toLong())
+                dismissSafely()
+            }
+        }
+
+        // حركة الحاوية الرئيسية (دخول نابض مخملي / خروج انسيابي سريع)
+        val sheetProgress by animateFloatAsState(
+            targetValue = if (isSheetVisible) 1f else 0f,
+            animationSpec = if (isSheetVisible) {
+                spring(
+                    dampingRatio = 0.86f,
+                    stiffness = 340f
+                )
+            } else {
+                tween(
+                    durationMillis = EXIT_DURATION_MS,
+                    easing = FastOutLinearInEasing
+                )
+            },
+            label = "royalSheetProgress"
+        )
+
+        // لمعة ذهبية عابرة مرة واحدة عند الفتح على الإطار العلوي
+        val shimmerOffset = remember { Animatable(-0.4f) }
+        LaunchedEffect(Unit) {
+            delay(90L)
+            shimmerOffset.animateTo(
+                targetValue = 1.4f,
+                animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing)
+            )
+        }
 
         val allowedItems = remember(rev) { menuConfigs.filter { isItemAllowed(it) } }
         val filteredItems = remember(allowedItems, searchQuery) {
@@ -388,17 +472,18 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
         val showLicense = remember(rev) { canSeeLicenseCard() }
         val showCustomizeBtn = remember(rev) { canCustomizeQuickAccess() }
 
-        val royalTopBorder = remember {
-            Brush.horizontalGradient(
-                listOf(
-                    GoldBronze.copy(alpha = 0.45f),
-                    GoldBright.copy(alpha = 0.85f),
-                    GoldPrimary,
-                    GoldBright.copy(alpha = 0.85f),
-                    GoldBronze.copy(alpha = 0.45f)
-                )
-            )
-        }
+        val s = shimmerOffset.value
+        val royalTopBorder = Brush.linearGradient(
+            colors = listOf(
+                GoldBronze.copy(alpha = 0.45f),
+                GoldPrimary.copy(alpha = 0.70f),
+                GoldBright,
+                GoldPrimary.copy(alpha = 0.70f),
+                GoldBronze.copy(alpha = 0.45f)
+            ),
+            start = Offset(s * 600f - 200f, 0f),
+            end = Offset(s * 600f + 200f, 120f)
+        )
 
         val royalSheetBg = remember {
             Brush.verticalGradient(
@@ -413,10 +498,17 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .graphicsLayer {
+                    alpha = sheetProgress.coerceIn(0f, 1f)
+                    translationY = (1f - sheetProgress) * 190f
+                    val scaleVal = 0.965f + (0.035f * sheetProgress)
+                    scaleX = scaleVal
+                    scaleY = scaleVal
+                }
                 .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)),
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
             color = NavyObsidian,
-            border = BorderStroke(1.2.dp, royalTopBorder)
+            border = BorderStroke(1.3.dp, royalTopBorder)
         ) {
             Column(
                 modifier = Modifier
@@ -442,93 +534,97 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
                         )
                 )
 
-                // شريط العنوان الملكي
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(GoldBright, GoldPrimary, GoldBronze)
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Diamond,
-                                contentDescription = null,
-                                tint = NavyObsidian,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = if (isArabic) "مركز القيادة السريع" else "MIRA Command Hub",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFFF8FAFC)
-                            )
-                            Text(
-                                text = if (isArabic) "وصول فوري للعمليات والأنظمة الذكية" else "Instant access to enterprise modules",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = GoldBright.copy(alpha = 0.85f)
-                            )
-                        }
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // زر البحث السريع
-                        RoyalHeaderCircleButton(
-                            icon = Icons.Rounded.Search,
-                            active = showSearchBar,
-                            tint = if (showSearchBar) CyanAccent else GoldBright,
-                            onClick = {
-                                performHaptic()
-                                showSearchBar = !showSearchBar
-                                if (!showSearchBar) searchQuery = ""
+                // شريط العنوان الملكي (المرحلة 0)
+                StaggeredEntrance(visible = isSheetVisible, index = 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(GoldBright, GoldPrimary, GoldBronze)
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Diamond,
+                                    contentDescription = null,
+                                    tint = NavyObsidian,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
-                        )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = if (isArabic) "مركز القيادة السريع" else "MIRA Command Hub",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFF8FAFC)
+                                )
+                                Text(
+                                    text = if (isArabic) "وصول فوري للعمليات والأنظمة الذكية" else "Instant access to enterprise modules",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = GoldBright.copy(alpha = 0.85f)
+                                )
+                            }
+                        }
 
-                        // زر تخصيص الأزرار السريعة للمديرين
-                        if (showCustomizeBtn) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             RoyalHeaderCircleButton(
-                                icon = Icons.Rounded.Tune,
-                                active = false,
-                                tint = GoldPrimary,
+                                icon = Icons.Rounded.Search,
+                                active = showSearchBar,
+                                tint = if (showSearchBar) CyanAccent else GoldBright,
                                 onClick = {
-                                    navigateToTag(
-                                        NavigationManager.TAG_QUICK_ACCESS,
-                                        MiraQuickAccessSettingsFragment()
-                                    )
+                                    performHaptic()
+                                    showSearchBar = !showSearchBar
+                                    if (!showSearchBar) searchQuery = ""
+                                }
+                            )
+
+                            if (showCustomizeBtn) {
+                                RoyalHeaderCircleButton(
+                                    icon = Icons.Rounded.Tune,
+                                    active = false,
+                                    tint = GoldPrimary,
+                                    onClick = {
+                                        navigateToTag(
+                                            NavigationManager.TAG_QUICK_ACCESS,
+                                            MiraQuickAccessSettingsFragment()
+                                        )
+                                    }
+                                )
+                            }
+
+                            RoyalHeaderCircleButton(
+                                icon = Icons.Rounded.Close,
+                                active = false,
+                                tint = Color(0xFF94A3B8),
+                                onClick = {
+                                    performHaptic()
+                                    triggerAnimatedDismiss()
                                 }
                             )
                         }
-
-                        // زر الإغلاق
-                        RoyalHeaderCircleButton(
-                            icon = Icons.Rounded.Close,
-                            active = false,
-                            tint = Color(0xFF94A3B8),
-                            onClick = {
-                                performHaptic()
-                                dismissSafely()
-                            }
-                        )
                     }
                 }
 
                 // شريط البحث الفوري القابل للطي
                 AnimatedVisibility(
                     visible = showSearchBar,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = expandVertically(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(tween(200)),
+                    exit = shrinkVertically(tween(180)) + fadeOut(tween(140))
                 ) {
                     OutlinedTextField(
                         value = searchQuery,
@@ -566,168 +662,176 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
                     )
                 }
 
-                // البطاقة الرئيسية المميزة: استوديو التكويد
+                // البطاقة الرئيسية المميزة: استوديو التكويد (المرحلة 1)
                 if (showStudio) {
-                    val studioInteraction = remember { MutableInteractionSource() }
-                    val studioPressed by studioInteraction.collectIsPressedAsState()
-                    val studioScale by animateFloatAsState(
-                        targetValue = if (studioPressed) 0.98f else 1f,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "studioScale"
-                    )
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .scale(studioScale)
-                            .shadow(
-                                elevation = 12.dp,
-                                shape = RoundedCornerShape(22.dp),
-                                ambientColor = NavyObsidian,
-                                spotColor = GoldPrimary.copy(alpha = 0.35f)
-                            )
-                            .clip(RoundedCornerShape(22.dp))
-                            .clickable(
-                                interactionSource = studioInteraction,
-                                indication = null
-                            ) {
-                                navigateToTag(
-                                    NavigationManager.TAG_IDENTITY_STUDIO,
-                                    MiraIdentityStudioFragment()
-                                )
-                            },
-                        shape = RoundedCornerShape(22.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(
-                            1.4.dp,
-                            Brush.horizontalGradient(
-                                listOf(GoldBright, GoldPrimary, CyanAccent.copy(alpha = 0.75f))
-                            )
+                    StaggeredEntrance(visible = isSheetVisible, index = 1) {
+                        val studioInteraction = remember { MutableInteractionSource() }
+                        val studioPressed by studioInteraction.collectIsPressedAsState()
+                        val studioScale by animateFloatAsState(
+                            targetValue = if (studioPressed) 0.975f else 1f,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "studioScale"
                         )
-                    ) {
-                        Row(
+
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            GoldPrimary.copy(alpha = 0.25f),
-                                            NavyTile,
-                                            NavyElevated
-                                        )
-                                    )
+                                .scale(studioScale)
+                                .shadow(
+                                    elevation = 12.dp,
+                                    shape = RoundedCornerShape(22.dp),
+                                    ambientColor = NavyObsidian,
+                                    spotColor = GoldPrimary.copy(alpha = 0.35f)
                                 )
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .clip(RoundedCornerShape(22.dp))
+                                .clickable(
+                                    interactionSource = studioInteraction,
+                                    indication = null
+                                ) {
+                                    navigateToTag(
+                                        NavigationManager.TAG_IDENTITY_STUDIO,
+                                        MiraIdentityStudioFragment()
+                                    )
+                                },
+                            shape = RoundedCornerShape(22.dp),
+                            color = Color.Transparent,
+                            border = BorderStroke(
+                                1.4.dp,
+                                Brush.horizontalGradient(
+                                    listOf(GoldBright, GoldPrimary, CyanAccent.copy(alpha = 0.75f))
+                                )
+                            )
                         ) {
                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(
+                                                GoldPrimary.copy(alpha = 0.25f),
+                                                NavyTile,
+                                                NavyElevated
+                                            )
+                                        )
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(RoundedCornerShape(15.dp))
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(GoldBright, GoldPrimary)
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.QrCode2,
+                                            contentDescription = null,
+                                            tint = NavyObsidian,
+                                            modifier = Modifier.size(27.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = if (isArabic) "استوديو التكويد" else "Encoding Studio",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color(0xFFF8FAFC)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = GoldPrimary.copy(alpha = 0.22f),
+                                                border = BorderStroke(0.8.dp, GoldPrimary.copy(alpha = 0.6f))
+                                            ) {
+                                                Text(
+                                                    text = "RFID / GS1",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = GoldBright,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = if (isArabic) "تكويد وربط شريحة قطعة جديدة بسهولة" else "Encode and link a new item smart tag",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFCBD5E1),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(15.dp))
-                                        .background(
-                                            Brush.linearGradient(
-                                                listOf(GoldBright, GoldPrimary)
-                                            )
-                                        ),
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(GoldPrimary.copy(alpha = 0.18f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.QrCode2,
+                                        imageVector = if (isArabic) Icons.Rounded.ArrowBack else Icons.Rounded.ArrowForward,
                                         contentDescription = null,
-                                        tint = NavyObsidian,
-                                        modifier = Modifier.size(27.dp)
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = if (isArabic) "استوديو التكويد" else "Encoding Studio",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = Color(0xFFF8FAFC)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = GoldPrimary.copy(alpha = 0.22f),
-                                            border = BorderStroke(0.8.dp, GoldPrimary.copy(alpha = 0.6f))
-                                        ) {
-                                            Text(
-                                                text = "RFID / GS1",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = GoldBright,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Text(
-                                        text = if (isArabic) "تكويد وربط شريحة قطعة جديدة بسهولة" else "Encode and link a new item smart tag",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFFCBD5E1),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(GoldPrimary.copy(alpha = 0.18f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (isArabic) Icons.Rounded.ArrowBack else Icons.Rounded.ArrowForward,
-                                    contentDescription = null,
-                                    tint = GoldBright,
-                                    modifier = Modifier.size(18.dp)
-                                )
                             }
                         }
                     }
                 }
 
                 if (opsItems.isNotEmpty()) {
-                    SectionBlock(
-                        title = if (isArabic) "العمليات والحركة" else "Operations",
-                        badgeCount = opsItems.size,
-                        accent = CyanAccent,
-                        items = opsItems,
-                        isArabic = isArabic,
-                        onClick = { navigateToTag(it.navTag) }
-                    )
+                    StaggeredEntrance(visible = isSheetVisible, index = 2) {
+                        SectionBlock(
+                            title = if (isArabic) "العمليات والحركة" else "Operations",
+                            badgeCount = opsItems.size,
+                            accent = CyanAccent,
+                            items = opsItems,
+                            isArabic = isArabic,
+                            onClick = { navigateToTag(it.navTag) }
+                        )
+                    }
                 }
 
                 if (scrapItems.isNotEmpty()) {
-                    SectionBlock(
-                        title = if (isArabic) "الذهب الكسر والأسعار" else "Scrap & Gold Rates",
-                        badgeCount = scrapItems.size,
-                        accent = GoldPrimary,
-                        items = scrapItems,
-                        isArabic = isArabic,
-                        onClick = { navigateToTag(it.navTag) }
-                    )
+                    StaggeredEntrance(visible = isSheetVisible, index = 3) {
+                        SectionBlock(
+                            title = if (isArabic) "الذهب الكسر والأسعار" else "Scrap & Gold Rates",
+                            badgeCount = scrapItems.size,
+                            accent = GoldPrimary,
+                            items = scrapItems,
+                            isArabic = isArabic,
+                            onClick = { navigateToTag(it.navTag) }
+                        )
+                    }
                 }
 
                 if (mgmtItems.isNotEmpty()) {
-                    SectionBlock(
-                        title = if (isArabic) "الإدارة والأجهزة والمراقبة" else "Management & Devices",
-                        badgeCount = mgmtItems.size,
-                        accent = Color(0xFF10B981),
-                        items = mgmtItems,
-                        isArabic = isArabic,
-                        onClick = { navigateToTag(it.navTag) }
-                    )
+                    StaggeredEntrance(visible = isSheetVisible, index = 4) {
+                        SectionBlock(
+                            title = if (isArabic) "الإدارة والأجهزة والمراقبة" else "Management & Devices",
+                            badgeCount = mgmtItems.size,
+                            accent = Color(0xFF10B981),
+                            items = mgmtItems,
+                            isArabic = isArabic,
+                            onClick = { navigateToTag(it.navTag) }
+                        )
+                    }
                 }
 
                 if (!showStudio && opsItems.isEmpty() && scrapItems.isEmpty() && mgmtItems.isEmpty()) {
@@ -762,68 +866,99 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
                     }
                 }
 
-                // بطاقة حالة الترخيص الملكية
+                // بطاقة حالة الترخيص الملكية (المرحلة 5)
                 if (showLicense) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .clickable { openLicenseStatus() },
-                        shape = RoundedCornerShape(18.dp),
-                        color = NavyTile,
-                        border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.45f))
-                    ) {
-                        Row(
+                    StaggeredEntrance(visible = isSheetVisible, index = 5) {
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(bottom = 8.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable { openLicenseStatus() },
+                            shape = RoundedCornerShape(18.dp),
+                            color = NavyTile,
+                            border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.45f))
                         ) {
                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(GoldPrimary.copy(alpha = 0.18f)),
-                                    contentAlignment = Alignment.Center
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.VerifiedUser,
-                                        contentDescription = null,
-                                        tint = GoldBright,
-                                        modifier = Modifier.size(22.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(GoldPrimary.copy(alpha = 0.18f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.VerifiedUser,
+                                            contentDescription = null,
+                                            tint = GoldBright,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = if (isArabic) "حالة الترخيص" else "License Status",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFFF8FAFC)
+                                        )
+                                        Text(
+                                            text = if (isArabic) "عرض تفاصيل ترخيص MIRA ID™ المعتمد" else "View verified MIRA ID™ license details",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = GoldBright.copy(alpha = 0.85f)
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = if (isArabic) "حالة الترخيص" else "License Status",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFFF8FAFC)
-                                    )
-                                    Text(
-                                        text = if (isArabic) "عرض تفاصيل ترخيص MIRA ID™ المعتمد" else "View verified MIRA ID™ license details",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = GoldBright.copy(alpha = 0.85f)
-                                    )
-                                }
-                            }
 
-                            Icon(
-                                imageVector = if (isArabic) Icons.Rounded.ArrowBack else Icons.Rounded.ArrowForward,
-                                contentDescription = null,
-                                tint = GoldBright
-                            )
+                                Icon(
+                                    imageVector = if (isArabic) Icons.Rounded.ArrowBack else Icons.Rounded.ArrowForward,
+                                    contentDescription = null,
+                                    tint = GoldBright
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    @Composable
+    private fun StaggeredEntrance(
+        visible: Boolean,
+        index: Int,
+        content: @Composable () -> Unit
+    ) {
+        val delayMs = (index * 35).coerceAtMost(200)
+        val itemProgress by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = if (visible) 260 else 140,
+                delayMillis = if (visible) delayMs else 0,
+                easing = if (visible) FastOutSlowInEasing else FastOutLinearInEasing
+            ),
+            label = "stagger_$index"
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    alpha = itemProgress
+                    translationY = (1f - itemProgress) * 26f
+                }
+        ) {
+            content()
         }
     }
 
@@ -949,7 +1084,7 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
 
         Surface(
             modifier = modifier
-                .height(82.dp)
+                .height(86.dp)
                 .scale(scale)
                 .clip(RoundedCornerShape(16.dp))
                 .clickable(
@@ -972,13 +1107,13 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
                             )
                         )
                     )
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                    .padding(horizontal = 4.dp, vertical = 7.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(35.dp)
+                        .size(34.dp)
                         .clip(RoundedCornerShape(11.dp))
                         .background(
                             Brush.linearGradient(
@@ -994,19 +1129,19 @@ class QuickActionsBottomSheetFragment : BottomSheetDialogFragment() {
                         imageVector = item.icon,
                         contentDescription = null,
                         tint = item.accent,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(5.dp))
                 Text(
                     text = if (isArabic) item.titleAr else item.titleEn,
                     style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.5.sp,
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFF8FAFC),
                     textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    softWrap = false,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
