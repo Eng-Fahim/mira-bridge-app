@@ -227,6 +227,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
     @Volatile private var lastScannedEpc = ""
     @Volatile private var lastScannedTid = ""
     @Volatile private var lastScanSource = "CHAINWAY"
+    @Volatile private var lastFetchedInventoryTagId: Int = 0
 
     @Volatile private var encodingRfidListener: MiraIRFIDReader.OnTagReadListener? = null
     @Volatile private var pendingBarcodeFromScanner: String? = null
@@ -968,44 +969,75 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
     }
 
-    private fun generateUniqueTestTid(): String {
-        return buildString(24) {
-            append("E280")
-            repeat(20) {
-                append(HEX_CHARS[secureRandom.nextInt(HEX_CHARS.length)])
-            }
-        }
-    }
-
     private fun applyManualTestEpc(rawEpc: String, explicitTid: String? = null) {
         if (!ENABLE_TEMP_MANUAL_EPC) return
         val isAr = isArabic
         val cleanEpc = rawEpc.trim().uppercase(Locale.US)
         val cleanExplicitTid = explicitTid?.trim()?.uppercase(Locale.US).orEmpty()
-        val testTid = if (cleanExplicitTid.length in MIN_TID_LENGTH..MAX_TID_LENGTH) {
-            cleanExplicitTid
-        } else {
-            generateUniqueTestTid()
+
+        if (cleanExplicitTid.length !in MIN_TID_LENGTH..MAX_TID_LENGTH) {
+            showValidationError(
+                if (isAr) "يجب جلب شريحة صالحة من جدول rfid_inventory أو مسح شريحة حقيقية."
+                else "A valid tag from rfid_inventory or a scanned tag is required."
+            )
+            return
         }
 
         isEpcBound = true
         isEpcBoundState = true
         boundEpcValue = cleanEpc
         lastScannedEpc = cleanEpc
-        lastScannedTid = testTid
+        lastScannedTid = cleanExplicitTid
         lastScanSource = "CHAINWAY"
 
         epcTextState = cleanEpc
-        statusBadgeTextState = if (isAr) "✅ موثّق (تجريبي)" else "✅ VERIFIED (TEST)"
+        statusBadgeTextState = if (isAr) "✅ موثّق (من المخزون)" else "✅ VERIFIED (INVENTORY)"
         statusBadgeColorState = Color(0xFF22C55E)
 
         showScanFeedback(
-            title = if (isAr) "🧪 تم اعتماد EPC تجريبي" else "🧪 Test EPC Applied",
-            details = "EPC: $cleanEpc\nTID: $testTid",
+            title = if (isAr) "✅ تم اعتماد شريحة من المخزون" else "✅ Inventory Tag Applied",
+            details = "EPC: $cleanEpc\nTID: $cleanExplicitTid",
             price = null,
             accentColor = Color(0xFF22C55E),
             isSuccess = true
         )
+    }
+
+    private fun fetchNextAvailableInventoryTag(onResult: (epc: String?, tid: String?, error: String?) -> Unit) {
+        val isAr = isArabic
+        val client = apiClient
+        val exec = miraExecutor
+        if (client == null || exec == null) {
+            onResult(null, null, if (isAr) "خدمة الاتصال غير متاحة" else "API client unavailable")
+            return
+        }
+
+        exec.networkExecutor.execute {
+            try {
+                val query = if (lastFetchedInventoryTagId > 0) {
+                    "/rfid-inventory/next-available?after_id=$lastFetchedInventoryTagId"
+                } else {
+                    "/rfid-inventory/next-available"
+                }
+                val resp = client.getWithAuth(query)
+                val dataObj = resp?.data?.optJSONObject("data") ?: resp?.data
+                if (resp != null && resp.isSuccess && dataObj != null) {
+                    val tagId = dataObj.optInt("id", 0)
+                    val epc = dataObj.optString("epc", "").trim().uppercase(Locale.US)
+                    val tid = dataObj.optString("tid", "").trim().uppercase(Locale.US)
+                    if (epc.isNotEmpty() && tid.isNotEmpty()) {
+                        if (tagId > 0) lastFetchedInventoryTagId = tagId
+                        safeRun { onResult(epc, tid, null) }
+                        return@execute
+                    }
+                }
+                val errMsg = resp?.message
+                    ?: if (isAr) "لا توجد شرائح متاحة في جدول rfid_inventory" else "No available tags in rfid_inventory"
+                safeRun { onResult(null, null, errMsg) }
+            } catch (e: Exception) {
+                safeRun { onResult(null, null, e.message ?: "Network error") }
+            }
+        }
     }
 
     private fun onEpcInputChanged(newText: String) {
@@ -3128,8 +3160,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                 isArabic = isAr,
                                 currentEpc = epcTextState,
                                 enabled = formEditable,
-                                onEpcConfirmed = { confirmedEpc ->
-                                    applyManualTestEpc(confirmedEpc)
+                                onEpcConfirmed = { confirmedEpc, confirmedTid ->
+                                    applyManualTestEpc(confirmedEpc, confirmedTid)
                                 }
                             )
                         }
@@ -3979,17 +4011,19 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         isArabic: Boolean,
         currentEpc: String,
         enabled: Boolean = true,
-        onEpcConfirmed: (String) -> Unit
+        onEpcConfirmed: (String, String?) -> Unit
     ) {
         if (!ENABLE_TEMP_MANUAL_EPC) return
 
         val colors = MiraTheme.colors
         var manualEpc by remember { mutableStateOf(currentEpc) }
+        var manualTid by remember { mutableStateOf("") }
         var validationError by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(currentEpc) {
             if (currentEpc.isEmpty()) {
                 manualEpc = ""
+                manualTid = ""
                 validationError = null
             }
         }
@@ -4032,13 +4066,21 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
                     TextButton(
                         onClick = {
-                            val randomHex = buildString(20) {
-                                repeat(20) { append(HEX_CHARS[secureRandom.nextInt(HEX_CHARS.length)]) }
-                            }
-                            val generated = "E280$randomHex"
-                            manualEpc = generated
                             validationError = null
-                            onEpcConfirmed(generated)
+                            fetchNextAvailableInventoryTag { fetchedEpc, fetchedTid, err ->
+                                if (!fetchedEpc.isNullOrEmpty() && !fetchedTid.isNullOrEmpty()) {
+                                    manualEpc = fetchedEpc
+                                    manualTid = fetchedTid
+                                    validationError = null
+                                    onEpcConfirmed(fetchedEpc, fetchedTid)
+                                } else {
+                                    validationError = err ?: if (isArabic) {
+                                        "تعذر جلب شريحة متاحة من جدول rfid_inventory"
+                                    } else {
+                                        "Failed to fetch available tag from rfid_inventory"
+                                    }
+                                }
+                            }
                         },
                         enabled = enabled,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
@@ -4084,6 +4126,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                 IconButton(
                                     onClick = {
                                         manualEpc = ""
+                                        manualTid = ""
                                         validationError = null
                                     }
                                 ) {
@@ -4112,9 +4155,15 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                 } else {
                                     "Enter valid Hex EPC (16-32 chars: 0-9, A-F)"
                                 }
+                            } else if (manualTid.length !in MIN_TID_LENGTH..MAX_TID_LENGTH) {
+                                validationError = if (isArabic) {
+                                    "اضغط توليد تجريبي لجلب TID صالح من المخزون أو امسح شريحة"
+                                } else {
+                                    "Tap Generate Test to fetch a valid TID from inventory or scan a tag"
+                                }
                             } else {
                                 validationError = null
-                                onEpcConfirmed(clean)
+                                onEpcConfirmed(clean, manualTid)
                             }
                         },
                         enabled = enabled,
