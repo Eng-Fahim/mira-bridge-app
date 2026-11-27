@@ -620,7 +620,7 @@ public class MiraApiClient {
                 DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT);
     }
 
-        private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
+    private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
 
         if (BuildConfig.DEBUG) {
@@ -697,13 +697,11 @@ public class MiraApiClient {
             apiResponse.message = serverMessage;
         }
 
-        // 0) اعتراض الطرد الإجباري / انتهاء الجلسة (HTTP 401) على أي مسار غير تسجيل الدخول
         if (responseCode == 401) {
             handleUnauthorizedResponse(conn, serverMessage);
             return apiResponse;
         }
 
-        // 1) التقاط بصمة الصلاحيات من الترويسة في أي استجابة ناجحة
         String headerPermVer = null;
         if (isSuccess) {
             try {
@@ -711,7 +709,6 @@ public class MiraApiClient {
             } catch (Exception ignored) {}
         }
 
-        // 2) حفظ وثيقة الصلاحيات القادمة من السيرفر تلقائياً (مع تحديث الـ version وإعلام الشاشات)
         boolean savedCapabilitiesNow = false;
         if (isSuccess && json != null) {
             String path = "";
@@ -752,7 +749,6 @@ public class MiraApiClient {
             }
         }
 
-        // 3) إذا تغيّرت ترويسة X-Permissions-Version في أي طلب عادي → أطلق التحديث اللحظي فوراً
         if (isSuccess && !savedCapabilitiesNow && headerPermVer != null && !headerPermVer.isEmpty()) {
             try {
                 if (PermissionManager.getInstance(context).needsRefresh(headerPermVer)) {
@@ -779,7 +775,6 @@ public class MiraApiClient {
             Log.e(TAG, "handleUnauthorizedResponse error: " + e.getMessage());
         }
     }
-
 
     private InputStream wrapBrotli(InputStream rawStream) {
         try {
@@ -1077,7 +1072,7 @@ public class MiraApiClient {
             }
         });
     }
-    
+
     private void mergeJsonInto(JSONObject target, JSONObject source) {
         if (target == null || source == null) return;
         try {
@@ -1092,7 +1087,6 @@ public class MiraApiClient {
             }
         } catch (Exception ignored) {}
     }
-
 
     public void getAllMessages(String userId, MessageCallback callback) {
         executorService.execute(() -> {
@@ -1327,8 +1321,8 @@ public class MiraApiClient {
     public ApiResponse getUserPermissions(int userId) {
         return getWithAuth("/auth/users/" + userId + "/permissions");
     }
-    
-        // ==================== مزامنة الصلاحيات الحية ====================
+
+    // ==================== مزامنة الصلاحيات الحية ====================
     public ApiResponse getPermissionsVersion() {
         return getWithAuth("/me/permissions/version");
     }
@@ -1336,7 +1330,6 @@ public class MiraApiClient {
     public ApiResponse getMyPermissions() {
         return getWithAuth("/me/permissions");
     }
-
 
     public ApiResponse updateUserStatus(int userId, String status) {
         JSONObject payload = new JSONObject();
@@ -1456,20 +1449,15 @@ public class MiraApiClient {
         return getWithAuth("/dashboard/gold-prices");
     }
 
-    /**
-     * جلب ملخص الداشبورد وبيانات الخزينة/المخزون من المسارات الفعلية للسيرفر
-     */
-        public ApiResponse getDashboardSummarySmart(int branchId) {
+    public ApiResponse getDashboardSummarySmart(int branchId) {
         try {
             JSONObject combined = new JSONObject();
 
-            // 1) المسار الرئيسي لتطبيق الداشبورد (/dashboard/app)
             ApiResponse appResp = getDashboardFull(branchId);
             if (appResp != null && appResp.isSuccess && appResp.data != null) {
                 mergeJsonInto(combined, appResp.data);
             }
 
-            // 2) المسار التكميلي (/dashboard/summary)
             if (!combined.has("vault") && !combined.has("inventory") && !combined.has("today_sales")) {
                 String sumEp = branchId > 0 ? ("/dashboard/summary?branch_id=" + branchId) : "/dashboard/summary";
                 ApiResponse sumResp = getWithAuth(sumEp);
@@ -1478,7 +1466,6 @@ public class MiraApiClient {
                 }
             }
 
-            // 3) إحصائيات مخزون الفرع مباشرة من السيرفر (/branches/{branchId}/inventory/stats)
             JSONObject existingVault = combined.optJSONObject("vault");
             int pieces = existingVault != null
                     ? existingVault.optInt("total_pieces", existingVault.optInt("in_stock_count", 0))
@@ -1515,9 +1502,7 @@ public class MiraApiClient {
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
-    /**
-     * جلب أسعار الذهب وسعر الصرف مباشرة من السيرفر بدون أي اشتقاقات محلية
-     */
+
     public ApiResponse getGoldPricesSmart(int branchId) {
         try {
             String branchQuery = branchId > 0 ? ("?branch_id=" + branchId) : "";
@@ -1646,7 +1631,6 @@ public class MiraApiClient {
             return null;
         }
     }
-
 
     private double firstPositiveDouble(JSONObject primary, JSONObject secondary, String... keys) {
         for (String k : keys) {
@@ -1823,9 +1807,7 @@ public class MiraApiClient {
             return response;
         }
     }
-    /**
-     * جلب التفاصيل الكاملة للفاتورة الواحدة من /pos/sales/{id}
-     */
+
     public ApiResponse getSaleDetail(long saleId) {
         if (saleId <= 0) {
             return new ApiResponse(400, null, "Invalid sale ID");
@@ -1833,9 +1815,6 @@ public class MiraApiClient {
         return getWithAuth("/pos/sales/" + saleId);
     }
 
-    /**
-     * جلب تفاصيل فاتورة محددة برقمها (يجلب التفاصيل الكاملة من /pos/sales/{id})
-     */
     public ApiResponse getSaleDetailsByNumber(String saleNumber) {
         try {
             if (saleNumber == null || saleNumber.trim().isEmpty()) {
@@ -1877,7 +1856,6 @@ public class MiraApiClient {
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
-
 
     public ApiResponse getItemDetail(String code) {
         return getWithAuth("/item/" + sanitizePathSegment(code));
@@ -2728,7 +2706,6 @@ public class MiraApiClient {
         return getWithAuth(path);
     }
 
-
     public ApiResponse getGoldSettings() {
         return getWithAuth("/gold/settings");
     }
@@ -2848,7 +2825,7 @@ public class MiraApiClient {
             String cleanUsername = (username != null) ? username.trim() : "";
 
             List<JSONObject> mergedList = new ArrayList<>();
-            Set<String> seenSaleNumbers = new HashSet<>();
+            Set<String> seenKeys = new HashSet<>();
             int totalSalesOnServer = 0;
             boolean hasMoreSales = false;
 
@@ -2901,9 +2878,9 @@ public class MiraApiClient {
                             if (normalizedFilter.equals("refund") && !opType.equals("refund")) continue;
                             if (normalizedFilter.equals("sale") && !opType.equals("sale")) continue;
 
-                            String saleNo = normalizedSale.optString("sale_number", "");
+                            String saleNo = normalizedSale.optString("sale_number", "").trim();
                             if (!saleNo.isEmpty()) {
-                                seenSaleNumbers.add(saleNo.toUpperCase(Locale.US));
+                                seenKeys.add("REF:" + saleNo.toUpperCase(Locale.US));
                             }
                             mergedList.add(normalizedSale);
                         }
@@ -2912,7 +2889,7 @@ public class MiraApiClient {
             }
 
             if (includeOtherActivities && page == 1) {
-                int actFetchLimit = isManager ? Math.max(limit, 25) : 60;
+                int actFetchLimit = isManager ? Math.max(limit, 50) : 80;
                 ApiResponse actResp = getUnifiedActivity(branchId, actFetchLimit);
                 if (actResp != null && actResp.isSuccess && actResp.data != null) {
                     JSONArray actArr = extractArrayFromPayload(actResp.data, "activities");
@@ -2921,31 +2898,38 @@ public class MiraApiClient {
                             JSONObject act = actArr.optJSONObject(i);
                             if (act == null) continue;
 
-                            if (!isManager && !matchesCurrentUser(act, userId, cleanUsername)) {
-                                continue;
-                            }
-
-                            String saleRef = act.optString("sale_number",
-                                    act.optString("invoice_number", "")).trim();
-                            if (!saleRef.isEmpty() && seenSaleNumbers.contains(saleRef.toUpperCase(Locale.US))) {
-                                continue;
-                            }
-
                             String rawType = (act.optString("type", "") + " " +
+                                    act.optString("operation_type", "") + " " +
                                     act.optString("action", "") + " " +
                                     act.optString("event", "")).toLowerCase(Locale.ROOT);
+                            String refCode = act.optString("sale_number",
+                                    act.optString("reference",
+                                            act.optString("scrap_number",
+                                                    act.optString("invoice_number", "")))).trim();
+
+                            String mappedType = mapActivityType(rawType);
+                            if (refCode.toUpperCase(Locale.US).startsWith("SCR")) {
+                                mappedType = "scrap";
+                            }
+
+                            if (!isManager && !"scrap".equals(mappedType) && !matchesCurrentUser(act, userId, cleanUsername)) {
+                                continue;
+                            }
+
+                            if (!refCode.isEmpty() && seenKeys.contains("REF:" + refCode.toUpperCase(Locale.US))) {
+                                continue;
+                            }
 
                             boolean isGenericSystem = rawType.trim().isEmpty()
                                     || rawType.contains("system")
                                     || rawType.contains("journal");
-                            boolean hasMeaningfulAmount = act.optDouble("amount", 0.0) > 0.0
-                                    || act.optDouble("weight", 0.0) > 0.0;
+                            boolean hasMeaningfulAmount = firstPositiveDouble(act, act.optJSONObject("data"),
+                                    "amount", "total_amount", "final_amount", "value_yer", "scrap_value", "weight", "weight_grams") > 0.0;
 
-                            if (isGenericSystem && !hasMeaningfulAmount && saleRef.isEmpty()) {
+                            if (isGenericSystem && !hasMeaningfulAmount && refCode.isEmpty()) {
                                 continue;
                             }
 
-                            String mappedType = mapActivityType(rawType);
                             if (!normalizedFilter.equals("all") && !mappedType.equals(normalizedFilter)) {
                                 continue;
                             }
@@ -2955,19 +2939,49 @@ public class MiraApiClient {
                                 continue;
                             }
 
-                            act.put("type", mappedType);
-                            if (!act.has("timestamp") || act.optString("timestamp").isEmpty()) {
-                                act.put("timestamp", act.optString("created_at", ""));
+                            JSONObject norm = new JSONObject(act.toString());
+                            norm.put("type", mappedType);
+                            if (!refCode.isEmpty() && norm.optString("sale_number", "").isEmpty()) {
+                                norm.put("sale_number", refCode);
                             }
-                            mergedList.add(act);
+                            if (!norm.has("timestamp") || norm.optString("timestamp").isEmpty()) {
+                                norm.put("timestamp", norm.optString("created_at", ""));
+                            }
+                            if (!refCode.isEmpty()) {
+                                seenKeys.add("REF:" + refCode.toUpperCase(Locale.US));
+                            }
+                            mergedList.add(norm);
                         }
+                    }
+                }
+
+                // جلب عمليات شراء الكسر (SCR-...) مباشرة من endpoints الكسر لضمان ظهورها دائماً حتى لو لم تُدرج في /activity/unified
+                if (normalizedFilter.equals("all") || normalizedFilter.equals("scrap")) {
+                    List<JSONObject> scrapItems = fetchScrapOperationsForUnified(branchId, cleanSearch);
+                    for (JSONObject sc : scrapItems) {
+                        if (sc == null) continue;
+                        if (!isManager && !matchesCurrentUser(sc, userId, cleanUsername)) {
+                            continue;
+                        }
+                        String ref = sc.optString("sale_number", sc.optString("reference", "")).trim();
+                        String idStr = sc.optString("id", "").trim();
+                        String dedupKey = !ref.isEmpty()
+                                ? "REF:" + ref.toUpperCase(Locale.US)
+                                : (!idStr.isEmpty() ? "SCR_ID:" + idStr : null);
+                        if (dedupKey != null && seenKeys.contains(dedupKey)) {
+                            continue;
+                        }
+                        if (dedupKey != null) {
+                            seenKeys.add(dedupKey);
+                        }
+                        mergedList.add(sc);
                     }
                 }
             }
 
             Collections.sort(mergedList, (a, b) -> {
-                String tA = a.optString("created_at", a.optString("timestamp", ""));
-                String tB = b.optString("created_at", b.optString("timestamp", ""));
+                String tA = a.optString("created_at", a.optString("timestamp", a.optString("date", "")));
+                String tB = b.optString("created_at", b.optString("timestamp", b.optString("date", "")));
                 return tB.compareTo(tA);
             });
 
@@ -2990,6 +3004,119 @@ public class MiraApiClient {
         } catch (Exception e) {
             Log.e(TAG, "getUnifiedOperations error: " + e.getMessage(), e);
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
+        }
+    }
+
+    private List<JSONObject> fetchScrapOperationsForUnified(int branchId, String search) {
+        List<JSONObject> result = new ArrayList<>();
+        try {
+            int effectiveBranchId = branchId > 0
+                    ? branchId
+                    : (branchesManagerSafeActiveBranchId());
+
+            ApiResponse resp = getAvailableScrapPurchases(effectiveBranchId);
+            JSONArray arr = null;
+            if (resp != null && resp.isSuccess && resp.data != null) {
+                arr = extractArrayFromPayload(resp.data, "purchases");
+                if (arr == null) arr = extractArrayFromPayload(resp.data, "scrap_purchases");
+                if (arr == null) arr = extractArrayFromPayload(resp.data, "items");
+                if (arr == null) arr = extractArrayFromPayload(resp.data, "activities");
+            }
+
+            if (arr == null || arr.length() == 0) {
+                ApiResponse batchesResp = getScrapBatches(effectiveBranchId);
+                if (batchesResp != null && batchesResp.isSuccess && batchesResp.data != null) {
+                    arr = extractArrayFromPayload(batchesResp.data, "batches");
+                    if (arr == null) arr = extractArrayFromPayload(batchesResp.data, "items");
+                }
+            }
+
+            if (arr != null) {
+                String searchLower = search != null ? search.trim().toLowerCase(Locale.ROOT) : "";
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject raw = arr.optJSONObject(i);
+                    if (raw == null) continue;
+                    JSONObject norm = normalizeScrapAsUnifiedOperation(raw, effectiveBranchId);
+                    if (!searchLower.isEmpty() && !norm.toString().toLowerCase(Locale.ROOT).contains(searchLower)) {
+                        continue;
+                    }
+                    result.add(norm);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "fetchScrapOperationsForUnified warning: " + e.getMessage());
+        }
+        return result;
+    }
+
+    private int branchesManagerSafeActiveBranchId() {
+        try {
+            if (context != null) {
+                return MiraBranchesManager.getInstance(context).getActiveBranchId();
+            }
+        } catch (Exception ignored) {}
+        return 1;
+    }
+
+    private JSONObject normalizeScrapAsUnifiedOperation(JSONObject raw, int branchId) {
+        try {
+            JSONObject out = new JSONObject(raw.toString());
+            out.put("type", "scrap");
+
+            if (!out.has("branch_id") || out.optInt("branch_id", 0) <= 0) {
+                if (branchId > 0) out.put("branch_id", branchId);
+            }
+
+            String ref = out.optString("sale_number",
+                    out.optString("reference",
+                            out.optString("scrap_number",
+                                    out.optString("code",
+                                            out.optString("number", ""))))).trim();
+            if (!ref.isEmpty()) {
+                out.put("sale_number", ref);
+                out.put("reference", ref);
+            }
+
+            String customer = out.optString("customer_name",
+                    out.optString("party_name",
+                            out.optString("supplier_name",
+                                    out.optString("customer", "")))).trim();
+            if (!customer.isEmpty() && out.optString("customer_name", "").isEmpty()) {
+                out.put("customer_name", customer);
+            }
+
+            double weight = firstPositiveDouble(out, out.optJSONObject("data"),
+                    "weight", "weight_grams", "net_weight", "gross_weight", "total_weight", "grams");
+            if (weight > 0.0) {
+                out.put("weight", weight);
+                out.put("total_weight", weight);
+            }
+
+            double amount = firstPositiveDouble(out, out.optJSONObject("data"),
+                    "final_amount", "total_amount", "value_yer", "scrap_value", "scrap_amount", "amount", "total");
+            if (amount > 0.0) {
+                out.put("final_amount", amount);
+                out.put("amount", amount);
+            }
+
+            String createdAt = out.optString("created_at",
+                    out.optString("purchased_at",
+                            out.optString("date", ""))).trim();
+            if (!createdAt.isEmpty()) {
+                if (out.optString("created_at", "").isEmpty()) out.put("created_at", createdAt);
+                if (out.optString("timestamp", "").isEmpty()) out.put("timestamp", createdAt);
+            }
+
+            if (out.optString("title_ar", "").isEmpty()) {
+                out.put("title_ar", !ref.isEmpty() ? ("شراء كسر #" + ref) : "شراء كسر ذهب");
+            }
+            if (out.optString("title_en", "").isEmpty()) {
+                out.put("title_en", !ref.isEmpty() ? ("Scrap Purchase #" + ref) : "Scrap Gold Purchase");
+            }
+
+            return out;
+        } catch (Exception e) {
+            return raw;
         }
     }
 
@@ -3036,7 +3163,6 @@ public class MiraApiClient {
                 out.put("timestamp", sale.optString("created_at", ""));
             }
 
-            // حساب إجمالي وزن الفاتورة من حقل الوزن أو بجمع أوزان الأصناف
             double saleWeight = sale.optDouble("total_weight", sale.optDouble("weight", 0.0));
             if (saleWeight <= 0.0) {
                 JSONArray items = sale.optJSONArray("items");
@@ -3063,7 +3189,7 @@ public class MiraApiClient {
         String lower = rawType.toLowerCase(Locale.ROOT);
         if (lower.contains("refund") || lower.contains("return")) return "refund";
         if (lower.contains("sale") || lower.contains("pos") || lower.contains("invoice")) return "sale";
-        if (lower.contains("scrap")) return "scrap";
+        if (lower.contains("scrap") || lower.contains("trade_in") || lower.contains("trade-in") || lower.contains("buy_gold")) return "scrap";
         if (lower.contains("transfer") || lower.contains("move")) return "transfer";
         if (lower.contains("inventory") || lower.contains("audit") || lower.contains("stock")) return "inventory";
         if (lower.contains("rfid") || lower.contains("encode") || lower.contains("gate") || lower.contains("tag")) return "rfid";
@@ -3377,11 +3503,8 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return true;
     }
-    
-    /**
- * جلب تنبيهات الفرع (المعلّقة والمحلولة)
- */
-        public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
+
+    public ApiResponse getBranchAlerts(int branchId, boolean includeResolved) {
         String endpoint = "/alerts?branch_id=" + branchId + "&include_resolved=" + (includeResolved ? 1 : 0);
         return getWithAuth(endpoint);
     }
@@ -3398,110 +3521,6 @@ public class MiraApiClient {
             return new ApiResponse(-1, null, getFriendlyErrorMessage(e));
         }
     }
-
-
-    private ApiResponse executeAlertsHttp(String method, String endpoint, JSONObject body) {
-        java.net.HttpURLConnection conn = null;
-        try {
-            String resolvedBase = "";
-            String resolvedToken = "";
-            android.content.Context foundCtx = null;
-
-            for (java.lang.reflect.Field f : this.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                Object val = f.get(this);
-                if (val instanceof String) {
-                    String s = ((String) val).trim();
-                    String fname = f.getName().toLowerCase(java.util.Locale.US);
-                    if (s.startsWith("http") && (fname.contains("url") || fname.contains("base") || resolvedBase.isEmpty())) {
-                        resolvedBase = s;
-                    } else if (!s.isEmpty() && fname.contains("token")) {
-                        resolvedToken = s;
-                    }
-                } else if (val instanceof android.content.Context) {
-                    foundCtx = (android.content.Context) val;
-                }
-            }
-
-            if (resolvedToken.isEmpty() && foundCtx != null) {
-                try {
-                    com.example.uhf.tools.SecureSessionManager sm =
-                            com.example.uhf.tools.SecureSessionManager.getInstance(foundCtx);
-                    for (java.lang.reflect.Method m : sm.getClass().getMethods()) {
-                        if ((m.getName().equals("getToken") || m.getName().equals("getAuthToken"))
-                                && m.getParameterCount() == 0) {
-                            Object t = m.invoke(sm);
-                            if (t != null && !t.toString().isEmpty()) {
-                                resolvedToken = t.toString();
-                                break;
-                            }
-                        }
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-
-            if (resolvedBase.isEmpty()) {
-                return new ApiResponse(0, null, "Base URL not configured");
-            }
-
-            String cleanBase = resolvedBase.endsWith("/")
-                    ? resolvedBase.substring(0, resolvedBase.length() - 1)
-                    : resolvedBase;
-            if (!cleanBase.endsWith("/api/v1")) {
-                cleanBase = cleanBase + "/api/v1";
-            }
-            String fullUrl = cleanBase + "/" + (endpoint.startsWith("/") ? endpoint.substring(1) : endpoint);
-
-            java.net.URL url = new java.net.URL(fullUrl);
-            conn = (java.net.HttpURLConnection) url.openConnection();
-            conn.setRequestMethod(method);
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            if (!resolvedToken.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + resolvedToken);
-            }
-
-            if ("POST".equals(method) && body != null) {
-                conn.setDoOutput(true);
-                byte[] out = body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                try (java.io.OutputStream os = conn.getOutputStream()) {
-                    os.write(out);
-                }
-            }
-
-            int statusCode = conn.getResponseCode();
-            java.io.InputStream is = (statusCode >= 200 && statusCode < 300)
-                    ? conn.getInputStream()
-                    : conn.getErrorStream();
-
-            StringBuilder sb = new StringBuilder();
-            if (is != null) {
-                try (java.io.BufferedReader br = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        sb.append(line);
-                    }
-                }
-            }
-
-            String raw = sb.toString().trim();
-            JSONObject json = raw.startsWith("{") ? new JSONObject(raw) : new JSONObject();
-            String msg = json.optString("message", (statusCode >= 200 && statusCode < 300) ? "OK" : "HTTP " + statusCode);
-            return new ApiResponse(statusCode, json, msg);
-        } catch (Exception e) {
-            return new ApiResponse(0, null, e.getMessage() != null ? e.getMessage() : "Network error");
-        } finally {
-            if (conn != null) {
-                conn.disconnect();
-            }
-        }
-    }
-
-
 
     // ==================== نماذج الاستجابة والخيوط ====================
     public static class ApiResponse {
