@@ -24,9 +24,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,6 +73,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -335,7 +337,7 @@ class POSCheckoutDialog : DialogFragment() {
         dialog.window?.apply {
             requestFeature(Window.FEATURE_NO_TITLE)
             setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-            setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
         }
         return dialog
     }
@@ -459,7 +461,6 @@ class POSCheckoutDialog : DialogFragment() {
         try {
             val client = MiraApiClient.getInstance(appCtx)
 
-            // 1. GET /api/v1/payment-methods -> PaymentMethodController@index
             val methodsResp = client.paymentMethods
             var arr: JSONArray? = null
 
@@ -467,7 +468,6 @@ class POSCheckoutDialog : DialogFragment() {
                 arr = extractMethodsArrayFromResponse(methodsResp)
             }
 
-            // مسار احتياطي مباشر إذا لم يحتفظ ApiResponse بالمصفوفة داخل حقوله
             if (arr == null) {
                 arr = fetchMethodsDirectFallback(appCtx, client)
             }
@@ -492,7 +492,6 @@ class POSCheckoutDialog : DialogFragment() {
                 methodsError = methodsResp?.error ?: "HTTP ${methodsResp?.statusCode ?: -1}"
             }
 
-            // 2. GET /api/v1/currency/rates -> ExchangeRateController@current
             val ratesResp = client.exchangeRates
             if (ratesResp != null && ratesResp.isSuccess && ratesResp.data != null) {
                 val payload = ratesResp.data.optJSONObject("data") ?: ratesResp.data
@@ -707,10 +706,20 @@ class POSCheckoutDialog : DialogFragment() {
     private fun parseDouble(s: String?): Double {
         if (s.isNullOrBlank()) return 0.0
         return try {
-            s.trim().replace(",", "").toDouble()
+            val cleaned = s.trim().replace(",", "")
+            if (cleaned == ".") 0.0 else cleaned.toDouble()
         } catch (_: Exception) {
             0.0
         }
+    }
+
+    private fun sanitizeDecimalInput(raw: String): String {
+        val filtered = raw.filter { it.isDigit() || it == '.' }
+        val firstDot = filtered.indexOf('.')
+        if (firstDot == -1) return filtered
+        val beforeDot = filtered.substring(0, firstDot + 1)
+        val afterDot = filtered.substring(firstDot + 1).replace(".", "")
+        return beforeDot + afterDot
     }
 
     private fun getTotalPaidYER(): Double {
@@ -924,7 +933,12 @@ class POSCheckoutDialog : DialogFragment() {
         val totalWithGoldYer = paidYer + tradeInTotalState
         val diffYer = totalWithGoldYer - requiredTotalYer
 
-        val showNationalIdField = diffYer > 50_000.0 ||
+        var hasExceededCreditThreshold by remember { mutableStateOf(false) }
+        if (diffYer > 50_000.0) {
+            hasExceededCreditThreshold = true
+        }
+
+        val showNationalIdField = hasExceededCreditThreshold ||
             (inlineErrorState?.contains("الهوية") == true) ||
             customerNationalIdState.isNotEmpty()
 
@@ -933,7 +947,8 @@ class POSCheckoutDialog : DialogFragment() {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 680.dp),
+                .fillMaxHeight(0.9f)
+                .imePadding(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
             border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f)),
@@ -1115,54 +1130,68 @@ class POSCheckoutDialog : DialogFragment() {
                     }
 
                     paymentRowsState.forEachIndexed { index, row ->
-                        PaymentRowCard(
-                            index = index,
-                            row = row,
-                            isArabic = isAr,
-                            currencies = currenciesState,
-                            rateToYer = getRateToYER(row.currency),
-                            enabled = !isSubmittingState,
-                            onOpenMethodPicker = { pickerForRowIndex = index },
-                            onCurrencySelected = { newCurr ->
-                                paymentRowsState[index] = row.copy(currency = newCurr)
-                                inlineErrorState = null
-                            },
-                            onAmountChanged = { newAmt ->
-                                paymentRowsState[index] = row.copy(amountText = newAmt)
-                                inlineErrorState = null
-                            },
-                            onFillRemaining = {
-                                val rowRate = getRateToYER(row.currency)
-                                if (rowRate <= 0.0 || usdRate <= 0.0) {
-                                    inlineErrorState = if (isAr) {
-                                        "⚠️ سعر الصرف غير متوفر من السيرفر"
-                                    } else {
-                                        "⚠️ Exchange rate unavailable"
+                        key(row.id) {
+                            PaymentRowCard(
+                                index = index,
+                                row = row,
+                                isArabic = isAr,
+                                currencies = currenciesState,
+                                rateToYer = getRateToYER(row.currency),
+                                enabled = !isSubmittingState,
+                                onOpenMethodPicker = { pickerForRowIndex = index },
+                                onCurrencySelected = { newCurr ->
+                                    val currentIdx = paymentRowsState.indexOfFirst { it.id == row.id }
+                                    if (currentIdx != -1) {
+                                        paymentRowsState[currentIdx] = row.copy(currency = newCurr)
+                                        inlineErrorState = null
                                     }
-                                    return@PaymentRowCard
+                                },
+                                onAmountChanged = { newAmt ->
+                                    val currentIdx = paymentRowsState.indexOfFirst { it.id == row.id }
+                                    if (currentIdx != -1) {
+                                        paymentRowsState[currentIdx] = row.copy(amountText = newAmt)
+                                        inlineErrorState = null
+                                    }
+                                },
+                                onFillRemaining = {
+                                    val currentIdx = paymentRowsState.indexOfFirst { it.id == row.id }
+                                    if (currentIdx == -1) return@PaymentRowCard
+                                    val targetRow = paymentRowsState[currentIdx]
+                                    val rowRate = getRateToYER(targetRow.currency)
+                                    if (rowRate <= 0.0 || usdRate <= 0.0) {
+                                        inlineErrorState = if (isAr) {
+                                            "⚠️ سعر الصرف غير متوفر من السيرفر"
+                                        } else {
+                                            "⚠️ Exchange rate unavailable"
+                                        }
+                                        return@PaymentRowCard
+                                    }
+                                    val currentRowYer = parseDouble(targetRow.amountText) * rowRate
+                                    val otherPaidYer = getTotalPaidYER() - currentRowYer
+                                    val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
+                                    if (remYer > 0.001) {
+                                        val formatted = String.format(Locale.US, "%.2f", remYer / rowRate)
+                                        paymentRowsState[currentIdx] = targetRow.copy(amountText = formatted)
+                                        inlineErrorState = null
+                                    }
+                                },
+                                onRemoveRow = {
+                                    if (paymentRowsState.size > 1) {
+                                        val currentIdx = paymentRowsState.indexOfFirst { it.id == row.id }
+                                        if (currentIdx != -1) {
+                                            paymentRowsState.removeAt(currentIdx)
+                                            inlineErrorState = null
+                                        }
+                                    } else {
+                                        Toast.makeText(
+                                            requireContext(),
+                                            if (isAr) "يجب إبقاء سطر واحد" else "At least one payment row required",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
-                                val currentRowYer = parseDouble(row.amountText) * rowRate
-                                val otherPaidYer = getTotalPaidYER() - currentRowYer
-                                val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
-                                if (remYer > 0.001) {
-                                    val formatted = String.format(Locale.US, "%.2f", remYer / rowRate)
-                                    paymentRowsState[index] = row.copy(amountText = formatted)
-                                    inlineErrorState = null
-                                }
-                            },
-                            onRemoveRow = {
-                                if (paymentRowsState.size > 1) {
-                                    paymentRowsState.removeAt(index)
-                                    inlineErrorState = null
-                                } else {
-                                    Toast.makeText(
-                                        requireContext(),
-                                        if (isAr) "يجب إبقاء سطر واحد" else "At least one payment row required",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
 
@@ -1589,7 +1618,12 @@ class POSCheckoutDialog : DialogFragment() {
                 ) {
                     OutlinedTextField(
                         value = row.amountText,
-                        onValueChange = onAmountChanged,
+                        onValueChange = { input ->
+                            val cleanInput = sanitizeDecimalInput(input)
+                            if (cleanInput != row.amountText) {
+                                onAmountChanged(cleanInput)
+                            }
+                        },
                         enabled = enabled,
                         singleLine = true,
                         placeholder = {
@@ -1708,7 +1742,8 @@ class POSCheckoutDialog : DialogFragment() {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 460.dp),
+                    .fillMaxHeight(0.75f)
+                    .imePadding(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
                 border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f))
