@@ -95,10 +95,6 @@ import java.util.regex.Pattern
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-/**
- * MiraPosFragment (Jetpack Compose Edition — Server Single Source of Truth)
- * السيرفر هو مصدر الحقيقة الوحيد للأسعار، حدود التفاوض السعري، سعر الصرف، وتوافر القطع.
- */
 class MiraPosFragment : MiraBaseFragment() {
 
     companion object {
@@ -148,7 +144,7 @@ class MiraPosFragment : MiraBaseFragment() {
         val maxPriceUsd: Double? = null,
         val goldFloorUsd: Double = 0.0,
         val enforceBounds: Boolean = false,
-        val source: String = "karat" // "item" | "karat"
+        val source: String = "karat"
     ) {
         val isActive: Boolean
             get() = enforceBounds && (minPriceUsd > 0.0 || (maxPriceUsd != null && maxPriceUsd > 0.0))
@@ -234,23 +230,15 @@ class MiraPosFragment : MiraBaseFragment() {
     private var pendingBarcodeFromScanner: String? = null
     private var pendingStopRfid: Runnable? = null
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose Reactive States (Server Single Source of Truth)
-    // ═══════════════════════════════════════════════════════════════════
-
     private var cartItemsState by mutableStateOf(emptyList<CartItem>())
     private var cartCountState by mutableIntStateOf(0)
     private var cartTotalUsdState by mutableDoubleStateOf(0.0)
     private var cartHasUnavailableState by mutableStateOf(false)
     private var cartRevisionState by mutableIntStateOf(0)
 
-    // سعر الصرف المعتمد من السيرفر (1 USD = X YER) موحّد بين السلة ونافذة الدفع والـ Payload
     private var activeUsdToYerRateState by mutableDoubleStateOf(0.0)
-
-    // خريطة حدود التفاوض السعري لكل قطعة في السلة (مصدرها السيرفر وتُفعّل فقط عند التفعيل من السيرفر)
     private var itemBoundsState by mutableStateOf(emptyMap<String, ItemPriceBoundInfo>())
 
-    // مفاتيح القطع التي تم تعديل سعرها بالتفاوض
     private val negotiatedItemKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var negotiatingItemState by mutableStateOf<NegotiateItemTarget?>(null)
 
@@ -277,10 +265,6 @@ class MiraPosFragment : MiraBaseFragment() {
 
     private var scanFeedbackState by mutableStateOf<ScanFeedbackBanner?>(null)
     private var showExitDialogState by mutableStateOf(false)
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ═══════════════════════════════════════════════════════════════════
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -624,9 +608,6 @@ class MiraPosFragment : MiraBaseFragment() {
         return buildItemKeys(item).any { negotiatedItemKeys.contains(it) }
     }
 
-    /**
-     * يُرجع حدود القطعة فقط إذا كانت مفعّلة صراحةً من السيرفر ومرتبطة بحد أدنى أو أعلى صالح.
-     */
     private fun getActiveBoundsForItem(item: CartItem): ItemPriceBoundInfo? {
         for (key in buildItemKeys(item)) {
             val bound = itemBoundsState[key]
@@ -692,9 +673,6 @@ class MiraPosFragment : MiraBaseFragment() {
         return false
     }
 
-    /**
-     * قراءة حدود الأسعار من السيرفر بحيث لا تُفعَّل أبداً ما لم يفعّلها الأدمن في السيرفر صراحةً.
-     */
     private fun resolveItemPriceBoundsFromJson(
         itemJson: JSONObject,
         karatNum: Int,
@@ -817,10 +795,6 @@ class MiraPosFragment : MiraBaseFragment() {
         return null
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Permissions & Scale Setup
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun requestScalePermissions() {
         val ctx = context ?: return
         val act = activity ?: return
@@ -939,10 +913,6 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Cooldown & Power Management
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun startCooldownCleanup() {
         stopCooldownCleanup()
         cooldownCleanupRunnable = object : Runnable {
@@ -1027,10 +997,6 @@ class MiraPosFragment : MiraBaseFragment() {
             Log.e(TAG, "openPosPowerSettings error", e)
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Scan Mode & Hardware Trigger
-    // ═══════════════════════════════════════════════════════════════════
 
     override fun myOnKeyDwon(keyCode: Int, event: KeyEvent): Boolean {
         val isTrigger = keyCode == KEYCODE_RFID_TRIGGER_1 ||
@@ -1166,10 +1132,6 @@ class MiraPosFragment : MiraBaseFragment() {
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Scanning & Item Lookup
-    // ═══════════════════════════════════════════════════════════════════
 
     private fun submitManualCode(rawCode: String) {
         if (!hasPosPermission()) {
@@ -1450,7 +1412,6 @@ class MiraPosFragment : MiraBaseFragment() {
                 return
             }
 
-            // السيرفر مصدر الحقيقة الوحيد لسعر الصرف: مزامنة فورية عند المسح
             val serverRate = extractUsdToYerFromJson(item).takeIf { it > 1.0 }
                 ?: extractUsdToYerFromJson(data)
             if (serverRate > 1.0) {
@@ -1639,10 +1600,6 @@ class MiraPosFragment : MiraBaseFragment() {
         )
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Barcode Scanner
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun openBarcodeScanner() {
         try {
             if (!hasPosPermission()) {
@@ -1771,10 +1728,6 @@ class MiraPosFragment : MiraBaseFragment() {
         return arrayOf(data, "raw")
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Checkout Flow (Server Single Source of Truth)
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun processCheckoutAndStockUpdate() {
         try {
             if (!hasPosPermission()) {
@@ -1875,7 +1828,6 @@ class MiraPosFragment : MiraBaseFragment() {
                         val serverTotalUsd = dataObj.optDouble("total_usd", 0.0)
                         val cachedTotalUsd = manager.snapshot().totalUsd
 
-                        // السيرفر مصدر الحقيقة الوحيد لسعر الصرف
                         val resolvedUsdToYerRate = extractUsdToYerFromPrepareResponse(dataObj)
                         applyAuthoritativeRateFromServer(resolvedUsdToYerRate)
 
@@ -1899,7 +1851,6 @@ class MiraPosFragment : MiraBaseFragment() {
                                         putBoundsForItem(matchingCartItem, updatedBounds)
 
                                         if (isItemNegotiated(matchingCartItem)) {
-                                            // السيرفر يحدد الحدود: السعر المتفاوض عليه يُقبل فقط إذا بقي ضمن حدود السيرفر المفعّلة والمحدّثة
                                             if (updatedBounds.isActive && updatedBounds.isOutOfBounds(matchingCartItem.price)) {
                                                 unmarkItemNegotiated(matchingCartItem)
                                                 if (newPrice > 0.0) {
@@ -2270,7 +2221,6 @@ class MiraPosFragment : MiraBaseFragment() {
         val discountUsd = data.discountAmount
         val finalUsd = data.finalAmount
 
-        // استخدام نفس سعر الصرف المقفل من السيرفر لمنع تضارب الإجماليات
         val yerRate = when {
             data.usdToYerRate > 1.0 -> data.usdToYerRate
             activeUsdToYerRateState > 1.0 -> activeUsdToYerRateState
@@ -2456,10 +2406,6 @@ class MiraPosFragment : MiraBaseFragment() {
             0L
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Refund V2
-    // ═══════════════════════════════════════════════════════════════════
 
     private fun showRefundDialog() {
         if (!canPerformRefund()) {
@@ -2648,10 +2594,6 @@ class MiraPosFragment : MiraBaseFragment() {
         return ""
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Offline Queue & Sync
-    // ═══════════════════════════════════════════════════════════════════
-
     private fun updatePendingSalesBadge() {
         try {
             pendingSalesCountState = pendingSalesQueue?.countPending() ?: 0
@@ -2712,10 +2654,6 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Public APIs (UHFMainActivity Compatibility)
-    // ═══════════════════════════════════════════════════════════════════
-
     fun showLastReceiptDialog() {
         try {
             if (!hasPosPermission()) {
@@ -2744,10 +2682,6 @@ class MiraPosFragment : MiraBaseFragment() {
     fun showDiscountDialog() {
         processCheckoutAndStockUpdate()
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Navigation & Back Handling
-    // ═══════════════════════════════════════════════════════════════════
 
     private fun setupBackPressedHandler() {
         if (activity == null) return
@@ -2829,16 +2763,13 @@ class MiraPosFragment : MiraBaseFragment() {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Jetpack Compose UI Screen
-    // ═══════════════════════════════════════════════════════════════════
-
     @Composable
     private fun MiraPosScreen() {
         val colors = MiraTheme.colors
         val isAr = isArabic
         val currentYerRate = activeUsdToYerRateState
         val revision = cartRevisionState
+        val composeDir = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
 
         val hasAnyOutOfBounds = remember(revision, cartItemsState, itemBoundsState) {
             cartItemsState.any { item ->
@@ -2865,93 +2796,54 @@ class MiraPosFragment : MiraBaseFragment() {
             }
         }
 
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = colors.backgroundTop
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(colors.backgroundTop, colors.backgroundMid, colors.backgroundTop)
-                        )
-                    )
+        CompositionLocalProvider(LocalLayoutDirection provides composeDir) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = colors.backgroundTop
             ) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(colors.backgroundTop, colors.backgroundMid, colors.backgroundTop)
+                            )
+                        )
                 ) {
-                    PosTopHeaderBar(
-                        isArabic = isAr,
-                        branchName = activeBranchNameState,
-                        scaleText = scaleStatusTextState,
-                        isScaleConnected = isScaleConnectedState,
-                        pendingSalesCount = pendingSalesCountState,
-                        canRefund = canPerformRefundState,
-                        onScaleClick = { scaleManager?.showSettingsDialog() },
-                        onPendingSalesClick = { openPendingSalesSheet() },
-                        onLastReceiptClick = { showLastReceiptDialog() },
-                        onRefundClick = { showRefundDialog() },
-                        onCloseClick = { handleCustomBack() }
-                    )
-
-                    PosSummaryBar(
-                        isArabic = isAr,
-                        itemCount = cartCountState,
-                        statusText = statusMessageState,
-                        totalFormatted = buildTotalText(cartCountState, cartTotalUsdState, currentYerRate),
-                        hasUnavailable = cartHasUnavailableState || hasAnyOutOfBounds
-                    )
-
-                    if (cartCountState > 0) {
-                        QuickScanActionStrip(
-                            isArabic = isAr,
-                            hasRfidHardware = hasRfidHardwareState,
-                            isRfidListening = currentScanMode == ScanMode.RFID,
-                            isManualOpen = isManualInputVisibleState,
-                            enabled = canUsePosState && !isButtonsBusyState,
-                            onGs1Click = { switchScanMode(ScanMode.GS1) },
-                            onRfidClick = {
-                                showToast(
-                                    if (isAr) "🎯 استخدم زر الزناد في القارئ للمسح"
-                                    else "🎯 Use the physical trigger to scan"
-                                )
-                            },
-                            onRfidLongClick = { openPosPowerSettings() },
-                            onManualClick = {
-                                switchScanMode(
-                                    if (currentScanMode == ScanMode.MANUAL) ScanMode.NONE else ScanMode.MANUAL
-                                )
-                            }
-                        )
-                    }
-
-                    AnimatedVisibility(
-                        visible = isManualInputVisibleState,
-                        enter = fadeIn() + slideInVertically { -it / 2 },
-                        exit = fadeOut() + slideOutVertically { -it / 2 }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding()
                     ) {
-                        ManualCodeEntryCard(
+                        PosTopHeaderBar(
                             isArabic = isAr,
-                            code = manualCodeInputState,
-                            enabled = canUsePosState && !isButtonsBusyState,
-                            onCodeChange = { manualCodeInputState = it },
-                            onSubmit = { submitManualCode(manualCodeInputState) },
-                            onClose = { switchScanMode(ScanMode.NONE) }
+                            branchName = activeBranchNameState,
+                            scaleText = scaleStatusTextState,
+                            isScaleConnected = isScaleConnectedState,
+                            pendingSalesCount = pendingSalesCountState,
+                            canRefund = canPerformRefundState,
+                            onScaleClick = { scaleManager?.showSettingsDialog() },
+                            onPendingSalesClick = { openPendingSalesSheet() },
+                            onLastReceiptClick = { showLastReceiptDialog() },
+                            onRefundClick = { showRefundDialog() },
+                            onCloseClick = { handleCustomBack() }
                         )
-                    }
 
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (cartCountState == 0) {
-                            PosEmptyHeroStage(
+                        PosSummaryBar(
+                            isArabic = isAr,
+                            itemCount = cartCountState,
+                            statusText = statusMessageState,
+                            totalFormatted = buildTotalText(cartCountState, cartTotalUsdState, currentYerRate),
+                            hasUnavailable = cartHasUnavailableState || hasAnyOutOfBounds
+                        )
+
+                        if (cartCountState > 0) {
+                            QuickScanActionStrip(
                                 isArabic = isAr,
-                                state = heroState,
-                                rfidCount = rfidReadCountState,
                                 hasRfidHardware = hasRfidHardwareState,
-                                isRfidConnected = isRfidConnectedState,
+                                isRfidListening = currentScanMode == ScanMode.RFID,
+                                isManualOpen = isManualInputVisibleState,
                                 enabled = canUsePosState && !isButtonsBusyState,
                                 onGs1Click = { switchScanMode(ScanMode.GS1) },
                                 onRfidClick = {
@@ -2967,85 +2859,126 @@ class MiraPosFragment : MiraBaseFragment() {
                                     )
                                 }
                             )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                itemsIndexed(
-                                    items = cartItemsState,
-                                    key = { index, item -> "${item.epc}_${item.serialNo}_$index" }
-                                ) { index, item ->
-                                    val itemBounds = remember(revision, item, itemBoundsState) {
-                                        getActiveBoundsForItem(item)
-                                    }
+                        }
 
-                                    PosCartItemCard(
-                                        isArabic = isAr,
-                                        item = item,
-                                        bounds = itemBounds,
-                                        yerRate = currentYerRate,
-                                        formattedPrice = formatDualUsdYer(item.price, currentYerRate),
-                                        onEditPrice = {
-                                            negotiatingItemState = NegotiateItemTarget(
-                                                index = index,
-                                                item = item,
-                                                bounds = itemBounds ?: ItemPriceBoundInfo(enforceBounds = false)
-                                            )
-                                        },
-                                        onSnapToBound = { targetUsd ->
-                                            updateCartItemNegotiatedPrice(index, targetUsd)
-                                        },
-                                        onRemove = {
-                                            unmarkItemNegotiated(item)
-                                            cartManager?.removeItemAt(index)
+                        AnimatedVisibility(
+                            visible = isManualInputVisibleState,
+                            enter = fadeIn() + slideInVertically { -it / 2 },
+                            exit = fadeOut() + slideOutVertically { -it / 2 }
+                        ) {
+                            ManualCodeEntryCard(
+                                isArabic = isAr,
+                                code = manualCodeInputState,
+                                enabled = canUsePosState && !isButtonsBusyState,
+                                onCodeChange = { manualCodeInputState = it },
+                                onSubmit = { submitManualCode(manualCodeInputState) },
+                                onClose = { switchScanMode(ScanMode.NONE) }
+                            )
+                        }
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (cartCountState == 0) {
+                                PosEmptyHeroStage(
+                                    isArabic = isAr,
+                                    state = heroState,
+                                    rfidCount = rfidReadCountState,
+                                    hasRfidHardware = hasRfidHardwareState,
+                                    isRfidConnected = isRfidConnectedState,
+                                    enabled = canUsePosState && !isButtonsBusyState,
+                                    onGs1Click = { switchScanMode(ScanMode.GS1) },
+                                    onRfidClick = {
+                                        showToast(
+                                            if (isAr) "🎯 استخدم زر الزناد في القارئ للمسح"
+                                            else "🎯 Use the physical trigger to scan"
+                                        )
+                                    },
+                                    onRfidLongClick = { openPosPowerSettings() },
+                                    onManualClick = {
+                                        switchScanMode(
+                                            if (currentScanMode == ScanMode.MANUAL) ScanMode.NONE else ScanMode.MANUAL
+                                        )
+                                    }
+                                )
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    itemsIndexed(
+                                        items = cartItemsState,
+                                        key = { index, item -> "${item.epc}_${item.serialNo}_$index" }
+                                    ) { index, item ->
+                                        val itemBounds = remember(revision, item, itemBoundsState) {
+                                            getActiveBoundsForItem(item)
                                         }
-                                    )
+
+                                        PosCartItemCard(
+                                            isArabic = isAr,
+                                            item = item,
+                                            bounds = itemBounds,
+                                            yerRate = currentYerRate,
+                                            formattedPrice = formatDualUsdYer(item.price, currentYerRate),
+                                            onEditPrice = {
+                                                negotiatingItemState = NegotiateItemTarget(
+                                                    index = index,
+                                                    item = item,
+                                                    bounds = itemBounds ?: ItemPriceBoundInfo(enforceBounds = false)
+                                                )
+                                            },
+                                            onSnapToBound = { targetUsd ->
+                                                updateCartItemNegotiatedPrice(index, targetUsd)
+                                            },
+                                            onRemove = {
+                                                unmarkItemNegotiated(item)
+                                                cartManager?.removeItemAt(index)
+                                            }
+                                        )
+                                    }
                                 }
                             }
+                        }
+
+                        AnimatedVisibility(
+                            visible = cartCountState > 0,
+                            enter = fadeIn() + slideInVertically { it },
+                            exit = fadeOut() + slideOutVertically { it }
+                        ) {
+                            PosStickyCheckoutFooter(
+                                isArabic = isAr,
+                                itemCount = cartCountState,
+                                totalFormatted = buildTotalText(cartCountState, cartTotalUsdState, currentYerRate),
+                                canCheckout = cartCountState > 0 &&
+                                        !cartHasUnavailableState &&
+                                        !hasAnyOutOfBounds &&
+                                        canUsePosState &&
+                                        !isButtonsBusyState,
+                                hasOutOfBounds = hasAnyOutOfBounds,
+                                canClear = cartCountState > 0 && !isButtonsBusyState,
+                                onClearClick = {
+                                    itemBoundsState = emptyMap()
+                                    negotiatedItemKeys.clear()
+                                    negotiatingItemState = null
+                                    cartManager?.clear()
+                                    currentSaleUuid = null
+                                },
+                                onCheckoutClick = { processCheckoutAndStockUpdate() }
+                            )
                         }
                     }
 
                     AnimatedVisibility(
-                        visible = cartCountState > 0,
-                        enter = fadeIn() + slideInVertically { it },
-                        exit = fadeOut() + slideOutVertically { it }
+                        visible = scanFeedbackState != null,
+                        enter = fadeIn() + slideInVertically { -it },
+                        exit = fadeOut() + slideOutVertically { -it },
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 64.dp)
                     ) {
-                        PosStickyCheckoutFooter(
-                            isArabic = isAr,
-                            itemCount = cartCountState,
-                            totalFormatted = buildTotalText(cartCountState, cartTotalUsdState, currentYerRate),
-                            canCheckout = cartCountState > 0 &&
-                                    !cartHasUnavailableState &&
-                                    !hasAnyOutOfBounds &&
-                                    canUsePosState &&
-                                    !isButtonsBusyState,
-                            hasOutOfBounds = hasAnyOutOfBounds,
-                            canClear = cartCountState > 0 && !isButtonsBusyState,
-                            onClearClick = {
-                                itemBoundsState = emptyMap()
-                                negotiatedItemKeys.clear()
-                                negotiatingItemState = null
-                                cartManager?.clear()
-                                currentSaleUuid = null
-                            },
-                            onCheckoutClick = { processCheckoutAndStockUpdate() }
-                        )
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = scanFeedbackState != null,
-                    enter = fadeIn() + slideInVertically { -it },
-                    exit = fadeOut() + slideOutVertically { -it },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 64.dp)
-                ) {
-                    scanFeedbackState?.let { banner ->
-                        ScanFeedbackToastCard(banner = banner)
+                        scanFeedbackState?.let { banner ->
+                            ScanFeedbackToastCard(banner = banner)
+                        }
                     }
                 }
             }
@@ -3071,7 +3004,8 @@ class MiraPosFragment : MiraBaseFragment() {
                     Text(
                         text = if (isAr) "مغادرة شاشة البيع؟" else "Leave POS?",
                         color = colors.textPrimary,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Start
                     )
                 },
                 text = {
@@ -3081,7 +3015,8 @@ class MiraPosFragment : MiraBaseFragment() {
                         } else {
                             "You have $cartCountState items in cart.\nLeave anyway? (Cart will be saved)"
                         },
-                        color = colors.textSecondary
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Start
                     )
                 },
                 confirmButton = {
@@ -3106,10 +3041,6 @@ class MiraPosFragment : MiraBaseFragment() {
             )
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Compose UI Components
-    // ═══════════════════════════════════════════════════════════════════
 
     @Composable
     private fun PosTopHeaderBar(
@@ -3158,12 +3089,13 @@ class MiraPosFragment : MiraBaseFragment() {
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (isArabic) "نقطة البيع" else "MIRA POS",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
+                        textAlign = TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -3172,6 +3104,7 @@ class MiraPosFragment : MiraBaseFragment() {
                             text = branchName,
                             style = MaterialTheme.typography.labelSmall,
                             color = colors.goldPrimary,
+                            textAlign = TextAlign.Start,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3299,7 +3232,10 @@ class MiraPosFragment : MiraBaseFragment() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -3319,28 +3255,34 @@ class MiraPosFragment : MiraBaseFragment() {
                         Text(
                             text = if (isArabic) "إجمالي السلة" else "Cart Summary",
                             style = MaterialTheme.typography.labelMedium,
-                            color = colors.textSecondary
+                            color = colors.textSecondary,
+                            textAlign = TextAlign.Start
                         )
                         Text(
                             text = statusText,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (hasUnavailable) Color(0xFFEF4444) else Color(0xFF10B981)
+                            color = if (hasUnavailable) Color(0xFFEF4444) else Color(0xFF10B981),
+                            textAlign = TextAlign.Start
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = if (isArabic) "المبلغ الإجمالي" else "Total Amount",
                         style = MaterialTheme.typography.labelSmall,
-                        color = colors.textSecondary
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.End
                     )
                     Text(
                         text = totalFormatted,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (active) colors.goldPrimary else colors.textPrimary
+                        color = if (active) colors.goldPrimary else colors.textPrimary,
+                        textAlign = TextAlign.End
                     )
                 }
             }
@@ -3518,7 +3460,8 @@ class MiraPosFragment : MiraBaseFragment() {
                         Text(
                             text = if (isArabic) "أدخل الرقم التسلسلي أو EPC..." else "Enter Serial or EPC...",
                             style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
+                            color = colors.textSecondary,
+                            textAlign = TextAlign.Start
                         )
                     },
                     trailingIcon = {
@@ -3867,6 +3810,7 @@ class MiraPosFragment : MiraBaseFragment() {
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.textPrimary,
+                            textAlign = TextAlign.Start,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3899,6 +3843,7 @@ class MiraPosFragment : MiraBaseFragment() {
                                 text = codeLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = colors.textSecondary.copy(alpha = 0.8f),
+                                textAlign = TextAlign.Start,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -3910,7 +3855,8 @@ class MiraPosFragment : MiraBaseFragment() {
                                 text = if (isArabic) "⚠️ غير متاحة للبيع (${item.status})" else "⚠️ Unavailable (${item.status})",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFFEF4444),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Start
                             )
                         }
                     }
@@ -4044,12 +3990,14 @@ class MiraPosFragment : MiraBaseFragment() {
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = sourceLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textSecondary,
+                    textAlign = TextAlign.Start,
                     maxLines = 1,
                     softWrap = false
                 )
@@ -4065,6 +4013,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = valueColor,
+                        textAlign = TextAlign.End,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -4074,6 +4023,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = valueColor,
+                        textAlign = TextAlign.End,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -4090,7 +4040,8 @@ class MiraPosFragment : MiraBaseFragment() {
                         text = if (isArabic) "⚠️ أقل من الحد الأدنى المسموح" else "⚠️ Below minimum allowed",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF87171)
+                        color = Color(0xFFF87171),
+                        textAlign = TextAlign.Start
                     )
                     TextButton(
                         onClick = { onSnapToBound(bounds.minPriceUsd) },
@@ -4115,7 +4066,8 @@ class MiraPosFragment : MiraBaseFragment() {
                         text = if (isArabic) "⚠️ يتجاوز الحد الأعلى المسموح" else "⚠️ Exceeds maximum allowed",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFBBF24)
+                        color = Color(0xFFFBBF24),
+                        textAlign = TextAlign.Start
                     )
                     TextButton(
                         onClick = { onSnapToBound(bounds.maxPriceUsd) },
@@ -4171,12 +4123,14 @@ class MiraPosFragment : MiraBaseFragment() {
                         text = if (isArabic) "تفاوض وتعديل سعر القطعة" else "Negotiate Item Price",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
+                        color = colors.textPrimary,
+                        textAlign = TextAlign.Start
                     )
                     Text(
                         text = "${target.item.name} • ${target.item.karat} (${String.format(Locale.US, "%.2fg", target.item.weight)})",
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.goldPrimary,
+                        textAlign = TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -4243,7 +4197,8 @@ class MiraPosFragment : MiraBaseFragment() {
                             },
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = colors.textSecondary
+                            color = colors.textSecondary,
+                            textAlign = TextAlign.Start
                         )
                     }
 
@@ -4276,7 +4231,8 @@ class MiraPosFragment : MiraBaseFragment() {
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = colors.goldPrimary
+                                color = colors.goldPrimary,
+                                textAlign = TextAlign.Start
                             )
 
                             Row(
@@ -4328,14 +4284,16 @@ class MiraPosFragment : MiraBaseFragment() {
                             text = if (isArabic) "⛔ السعر أقل من الحد الأدنى المعتمد للقطعة!" else "⛔ Price is below minimum bound!",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF87171)
+                            color = Color(0xFFF87171),
+                            textAlign = TextAlign.Start
                         )
                     } else if (aboveMax) {
                         Text(
                             text = if (isArabic) "⛔ السعر يتجاوز الحد الأعلى المعتمد للقطعة!" else "⛔ Price exceeds maximum bound!",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFBBF24)
+                            color = Color(0xFFFBBF24),
+                            textAlign = TextAlign.Start
                         )
                     }
                 }
@@ -4497,6 +4455,7 @@ class MiraPosFragment : MiraBaseFragment() {
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
+                        textAlign = TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -4505,6 +4464,7 @@ class MiraPosFragment : MiraBaseFragment() {
                             text = banner.details,
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.textSecondary,
+                            textAlign = TextAlign.Start,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -4514,17 +4474,14 @@ class MiraPosFragment : MiraBaseFragment() {
                             text = banner.price,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.ExtraBold,
-                            color = banner.accentColor
+                            color = banner.accentColor,
+                            textAlign = TextAlign.Start
                         )
                     }
                 }
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Helpers & Unified Currency Formatting
-    // ═══════════════════════════════════════════════════════════════════
 
     private fun getEffectiveYerRate(): Double {
         if (activeUsdToYerRateState > 1.0 && activeUsdToYerRateState.isFinite()) {
