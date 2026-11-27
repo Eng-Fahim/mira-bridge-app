@@ -115,7 +115,6 @@ import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.abs
-import kotlin.math.roundToLong
 
 class POSCheckoutDialog : DialogFragment() {
 
@@ -126,7 +125,7 @@ class POSCheckoutDialog : DialogFragment() {
         private const val ARG_RATES_JSON = "rates_json"
         private const val ARG_SCRAP_DETAILS_JSON = "scrap_details_json"
         private const val ARG_USD_TO_YER_RATE = "usd_to_yer_rate"
-        private const val MATCH_TOLERANCE_YER = 5.0
+        private const val MATCH_TOLERANCE_YER = 0.05
 
         @JvmStatic
         fun newInstance(
@@ -792,7 +791,7 @@ class POSCheckoutDialog : DialogFragment() {
             }
         }
 
-        val requiredYer = (currentTotalWithDiscountUsd * usdRate).roundToLong().toDouble()
+        val requiredYer = currentTotalWithDiscountUsd * usdRate
         val paidYer = getTotalPaidYER()
         val totalSettledYer = paidYer + tradeInTotalState
         val diffYer = totalSettledYer - requiredYer
@@ -803,7 +802,7 @@ class POSCheckoutDialog : DialogFragment() {
         }
 
         if (diffYer < -MATCH_TOLERANCE_YER) {
-            val remFormatted = String.format(Locale.US, "%,.0f YER", abs(diffYer))
+            val remFormatted = String.format(Locale.US, "%,.2f YER", abs(diffYer))
             return if (isArabic) "⚠️ المبلغ المدفوع غير مكتمل — المتبقي: $remFormatted"
             else "⚠️ Payment incomplete — Remaining: $remFormatted"
         }
@@ -917,7 +916,7 @@ class POSCheckoutDialog : DialogFragment() {
 
         val usdRate = getRateToYER("USD")
         val requiredTotalYer = if (usdRate > 0.0) {
-            (currentTotalWithDiscountUsd * usdRate).roundToLong().toDouble()
+            currentTotalWithDiscountUsd * usdRate
         } else {
             0.0
         }
@@ -1145,12 +1144,8 @@ class POSCheckoutDialog : DialogFragment() {
                                 val currentRowYer = parseDouble(row.amountText) * rowRate
                                 val otherPaidYer = getTotalPaidYER() - currentRowYer
                                 val remYer = requiredTotalYer - otherPaidYer - tradeInTotalState
-                                if (remYer > 0.01) {
-                                    val formatted = if (row.currency.equals("YER", ignoreCase = true)) {
-                                        remYer.roundToLong().toString()
-                                    } else {
-                                        String.format(Locale.US, "%.2f", remYer / rowRate)
-                                    }
+                                if (remYer > 0.001) {
+                                    val formatted = String.format(Locale.US, "%.2f", remYer / rowRate)
                                     paymentRowsState[index] = row.copy(amountText = formatted)
                                     inlineErrorState = null
                                 }
@@ -1281,13 +1276,13 @@ class POSCheckoutDialog : DialogFragment() {
                 Color(0xFFEF4444),
                 Icons.Rounded.WarningAmber,
                 if (isArabic) "المتبقي" else "Remaining",
-                String.format(Locale.US, "%,.0f YER", abs(diffYer))
+                String.format(Locale.US, "%,.2f YER", abs(diffYer))
             )
             else -> Quadruple(
                 Color(0xFF3B82F6),
                 Icons.Rounded.SwapHoriz,
                 if (isArabic) "رصيد دائن للعميل" else "Customer Credit",
-                String.format(Locale.US, "+%,.0f YER", diffYer)
+                String.format(Locale.US, "+%,.2f YER", diffYer)
             )
         }
 
@@ -1320,7 +1315,7 @@ class POSCheckoutDialog : DialogFragment() {
                         )
                     }
                     Text(
-                        text = if (hasValidRate) String.format(Locale.US, "%,.0f YER", requiredYer) else "--",
+                        text = if (hasValidRate) String.format(Locale.US, "%,.2f YER", requiredYer) else "--",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.goldPrimary
@@ -1354,7 +1349,7 @@ class POSCheckoutDialog : DialogFragment() {
                                 )
                             }
                             Text(
-                                text = String.format(Locale.US, "-%,.0f YER", tradeInTotal),
+                                text = String.format(Locale.US, "-%,.2f YER", tradeInTotal),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = colors.goldPrimary,
                                 fontWeight = FontWeight.Bold
