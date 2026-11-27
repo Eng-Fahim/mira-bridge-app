@@ -48,15 +48,22 @@ class SplashActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "SplashActivity"
-        private const val SPLASH_DURATION_MS = 2800L
+        private const val SPLASH_FAST_MS = 650L      // عند وجود جلسة نشطة (دخول فوري)
+        private const val SPLASH_FULL_MS = 2200L     // عند أول تشغيل أو الحاجة لتسجيل الدخول
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // يضبط لون أيقونات شريط الحالة العلوي تلقائياً حسب الوضع الفاتح أو الداكن
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         val isArabic = Locale.getDefault().language == "ar"
+        val sm = SessionManager(applicationContext)
+        val hasActiveSession = isLicenseActivated(sm) &&
+                sm.offlineStatus != "BLOCKED" &&
+                sm.isLoggedIn &&
+                sm.hasValidToken()
+
+        val duration = if (hasActiveSession) SPLASH_FAST_MS else SPLASH_FULL_MS
 
         setContent {
             val layoutDirection = if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -64,65 +71,54 @@ class SplashActivity : ComponentActivity() {
                 MiraJewelryTheme {
                     MiraLuxurySplashScreen(
                         isArabic = isArabic,
-                        durationMs = SPLASH_DURATION_MS,
-                        onTimeout = { navigateToNextScreen() }
+                        durationMs = duration,
+                        onTimeout = { navigateToNextScreen(sm) }
                     )
                 }
             }
         }
     }
 
-    private fun navigateToNextScreen() {
+    private fun navigateToNextScreen(sm: SessionManager) {
         if (isFinishing || isDestroyed) return
 
-        val target: Class<*> = if (isLicenseActivated()) {
-            Log.d(TAG, "✅ License active — → LoginActivity")
-            LoginActivity::class.java
-        } else {
-            Log.d(TAG, "⚠️ License NOT active — → ActivationActivity")
-            ActivationActivity::class.java
+        val target: Class<*> = when {
+            !isLicenseActivated(sm) -> {
+                Log.d(TAG, "⚠️ License NOT active → ActivationActivity")
+                ActivationActivity::class.java
+            }
+            sm.offlineStatus != "BLOCKED" && sm.isLoggedIn && sm.hasValidToken() -> {
+                Log.d(TAG, "✅ Valid session found → UHFMainActivity directly")
+                UHFMainActivity::class.java
+            }
+            else -> {
+                Log.d(TAG, "🔐 License active, login required → LoginActivity")
+                LoginActivity::class.java
+            }
         }
 
-        val intent = Intent(this, target)
+        val intent = Intent(this, target).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            if (target == UHFMainActivity::class.java) {
+                putExtra("fresh_start", true)
+            }
+        }
         startActivity(intent)
         @Suppress("DEPRECATION")
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
         finish()
     }
 
-    private fun isLicenseActivated(): Boolean {
+    private fun isLicenseActivated(sm: SessionManager): Boolean {
         return try {
-            val sm = SessionManager(applicationContext)
-
-            var token: String? = null
-            try {
-                val method = sm.javaClass.getMethod("getActivationToken")
-                val result = method.invoke(sm)
-                if (result is String) token = result
-            } catch (e: Exception) {
-                Log.w(TAG, "getActivationToken not available: ${e.message}")
-            }
-
-            if (token.isNullOrEmpty()) {
-                Log.d(TAG, "❌ No activation token → NOT activated")
-                return false
-            }
+            val token = sm.activationToken
+            if (token.isNullOrEmpty()) return false
 
             val serverUrl = sm.serverUrl
-            if (serverUrl.isNullOrEmpty()) {
-                Log.d(TAG, "❌ No serverUrl → NOT activated")
-                return false
-            }
-            if (serverUrl.contains("id.ibreg.org") || serverUrl.contains("wp-json")) {
-                Log.d(TAG, "❌ serverUrl is legacy WordPress → NOT activated")
-                return false
-            }
-            if (serverUrl.endsWith("/api/v1") || serverUrl.endsWith("/api/v1/")) {
-                Log.d(TAG, "❌ serverUrl is center URL (/api/v1), not customer URL → NOT activated")
-                return false
-            }
+            if (serverUrl.isNullOrEmpty()) return false
+            if (serverUrl.contains("id.ibreg.org") || serverUrl.contains("wp-json")) return false
+            if (serverUrl.endsWith("/api/v1") || serverUrl.endsWith("/api/v1/")) return false
 
-            Log.d(TAG, "✅ Activated: token=${token.length} chars, server=$serverUrl")
             true
         } catch (e: Exception) {
             Log.e(TAG, "License check failed: ${e.message}", e)
