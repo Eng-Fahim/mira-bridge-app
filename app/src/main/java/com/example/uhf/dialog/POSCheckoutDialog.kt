@@ -1,6 +1,7 @@
 package com.example.uhf.dialog
 
 import android.app.Dialog
+import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
@@ -451,7 +452,7 @@ class POSCheckoutDialog : DialogFragment() {
         val methodsError: String? = null
     )
 
-    private fun fetchConfigFromServer(appCtx: android.content.Context): ServerConfigResult {
+    private fun fetchConfigFromServer(appCtx: Context): ServerConfigResult {
         val methods = ArrayList<PaymentMethodDto>()
         val extractedRates = HashMap<String, Double>()
         var methodsError: String? = null
@@ -522,14 +523,12 @@ class POSCheckoutDialog : DialogFragment() {
     }
 
     private fun extractMethodsArrayFromResponse(resp: MiraApiClient.ApiResponse): JSONArray? {
-        // 1. إذا كان resp.data يحتوي مصفوفة داخلية
         resp.data?.let { d ->
             d.optJSONArray("data")?.let { return it }
             d.optJSONArray("payment_methods")?.let { return it }
             d.optJSONArray("methods")?.let { return it }
         }
 
-        // 2. فحص حقول ApiResponse (مثل dataArray أو rawResponse أو body)
         val allFields = (resp.javaClass.fields.toList() + resp.javaClass.declaredFields.toList())
             .distinctBy { it.name }
         for (field in allFields) {
@@ -555,14 +554,56 @@ class POSCheckoutDialog : DialogFragment() {
         return null
     }
 
+    private fun extractTokenFromObject(target: Any?): String? {
+        if (target == null) return null
+        val cls = target.javaClass
+
+        val methods = (cls.methods.toList() + cls.declaredMethods.toList()).distinctBy { it.name }
+        for (m in methods) {
+            if (m.parameterCount == 0 &&
+                m.returnType == String::class.java &&
+                m.name.contains("token", ignoreCase = true)
+            ) {
+                try {
+                    m.isAccessible = true
+                    val v = m.invoke(target) as? String
+                    if (!v.isNullOrBlank()) return v.trim()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        val fields = (cls.fields.toList() + cls.declaredFields.toList()).distinctBy { it.name }
+        for (f in fields) {
+            if (f.type == String::class.java && f.name.contains("token", ignoreCase = true)) {
+                try {
+                    f.isAccessible = true
+                    val v = f.get(target) as? String
+                    if (!v.isNullOrBlank()) return v.trim()
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return null
+    }
+
+    private fun resolveAuthToken(appCtx: Context, client: MiraApiClient): String? {
+        extractTokenFromObject(client)?.let { return it }
+        try {
+            val session = SessionManager(appCtx)
+            extractTokenFromObject(session)?.let { return it }
+        } catch (_: Exception) {
+        }
+        return null
+    }
+
     private fun fetchMethodsDirectFallback(
-        appCtx: android.content.Context,
+        appCtx: Context,
         client: MiraApiClient
     ): JSONArray? {
         var conn: HttpURLConnection? = null
         return try {
-            val session = SessionManager(appCtx)
-            val token = session.token
+            val token = resolveAuthToken(appCtx, client)
             if (token.isNullOrBlank()) return null
 
             var baseUrl: String? = null
@@ -620,7 +661,6 @@ class POSCheckoutDialog : DialogFragment() {
         return try {
             gson.fromJson(obj.toString(), PaymentMethodDto::class.java)
         } catch (_: Exception) {
-            // معالجة اختلاف requires_account بين 0/1 و false/true
             try {
                 val normalized = JSONObject(obj.toString())
                 if (normalized.has("requires_account")) {
