@@ -13,30 +13,42 @@ import org.json.JSONObject;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
- * MiraPriceManager v4.0 — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
+ * MiraPriceManager v4.1 — السيرفر هو مصدر الحقيقة الوحيد (Single Source of Truth)
  *
  * ✅ لا قرارات أو هوامش أو أسعار صرف افتراضية محلية
- * ✅ مزامنة لحظية من السيرفر ومن أي استجابة API تحتوي على exchange_rate
- * ✅ إشعار فوري عبر MIRA_PRICES_UPDATED لتوحيد العملة بين السلة والدفع والإيصال
+ * ✅ مزامنة لحظية من السيرفر ومن أي استجابة API تحتوي على exchange_rate أو price_bounds
+ * ✅ إشعار فوري عبر Listeners + MIRA_PRICES_UPDATED لتحديث الأسعار والحدود لحظياً
  */
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
     private static final String PREFS_NAME = "MIRA_GOLD_SETTINGS";
-    private static final String ACTION_PRICES_UPDATED = "MIRA_PRICES_UPDATED";
-    private static final long MIN_SYNC_INTERVAL_MS = 10_000L;
+    public static final String ACTION_PRICES_UPDATED = "MIRA_PRICES_UPDATED";
+    private static final long MIN_SYNC_INTERVAL_MS = 2_000L;
+    private static final long MAX_STUCK_LOADING_MS = 12_000L;
+
+    public interface PriceUpdateListener {
+        void onPricesUpdated();
+    }
 
     private static volatile MiraPriceManager instance;
-    private static Context appContext;
+    private static volatile Context appContext;
 
     private static volatile boolean isLoading = false;
+    private static volatile long loadingStartedAtMs = 0L;
     private static volatile long lastSyncTimeMs = 0L;
+    private static volatile CountDownLatch activeSyncLatch = null;
 
     private final SharedPreferences prefs;
+    private final CopyOnWriteArrayList<PriceUpdateListener> listeners = new CopyOnWriteArrayList<>();
 
     private final DecimalFormat decimalFormat;
     private final DecimalFormat largeFormat;
@@ -62,26 +74,63 @@ public class MiraPriceManager {
         decimalFormat = new DecimalFormat("#,##0.00", symbols);
         largeFormat = new DecimalFormat("#,##0", symbols);
 
-        loadFromServer(true);
+        startSync(true, null);
     }
 
-    public static synchronized MiraPriceManager getInstance(Context context) {
+    public static MiraPriceManager getInstance(Context context) {
+        if (context != null && context.getApplicationContext() != null) {
+            appContext = context.getApplicationContext();
+        }
         if (instance == null) {
-            instance = new MiraPriceManager(context);
-        } else {
-            instance.ensureFreshRates();
+            synchronized (MiraPriceManager.class) {
+                if (instance == null) {
+                    instance = new MiraPriceManager(appContext);
+                }
+            }
         }
         return instance;
     }
 
+    public void addPriceUpdateListener(PriceUpdateListener listener) {
+        if (listener != null && !listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+
+    public void removePriceUpdateListener(PriceUpdateListener listener) {
+        if (listener != null) {
+            listeners.remove(listener);
+        }
+    }
+
+    /**
+     * تحديث فوري وإجباري من السيرفر (يتجاوز الفاصل الزمني المحلي).
+     */
     public void refreshNow() {
-        loadFromServer(true);
+        startSync(true, null);
+    }
+
+    /**
+     * تحديث فوري من السيرفر مع انتظار قصير (افتراضياً 2.5 ثانية) لضمان
+     * وصول أحدث الأسعار وحدود الأسعار قبل العرض عند فتح شاشة البيع.
+     */
+    public void refreshAndAwait(long timeoutMs) {
+        CountDownLatch latch = new CountDownLatch(1);
+        startSync(true, latch);
+        try {
+            latch.await(Math.max(200L, timeoutMs), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public void ensureFreshRates() {
         long now = System.currentTimeMillis();
+        if (isLoading && loadingStartedAtMs > 0L && (now - loadingStartedAtMs) > MAX_STUCK_LOADING_MS) {
+            isLoading = false;
+        }
         if (!isLoading && (now - lastSyncTimeMs >= MIN_SYNC_INTERVAL_MS)) {
-            loadFromServer(false);
+            startSync(false, null);
         }
     }
 
@@ -96,7 +145,7 @@ public class MiraPriceManager {
         String code = currency.trim().toUpperCase(Locale.US);
         if (CURRENCY_USD.equals(code)) return;
 
-        double current = getExchangeRate(code);
+        double current = readExchangeRateFromPrefs(code);
         if (Math.abs(current - rate) < 0.0001) {
             return;
         }
@@ -119,7 +168,7 @@ public class MiraPriceManager {
             Log.w(TAG, "setAuthoritativeExchangeRate json merge warning: " + e.getMessage());
         }
 
-        editor.apply();
+        editor.commit();
         notifyPriceUpdated();
         Log.d(TAG, "✅ Authoritative exchange rate updated: 1 USD = " + rate + " " + code);
     }
@@ -128,22 +177,56 @@ public class MiraPriceManager {
         setAuthoritativeExchangeRate(currency, rate);
     }
 
-    private void loadFromServer(boolean force) {
-        if (isLoading) {
+    private synchronized void startSync(boolean force, CountDownLatch callerLatch) {
+        Context ctx = appContext;
+        if (ctx == null) {
+            if (callerLatch != null) callerLatch.countDown();
             return;
         }
 
         long now = System.currentTimeMillis();
+        if (isLoading && loadingStartedAtMs > 0L && (now - loadingStartedAtMs) > MAX_STUCK_LOADING_MS) {
+            isLoading = false;
+            CountDownLatch prev = activeSyncLatch;
+            if (prev != null) prev.countDown();
+            activeSyncLatch = null;
+        }
+
         if (!force && (now - lastSyncTimeMs < MIN_SYNC_INTERVAL_MS)) {
+            if (callerLatch != null) callerLatch.countDown();
+            return;
+        }
+
+        if (isLoading) {
+            if (callerLatch != null && activeSyncLatch != null) {
+                CountDownLatch shared = activeSyncLatch;
+                Thread waiter = new Thread(() -> {
+                    try {
+                        shared.await(3_000L, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        callerLatch.countDown();
+                    }
+                }, "MiraPriceWaiter");
+                waiter.setDaemon(true);
+                waiter.start();
+            } else if (callerLatch != null) {
+                callerLatch.countDown();
+            }
             return;
         }
 
         isLoading = true;
+        loadingStartedAtMs = now;
         lastSyncTimeMs = now;
+        CountDownLatch syncLatch = new CountDownLatch(1);
+        activeSyncLatch = syncLatch;
 
         Thread loaderThread = new Thread(() -> {
+            boolean updated = false;
             try {
-                MiraApiClient client = MiraApiClient.getInstance(appContext);
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
                 MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
 
                 if (response != null && response.isSuccess && response.data != null) {
@@ -154,9 +237,20 @@ public class MiraPriceManager {
                     }
 
                     JSONObject goldData = data.optJSONObject("gold");
+                    if (goldData == null) goldData = root.optJSONObject("gold");
+
                     JSONObject currencyData = data.optJSONObject("currency");
+                    if (currencyData == null) currencyData = root.optJSONObject("currency");
+
+                    JSONObject boundsData = data.optJSONObject("price_bounds");
+                    if (boundsData == null) boundsData = data.optJSONObject("bounds");
+                    if (boundsData == null) boundsData = root.optJSONObject("price_bounds");
 
                     SharedPreferences.Editor editor = prefs.edit();
+
+                    if (boundsData != null) {
+                        editor.putString("price_bounds", boundsData.toString());
+                    }
 
                     if (goldData != null) {
                         editor.putString("gold_settings", goldData.toString());
@@ -228,14 +322,27 @@ public class MiraPriceManager {
                         editor.putString("pricing_version", version);
                     }
 
-                    editor.apply();
-                    notifyPriceUpdated();
+                    editor.commit();
+                    updated = true;
                     Log.d(TAG, "✅ loadFromServer: synced from server (source of truth)");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "❌ loadFromServer error: " + e.getMessage(), e);
             } finally {
-                isLoading = false;
+                synchronized (MiraPriceManager.class) {
+                    isLoading = false;
+                    loadingStartedAtMs = 0L;
+                    if (activeSyncLatch == syncLatch) {
+                        activeSyncLatch = null;
+                    }
+                }
+                syncLatch.countDown();
+                if (callerLatch != null) {
+                    callerLatch.countDown();
+                }
+                if (updated) {
+                    notifyPriceUpdated();
+                }
             }
         }, "MiraPriceLoader");
 
@@ -244,14 +351,28 @@ public class MiraPriceManager {
     }
 
     private void notifyPriceUpdated() {
-        if (appContext == null) return;
+        for (PriceUpdateListener listener : listeners) {
+            try {
+                listener.onPricesUpdated();
+            } catch (Exception e) {
+                Log.w(TAG, "Listener error: " + e.getMessage());
+            }
+        }
+
+        Context ctx = appContext;
+        if (ctx == null) return;
         try {
             Intent intent = new Intent(ACTION_PRICES_UPDATED);
-            intent.setPackage(appContext.getPackageName());
-            appContext.sendBroadcast(intent);
+            intent.setPackage(ctx.getPackageName());
+            ctx.sendBroadcast(intent);
         } catch (Exception e) {
             Log.e(TAG, "notifyPriceUpdated error: " + e.getMessage());
         }
+    }
+
+    public String getPriceBoundsJson() {
+        ensureFreshRates();
+        return prefs.getString("price_bounds", "");
     }
 
     // ============================================
@@ -411,8 +532,15 @@ public class MiraPriceManager {
         if (currency == null || currency.trim().isEmpty() || CURRENCY_USD.equalsIgnoreCase(currency.trim())) {
             return 1.0;
         }
-
         ensureFreshRates();
+        return readExchangeRateFromPrefs(currency);
+    }
+
+    private double readExchangeRateFromPrefs(String currency) {
+        if (currency == null || currency.trim().isEmpty() || CURRENCY_USD.equalsIgnoreCase(currency.trim())) {
+            return 1.0;
+        }
+
         String code = currency.trim().toUpperCase(Locale.US);
 
         try {
@@ -566,7 +694,7 @@ public class MiraPriceManager {
             }
         }
 
-        editor.apply();
+        editor.commit();
         notifyPriceUpdated();
     }
 
@@ -594,7 +722,7 @@ public class MiraPriceManager {
             }
         }
 
-        editor.apply();
+        editor.commit();
         notifyPriceUpdated();
     }
 
@@ -632,8 +760,14 @@ public class MiraPriceManager {
         return getGoldPricePerGram(KARAT_24) > 0;
     }
 
-    public static void resetLoadState() {
+    public static synchronized void resetLoadState() {
         isLoading = false;
+        loadingStartedAtMs = 0L;
         lastSyncTimeMs = 0L;
+        CountDownLatch prev = activeSyncLatch;
+        if (prev != null) {
+            prev.countDown();
+            activeSyncLatch = null;
+        }
     }
 }
