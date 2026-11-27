@@ -301,10 +301,12 @@ class BottomNavManager(
 
             val hideFabForSecurity = pm.isGateUser()
             showCenterHubState = !hideFabForSecurity && (
-                pm.isSystemAdmin() ||
-                    pm.isOrgAdmin() ||
-                    pm.getAllowedQuickActions().isNotEmpty()
-                )
+    pm.isSystemAdmin() ||
+    pm.isOrgAdmin() ||
+    pm.isPosOperator() ||
+    pm.getAllowedQuickActions().isNotEmpty()
+)
+
             isPosOperatorState = pm.isPosOperator()
 
             if (!showCenterHubState && isFabMenuOpenState) {
