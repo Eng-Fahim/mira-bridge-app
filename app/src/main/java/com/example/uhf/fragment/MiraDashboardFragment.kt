@@ -19,7 +19,17 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -28,9 +38,37 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.material.icons.rounded.Contactless
+import androidx.compose.material.icons.rounded.Diamond
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.PersonPin
+import androidx.compose.material.icons.rounded.PointOfSale
+import androidx.compose.material.icons.rounded.QrCodeScanner
+import androidx.compose.material.icons.rounded.Scale
+import androidx.compose.material.icons.rounded.Store
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +93,18 @@ import com.example.uhf.manager.MiraPriceManager
 import com.example.uhf.manager.PermissionManager
 import com.example.uhf.tools.RecentActivityCache
 import com.example.uhf.tools.SecureSessionManager
-import com.example.uhf.ui.dashboard.*
+import com.example.uhf.ui.dashboard.AlertsBannerCard
+import com.example.uhf.ui.dashboard.ChartPeriodPoint
+import com.example.uhf.ui.dashboard.DashboardTopHeader
+import com.example.uhf.ui.dashboard.KaratDistributionItem
+import com.example.uhf.ui.dashboard.ManagerAnalyticsChartsSection
+import com.example.uhf.ui.dashboard.OperationSummaryMetric
+import com.example.uhf.ui.dashboard.QuickActionItem
+import com.example.uhf.ui.dashboard.QuickActionsSection
+import com.example.uhf.ui.dashboard.RecentActivitySection
+import com.example.uhf.ui.dashboard.SalesMetricBox
+import com.example.uhf.ui.dashboard.StaffAchievementChartCard
+import com.example.uhf.ui.dashboard.VaultStatChip
 import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import org.json.JSONArray
@@ -69,6 +118,7 @@ import java.util.TimeZone
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 
 class MiraDashboardFragment : Fragment() {
 
@@ -128,12 +178,18 @@ class MiraDashboardFragment : Fragment() {
     private var localCurrencyState by mutableStateOf("YER")
     private var pricesLastUpdatedState by mutableStateOf("")
 
-    // مؤشرات المبيعات اليومية والخزينة
+    // مؤشرات المبيعات اليومية
     private var todaySalesLocalState by mutableDoubleStateOf(0.0)
     private var todaySalesUsdState by mutableDoubleStateOf(0.0)
     private var todayInvoicesCountState by mutableIntStateOf(0)
     private var todaySoldWeightState by mutableDoubleStateOf(0.0)
 
+    // مؤشرات شراء كسر الذهب اليومية
+    private var todayScrapLocalState by mutableDoubleStateOf(0.0)
+    private var todayScrapCountState by mutableIntStateOf(0)
+    private var todayScrapWeightState by mutableDoubleStateOf(0.0)
+
+    // مؤشرات الخزينة والمخزون
     private var totalVaultPiecesState by mutableIntStateOf(0)
     private var totalVaultWeightState by mutableDoubleStateOf(0.0)
     private var pure24kWeightState by mutableDoubleStateOf(0.0)
@@ -202,10 +258,12 @@ class MiraDashboardFragment : Fragment() {
             initSessionAndBranchState()
             recentActivitiesState = emptyList()
             operationsBreakdownState = emptyList()
+            todayScrapLocalState = 0.0
+            todayScrapCountState = 0
+            todayScrapWeightState = 0.0
             loadOfflineData()
             refreshAllDashboardData(forceNetwork = true)
         } else if (System.currentTimeMillis() - lastFullRefreshMs > 1500L) {
-            // تحديث كامل للخزينة والتنبيهات والمبيعات والرسوم عند العودة من الجرد أو نقطة البيع
             refreshAllDashboardData(forceNetwork = true)
         }
     }
@@ -239,7 +297,8 @@ class MiraDashboardFragment : Fragment() {
                     val action = intent.action
                     if (action == "com.example.uhf.REFRESH_DASHBOARD" ||
                         action == "com.example.uhf.REFRESH_INVENTORY" ||
-                        action == "com.example.uhf.REFRESH_SALES"
+                        action == "com.example.uhf.REFRESH_SALES" ||
+                        action == "com.example.uhf.REFRESH_SCRAP"
                     ) {
                         mainHandler.post {
                             if (!isDestroyed && isAdded) {
@@ -254,6 +313,7 @@ class MiraDashboardFragment : Fragment() {
                 addAction("com.example.uhf.REFRESH_DASHBOARD")
                 addAction("com.example.uhf.REFRESH_INVENTORY")
                 addAction("com.example.uhf.REFRESH_SALES")
+                addAction("com.example.uhf.REFRESH_SCRAP")
             }
 
             ContextCompat.registerReceiver(
@@ -402,7 +462,7 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
-        private fun switchBranch(branchId: Int) {
+    private fun switchBranch(branchId: Int) {
         if (!isManagerState) return
         if (branchId <= 0 || branchId == currentBranchId) return
         currentBranchId = branchId
@@ -417,10 +477,12 @@ class MiraDashboardFragment : Fragment() {
 
         recentActivitiesState = emptyList()
         operationsBreakdownState = emptyList()
+        todayScrapLocalState = 0.0
+        todayScrapCountState = 0
+        todayScrapWeightState = 0.0
         loadOfflineData()
         refreshAllDashboardData(forceNetwork = true)
     }
-
 
     private fun summaryCacheKey(branchId: Int): String {
         return if (isManagerState) "summary_b${branchId}_all" else "summary_b${branchId}_u${currentUserId}"
@@ -451,7 +513,11 @@ class MiraDashboardFragment : Fragment() {
                     cachedActs.optJSONObject(i)?.let { cachedList.add(it) }
                 }
                 recentActivitiesState = cachedList
-                recomputeTodaySalesFromOperations(cachedList, forceOverride = !isManagerState || todaySalesLocalState <= 0.0)
+                recomputeTodaySalesFromOperations(
+                    cachedList,
+                    forceOverride = !isManagerState || todaySalesLocalState <= 0.0
+                )
+                recomputeTodayScrapFromOperations(cachedList)
                 if (chartPointsState.isEmpty()) {
                     buildFallbackChartsFromOperations(cachedList, selectedChartDaysState)
                 }
@@ -494,6 +560,7 @@ class MiraDashboardFragment : Fragment() {
                             if (!managerSnapshot && currentUserId == userSnapshot) {
                                 recomputeTodaySalesFromOperations(recentActivitiesState, forceOverride = true)
                             }
+                            recomputeTodayScrapFromOperations(recentActivitiesState)
                         }
                     }
                 }
@@ -632,7 +699,13 @@ class MiraDashboardFragment : Fragment() {
 
                 var scrap = parseFlexibleDouble(item, "scrap")
                     .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "scrap_total")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "scrap_amount")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "scrap_value")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "trade_in_total")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "total_scrap")
                 val scrapUsd = parseFlexibleDouble(item, "scrap_usd")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "scrap_value_usd")
+                    .takeIf { it > 0.0 } ?: parseFlexibleDouble(item, "trade_in_total_usd")
                 if (scrap <= 0.0 && scrapUsd > 0.0) {
                     scrap = convertUsdToActiveCurrency(scrapUsd)
                 }
@@ -647,7 +720,7 @@ class MiraDashboardFragment : Fragment() {
             }
         }
 
-        if (parsedPoints.isNotEmpty() && parsedPoints.sumOf { it.salesAmount } > 0.0) {
+        if (parsedPoints.isNotEmpty() && (parsedPoints.sumOf { it.salesAmount } > 0.0 || parsedPoints.sumOf { it.scrapAmount } > 0.0)) {
             chartPointsState = parsedPoints
         } else {
             buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
@@ -675,9 +748,10 @@ class MiraDashboardFragment : Fragment() {
 
         val opsObj = data.optJSONObject("operations_summary") ?: data.optJSONObject("counts")
         if (opsObj != null) {
+            val apiScrapCount = opsObj.optInt("scrap", opsObj.optInt("scrap_count", opsObj.optInt("trade_ins", 0)))
             operationsBreakdownState = listOf(
                 OperationSummaryMetric("المبيعات (POS)", "POS Sales", opsObj.optInt("sales", todayInvoicesCountState), Color(0xFF10B981)),
-                OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", opsObj.optInt("scrap", 0), Color(0xFFF59E0B)),
+                OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", apiScrapCount.coerceAtLeast(todayScrapCountState), Color(0xFFF59E0B)),
                 OperationSummaryMetric("التحويلات المخزنية", "Transfers", opsObj.optInt("transfers", 0), Color(0xFFA855F7)),
                 OperationSummaryMetric("جلسات الجرد", "Inventory Scans", opsObj.optInt("inventory", 0), Color(0xFF06B6D4))
             )
@@ -724,7 +798,7 @@ class MiraDashboardFragment : Fragment() {
 
             when {
                 isSaleOperation(op) -> salesCnt++
-                type.contains("scrap") -> scrapCnt++
+                isScrapOperation(op) -> scrapCnt++
                 type.contains("transfer") -> transferCnt++
                 type.contains("inv") || type.contains("scan") || type.contains("audit") || type.contains("stock") -> invCnt++
             }
@@ -757,7 +831,10 @@ class MiraDashboardFragment : Fragment() {
                         sCount++
                         sWeight += w
                     }
-                    t.contains("scrap") -> scAmt += amt
+                    isScrapOperation(op) -> {
+                        val scVal = extractScrapAmountLocal(op)
+                        scAmt += if (scVal > 0.0) scVal else amt
+                    }
                     t.contains("refund") || t.contains("return") -> rfAmt += amt
                 }
             }
@@ -775,6 +852,9 @@ class MiraDashboardFragment : Fragment() {
                 }
                 if (sWeight <= 0.0 && todaySoldWeightState > 0.0) {
                     sWeight = todaySoldWeightState
+                }
+                if (scAmt <= 0.0 && todayScrapLocalState > 0.0) {
+                    scAmt = todayScrapLocalState
                 }
             }
 
@@ -801,7 +881,7 @@ class MiraDashboardFragment : Fragment() {
             if (ops.isNotEmpty() || operationsBreakdownState.isEmpty()) {
                 operationsBreakdownState = listOf(
                     OperationSummaryMetric("المبيعات (POS)", "POS Sales", salesCnt.coerceAtLeast(todayInvoicesCountState), Color(0xFF10B981)),
-                    OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", scrapCnt, Color(0xFFF59E0B)),
+                    OperationSummaryMetric("شراء كسر الذهب", "Scrap Gold", scrapCnt.coerceAtLeast(todayScrapCountState), Color(0xFFF59E0B)),
                     OperationSummaryMetric("التحويلات المخزنية", "Transfers", transferCnt, Color(0xFFA855F7)),
                     OperationSummaryMetric("جلسات الجرد", "Inventory Scans", invCnt, Color(0xFF06B6D4))
                 )
@@ -849,11 +929,12 @@ class MiraDashboardFragment : Fragment() {
 
         val localKeys = arrayOf(
             "total_yer", "amount_yer", "final_amount_yer", "local_amount",
+            "value_yer", "scrap_value_yer", "trade_in_total",
             "final_amount", "total_amount", "amount", "total", "price"
         )
         val usdKeys = arrayOf(
             "total_usd", "amount_usd", "final_amount_usd", "total_amount_usd",
-            "subtotal_usd", "price_usd"
+            "subtotal_usd", "price_usd", "value_usd"
         )
 
         fun readFirstPositive(obj: JSONObject?, keys: Array<String>): Double {
@@ -872,7 +953,7 @@ class MiraDashboardFragment : Fragment() {
             ?: readFirstPositive(nested, localKeys)
 
         val opCurrency = op.optString("currency", op.optString("currency_code", "")).uppercase(Locale.US)
-        val isRawInUsd = opCurrency == "USD" || (usdVal > 0.0 && kotlin.math.abs(rawLocalVal - usdVal) < 0.01)
+        val isRawInUsd = opCurrency == "USD" || (usdVal > 0.0 && abs(rawLocalVal - usdVal) < 0.01)
 
         if (activeCurrency.equals("USD", ignoreCase = true)) {
             if (usdVal > 0.0) return usdVal
@@ -887,15 +968,62 @@ class MiraDashboardFragment : Fragment() {
         return 0.0
     }
 
+    private fun extractScrapAmountLocal(op: JSONObject): Double {
+        val nested = op.optJSONObject("data")
+            ?: op.optJSONObject("scrap")
+            ?: op.optJSONObject("trade_in")
+            ?: op.optJSONObject("details")
+
+        val activeCurrency = localCurrencyState.ifBlank { "YER" }
+        val yerRate = resolveEffectiveExchangeRate("YER")
+
+        val localKeys = arrayOf(
+            "value_yer", "scrap_value_yer", "scrap_amount_yer", "scrap_total_yer",
+            "trade_in_total", "scrap_total", "scrap_amount", "scrap_value",
+            "total_yer", "amount_yer", "final_amount", "total_amount", "amount", "total"
+        )
+        val usdKeys = arrayOf(
+            "value_usd", "scrap_value_usd", "scrap_amount_usd", "scrap_total_usd",
+            "trade_in_total_usd", "total_usd", "amount_usd"
+        )
+
+        fun readFirstPositive(obj: JSONObject?, keys: Array<String>): Double {
+            if (obj == null) return 0.0
+            for (k in keys) {
+                val v = parseFlexibleDouble(obj, k)
+                if (v > 0.0) return v
+            }
+            return 0.0
+        }
+
+        val usdVal = readFirstPositive(op, usdKeys).takeIf { it > 0.0 }
+            ?: readFirstPositive(nested, usdKeys)
+        val rawLocal = readFirstPositive(op, localKeys).takeIf { it > 0.0 }
+            ?: readFirstPositive(nested, localKeys)
+
+        if (activeCurrency.equals("USD", ignoreCase = true)) {
+            if (usdVal > 0.0) return usdVal
+            if (rawLocal > 0.0) return rawLocal / yerRate
+            return 0.0
+        }
+
+        val targetRate = resolveEffectiveExchangeRate(activeCurrency)
+        if (rawLocal > 0.0) return rawLocal
+        if (usdVal > 0.0) return usdVal * targetRate
+        return 0.0
+    }
+
     private fun extractOperationWeight(op: JSONObject): Double {
         val nested = op.optJSONObject("data")
             ?: op.optJSONObject("sale")
+            ?: op.optJSONObject("scrap")
+            ?: op.optJSONObject("trade_in")
             ?: op.optJSONObject("details")
             ?: op.optJSONObject("summary")
             ?: op.optJSONObject("meta")
 
         val weightKeys = arrayOf(
-            "weight", "total_weight", "total_weight_grams", "sold_weight",
+            "weight", "total_weight", "total_weight_grams", "sold_weight", "scrap_weight",
             "gross_weight", "gross_weight_grams", "net_weight", "net_weight_grams",
             "weight_grams", "gold_weight", "gold_weight_grams", "grams", "total_grams", "item_weight"
         )
@@ -907,7 +1035,10 @@ class MiraDashboardFragment : Fragment() {
             if (nv > 0.0) return nv
         }
 
-        val items = op.optJSONArray("items") ?: nested?.optJSONArray("items")
+        val items = op.optJSONArray("items")
+            ?: op.optJSONArray("trade_ins")
+            ?: nested?.optJSONArray("items")
+            ?: nested?.optJSONArray("trade_ins")
         if (items != null && items.length() > 0) {
             var sum = 0.0
             for (i in 0 until items.length()) {
@@ -1002,10 +1133,23 @@ class MiraDashboardFragment : Fragment() {
             rawTime.contains("ساعات")
     }
 
+    private fun isScrapOperation(op: JSONObject): Boolean {
+        val type = op.optString("type", op.optString("operation_type", ""))
+            .lowercase(Locale.ROOT)
+            .trim()
+        return type.contains("scrap") ||
+            type.contains("trade_in") ||
+            type.contains("trade-in") ||
+            type.contains("buy_gold") ||
+            type.contains("gold_buy") ||
+            type.contains("كسر")
+    }
+
     private fun isSaleOperation(op: JSONObject): Boolean {
+        if (isScrapOperation(op)) return false
         val type = op.optString("type", op.optString("operation_type", "")).lowercase(Locale.ROOT)
         val invoiceNo = op.optString("invoice_number", op.optString("reference", "")).uppercase(Locale.US)
-        if (type.contains("refund") || type.contains("return") || type.contains("scrap") || type.contains("transfer")) {
+        if (type.contains("refund") || type.contains("return") || type.contains("transfer")) {
             return false
         }
         return type == "sale" || type == "pos_sale" || type == "invoice" ||
@@ -1050,6 +1194,7 @@ class MiraDashboardFragment : Fragment() {
                                     itemsList,
                                     forceOverride = !managerSnapshot || todaySalesLocalState <= 0.0
                                 )
+                                recomputeTodayScrapFromOperations(itemsList)
                                 buildFallbackChartsFromOperations(itemsList, selectedChartDaysState)
                             }
                         }
@@ -1076,7 +1221,7 @@ class MiraDashboardFragment : Fragment() {
                 "today_count",
                 salesObj.optInt("invoices_count", salesObj.optInt("sales_count", 0))
             )
-            var sWeight = parseFlexibleDouble(salesObj, "today_weight")
+            val sWeight = parseFlexibleDouble(salesObj, "today_weight")
                 .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "sold_weight")
                 .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "total_weight")
                 .takeIf { it > 0.0 } ?: parseFlexibleDouble(salesObj, "weight")
@@ -1122,6 +1267,30 @@ class MiraDashboardFragment : Fragment() {
                     forceOverride = todaySalesLocalState <= 0.0 && todaySalesUsdState <= 0.0
                 )
             }
+        }
+
+        // قراءة ملخص شراء الكسر من السيرفر إن وجد
+        val scrapObj = data.optJSONObject("today_scrap")
+            ?: data.optJSONObject("scrap_summary")
+            ?: data.optJSONObject("scrap")
+        if (scrapObj != null) {
+            var scLocal = parseFlexibleDouble(scrapObj, "total_local")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(scrapObj, "today_total_local")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(scrapObj, "total_amount")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(scrapObj, "amount")
+            val scUsd = parseFlexibleDouble(scrapObj, "total_usd")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(scrapObj, "amount_usd")
+            if (scLocal <= 0.0 && scUsd > 0.0) {
+                scLocal = convertUsdToActiveCurrency(scUsd)
+            }
+            val scCount = scrapObj.optInt("count", scrapObj.optInt("scrap_count", 0))
+            val scWeight = parseFlexibleDouble(scrapObj, "weight")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(scrapObj, "total_weight")
+                .takeIf { it > 0.0 } ?: parseFlexibleDouble(scrapObj, "weight_grams")
+
+            if (scLocal > 0.0) todayScrapLocalState = scLocal
+            if (scCount > 0) todayScrapCountState = scCount
+            if (scWeight > 0.0) todayScrapWeightState = scWeight
         }
 
         val vaultObj = data.optJSONObject("vault") ?: data.optJSONObject("inventory") ?: data
@@ -1348,6 +1517,31 @@ class MiraDashboardFragment : Fragment() {
         }
     }
 
+    private fun recomputeTodayScrapFromOperations(ops: List<JSONObject>) {
+        val sdfKey = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val todayKey = sdfKey.format(Date())
+
+        var count = 0
+        var sumLocal = 0.0
+        var sumWeight = 0.0
+
+        for (op in ops) {
+            if (!isScrapOperation(op)) continue
+            if (isOperationToday(op, sdfKey, todayKey)) {
+                count++
+                val amt = extractScrapAmountLocal(op)
+                sumLocal += if (amt > 0.0) amt else extractOperationAmountLocal(op)
+                sumWeight += extractOperationWeight(op)
+            }
+        }
+
+        if (count > 0) {
+            todayScrapCountState = count
+            if (sumLocal > 0.0) todayScrapLocalState = sumLocal
+            if (sumWeight > 0.0) todayScrapWeightState = sumWeight
+        }
+    }
+
     private fun extractActivitiesArray(root: JSONObject?): JSONArray? {
         if (root == null) return null
         root.optJSONArray("activities")?.let { return it }
@@ -1474,7 +1668,6 @@ class MiraDashboardFragment : Fragment() {
         return fallback()
     }
 
-    /** التحقق من صلاحية كل زر في شبكة الوصول السريع بالداشبورد */
     private fun isQuickActionAllowed(tag: String): Boolean {
         val pm = permissionManager ?: return false
         return when (tag) {
@@ -1511,26 +1704,23 @@ class MiraDashboardFragment : Fragment() {
         navigateToFragment(action.fragmentProvider(), action.tag)
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  واجهة لوحة القيادة التنفيذية (Jetpack Compose)
-    // ═══════════════════════════════════════════════════════════════════
-
     @Composable
     private fun DashboardScreenContent() {
         val colors = MiraTheme.colors
         val scrollState = rememberScrollState()
         val isAr = isArabic
 
-        // الاستماع اللحظي لتحديثات الصلاحيات أثناء عرض الداشبورد
         val pm = permissionManager
         var permTick by remember { mutableIntStateOf(0) }
         DisposableEffect(pm) {
             val listener = PermissionManager.OnPermissionsChangedListener {
                 mainHandler.post {
-                    isManagerState = resolveIsManagerOrAdmin(sessionManager, userRoleState) ||
-                        (permissionManager?.isManager == true) ||
-                        (permissionManager?.canViewAllBranches() == true)
-                    permTick++
+                    if (!isDestroyed && isAdded) {
+                        isManagerState = resolveIsManagerOrAdmin(sessionManager, userRoleState) ||
+                            (permissionManager?.isManager == true) ||
+                            (permissionManager?.canViewAllBranches() == true)
+                        permTick++
+                    }
                 }
             }
             pm?.addListener(listener)
@@ -1545,6 +1735,7 @@ class MiraDashboardFragment : Fragment() {
                     recentActivitiesState,
                     forceOverride = !isManagerState || todaySalesLocalState <= 0.0
                 )
+                recomputeTodayScrapFromOperations(recentActivitiesState)
                 buildFallbackChartsFromOperations(recentActivitiesState, selectedChartDaysState)
             }
         }
@@ -2037,6 +2228,32 @@ class MiraDashboardFragment : Fragment() {
                         accent = Color(0xFF06B6D4),
                         modifier = Modifier.weight(0.95f)
                     )
+                }
+
+                if (todayScrapLocalState > 0.0 || todayScrapCountState > 0 || todayScrapWeightState > 0.0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        VaultStatChip(
+                            label = if (isArabic) "شراء كسر اليوم" else "Scrap Bought",
+                            value = if (masked) "•••••" else "${formatCompactNumber(todayScrapLocalState)} $curr",
+                            icon = Icons.Rounded.Scale,
+                            modifier = Modifier.weight(1.25f)
+                        )
+                        VaultStatChip(
+                            label = if (isArabic) "وزن الكسر" else "Scrap Weight",
+                            value = if (masked) "•••" else String.format(Locale.US, "%.2f g", todayScrapWeightState),
+                            icon = Icons.Rounded.Diamond,
+                            modifier = Modifier.weight(0.95f)
+                        )
+                        VaultStatChip(
+                            label = if (isArabic) "عمليات الكسر" else "Scrap Ops",
+                            value = if (masked) "••" else "$todayScrapCountState",
+                            icon = Icons.Rounded.History,
+                            modifier = Modifier.weight(0.75f)
+                        )
+                    }
                 }
 
                 if (isManager && (totalVaultPiecesState > 0 || totalVaultWeightState > 0.0)) {
