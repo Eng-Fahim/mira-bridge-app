@@ -141,8 +141,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         private val STANDARD_EPC_REGEX = Regex("^E2[0-9A-F]{22}$")
         private val HEX_24_REGEX = Regex("^[0-9A-F]{24}$")
         private val SERIAL_REGEX = Regex("^MIRA-SN-\\d+$")
-       /* private val GS1_SERIAL_PATTERN = Pattern.compile("(?:^|\\|)21(MIRA-SN-\\d+)")*/
         private val GS1_SERIAL_PATTERN = Pattern.compile("(?:^|\\||01\\d{14})21([A-Za-z0-9\\-_]+)")
+        private const val HEX_CHARS = "0123456789ABCDEF"
     }
 
     private data class ScanFeedbackData(
@@ -170,7 +170,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         val stoneCount: Int,
         val stoneValue: Double,
         val netWeight: Double
-        
     )
 
     private data class AlertDialogPayload(
@@ -766,7 +765,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         val isAr = isArabic
 
         try {
-            // إزالة أي مستمع سابق عالق قبل تسجيل مستمع جديد
             encodingRfidListener?.let { old ->
                 try {
                     mgr.removeListener(old)
@@ -970,11 +968,25 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         }
     }
 
-    private fun applyManualTestEpc(rawEpc: String) {
+    private fun generateUniqueTestTid(): String {
+        return buildString(24) {
+            append("E280")
+            repeat(20) {
+                append(HEX_CHARS[secureRandom.nextInt(HEX_CHARS.length)])
+            }
+        }
+    }
+
+    private fun applyManualTestEpc(rawEpc: String, explicitTid: String? = null) {
         if (!ENABLE_TEMP_MANUAL_EPC) return
         val isAr = isArabic
         val cleanEpc = rawEpc.trim().uppercase(Locale.US)
-        val testTid = ("E280117020000201" + cleanEpc).padEnd(24, '0').take(24)
+        val cleanExplicitTid = explicitTid?.trim()?.uppercase(Locale.US).orEmpty()
+        val testTid = if (cleanExplicitTid.length in MIN_TID_LENGTH..MAX_TID_LENGTH) {
+            cleanExplicitTid
+        } else {
+            generateUniqueTestTid()
+        }
 
         isEpcBound = true
         isEpcBoundState = true
@@ -1424,7 +1436,7 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
         return normalized.toIntOrNull()
     }
 
-        private fun calculateEstimatedGoldValue() {
+    private fun calculateEstimatedGoldValue() {
         try {
             val pm = priceManager ?: return
             val grossWeight = parseLocalizedDouble(grossWeightTextState) ?: 0.0
@@ -1452,7 +1464,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
             resetCalculatedDisplay()
         }
     }
-
 
     private fun resetCalculatedDisplay() {
         val pm = priceManager
@@ -1755,23 +1766,22 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             isNetworkError = true
                         }
                     }
-                                            // استخراج السعر وسعر الصرف المعتمدين من السيرفر بعد الحفظ
-                        val itemObj = responseDataObj?.optJSONObject("item")
-                            ?: responseDataObj?.optJSONObject("data")
-                            ?: responseDataObj
 
-                        val serverExchangeRate = itemObj?.optDouble("exchange_rate", 0.0) ?: 0.0
-                        if (serverExchangeRate > 1.0 && serverExchangeRate.isFinite()) {
-                            prcMgr.setAuthoritativeExchangeRate("YER", serverExchangeRate)
-                        }
+                    val itemObj = responseDataObj?.optJSONObject("item")
+                        ?: responseDataObj?.optJSONObject("data")
+                        ?: responseDataObj
 
-                        val serverRetailUsd = itemObj?.optDouble("retail_price_usd", 0.0) ?: 0.0
-                        val authoritativeFinalPriceUsd = if (serverRetailUsd > 0.0 && serverRetailUsd.isFinite()) {
-                            serverRetailUsd
-                        } else {
-                            finalPriceUSD
-                        }
+                    val serverExchangeRate = itemObj?.optDouble("exchange_rate", 0.0) ?: 0.0
+                    if (serverExchangeRate > 1.0 && serverExchangeRate.isFinite()) {
+                        prcMgr.setAuthoritativeExchangeRate("YER", serverExchangeRate)
+                    }
 
+                    val serverRetailUsd = itemObj?.optDouble("retail_price_usd", 0.0) ?: 0.0
+                    val authoritativeFinalPriceUsd = if (serverRetailUsd > 0.0 && serverRetailUsd.isFinite()) {
+                        serverRetailUsd
+                    } else {
+                        finalPriceUSD
+                    }
 
                     if (!apiSuccess) {
                         safeRun {
@@ -2656,10 +2666,9 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
     override fun onPause() {
         super.onPause()
-                try {
+        try {
             requireContext().unregisterReceiver(pricesUpdatedReceiver)
         } catch (_: Exception) {}
-
 
         (activity as? UHFMainActivity)?.apply {
             setBottomNavVisible(true)
@@ -2774,7 +2783,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         .statusBarsPadding()
                         .navigationBarsPadding()
                 ) {
-                    // 1. الشريط العلوي لاستوديو التكويد
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2819,7 +2827,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             }
                         }
 
-                        // زر سجل المزامنة والعمليات المعلقة
                         Surface(
                             modifier = Modifier.clickable { openSyncLogFragment() },
                             shape = RoundedCornerShape(12.dp),
@@ -2856,7 +2863,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         }
                     }
 
-                    // 2. بطاقة التقييم اللحظي (Hero Live Valuation Card)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2930,7 +2936,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         }
                     }
 
-                    // 3. محتوى النموذج القابل للتمرير
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -2938,7 +2943,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // أ. بطاقة الربط بالشريحة الذكية (RFID Binding)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -2974,7 +2978,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                         )
                                     }
 
-                                    // شارة حالة الشريحة
                                     Surface(
                                         shape = RoundedCornerShape(50),
                                         color = statusBadgeColorState.copy(alpha = 0.16f),
@@ -3045,7 +3048,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                         .focusRequester(epcFocusRequester)
                                 )
 
-                                // أزرار المسح وإعدادات الطاقة
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3098,7 +3100,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                                         }
                                     }
 
-                                    // زر ضبط طاقة التكويد (dBm)
                                     Surface(
                                         modifier = Modifier
                                             .size(46.dp)
@@ -3133,7 +3134,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             )
                         }
 
-                        // ب. بطاقة التصنيف والوصف
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -3245,7 +3245,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             }
                         }
 
-                        // ج. بطاقة العيار والوزن الإجمالي
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -3329,7 +3328,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             }
                         }
 
-                        // د. بطاقة الأحجار الكريمة والفصوص
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -3451,7 +3449,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                             }
                         }
 
-                        // هـ. بطاقة الصور المرفقة
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
@@ -3572,7 +3569,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                         Spacer(modifier = Modifier.height(14.dp))
                     }
 
-                    // 4. الشريط السفلي للاعتماد والتصدير
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         color = colors.cardSurface,
@@ -3614,7 +3610,6 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
                     }
                 }
 
-                // 5. بطاقة إشعار المسح العلوية المتحركة (Scan Feedback Banner)
                 AnimatedVisibility(
                     visible = scanFeedbackState != null,
                     enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
@@ -4037,9 +4032,8 @@ class MiraIdentityStudioFragment : MiraBaseFragment() {
 
                     TextButton(
                         onClick = {
-                            val hexChars = "0123456789ABCDEF"
                             val randomHex = buildString(20) {
-                                repeat(20) { append(hexChars[secureRandom.nextInt(hexChars.length)]) }
+                                repeat(20) { append(HEX_CHARS[secureRandom.nextInt(HEX_CHARS.length)]) }
                             }
                             val generated = "E280$randomHex"
                             manualEpc = generated
