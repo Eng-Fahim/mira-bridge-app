@@ -22,9 +22,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,10 +59,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,6 +82,7 @@ import com.example.uhf.ui.theme.MiraJewelryTheme
 import com.example.uhf.ui.theme.MiraTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -92,10 +92,10 @@ import java.util.UUID
 import kotlin.math.round
 
 /**
- * TradeInDialog v3.0 — Jetpack Compose Luxury Edition
+ * TradeInDialog v3.1 — Jetpack Compose Luxury Edition
  * - متطابق بصرياً مع POSCheckoutDialog (MiraJewelryTheme)
  * - يعتمد أسعار شراء الكسر المعتمدة من السيرفر (scrap_details) كـ Single Source of Truth
- * - يستعيد الأسطر السابقة عند إعادة الفتح
+ * - يستعيد الأسطر السابقة عند إعادة الفتح مع حماية كاملة من اهتزاز الكيبورد وتضارب الحسابات
  */
 class TradeInDialog : DialogFragment() {
 
@@ -169,7 +169,7 @@ class TradeInDialog : DialogFragment() {
         super.onCreate(savedInstanceState)
 
         arguments?.let { args ->
-            maxValue = args.getDouble(ARG_MAX_VALUE, 0.0)
+            maxValue = args.getDouble(ARG_MAX_VALUE, 0.0).coerceAtLeast(0.0)
             parseServerScrapDetails(args.getString(ARG_SCRAP_DETAILS_JSON, "{}"))
         }
 
@@ -187,6 +187,12 @@ class TradeInDialog : DialogFragment() {
         if (linesState.isEmpty()) {
             linesState.add(TradeInLineUiModel())
         }
+    }
+
+    override fun onDestroyView() {
+        calcJobs.values.forEach { it.cancel() }
+        calcJobs.clear()
+        super.onDestroyView()
     }
 
     private fun parseServerScrapDetails(json: String?) {
@@ -213,7 +219,7 @@ class TradeInDialog : DialogFragment() {
         dialog.window?.apply {
             requestFeature(Window.FEATURE_NO_TITLE)
             setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-            setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
         }
         return dialog
     }
@@ -257,8 +263,8 @@ class TradeInDialog : DialogFragment() {
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val karat = obj.optString("karat", "21K").uppercase(Locale.US).trim()
-                val weight = obj.optDouble("weight_grams", 0.0)
-                val value = obj.optDouble("value_yer", 0.0)
+                val weight = obj.optDouble("weight_grams", 0.0).coerceAtLeast(0.0)
+                val value = obj.optDouble("value_yer", 0.0).coerceAtLeast(0.0)
                 val desc = obj.optString("description", "")
 
                 val model = TradeInLineUiModel(
@@ -270,7 +276,7 @@ class TradeInDialog : DialogFragment() {
                 )
                 linesState.add(model)
                 if (weight > 0.0) {
-                    recalculateLine(model.id)
+                    recalculateLine(model.id, immediateNetwork = true)
                 }
             }
         } catch (e: Exception) {
@@ -278,10 +284,21 @@ class TradeInDialog : DialogFragment() {
         }
     }
 
+    private fun sanitizeWeightInput(raw: String): String {
+        val normalized = raw.replace(",", ".")
+        val filtered = normalized.filter { it.isDigit() || it == '.' }
+        val firstDot = filtered.indexOf('.')
+        if (firstDot == -1) return filtered
+        val beforeDot = filtered.substring(0, firstDot + 1)
+        val afterDot = filtered.substring(firstDot + 1).replace(".", "")
+        return beforeDot + afterDot
+    }
+
     private fun parseWeight(raw: String): Double {
-        if (raw.isBlank()) return 0.0
+        if (raw.isBlank() || raw == ".") return 0.0
         return try {
-            raw.trim().replace(",", ".").toDouble().coerceAtLeast(0.0)
+            val v = raw.trim().replace(",", ".").toDouble()
+            if (v.isFinite() && v > 0.0) v else 0.0
         } catch (_: Exception) {
             0.0
         }
@@ -294,7 +311,7 @@ class TradeInDialog : DialogFragment() {
         }
     }
 
-    private fun recalculateLine(lineId: String) {
+    private fun recalculateLine(lineId: String, immediateNetwork: Boolean = false) {
         val current = linesState.firstOrNull { it.id == lineId } ?: return
         calcJobs[lineId]?.cancel()
 
@@ -314,7 +331,6 @@ class TradeInDialog : DialogFragment() {
         val karatKey = current.karat.uppercase(Locale.US).trim()
         val serverDetail = serverScrapDetails[karatKey]
 
-        // المسار الأساسي: الحساب المباشر من أرقام السيرفر المعتمدة في prepare-checkout
         if (serverDetail != null) {
             val factor = serverDetail.optDouble("karat_factor", getDefaultFactor(karatKey))
             val base24k = serverDetail.optDouble("base_24k_yer", 0.0)
@@ -327,25 +343,32 @@ class TradeInDialog : DialogFragment() {
             } else {
                 current.weight * netGramYer
             }
+            val safeValue = if (rawValue.isFinite() && rawValue > 0.0) {
+                round(rawValue * 100.0) / 100.0
+            } else {
+                0.0
+            }
 
             updateLineById(lineId) {
                 it.copy(
                     pure24k = round(pure * 1000.0) / 1000.0,
                     pricePerGram = round(base24k * 100.0) / 100.0,
                     discountPct = round(discountPct * 100.0) / 100.0,
-                    value = round(rawValue * 100.0) / 100.0,
+                    value = safeValue,
                     calculating = false
                 )
             }
             return
         }
 
-        // مسار احتياطي من السيرفر عند عدم توفر scrap_details
         val appCtx = context?.applicationContext ?: return
         val targetWeight = current.weight
         updateLineById(lineId) { it.copy(calculating = true) }
 
         calcJobs[lineId] = viewLifecycleOwner.lifecycleScope.launch {
+            if (!immediateNetwork) {
+                delay(250L)
+            }
             val response = withContext(Dispatchers.IO) {
                 try {
                     MiraApiClient.getInstance(appCtx).calculateScrap(targetWeight, karatKey)
@@ -360,8 +383,9 @@ class TradeInDialog : DialogFragment() {
                 if (latest.weight != targetWeight || !latest.karat.equals(karatKey, ignoreCase = true)) {
                     latest
                 } else if (response != null && response.isSuccess && response.data != null) {
+                    val apiValue = response.data.optDouble("total_value", 0.0)
                     latest.copy(
-                        value = response.data.optDouble("total_value", 0.0),
+                        value = if (apiValue.isFinite() && apiValue > 0.0) apiValue else 0.0,
                         pure24k = response.data.optDouble("pure_24k_grams", 0.0),
                         pricePerGram = response.data.optDouble("price_per_gram", 0.0),
                         discountPct = response.data.optDouble("discount_percent", 0.0),
@@ -422,7 +446,7 @@ class TradeInDialog : DialogFragment() {
                 total += line.value
             }
             cb.onConfirm(arr, total)
-            dismiss()
+            dismissAllowingStateLoss()
         } catch (e: Exception) {
             Log.e(TAG, "confirm error", e)
         }
@@ -441,14 +465,14 @@ class TradeInDialog : DialogFragment() {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 680.dp),
+                .fillMaxHeight(0.9f)
+                .imePadding(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = colors.cardSurface),
             border = BorderStroke(1.dp, colors.goldPrimary.copy(alpha = 0.35f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // ─── Header ───
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -501,7 +525,6 @@ class TradeInDialog : DialogFragment() {
 
                 HorizontalDivider(color = colors.goldPrimary.copy(alpha = 0.2f))
 
-                // ─── Body ───
                 Column(
                     modifier = Modifier
                         .weight(1f, fill = false)
@@ -550,45 +573,50 @@ class TradeInDialog : DialogFragment() {
                     }
 
                     linesState.forEachIndexed { index, line ->
-                        TradeInLineCard(
-                            index = index,
-                            line = line,
-                            isArabic = isAr,
-                            canRemove = linesState.size > 1,
-                            onSelectKarat = { selectedKarat ->
-                                updateLineById(line.id) { it.copy(karat = selectedKarat) }
-                                recalculateLine(line.id)
-                            },
-                            onWeightChanged = { newText ->
-                                val parsed = parseWeight(newText)
-                                updateLineById(line.id) {
-                                    it.copy(weightText = newText, weight = parsed)
+                        key(line.id) {
+                            TradeInLineCard(
+                                index = index,
+                                line = line,
+                                isArabic = isAr,
+                                canRemove = linesState.size > 1,
+                                onSelectKarat = { selectedKarat ->
+                                    updateLineById(line.id) { it.copy(karat = selectedKarat) }
+                                    recalculateLine(line.id, immediateNetwork = true)
+                                },
+                                onWeightChanged = { rawText ->
+                                    val cleanText = sanitizeWeightInput(rawText)
+                                    val parsed = parseWeight(cleanText)
+                                    updateLineById(line.id) {
+                                        it.copy(weightText = cleanText, weight = parsed)
+                                    }
+                                    recalculateLine(line.id, immediateNetwork = false)
+                                },
+                                onDescriptionChanged = { newDesc ->
+                                    updateLineById(line.id) { it.copy(description = newDesc) }
+                                },
+                                onRemove = {
+                                    if (linesState.size > 1) {
+                                        calcJobs[line.id]?.cancel()
+                                        calcJobs.remove(line.id)
+                                        val idx = linesState.indexOfFirst { it.id == line.id }
+                                        if (idx >= 0) {
+                                            linesState.removeAt(idx)
+                                        }
+                                    } else {
+                                        Toast.makeText(
+                                            requireContext(),
+                                            if (isAr) "يجب إبقاء قطعة واحدة على الأقل" else "At least one piece is required",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
-                                recalculateLine(line.id)
-                            },
-                            onDescriptionChanged = { newDesc ->
-                                updateLineById(line.id) { it.copy(description = newDesc) }
-                            },
-                            onRemove = {
-                                if (linesState.size > 1) {
-                                    calcJobs[line.id]?.cancel()
-                                    calcJobs.remove(line.id)
-                                    linesState.removeAt(index)
-                                } else {
-                                    Toast.makeText(
-                                        requireContext(),
-                                        if (isAr) "يجب إبقاء قطعة واحدة على الأقل" else "At least one piece is required",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
 
                 HorizontalDivider(color = colors.textSecondary.copy(alpha = 0.14f))
 
-                // ─── Footer ───
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -809,7 +837,6 @@ class TradeInDialog : DialogFragment() {
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // ─── Top Row: Piece Badge + Calculated Value + Delete ───
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -882,7 +909,6 @@ class TradeInDialog : DialogFragment() {
                     }
                 }
 
-                // ─── Karat Selector Chips ───
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -916,7 +942,6 @@ class TradeInDialog : DialogFragment() {
                     }
                 }
 
-                // ─── Weight & Description Fields ───
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -980,7 +1005,6 @@ class TradeInDialog : DialogFragment() {
                     )
                 }
 
-                // ─── Live Valuation Breakdown Strip ───
                 AnimatedVisibility(visible = line.value > 0.0 && !line.calculating) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
