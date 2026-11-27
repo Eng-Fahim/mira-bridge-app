@@ -18,7 +18,7 @@ import java.util.Locale;
 
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  PermissionManager v4.5 — Server-Driven & Live Sync
+ *  PermissionManager v4.6 — Server-Driven & Role-Conflict Free
  * ═══════════════════════════════════════════════════════════════════
  *  متطابق 100% مع PermissionsNormalizer::MODULES (23 وحدة قياسية)
  */
@@ -42,7 +42,7 @@ public class PermissionManager {
     private JSONObject legacyPermissions;
     private JSONObject fragments;
 
-    // الأدوار — constants فقط (للعرض)
+    // الأدوار — constants
     public static final String ROLE_SYSTEM_ADMIN    = "SYSTEM_ADMIN";
     public static final String ROLE_ORG_ADMIN       = "ORG_ADMIN";
     public static final String ROLE_FINANCE_MANAGER = "FINANCE_MANAGER";
@@ -458,34 +458,96 @@ public class PermissionManager {
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Role checks — للعرض فقط
+    //  Role checks — خالية من تضارب صلاحيات المديرين
     // ═══════════════════════════════════════════════════════
     public String getRoleForDisplay() {
-        return sessionManager.getRoleString();
+        String r = sessionManager.getRoleString();
+        return r == null ? "" : r.trim();
     }
 
-    public boolean isSystemAdmin()    { return moduleEnabled("admin"); }
-    public boolean isOrgAdmin()       { return moduleEnabled("admin"); }
-    public boolean isFinanceManager() { return moduleEnabled("accounting"); }
-    public boolean isInventoryManager(){ return moduleEnabled("inventory"); }
-    public boolean isBranchManager()  { return moduleEnabled("branches"); }
-    public boolean isAccountant()     { return moduleEnabled("accounting"); }
-    public boolean isAuditor()        { return moduleEnabled("audit"); }
-    public boolean isPosOperator()    { return moduleEnabled("pos"); }
-    public boolean isSecurity()       { return moduleEnabled("gate"); }
-    public boolean isGateSecurity()   { return moduleEnabled("gate"); }
+    private boolean hasRoleCode(String expectedRole) {
+        return expectedRole.equalsIgnoreCase(getRoleForDisplay());
+    }
+
+    public boolean isSystemAdmin() {
+        return hasRoleCode(ROLE_SYSTEM_ADMIN) || moduleEnabled("admin");
+    }
+
+    public boolean isOrgAdmin() {
+        return hasRoleCode(ROLE_ORG_ADMIN) || moduleEnabled("admin");
+    }
+
+    public boolean isFinanceManager() {
+        return hasRoleCode(ROLE_FINANCE_MANAGER) || moduleEnabled("accounting");
+    }
+
+    public boolean isInventoryManager() {
+        return hasRoleCode(ROLE_INVENTORY_MGR) || scopeAllows("inventory", "edit");
+    }
+
+    public boolean isBranchManager() {
+        return hasRoleCode(ROLE_BRANCH_MANAGER) || moduleEnabled("branches");
+    }
+
+    public boolean isAccountant() {
+        return hasRoleCode(ROLE_ACCOUNTANT) || (moduleEnabled("accounting") && !isAdmin() && !isBranchManager());
+    }
+
+    public boolean isAuditor() {
+        return hasRoleCode(ROLE_AUDITOR) || (moduleEnabled("audit") && !isAdmin() && !isBranchManager());
+    }
+
+    /**
+     * موظف نقطة بيع مقيد: يرجع true فقط إذا كان دوره POS_OPERATOR
+     * أو يملك POS دون صلاحيات الإدارة / الفروع / إدارة المخزون.
+     */
+    public boolean isPosOperator() {
+        if (isAdmin() || isBranchManager() || isInventoryManager()) {
+            return false;
+        }
+        if (hasRoleCode(ROLE_POS_OPERATOR)) {
+            return true;
+        }
+        return moduleEnabled("pos");
+    }
+
+    /**
+     * مستخدم بوابة أمنية مقيد: لا ينطبق إطلاقاً على المديرين أو المشرفين.
+     */
+    public boolean isSecurity() {
+        if (isAdmin() || isBranchManager() || isInventoryManager()) {
+            return false;
+        }
+        if (hasRoleCode(ROLE_GATE_SECURITY) || hasRoleCode(ROLE_SECURITY)) {
+            return true;
+        }
+        return moduleEnabled("gate")
+            && !moduleEnabled("pos")
+            && !moduleEnabled("inventory")
+            && !moduleEnabled("scrap");
+    }
+
+    public boolean isGateSecurity() {
+        return isSecurity();
+    }
 
     public boolean isAdmin() {
-        return moduleEnabled("admin");
+        return hasRoleCode(ROLE_SYSTEM_ADMIN)
+            || hasRoleCode(ROLE_ORG_ADMIN)
+            || hasRoleCode(ROLE_ADMIN)
+            || moduleEnabled("admin");
     }
+
     public boolean isManager() {
-        return moduleEnabled("admin") || moduleEnabled("branches") || moduleEnabled("inventory");
+        return isAdmin() || isBranchManager() || isInventoryManager();
     }
+
     public boolean isAccountingUser() {
         return moduleEnabled("accounting") || moduleEnabled("audit");
     }
+
     public boolean isGateUser() {
-        return moduleEnabled("gate");
+        return isSecurity();
     }
 
     // ═══════════════════════════════════════════════════════
@@ -573,20 +635,26 @@ public class PermissionManager {
             }
             if (!allowed.isEmpty()) return allowed;
         }
-        if (canAccessFragment("IdentityStudio"))  allowed.add("identity");
-        if (canAccessFragment("Radar"))           allowed.add("radar");
-        if (canAccessFragment("SecureGate"))      allowed.add("gate");
-        if (canAccessFragment("Reports"))         allowed.add("reports");
-        if (canAccessFragment("Accounting"))      allowed.add("accounting");
-        if (canAccessFragment("Transfers"))       allowed.add("transfers");
-        if (canAccessFragment("AdminHub"))        allowed.add("admin_hub");
-        if (canAccessFragment("SalesHistory"))    allowed.add("sales_history");
-        if (canAccessFragment("ServerConfig"))    allowed.add("server_config");
-        if (canAccessFragment("GoldRates"))       allowed.add("gold_rates");
-        if (canAccessFragment("UsersManagement")) allowed.add("users");
-        if (canAccessFragment("Branches"))        allowed.add("branches");
-        if (canAccessFragment("RFIDWrite"))       allowed.add("rfid_write");
-        if (canAccessFragment("RfidBindings"))    allowed.add("rfid_bindings");
+        if (canAccessFragment("IdentityStudio"))   allowed.add("identity");
+        if (canAccessFragment("Radar"))            allowed.add("radar");
+        if (canAccessFragment("SecureGate"))       allowed.add("gate");
+        if (canAccessFragment("Reports"))          allowed.add("reports");
+        if (canAccessFragment("Transfers"))        allowed.add("transfers");
+        if (canAccessFragment("AdminHub"))         allowed.add("admin_hub");
+        if (canAccessFragment("SalesHistory"))     allowed.add("sales_history");
+        if (canAccessFragment("ServerConfig"))     allowed.add("server_config");
+        if (canAccessFragment("GoldRates"))        allowed.add("gold_rates");
+        if (canAccessFragment("ScrapGoldBuy"))     allowed.add("scrap_buy");
+        if (canAccessFragment("Parties"))          allowed.add("parties");
+        if (canAccessFragment("PurchaseInvoice"))  allowed.add("purchase_invoice");
+        if (canAccessFragment("GoldConversion"))   allowed.add("gold_conversion");
+        if (canAccessFragment("Vouchers"))         allowed.add("vouchers");
+        if (canAccessFragment("AuditLogs"))        allowed.add("audit_logs");
+        if (canAccessFragment("ReaderSetup"))      allowed.add("reader_setup");
+        if (canAccessFragment("UsersManagement"))  allowed.add("users");
+        if (canAccessFragment("Branches"))         allowed.add("branches");
+        if (canAccessFragment("RFIDWrite"))        allowed.add("rfid_write");
+        if (canAccessFragment("RfidBindings"))     allowed.add("rfid_bindings");
         return allowed;
     }
 
@@ -606,10 +674,10 @@ public class PermissionManager {
         String v = dashboardVariant();
         return "full".equals(v) || "pos".equals(v);
     }
-    public boolean canViewDashboardGoldPrices()    { return canViewGoldRates(); }
+    public boolean canViewDashboardGoldPrices()     { return canViewGoldRates(); }
     public boolean canViewDashboardInventoryByKarat(){ return canViewInventory(); }
-    public boolean canViewDashboardScrap()         { return moduleEnabled("scrap") || moduleEnabled("inventory"); }
-    public boolean canViewDashboardScrapAging()    { return canViewDashboardScrap(); }
+    public boolean canViewDashboardScrap()          { return moduleEnabled("scrap") || moduleEnabled("inventory"); }
+    public boolean canViewDashboardScrapAging()     { return canViewDashboardScrap(); }
     public boolean canViewDashboardCharts() {
         String v = dashboardVariant();
         return "full".equals(v) || "hero_inventory".equals(v);
@@ -618,8 +686,8 @@ public class PermissionManager {
         String v = dashboardVariant();
         return "full".equals(v) || "hero_inventory".equals(v);
     }
-    public boolean canViewDashboardRecentActivity(){ return true; }
-    public boolean canRefreshGoldManually()        { return scopeAllows("gold_rates", "edit"); }
+    public boolean canViewDashboardRecentActivity() { return true; }
+    public boolean canRefreshGoldManually()         { return scopeAllows("gold_rates", "edit"); }
     public boolean canRevealSensitiveValues() {
         String v = dashboardVariant();
         return "full".equals(v) || "hero_inventory".equals(v);
@@ -718,6 +786,9 @@ public class PermissionManager {
 
         if ("identitystudio".equals(normalized)) {
             return canViewIdentity();
+        }
+        if ("quickaccesssettings".equals(normalized)) {
+            return canManageQuickAccess();
         }
         if ("quickactions".equals(normalized) || "receipt".equals(normalized)) {
             return true;
