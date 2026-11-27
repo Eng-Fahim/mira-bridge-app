@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -332,7 +333,10 @@ class MiraAllActivitiesFragment : Fragment() {
             .trim()
         val refCode = copy.optString(
             "sale_number",
-            copy.optString("reference", copy.optString("code", copy.optString("number", "")))
+            copy.optString(
+                "reference",
+                copy.optString("scrap_number", copy.optString("code", copy.optString("number", "")))
+            )
         ).trim()
 
         if (rawType.isBlank() && refCode.uppercase(Locale.US).startsWith("SCR")) {
@@ -356,7 +360,7 @@ class MiraAllActivitiesFragment : Fragment() {
             .trim()
         val refUpper = act.optString(
             "sale_number",
-            act.optString("reference", act.optString("code", ""))
+            act.optString("reference", act.optString("scrap_number", act.optString("code", "")))
         ).uppercase(Locale.US).trim()
 
         return when (filterKey) {
@@ -415,7 +419,8 @@ class MiraAllActivitiesFragment : Fragment() {
     private fun selectFilter(filter: String) {
         if (currentFilterState != filter) {
             currentFilterState = filter
-            applyLocalFilters()
+            allActivities.clear()
+            filteredActivitiesState.clear()
             loadActivities(reset = true)
         }
     }
@@ -826,7 +831,10 @@ class MiraAllActivitiesFragment : Fragment() {
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(categories, key = { it.key }) { cat ->
+                        items(
+                            items = categories,
+                            key = { cat -> cat.key }
+                        ) { cat ->
                             val selected = currentFilterState == cat.key
                             val label = if (isAr) cat.labelAr else cat.labelEn
 
@@ -849,7 +857,7 @@ class MiraAllActivitiesFragment : Fragment() {
                                 ) {
                                     Icon(
                                         imageVector = cat.icon,
-                                        contentDescription = null,
+                                        contentDescription = label,
                                         tint = if (selected) cat.color else colors.textSecondary,
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -858,7 +866,10 @@ class MiraAllActivitiesFragment : Fragment() {
                                         text = label,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                        color = if (selected) cat.color else colors.textSecondary
+                                        color = if (selected) cat.color else colors.textSecondary,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
