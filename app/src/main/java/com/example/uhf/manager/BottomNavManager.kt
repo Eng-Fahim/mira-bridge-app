@@ -20,7 +20,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +37,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -154,16 +152,8 @@ class BottomNavManager(
 
     private val bottomNavContainer: ViewGroup? =
         rootView.findViewById(R.id.bottomNavContainer)
-    private val legacyBottomNav: View? =
-        rootView.findViewById(R.id.bottomNavigationView)
     private val fragmentContainer: View? =
         rootView.findViewById(R.id.fragment_container)
-    private val legacyFabCenter: View? =
-        rootView.findViewById(R.id.fabActionCenter)
-    private val legacyFabReports: View? =
-        rootView.findViewById(R.id.fabReports)
-    private val legacyFabProfile: View? =
-        rootView.findViewById(R.id.fabProfile)
 
     private var composeView: ComposeView? = null
 
@@ -183,17 +173,8 @@ class BottomNavManager(
 
     fun setup() {
         try {
-            // إزالة الأزرار التقليدية تماماً من الحاوية لمنع أي تراكب بالارتفاع (Z-Order)
-            listOf(legacyBottomNav, legacyFabCenter, legacyFabReports, legacyFabProfile).forEach { v ->
-                v?.visibility = View.GONE
-                if (v != null && v.parent is ViewGroup) {
-                    (v.parent as ViewGroup).removeView(v)
-                }
-            }
-
             mountComposeDock()
             applyPermissions()
-
             permissionManager?.addListener(permissionsListener)
         } catch (e: Exception) {
             Log.e(TAG, "setup error: ${e.message}", e)
@@ -595,7 +576,6 @@ class BottomNavManager(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // اختصارات موظف نقطة البيع عند فتح الزر الأوسط
             AnimatedVisibility(
                 visible = showCenterHub && isPosOperator && isFabMenuOpen,
                 enter = fadeIn(tween(200)) + scaleIn(
@@ -633,7 +613,6 @@ class BottomNavManager(
                 }
             }
 
-            // الحاوية المتوازنة للشريط + الزر الدائري الذهبي في المنتصف
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -659,7 +638,6 @@ class BottomNavManager(
                             .padding(horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // النصف الأيمن (في العربية)
                         Row(
                             modifier = Modifier.weight(1f),
                             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -679,12 +657,10 @@ class BottomNavManager(
                             }
                         }
 
-                        // مساحة محجوزة ثابتة للزر الذهبي الأوسط تمنع أي تراكب مع النصوص
                         if (showCenterHub) {
                             Spacer(modifier = Modifier.width(66.dp))
                         }
 
-                        // النصف الأيسر (في العربية)
                         if (trailingItems.isNotEmpty()) {
                             Row(
                                 modifier = Modifier.weight(1f),
@@ -708,7 +684,6 @@ class BottomNavManager(
                     }
                 }
 
-                // الزر الدائري الذهبي الأوسط (CircleShape حقيقي)
                 if (showCenterHub) {
                     CenterGoldCircleButton(
                         isOpen = isFabMenuOpen,
@@ -840,7 +815,6 @@ class BottomNavManager(
             )
         }
 
-        // حلقة خارجية بلون خلفية الشاشة تعزل الدائرة الذهبية بنظافة تامة
         Box(
             modifier = modifier
                 .size(58.dp)
