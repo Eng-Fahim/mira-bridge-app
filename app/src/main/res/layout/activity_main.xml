@@ -9,122 +9,91 @@
     android:background="?attr/colorSurface"
     tools:context=".activity.UHFMainActivity">
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  1. الهيدر العلوي الملكي (MIRA ID™ Royal Header)         -->
-    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 1. الهيدر العلوي المتناغم مع الثيم -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#071224"
+        android:background="?attr/colorSurface"
         android:stateListAnimator="@null"
-        app:elevation="6dp"
+        app:elevation="2dp"
         app:liftOnScroll="false">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="64dp"
-            android:background="#071224"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorSurface"
             android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp"
             app:contentInsetStartWithNavigation="0dp"
             app:menu="@menu/main_menu"
-            app:titleTextColor="#F8FAFC">
+            app:titleTextColor="?attr/colorOnSurface">
 
             <LinearLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingEnd="8dp">
+                android:orientation="vertical"
+                android:paddingEnd="6dp">
 
-                <!-- شعار الألماسة الملكي بجانب اسم المنشأة -->
-                <FrameLayout
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="10dp"
-                    android:background="#132644">
+                <TextView
+                    android:id="@+id/tvTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="15.5sp"
+                    android:textStyle="bold"
+                    tools:text="منظومة الذهب الدولية" />
 
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="MIRA ID Emblem"
-                        android:src="@drawable/ic_diamond"
-                        app:tint="#F7DF8B" />
-                </FrameLayout>
-
-                <!-- اسم المنشأة + شارة الفرع النشط -->
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:gravity="center_vertical"
-                    android:orientation="vertical">
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:id="@+id/tvTitle"
+                        android:id="@+id/tvSubtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="#F8FAFC"
-                        android:textSize="16sp"
+                        android:textColor="#8C6200"
+                        android:textSize="11sp"
                         android:textStyle="bold"
-                        tools:text="منظومة الذهب الدولية" />
+                        tools:text="📍 Main Branch - Sanaa" />
 
-                    <LinearLayout
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_status_dot"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/statusText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/tvSubtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="#F7DF8B"
-                            android:textSize="11.5sp"
-                            android:textStyle="bold"
-                            tools:text="📍 الفرع الرئيسي" />
-
-                        <View
-                            android:id="@+id/statusDot"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_status_dot"
-                            android:visibility="gone" />
-
-                        <TextView
-                            android:id="@+id/statusText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:textColor="#94A3B8"
-                            android:textSize="10sp"
-                            android:visibility="gone" />
-                    </LinearLayout>
+                        android:layout_marginStart="4dp"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="10sp"
+                        android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- خط ذهبي معدني فاصل أسفل الهيدر -->
         <View
             android:layout_width="match_parent"
-            android:layout_height="1.5dp"
-            android:background="#66D4AF37" />
+            android:layout_height="1dp"
+            android:background="#33D4AF37" />
 
-        <!-- الشريط الثانوي التفاعلي حسب الشاشة -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/secondaryToolbar"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:background="#0F213E"
             android:layoutDirection="locale"
             android:visibility="gone"
             app:contentInsetEnd="0dp"
@@ -135,9 +104,7 @@
             app:paddingStart="0dp" />
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  2. حاوية الشاشات وغطاء التحميل الملكي                  -->
-    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 2. حاوية الشاشات -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -158,7 +125,8 @@
             android:id="@+id/successOverlayMain"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#EB071224"
+            android:alpha="0.92"
+            android:background="?attr/colorSurface"
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
@@ -168,33 +136,30 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:gravity="center"
-                android:orientation="vertical"
-                android:padding="24dp">
+                android:orientation="vertical">
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:indeterminate="true"
                     app:indicatorColor="#D4AF37"
-                    app:indicatorSize="54dp"
-                    app:trackColor="#1E2D4D"
+                    app:indicatorSize="52dp"
+                    app:trackColor="?attr/colorSurfaceVariant"
                     app:trackThickness="4dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="14dp"
                     android:text="جاري التحميل..."
-                    android:textColor="#F7DF8B"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  3. حاوية الكبسولة السفلية العائمة (Compose Dock Host)   -->
-    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 3. حاوية الشريط السفلي (Compose Host) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomNavContainer"
         android:layout_width="match_parent"
@@ -203,56 +168,6 @@
         android:clipChildren="false"
         android:clipToPadding="false"
         android:layoutDirection="locale"
-        android:paddingBottom="4dp">
+        android:paddingBottom="4dp" />
 
-        <!-- عناصر محفوظة للتوافق البرمجي الخلفي (تُدار واجهتها عبر BottomNavManager.kt) -->
-        <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottomNavigationView"
-            android:layout_width="0dp"
-            android:layout_height="70dp"
-            android:visibility="gone"
-            app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
-            app:itemTextAppearanceActive="@style/NavItemTextActive"
-            app:itemTextAppearanceInactive="@style/NavItemTextInactive"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:menu="@menu/bottom_nav_menu" />
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabActionCenter"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:src="@drawable/ic_diamond"
-            android:visibility="gone"
-            app:fabCustomSize="56dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabProfile"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/ic_user_placeholder"
-            android:visibility="gone"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
-            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
-            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-            app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fabReports"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/ic_reports"
-            android:visibility="gone"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="@id/fabActionCenter"
-            app:layout_constraintEnd_toEndOf="@id/fabActionCenter"
-            app:layout_constraintStart_toStartOf="@id/fabActionCenter"
-            app:layout_constraintTop_toTopOf="@id/fabActionCenter" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
