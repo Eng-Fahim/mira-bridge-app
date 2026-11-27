@@ -1047,15 +1047,29 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         transferCountHandler.removeCallbacks(transferRefreshRunnable);
     }
 
+        private boolean isGateSecurityExempt() {
+        return permissionManager != null
+                && (permissionManager.isGateSecurity() || permissionManager.isSecurity());
+    }
+
     private boolean checkAutoLock() {
         try {
             if (sessionManager == null) return true;
             if (!sessionManager.isLoggedIn()) return true;
 
+            // استثناء أجهزة البوابات الأمنية لتعمل 24/7 دون انقطاع
+            if (isGateSecurityExempt()) {
+                if (sessionManager.isSessionLocked()) {
+                    sessionManager.setSessionLocked(false);
+                }
+                sessionManager.touchActivity();
+                return true;
+            }
+
             if (sessionManager.isSessionLocked()
                     || sessionManager.isInactivityTimeout(INACTIVITY_TIMEOUT_MS)) {
 
-                Log.d(TAG, "🔒 Auto-Lock triggered");
+                Log.d(TAG, "🔒 Auto-Lock triggered (10m inactivity)");
                 sessionManager.setSessionLocked(true);
                 mainHandler.postDelayed(this::showAutoLockDialog, 300);
                 return false;
@@ -1068,6 +1082,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             return true;
         }
     }
+
 
     private void showAutoLockDialog() {
         if (!isActivityAlive() || sessionManager == null) return;
@@ -1086,7 +1101,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     @Override
                     public void onSessionUnlocked() {
                         justUnlockedWithBiometric = true;
+                        if (sessionManager != null) {
+                            sessionManager.setSessionLocked(false);
+                            sessionManager.touchActivity();
+                        }
                     }
+
 
                     @Override
                     public void onLogoutRequested() {
@@ -1155,10 +1175,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void onPause() {
         super.onPause();
 
-        if (sessionManager != null) {
-            sessionManager.touchActivity();
-        }
-
         forceHideLoadingImmediate();
         AppWatchdog.getInstance().stopMonitoring();
         if (statusIndicatorManager != null) statusIndicatorManager.cleanup();
@@ -1171,6 +1187,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.w(TAG, "Error stopping scan in onPause: " + e.getMessage());
         }
     }
+
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
