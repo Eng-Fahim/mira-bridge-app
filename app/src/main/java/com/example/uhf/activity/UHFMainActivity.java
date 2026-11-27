@@ -178,7 +178,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private long lastBackPressTime = 0;
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
-    private static final long INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+    private static final long INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
     private AppLifecycleObserver appLifecycleObserver;
 
