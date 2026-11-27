@@ -75,7 +75,7 @@ public class BottomNavManager {
         }
     }
 
-    // مصدر الحقيقة الوحيد لعناصر الشريط السفلي
+    // مصدر الحقيقة الوحيد لعناصر الشريط السفلي (تم إلغاء تبويب المالية)
     private static final NavItemCfg[] NAV_CONFIGS = {
             new NavItemCfg(
                     R.id.nav_home,
@@ -84,14 +84,6 @@ public class BottomNavManager {
                     R.string.nav_home,
                     NavigationManager.TAG_DASHBOARD,
                     true
-            ),
-            new NavItemCfg(
-                    R.id.nav_accounting,
-                    R.drawable.ic_accounting,
-                    R.string.nav_accounting,
-                    R.string.nav_accounting,
-                    NavigationManager.TAG_ACCOUNTING,
-                    false
             ),
             new NavItemCfg(
                     R.id.nav_inventory,
@@ -162,7 +154,6 @@ public class BottomNavManager {
         this.host = host;
         this.isArabic = isArabic;
 
-        // تهيئة جميع مراجع الواجهات أولاً
         this.bottomNavContainer = rootView.findViewById(R.id.bottomNavContainer);
         this.bottomNav = rootView.findViewById(R.id.bottomNavigationView);
         this.fragmentContainer = rootView.findViewById(R.id.fragment_container);
@@ -170,7 +161,6 @@ public class BottomNavManager {
         this.fabReports = rootView.findViewById(R.id.fabReports);
         this.fabProfile = rootView.findViewById(R.id.fabProfile);
 
-        // إنشاء المستمع بعد تهيئة bottomNav
         this.permissionsListener = () -> {
             if (this.bottomNav != null) {
                 this.bottomNav.post(this::applyPermissions);
@@ -221,7 +211,6 @@ public class BottomNavManager {
                 return;
             }
 
-            // 1. تحديث ظهور الزر المركزي
             boolean hideFabForSecurity = permissionManager.isGateUser();
 
             boolean hasQuickActions = !hideFabForSecurity
@@ -239,7 +228,6 @@ public class BottomNavManager {
                 }
             }
 
-            // 2. إعادة بناء عناصر القائمة
             bottomNav.setOnItemSelectedListener(null);
             bottomNav.getMenu().clear();
 
@@ -268,7 +256,6 @@ public class BottomNavManager {
                 added++;
             }
 
-            // 3. إظهار الشريط بعد اكتمال الإعداد
             if (host.isSetupCompleted()) {
                 bottomNav.setVisibility(View.VISIBLE);
                 bottomNavContainer.setVisibility(View.VISIBLE);
@@ -278,11 +265,9 @@ public class BottomNavManager {
                 }
             }
 
-            // 4. تحديد العنصر النشط
             String currentTag = host.getCurrentFragmentTag();
             selectByTag(currentTag);
 
-            // 5. إعادة ربط مستمع التنقل
             attachNavListener(bottomNav);
 
             Log.d(
@@ -317,13 +302,6 @@ public class BottomNavManager {
         }
 
         int id = cfg.itemId;
-
-        if (id == R.id.nav_accounting) {
-            return permissionManager.canViewAccounting()
-                    && permissionManager.canAccessFragment(
-                    NavigationManager.TAG_ACCOUNTING
-            );
-        }
 
         if (id == R.id.nav_inventory) {
             return permissionManager.canViewInventory()
