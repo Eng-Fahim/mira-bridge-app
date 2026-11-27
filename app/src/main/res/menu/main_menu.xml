@@ -2,23 +2,20 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 📌 العناصر الظاهرة مباشرة في شريط العنوان (Toolbar Header) -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  1. المؤشرات الحية الظاهرة في الشريط العلوي (3 فقط)     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
     <item
         android:id="@+id/action_gold_rates"
         android:icon="@drawable/ic_gold_rate"
         android:title="@string/menu_gold_rates"
         app:showAsAction="always" />
 
-    <!-- 📦 جرد MIRA (النسخة الجديدة) -->
-<item
-    android:id="@+id/action_mira_inventory"
-    android:icon="@drawable/ic_inventory"
-    android:title="جرد MIRA"
-    app:showAsAction="never" />
     <item
-        android:id="@+id/action_profile"
-        android:icon="@drawable/ic_profile"
-        android:title="@string/menu_profile"
+        android:id="@+id/action_device_status"
+        android:icon="@drawable/ic_device_connected"
+        android:title="@string/menu_device_status"
         app:showAsAction="always" />
 
     <item
@@ -28,14 +25,36 @@
         app:actionLayout="@layout/action_item_notification_badge"
         app:showAsAction="always" />
 
-    <!-- 🛡️ أجهزة ومستشعرات المنظومة (نُقل من Secondary Toolbar) -->
-<item
-    android:id="@+id/action_device_status"
-    android:icon="@drawable/ic_device_connected"
-    android:title="@string/menu_device_status"
-    app:showAsAction="always" />
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  2. القائمة المنسدلة الفاخرة (Overflow Menu)            -->
+    <!-- ═══════════════════════════════════════════════════════ -->
 
-    <!-- 📌 القائمة المنسدلة (Overflow Menu) -->
+    <!-- الحساب والعمليات السريعة -->
+    <group android:id="@+id/group_account_ops">
+        <item
+            android:id="@+id/action_profile"
+            android:icon="@drawable/ic_profile"
+            android:title="@string/menu_profile"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/action_mira_inventory"
+            android:icon="@drawable/ic_inventory"
+            android:title="جرد MIRA"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/action_locator"
+            android:icon="@drawable/ic_diamond"
+            android:title="باحث القطع (الرادار)"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/action_export_data"
+            android:icon="@drawable/ic_export"
+            android:title="@string/menu_export_data"
+            app:showAsAction="never" />
+    </group>
 
     <!-- إعدادات الواجهة والتخصيص -->
     <group android:id="@+id/group_settings">
@@ -58,43 +77,14 @@
             app:showAsAction="never" />
     </group>
 
-    <!-- إدارة النظام والفروع -->
-<group android:id="@+id/group_management">
-   <item
-    android:id="@+id/action_locator"
-    android:icon="@android:drawable/ic_menu_mylocation"
-    android:title="باحث القطع"
-    app:showAsAction="never" />
-    
-    
-
-    <item
-        android:id="@+id/action_export_data"
-        android:icon="@drawable/ic_export"
-        android:title="@string/menu_export_data"
-        app:showAsAction="never" />
-<item
-    android:id="@+id/action_accounting_setup"
-    android:title="إعداد المحاسبة"
-    android:icon="@android:drawable/ic_menu_preferences"
-    app:showAsAction="never"/>
-    <!-- ✅ جديد: المحاسبة -->
-    <item
-        android:id="@+id/action_accounting"
-        android:icon="@android:drawable/ic_menu_agenda"
-        android:title="المحاسبة"
-        app:showAsAction="never" />
-
-    <!-- 🔐 حالة الترخيص -->
-<item
-    android:id="@+id/action_license_status"
-    android:icon="@android:drawable/ic_lock_lock"
-    android:title="حالة الترخيص"
-    app:showAsAction="never" />
-</group>
-
-    <!-- حول الجهاز والنظام -->
+    <!-- الترخيص ومعلومات النظام -->
     <group android:id="@+id/group_info">
+        <item
+            android:id="@+id/action_license_status"
+            android:icon="@drawable/ic_info"
+            android:title="حالة الترخيص"
+            app:showAsAction="never" />
+
         <item
             android:id="@+id/action_device_version"
             android:icon="@drawable/ic_info"
@@ -110,5 +100,17 @@
             android:title="@string/menu_logout"
             app:showAsAction="never" />
     </group>
+
+    <!-- عناصر مخفية للحفاظ على التوافق البرمجي دون ظهور -->
+    <item
+        android:id="@+id/action_accounting_setup"
+        android:title="إعداد المحاسبة"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_accounting"
+        android:title="المحاسبة"
+        android:visible="false"
+        app:showAsAction="never" />
 
 </menu>
